@@ -75,6 +75,15 @@ py -3 -m venv .venv
 - PySide6 6.7 이상, 7 미만
 - FH6 로컬 저장 폴더에 대한 읽기 권한
 
+## 자료 출처 및 감사
+
+차량 식별 번호 데이터와 튜닝 데이터 구조를 공개한 [HDR](https://gist.github.com/HDR)의 자료를 참고했습니다.
+
+- [Forza Horizon 6 Car Ordinals](https://gist.github.com/HDR/0659d1717bc61504bf83750628963f4f)
+- [Forza Horizon 6 Tune Data Structure](https://gist.github.com/HDR/41426137a24ef83b3f391542ce51982d)
+
+유용한 자료를 공개한 HDR에게 감사드립니다.
+
 ## 문서
 
 - [변경 이력](https://github.com/Trapdoor00/FH6_Garage_Analyzer/blob/main/CHANGELOG.md)
