@@ -4,7 +4,7 @@
 
 [![Version](https://img.shields.io/badge/version-1.1-6e4bf2)](https://github.com/Trapdoor00/FH6_Garage_Analyzer/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows-0078D4)](#system-requirements)
-[![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/python-3.12%2B-3776AB)](https://www.python.org/)
 [![Tests](https://github.com/Trapdoor00/FH6_Garage_Analyzer/actions/workflows/tests.yml/badge.svg)](https://github.com/Trapdoor00/FH6_Garage_Analyzer/actions/workflows/tests.yml)
 
 FH6의 로컬 PGS 세이브 폴더를 분석하여 보유 차량, 저장 리버리, 튜닝 및 제작자 정보를 한 화면에서 관리하는 Windows 데스크톱 도구입니다.
@@ -14,17 +14,9 @@ FH6의 로컬 PGS 세이브 폴더를 분석하여 보유 차량, 저장 리버�
 ## 주요 기능
 
 - 보유 차량, 리버리, 튜닝 및 제작자 통계
-- 리버리·튜닝 전용 2열 바둑판 보기와 모던 스크롤바
-- 차량명·제작자·다운로드일 정렬과 250ms 지연 검색
-- 동일 차량 그룹화 및 그룹별 표시 개수
-- 녹색 원형 체크, 삼각형, X, 메모 분류
-- 중복 리버리 필터
-- 아이콘 기반 복수 상태 필터
 - 리버리 설명·제작자 업로드 날짜 확인
 - 튜닝 Data의 장착 부품 ID와 세부 설정값 읽기 전용 보기
 - FH6 창 자동 활성화와 인게임 위치 이동 보조
-- 선택형 항상 위 표시와 장시간 작업 로딩 화면
-- Car ID 데이터베이스 수동 업데이트 및 사용자 오버라이드
 
 ## 안전 범위
 
@@ -35,11 +27,10 @@ FH6의 로컬 PGS 세이브 폴더를 분석하여 보유 차량, 저장 리버�
 ### 권장: 클린 배포본
 
 1. [FH6_Garage_Analyzer_v1.1_clean.zip](releases/FH6_Garage_Analyzer_v1.1_clean.zip)을 받습니다.
-2. 쓰기 가능한 일반 폴더에 압축을 풉니다.
-3. `FH6 Garage Analyzer.vbs`를 실행합니다.
-4. 최초 실행 시 필요한 Python 환경과 PySide6가 `%LOCALAPPDATA%\FH6GarageAnalyzer`에 준비됩니다.
+2. 압축을 푼 뒤 `FH6 Garage Analyzer.vbs`를 실행합니다.
+3. 최초 실행 시 필요한 Python 환경과 PySide6가 `%LOCALAPPDATA%\FH6GarageAnalyzer`에 준비됩니다.
 
-오류를 확인해야 할 때는 CMD 창이 표시되는 `run.bat`을 실행하십시오.
+오류를 확인해야 할 때는 `run.bat`을 실행하십시오.
 
 ### 소스에서 실행
 
@@ -54,11 +45,19 @@ py -3 -m venv .venv
 ## 기본 사용법
 
 1. `세이브 폴더 선택`으로 FH6 PGS 저장 경로를 지정합니다.
-2. 대시보드에서 차량·리버리·튜닝 수를 확인합니다.
-3. 리버리 또는 튜닝 화면에서 검색, 정렬, 필터와 바둑판 분류 기능을 사용합니다.
-4. 상태 필터 메뉴에서는 아이콘을 여러 개 선택하여 조건을 조합할 수 있습니다.
 
-바둑판 화면의 그룹 설정은 다음 파일에 저장됩니다.
+   경로 예시:
+
+   ```text
+   C:\XboxGames\GameSave\pgs\u_XXXXXXXXXXXX_XXXXXX
+   ```
+
+   위 폴더 또는 그 아래의 `current`, 숫자로 된 버전 폴더, `ContainersRoot` 폴더를 선택할 수 있습니다.
+
+2. 리버리 또는 튜닝 화면에서 검색, 정렬, 필터와 바둑판 분류 기능을 사용합니다.
+3. 상태 필터 메뉴에서는 아이콘을 여러 개 선택하여 조건을 조합할 수 있습니다.
+
+화면의 그룹 설정은 다음 파일에 저장됩니다.
 
 ```text
 %LOCALAPPDATA%\FH6GarageAnalyzer\ui_preferences.json
@@ -79,27 +78,14 @@ py -3 -m venv .venv
 
 ## 시스템 요구사항
 
-- Windows 10 또는 Windows 11
-- Python 3.10 이상
+- Windows 11에서 검증됨
+- Python 3.12 이상
 - PySide6 6.7 이상, 7 미만
 - FH6 PGS 세이브 폴더에 대한 읽기 권한
-
-## 개발 및 검증
-
-```powershell
-py -3 -m pip install -r requirements.txt pytest
-py -3 -m pytest -q
-py -3 -m compileall -q app.py fh6garage tests
-```
-
-v1.1 기준 자동화 검사 121개가 통과했습니다. 상세 검증 범위는 [VALIDATION.md](VALIDATION.md)를 참고하십시오.
-
-프로그램 아이콘의 SVG·PNG·ICO 시안은 `assets/icons`에 포함되어 있습니다. VBS 자체에는 사용자 아이콘을 내장할 수 없으므로 Windows 바로가기에 ICO를 지정하십시오.
 
 ## 문서
 
 - [변경 이력](CHANGELOG.md)
-- [v1.1 릴리스 노트](RELEASE_NOTES_v1.1.md)
 - [기여 안내](CONTRIBUTING.md)
 - [보안 정책](SECURITY.md)
 
