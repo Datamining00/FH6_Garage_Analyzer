@@ -1,22 +1,15 @@
 # FH6 Garage Analyzer
 
-![FH6 Garage Analyzer banner](docs/banner.svg)
+FH6의 로컬 세이브 폴더를 분석하여 보유 차량, 저장 리버리, 튜닝 및 제작자 정보를 확인하는 Windows 데스크톱 도구입니다.
 
-[![Version](https://img.shields.io/badge/version-1.1-6e4bf2)](https://github.com/Trapdoor00/FH6_Garage_Analyzer/releases)
-[![Platform](https://img.shields.io/badge/platform-Windows-0078D4)](#system-requirements)
-[![Python](https://img.shields.io/badge/python-3.12%2B-3776AB)](https://www.python.org/)
-[![Tests](https://github.com/Trapdoor00/FH6_Garage_Analyzer/actions/workflows/tests.yml/badge.svg)](https://github.com/Trapdoor00/FH6_Garage_Analyzer/actions/workflows/tests.yml)
-
-FH6의 로컬 PGS 세이브 폴더를 분석하여 보유 차량, 저장 리버리, 튜닝 및 제작자 정보를 한 화면에서 관리하는 Windows 데스크톱 도구입니다.
-
-> 이 프로젝트는 비공식 커뮤니티 도구이며 Microsoft, Xbox Game Studios, Playground Games 또는 Forza와 제휴하거나 보증받지 않았습니다.
+> 이 프로젝트는 비공식 커뮤니티 도구이며 Microsoft, Xbox Game Studios, Playground Games 또는 Forza와 제휴하거나 보증받지 않았습니다. 프로그램 사용으로 인해 발생하는 문제나 불이익에 대한 책임은 사용자에게 있습니다.
 
 ## 주요 기능
 
 - 보유 차량, 리버리, 튜닝 및 제작자 통계
-- 리버리 설명·제작자 업로드 날짜 확인
+- 리버리 설명·제작자 확인
 - 튜닝 Data의 장착 부품 ID와 세부 설정값 읽기 전용 보기
-- FH6 창 자동 활성화와 인게임 위치 이동 보조
+- 지정한 리버리 위치로의 이동 보조
 
 ## 안전 범위
 
@@ -24,9 +17,7 @@ FH6의 로컬 PGS 세이브 폴더를 분석하여 보유 차량, 저장 리버�
 
 ## 설치 및 실행
 
-### 권장: 클린 배포본
-
-1. [FH6_Garage_Analyzer_v1.1_clean.zip](releases/FH6_Garage_Analyzer_v1.1_clean.zip)을 받습니다.
+1. [FH6_Garage_Analyzer_v1.1.zip](releases/FH6_Garage_Analyzer_v1.1.zip)을 받습니다.
 2. 압축을 푼 뒤 `FH6 Garage Analyzer.vbs`를 실행합니다.
 3. 최초 실행 시 필요한 Python 환경과 PySide6가 `%LOCALAPPDATA%\FH6GarageAnalyzer`에 준비됩니다.
 
