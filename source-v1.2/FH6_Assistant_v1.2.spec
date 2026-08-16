@@ -27,7 +27,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='FH6 Assistant v1.1',
+    name='FH6 Assistant v1.2',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

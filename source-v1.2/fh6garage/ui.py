@@ -659,7 +659,7 @@ class MainWindow(QMainWindow):
         self._dashboard_creator_sort_section = 1
         self._dashboard_creator_sort_order = Qt.SortOrder.AscendingOrder
 
-        self.setWindowTitle("FH6 Assistant v1.1")
+        self.setWindowTitle("FH6 Assistant v1.2")
         self.resize(1460, 900)
         # Allow a narrower compact layout while preventing the two-row toolbar
         # and card metadata from being vertically clipped.
@@ -876,7 +876,7 @@ class MainWindow(QMainWindow):
         )
         self.always_on_top_box.toggled.connect(self._set_always_on_top)
         side.addWidget(self.always_on_top_box)
-        version = QLabel("v1.1\nLIVERY & TUNING")
+        version = QLabel("v1.2\nLIVERY & TUNING")
         version.setStyleSheet("color:#777b8b; padding:8px;")
         side.addWidget(version)
         outer.addWidget(sidebar)
