@@ -10,21 +10,28 @@ FH6의 로컬 저장 폴더를 분석하여 보유 차량, 저장된 리버리, 
 * 리버리 설명과 제작자 정보 확인
 * 튜닝 데이터에 기록된 장착 부품 식별 번호와 세부 설정값을 읽기 전용으로 확인
 * 지정한 리버리의 게임 내 위치로 이동 보조
+* 차량, 리버리 및 튜닝 정보 검색·정렬·필터링
+* 원, 삼각형, X 및 메모를 이용한 사용자 분류
 
 ## 파일 변경 범위
 
-일반적인 검색, 정렬, 표시 및 분석 기능은 게임 저장 파일과 섬네일 파일을 변경하지 않습니다.
+일반적인 검색, 정렬, 표시 및 분석 기능은 FH6의 게임 저장 파일과 썸네일 파일을 변경하지 않습니다.
+
+프로그램은 FH6의 리버리 및 튜닝 썸네일을 표시 목적으로만 읽으며 원본 썸네일을 수정하지 않습니다.
 
 원, 삼각형, X 및 메모를 이용한 분류 정보는 프로그램의 로컬 설정 파일에만 저장됩니다.
 
+FH6의 실제 게임 저장 데이터와 프로그램의 사용자 설정 데이터는 서로 별도로 관리됩니다.
+
 ## 설치 및 실행
 
-1. `FH6_Assistant`를 내려받습니다.
-2. Python 3.12 이상이 설치되어 있는지 확인합니다.
-3. 압축을 푼 뒤 `FH6 Garage Analyzer.vbs`를 실행합니다.
-4. 최초 실행 시 프로그램 전용 Python 가상 환경과 PySide6가 `%LOCALAPPDATA%\FH6GarageAnalyzer`에 자동으로 준비됩니다.
+1. GitHub Releases에서 `FH6 Assistant v1.1.exe`를 내려받습니다.
+2. 내려받은 EXE 파일을 실행합니다.
+3. 최초 실행 후 `세이브 폴더 선택`을 눌러 FH6의 로컬 저장 경로를 지정합니다.
 
-실행 오류를 확인해야 할 때는 `run.bat`을 실행하십시오.
+v1.1 개선을 통해 별도의 설치 과정은 필요하지 않게 되었습니다.
+
+> 현재 프로그램에는 코드 서명이 적용되어 있지 않으므로 Windows SmartScreen에서 알 수 없는 게시자 또는 보호 경고가 표시될 수 있습니다.
 
 ## 기본 사용법
 
@@ -42,7 +49,7 @@ FH6의 로컬 저장 폴더를 분석하여 보유 차량, 저장된 리버리, 
 
 3. 상태 필터 메뉴에서 여러 아이콘을 선택하여 조건을 조합할 수 있습니다.
 
-화면의 그룹 설정은 다음 파일에 저장됩니다.
+화면의 그룹 설정 및 표시 관련 설정은 다음 파일에 저장됩니다.
 
 ```text
 %LOCALAPPDATA%\FH6GarageAnalyzer\ui_preferences.json
@@ -54,6 +61,8 @@ FH6의 로컬 저장 폴더를 분석하여 보유 차량, 저장된 리버리, 
 %LOCALAPPDATA%\FH6GarageAnalyzer\annotations.json
 ```
 
+위 설정 파일은 FH6의 실제 게임 저장 파일과 별도로 관리됩니다.
+
 ## 게임 내 위치 이동 보조
 
 * FH6가 전체 화면일 경우 동작이 확인되었습니다.
@@ -64,10 +73,18 @@ FH6의 로컬 저장 폴더를 분석하여 보유 차량, 저장된 리버리, 
 
 ## 시스템 요구 사항
 
-* Windows 11에서 검증됨
-* Python 3.12 이상
-* PySide6 6.7 이상, 7 미만
+* Windows 11, 10
 * FH6 로컬 저장 폴더에 대한 읽기 권한
+
+
+## 보안 및 백신 관련 안내
+
+본 프로그램은 PyInstaller를 사용하여 단일 Windows 실행 파일로 패키징되어 있습니다.
+
+디지털 서명이 없어 일부 백신 프로그램 또는 Windows Defender의 머신러닝·휴리스틱 검사에서 PyInstaller 기반 실행 파일이 오탐될 수 있습니다.
+
+SHA-256 파일은 프로그램 실행에 필요한 파일이 아니며 무결성 확인을 위한 선택 사항입니다.
+
 
 ## 자료 출처 및 감사
 
@@ -79,14 +96,17 @@ FH6의 로컬 저장 폴더를 분석하여 보유 차량, 저장된 리버리, 
 유용한 자료를 공개한 HDR에게 감사드립니다.
 
 본 프로젝트의 개발 과정에서 생성형 AI 도구인 OpenAI ChatGPT의 도움을 받았습니다.
+
 ChatGPT는 코드 작성 및 검토, 오류 분석, 기능 구현 방안 검토와 문서 작성·정리에 보조적으로 활용되었습니다.
 
 ## 문서
 
-* [변경 이력](https://github.com/Trapdoor00/FH6_Garage_Analyzer/blob/main/CHANGELOG.md)
-* [기여 안내](https://github.com/Trapdoor00/FH6_Garage_Analyzer/blob/main/CONTRIBUTING.md)
-* [보안 정책](https://github.com/Trapdoor00/FH6_Garage_Analyzer/blob/main/SECURITY.md)
+* [변경 이력](https://github.com/Datamining00/FH6_Garage_Analyzer/blob/main/CHANGELOG.md)
+* [기여 안내](https://github.com/Datamining00/FH6_Garage_Analyzer/blob/main/CONTRIBUTING.md)
+* [보안 정책](https://github.com/Datamining00/FH6_Garage_Analyzer/blob/main/SECURITY.md)
 
 ## 라이선스
 
-현재 별도의 오픈 소스 라이선스가 지정되어 있지 않습니다. 라이선스가 추가되기 전까지 저작권법에 따라 모든 권리는 저장소 소유자에게 있습니다.
+현재 별도의 오픈 소스 라이선스가 지정되어 있지 않습니다.
+
+라이선스가 추가되기 전까지 저작권법에 따라 모든 권리는 저장소 소유자에게 있습니다.
