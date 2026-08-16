@@ -65,7 +65,7 @@ jobs:
               return gzip.decompress(base64.b64decode(encoded))
 
           patch = decode_parts("patch")
-          icon = decode_parts("icon")
+          icon = decode_parts("icon64")
 
           (workspace / "v1.1.patch").write_bytes(patch)
           icon_path = app_dir / "icons" / "FH6_Assistant.ico"
@@ -73,11 +73,11 @@ jobs:
 
           if len(patch) < 60000:
               raise RuntimeError(f"Reconstructed patch is unexpectedly small: {len(patch)}")
-          if len(icon) < 20000 or icon[:4] != b"\x00\x00\x01\x00":
+          if len(icon) < 6000 or icon[:4] != b"\x00\x00\x01\x00":
               raise RuntimeError("Reconstructed FH6_Assistant.ico is invalid")
 
           print(f"Patch bytes: {len(patch)}")
-          print(f"Icon bytes: {len(icon)}")
+          print(f"Transparent icon bytes: {len(icon)}")
           '@ | Set-Content -Path reconstruct_assets.py -Encoding UTF8
 
           python reconstruct_assets.py
