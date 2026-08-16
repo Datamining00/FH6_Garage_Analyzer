@@ -1,0 +1,85 @@
+name: Apply FH6 Assistant v1.2 version metadata
+
+on:
+  push:
+    branches:
+      - v1.2-work
+    paths:
+      - ".github/workflows/apply-v12-version.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout work branch
+        uses: actions/checkout@v6
+        with:
+          ref: v1.2-work
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Apply v1.2 version patch
+        run: python .github/scripts/apply_v12_version.py
+
+      - name: Verify no old v1.1 metadata remains
+        shell: pwsh
+        run: |
+          $output = python .github/scripts/audit_v12_version.py
+          $output | Write-Host
+          if ($output -notmatch "Old-version occurrences: 0") {
+            throw "Old v1.1 version metadata remains in source-v1.2."
+          }
+          if (-not (Test-Path "source-v1.2/FH6_Assistant_v1.2.spec")) { throw "v1.2 spec is missing." }
+          if (Test-Path "source-v1.2/FH6_Assistant_v1.1.spec") { throw "obsolete v1.1 spec still exists." }
+
+      - name: Compile source
+        shell: pwsh
+        run: |
+          Set-Location source-v1.2
+          python -m compileall -q .
+
+      - name: Run regression tests
+        shell: pwsh
+        run: |
+          Set-Location source-v1.2
+          python -m unittest discover -s tests -v
+
+      - name: Verify v1.2 metadata contract
+        shell: pwsh
+        run: |
+          $app = Get-Content "source-v1.2/app.py" -Raw
+          $ui = Get-Content "source-v1.2/fh6garage/ui.py" -Raw
+          $pkg = Get-Content "source-v1.2/fh6garage/__init__.py" -Raw
+          $spec = Get-Content "source-v1.2/FH6_Assistant_v1.2.spec" -Raw
+          $ver = Get-Content "source-v1.2/version_info.txt" -Raw
+          if ($app -notmatch 'setApplicationVersion\("1\.2"\)') { throw "Application version is not 1.2." }
+          if ($ui -notmatch 'FH6 Assistant v1\.2') { throw "Window title is not v1.2." }
+          if ($pkg -notmatch '__version__ = "1\.2"') { throw "Package version is not 1.2." }
+          if ($spec -notmatch "name='FH6 Assistant v1\.2'") { throw "EXE name is not v1.2." }
+          if ($ver -notmatch "ProductVersion', '1\.2'") { throw "Windows ProductVersion is not 1.2." }
+
+      - name: Verify v1.1 source baseline remains untouched
+        shell: pwsh
+        run: |
+          $expected = "757cf0349b9b2240273c99f892497e3f89438333"
+          $actual = (git rev-parse "HEAD:source-v1.1").Trim()
+          if ($actual -ne $expected) { throw "v1.1 baseline changed: $actual" }
+
+      - name: Commit v1.2 metadata
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add source-v1.2
+          git diff --cached --quiet
+          if ($LASTEXITCODE -ne 0) {
+            git commit -m "Finalize FH6 Assistant v1.2 version metadata"
+            git push origin HEAD:v1.2-work
+          }
