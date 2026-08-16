@@ -186,6 +186,95 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "ko": "크기",
         "en": "Size",
     },
+    "tune_data.size_error": {
+        "ko": "Data 파일 크기가 {actual}바이트입니다. 예상 크기는 {expected}바이트입니다.",
+        "en": "The Data file is {actual} bytes; expected {expected} bytes.",
+    },
+    "tune_data.nonfinite_error": {
+        "ko": "튜닝 값에 NaN 또는 무한대가 포함되어 있습니다.",
+        "en": "The tuning data contains NaN or infinite values.",
+    },
+}
+
+_TUNE_LABELS_EN: dict[str, str] = {
+    "엔진": "Engine",
+    "구동계": "Drivetrain",
+    "차체": "Chassis",
+    "모터": "Motor",
+    "브레이크": "Brakes",
+    "스프링·댐퍼": "Springs & dampers",
+    "전륜 안티롤바": "Front anti-roll bar",
+    "후륜 안티롤바": "Rear anti-roll bar",
+    "타이어 컴파운드": "Tire compound",
+    "리어 윙": "Rear wing",
+    "전륜 휠 크기": "Front wheel size",
+    "후륜 휠 크기": "Rear wheel size",
+    "캠축": "Camshaft",
+    "밸브": "Valves",
+    "배기량": "Displacement",
+    "피스톤·압축": "Pistons & compression",
+    "연료 시스템": "Fuel system",
+    "점화": "Ignition",
+    "배기": "Exhaust",
+    "흡기": "Intake",
+    "플라이휠": "Flywheel",
+    "매니폴드": "Manifold",
+    "리스트릭터 플레이트": "Restrictor plate",
+    "오일 냉각": "Oil cooling",
+    "싱글 터보": "Single turbo",
+    "트윈 터보": "Twin turbo",
+    "쿼드 터보": "Quad turbo",
+    "용적식 슈퍼차저": "Positive-displacement supercharger",
+    "원심식 슈퍼차저": "Centrifugal supercharger",
+    "인터쿨러": "Intercooler",
+    "클러치": "Clutch",
+    "변속기": "Transmission",
+    "드라이브라인": "Driveline",
+    "디퍼렌셜": "Differential",
+    "전면 범퍼": "Front bumper",
+    "후면 범퍼": "Rear bumper",
+    "보닛": "Hood",
+    "사이드 스커트": "Side skirts",
+    "전륜 타이어 폭": "Front tire width",
+    "후륜 타이어 폭": "Rear tire width",
+    "경량화": "Weight reduction",
+    "차체 보강·롤케이지": "Chassis reinforcement & roll cage",
+    "모터 부품": "Motor parts",
+    "휠 스타일": "Wheel style",
+    "과급 방식": "Forced-induction type",
+    "전륜 트랙 폭": "Front track width",
+    "후륜 트랙 폭": "Rear track width",
+    "전륜 타이어 편평비": "Front tire profile",
+    "후륜 타이어 편평비": "Rear tire profile",
+    "후륜 휠 스타일": "Rear wheel style",
+    "전륜 다운포스": "Front downforce",
+    "후륜 다운포스": "Rear downforce",
+    "최종감속비": "Final drive ratio",
+    "브레이크 압력": "Brake pressure",
+    "브레이크 밸런스": "Brake balance",
+    "핸드브레이크 압력": "Handbrake pressure",
+    "센터 디퍼렌셜": "Center differential",
+    "TCS 슬립 기준": "TCS slip threshold",
+    "전륜 공기압": "Front tire pressure",
+    "전륜 캠버": "Front camber",
+    "전륜 토": "Front toe",
+    "전륜 캐스터": "Front caster",
+    "전륜 스프링": "Front spring",
+    "전륜 차고": "Front ride height",
+    "전륜 범프 강성": "Front bump stiffness",
+    "전륜 리바운드 강성": "Front rebound stiffness",
+    "전륜 디퍼렌셜 가속": "Front differential acceleration",
+    "전륜 디퍼렌셜 감속": "Front differential deceleration",
+    "후륜 공기압": "Rear tire pressure",
+    "후륜 캠버": "Rear camber",
+    "후륜 토": "Rear toe",
+    "후륜 캐스터": "Rear caster",
+    "후륜 스프링": "Rear spring",
+    "후륜 차고": "Rear ride height",
+    "후륜 범프 강성": "Rear bump stiffness",
+    "후륜 리바운드 강성": "Rear rebound stiffness",
+    "후륜 디퍼렌셜 가속": "Rear differential acceleration",
+    "후륜 디퍼렌셜 감속": "Rear differential deceleration",
 }
 
 _current_language = DEFAULT_LANGUAGE
@@ -231,3 +320,18 @@ def tr(key: str, **values: object) -> str:
         except (KeyError, IndexError, ValueError):
             return template
     return template
+
+
+def tune_label(label: str) -> str:
+    """Translate a canonical Korean tune-data label for the active UI language."""
+    if _current_language == "ko":
+        return label
+    if _current_language == "en":
+        translated = _TUNE_LABELS_EN.get(label)
+        if translated is not None:
+            return translated
+        if label.endswith("단 기어비"):
+            gear = label.removesuffix("단 기어비").strip()
+            if gear.isdigit():
+                return f"Gear {gear} ratio"
+    return label
