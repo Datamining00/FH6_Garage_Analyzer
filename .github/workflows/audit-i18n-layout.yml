@@ -32,8 +32,6 @@ jobs:
 
       - name: Audit Korean and English layouts
         shell: pwsh
-        env:
-          QT_QPA_PLATFORM: offscreen
         run: python .github/scripts/audit_i18n_layout.py
 
       - name: Upload layout screenshots
