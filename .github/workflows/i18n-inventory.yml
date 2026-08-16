@@ -1,0 +1,43 @@
+name: Generate FH6 Assistant i18n inventory
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - v1.2-work
+    paths:
+      - "tools/i18n_inventory.py"
+      - ".github/workflows/i18n-inventory.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout work branch
+        uses: actions/checkout@v6
+        with:
+          ref: v1.2-work
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Generate inventory
+        run: python tools/i18n_inventory.py
+
+      - name: Commit inventory report
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add I18N_INVENTORY.md
+          if ! git diff --cached --quiet; then
+            git commit -m "Add FH6 Assistant v1.2 i18n inventory"
+            git push origin HEAD:v1.2-work
+          fi
