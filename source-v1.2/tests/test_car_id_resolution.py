@@ -1,8 +1,36 @@
 from __future__ import annotations
 
+import tempfile
 import unittest
+from pathlib import Path
+from types import SimpleNamespace
 
-from fh6garage.scanner import _container_car_id, _resolve_car_id
+from fh6garage.scanner import _container_car_id, _resolve_car_id, scan_save
+
+
+FURAI_HEADER_1 = bytes.fromhex(
+    "07 00 00 00 05 00 00 00 46 00 6f 00 72 00 7a 00 "
+    "61 00 00 00 00 00 ea 07 08 00 00 00 10 00 09 00 "
+    "16 00 2f 00 09 01 03 00 00 00 98 03 38 23 f3 01 "
+    "09 00 04 00 00 00 55 00 53 00 45 00 52 00 00 00 "
+    "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
+    "00 00 00 00 00 00 00 00 00 00 01 02 00 00 00 00 "
+    "00 00 00 3f 01 00 00 cd 04 00 00 37 3b b4 92 8f "
+    "c7 95 4f bb 38 cf 10 10 41 a8 bc e7 e3 3d 99 4e "
+    "40 b8 55 6b 1e fa 02 b0 f5"
+)
+
+FURAI_HEADER_2 = bytes.fromhex(
+    "07 00 00 00 06 00 00 00 46 00 6f 00 72 00 7a 00 "
+    "61 00 32 00 00 00 00 00 ea 07 08 00 00 00 10 00 "
+    "09 00 16 00 39 00 bb 02 03 00 00 00 98 03 38 23 "
+    "f3 01 09 00 04 00 00 00 55 00 53 00 45 00 52 00 "
+    "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
+    "00 00 00 00 00 00 00 00 00 00 00 00 01 02 00 00 "
+    "00 00 00 00 00 3f 01 00 00 cd 04 00 00 b3 ab 5c "
+    "a5 29 da bf 48 b6 d3 d3 97 74 de 63 8d 3d 99 4e "
+    "40 b8 55 6b 1e fa 02 b0 f5"
+)
 
 
 class _FakeCarDatabase:
@@ -11,6 +39,10 @@ class _FakeCarDatabase:
 
     def is_known(self, car_id: int) -> bool:
         return car_id in self.known
+
+    def get(self, car_id: int):
+        label = "2008 Mazda Furai" if car_id == 1229 else f"Car ID {car_id}"
+        return SimpleNamespace(label=label)
 
 
 class CarIdResolutionTests(unittest.TestCase):
@@ -45,6 +77,32 @@ class CarIdResolutionTests(unittest.TestCase):
             ),
             1229,
         )
+
+    def test_scan_save_recovers_both_supplied_furai_samples(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            save_root = Path(tmp) / "save"
+            containers = save_root / "current" / "ContainersRoot"
+            containers.mkdir(parents=True)
+
+            samples = (
+                ("Livery_1229_20260816092247", FURAI_HEADER_1),
+                ("Livery_1229_20260816092257", FURAI_HEADER_2),
+            )
+            for name, header_bytes in samples:
+                folder = containers / name
+                folder.mkdir()
+                (folder / "header").write_bytes(header_bytes)
+                (folder / "C_livery").write_bytes(b"sample")
+
+            result = scan_save(save_root, self.db)
+
+            self.assertEqual([item.car_id for item in result.liveries], [1229, 1229])
+            self.assertEqual(len(result.car_summaries), 1)
+            self.assertEqual(result.car_summaries[0].car_id, 1229)
+            self.assertEqual(result.car_summaries[0].label, "2008 Mazda Furai")
+            self.assertEqual(result.car_summaries[0].livery_count, 2)
+            self.assertTrue(any("1091571919" in warning for warning in result.warnings))
+            self.assertTrue(any("2547241910" in warning for warning in result.warnings))
 
     def test_legacy_result_is_unchanged_when_container_name_has_no_ordinal(self) -> None:
         self.assertEqual(
