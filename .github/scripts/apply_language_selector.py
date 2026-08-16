@@ -107,6 +107,21 @@ ui_path.write_text(ui, encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
+# Stage 1 regression test: do not couple the test to an exact import spelling.
+# The implementation may import additional i18n helpers while still using tr().
+# ---------------------------------------------------------------------------
+stage1_path = ROOT / "tests" / "test_i18n_stage1.py"
+stage1 = stage1_path.read_text(encoding="utf-8")
+stage1 = replace_once(
+    stage1,
+    "        required = (\n            'from .i18n import tr',\n",
+    "        required = (\n",
+    "test_i18n_stage1.py import contract",
+)
+stage1_path.write_text(stage1, encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
 # Regression contract test. It deliberately avoids importing PySide6 so the
 # existing lightweight CI remains unchanged.
 # ---------------------------------------------------------------------------
