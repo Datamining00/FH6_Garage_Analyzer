@@ -55,6 +55,7 @@ from .game_navigation import (
     NavigationItem,
     send_arrow_keys_to_fh6,
 )
+from .i18n import tr
 from .models import LiveryRecord, ScanResult, TuningRecord
 from .preferences import LocalPreferences
 from .scanner import SaveLayoutError, scan_save
@@ -398,7 +399,7 @@ class BusyOverlay(QWidget):
         panel_layout = QVBoxLayout(panel)
         panel_layout.setContentsMargins(24, 21, 24, 21)
         panel_layout.setSpacing(14)
-        self.message = QLabel("처리 중…")
+        self.message = QLabel(tr("common.processing"))
         self.message.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.progress = QProgressBar()
         self.progress.setRange(0, 0)
@@ -464,8 +465,8 @@ class DashboardSortBar(QWidget):
 
             up = QToolButton()
             up.setText("▲")
-            up.setToolTip(f"{label_text} 오름차순")
-            up.setAccessibleName(f"{label_text} 오름차순")
+            up.setToolTip(tr("common.ascending", label=label_text))
+            up.setAccessibleName(tr("common.ascending", label=label_text))
             up.setCheckable(True)
             up.setAutoRaise(True)
             up.setFixedSize(17, 22)
@@ -479,8 +480,8 @@ class DashboardSortBar(QWidget):
 
             down = QToolButton()
             down.setText("▼")
-            down.setToolTip(f"{label_text} 내림차순")
-            down.setAccessibleName(f"{label_text} 내림차순")
+            down.setToolTip(tr("common.descending", label=label_text))
+            down.setAccessibleName(tr("common.descending", label=label_text))
             down.setCheckable(True)
             down.setAutoRaise(True)
             down.setFixedSize(17, 22)
@@ -767,7 +768,7 @@ class MainWindow(QMainWindow):
     def _show_copy_toast(self) -> None:
         """Show a true one-second overlay independent of mouse hover state."""
         if not hasattr(self, "_copy_toast"):
-            toast = QLabel("클립보드에 복사되었습니다", self)
+            toast = QLabel(tr("common.copied"), self)
             toast.setAlignment(Qt.AlignmentFlag.AlignCenter)
             toast.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
             toast.setStyleSheet(
@@ -787,7 +788,7 @@ class MainWindow(QMainWindow):
         toast.show()
         toast.raise_()
         self._copy_toast_timer.start(1000)
-        self._show_status("클립보드에 복사되었습니다", 1000)
+        self._show_status(tr("common.copied"), 1000)
 
     def _build_ui(self) -> None:
         root = QWidget()
@@ -808,7 +809,7 @@ class MainWindow(QMainWindow):
         self.nav_group = QButtonGroup(self)
         self.nav_group.setExclusive(True)
         self.nav_buttons: list[QPushButton] = []
-        for index, text in enumerate(("대시보드", "리버리", "튜닝")):
+        for index, text in enumerate((tr("nav.dashboard"), tr("nav.livery"), tr("nav.tuning"))):
             button = QPushButton(text)
             button.setObjectName("nav")
             button.setCheckable(True)
@@ -819,7 +820,7 @@ class MainWindow(QMainWindow):
             self.nav_buttons.append(button)
             side.addWidget(button)
         side.addStretch(1)
-        self.always_on_top_box = QCheckBox("항상 위에 표시")
+        self.always_on_top_box = QCheckBox(tr("sidebar.always_on_top"))
         self.always_on_top_box.setStyleSheet(
             "QCheckBox { color:#c7c9d4; spacing:7px; padding:7px 6px; }"
             "QCheckBox:hover { color:white; }"
@@ -828,7 +829,7 @@ class MainWindow(QMainWindow):
             self.settings.value("window_always_on_top", False, bool)
         )
         self.always_on_top_box.setToolTip(
-            "인게임 이동을 시작하면 포르자 화면을 가리지 않도록 분석기 창을 최소화합니다."
+            tr("sidebar.always_on_top_tip")
         )
         self.always_on_top_box.toggled.connect(self._set_always_on_top)
         side.addWidget(self.always_on_top_box)
@@ -845,11 +846,11 @@ class MainWindow(QMainWindow):
         top = QHBoxLayout()
         self.path_edit = QLineEdit()
         self.path_edit.setReadOnly(True)
-        self.path_edit.setPlaceholderText("FH6 세이브 루트/current/버전/ContainersRoot 폴더를 선택하세요")
-        choose = QPushButton("세이브 폴더 선택")
+        self.path_edit.setPlaceholderText(tr("save.placeholder"))
+        choose = QPushButton(tr("save.choose_folder"))
         choose.setObjectName("primary")
         choose.clicked.connect(self.choose_save_folder)
-        refresh = QPushButton("새로고침")
+        refresh = QPushButton(tr("save.refresh"))
         refresh.setObjectName("secondary")
         refresh.clicked.connect(self.refresh_scan)
         top.addWidget(self.path_edit, 1)
@@ -886,40 +887,40 @@ class MainWindow(QMainWindow):
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addLayout(self._page_header("차고 분석 대시보드", ""))
+        layout.addLayout(self._page_header(tr("dashboard.title"), ""))
 
         cards = QGridLayout()
         cards.setSpacing(12)
-        self.card_cars = SummaryCard("차고 차량", "—")
-        self.card_livery = SummaryCard("저장 리버리", "—")
-        self.card_tuning = SummaryCard("저장 튜닝", "—")
+        self.card_cars = SummaryCard(tr("dashboard.garage_cars"), "—")
+        self.card_livery = SummaryCard(tr("dashboard.saved_livery"), "—")
+        self.card_tuning = SummaryCard(tr("dashboard.saved_tuning"), "—")
         for i, card in enumerate((self.card_cars, self.card_livery, self.card_tuning)):
             cards.addWidget(card, 0, i)
         layout.addLayout(cards)
 
         db_panel = QFrame(); db_panel.setObjectName("panel")
         db_layout = QHBoxLayout(db_panel); db_layout.setContentsMargins(14, 11, 14, 11)
-        db_title = QLabel("차량 DB")
+        db_title = QLabel(tr("db.title"))
         db_title.setStyleSheet("font-size:11pt;font-weight:700;")
 
-        self.db_last_update_label = QLabel("/ 마지막 업데이트: 확인 불가")
+        self.db_last_update_label = QLabel(tr("db.last_update_unavailable"))
         self.db_last_update_label.setObjectName("muted")
         self.db_last_update_label.setStyleSheet(
             "color:#737787; font-size:9.5pt; background:transparent;"
         )
 
-        self.db_update_button = QPushButton("업데이트 확인")
+        self.db_update_button = QPushButton(tr("db.check_update"))
         self.db_update_button.setObjectName("secondary")
-        self.db_update_button.setToolTip("차량 DB의 새로운 버전을 확인합니다.")
+        self.db_update_button.setToolTip(tr("db.check_update_tip"))
         self.db_update_button.clicked.connect(self.start_car_db_update)
 
         self.db_source_button = QToolButton()
-        self.db_source_button.setText("DB 출처")
+        self.db_source_button.setText(tr("db.source"))
         self.db_source_button.setIcon(self._external_link_icon())
         self.db_source_button.setIconSize(QSize(18, 18))
         self.db_source_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-        self.db_source_button.setToolTip("차량 DB 원본 페이지를 브라우저에서 엽니다.")
-        self.db_source_button.setAccessibleName("차량 DB 출처 열기")
+        self.db_source_button.setToolTip(tr("db.source_tip"))
+        self.db_source_button.setAccessibleName(tr("db.source_accessible"))
         self.db_source_button.setMinimumHeight(38)
         self.db_source_button.setStyleSheet(
             "QToolButton { background:white; color:#303341; "
@@ -928,9 +929,9 @@ class MainWindow(QMainWindow):
         )
         self.db_source_button.clicked.connect(self._open_car_db_source)
 
-        self.db_override_button = QPushButton("사용자 차량 이름 지정")
+        self.db_override_button = QPushButton(tr("db.override"))
         self.db_override_button.setObjectName("secondary")
-        self.db_override_button.setToolTip("Car ID에 대응하는 차량 이름을 직접 지정하거나 수정합니다.")
+        self.db_override_button.setToolTip(tr("db.override_tip"))
         self.db_override_button.clicked.connect(self.open_car_db_override)
 
         db_layout.addWidget(db_title)
@@ -951,13 +952,13 @@ class MainWindow(QMainWindow):
         self.dashboard_mode_group = QButtonGroup(self)
         self.dashboard_mode_group.setExclusive(True)
 
-        self.dashboard_car_button = QPushButton("차종별 저장 콘텐츠")
+        self.dashboard_car_button = QPushButton(tr("dashboard.by_vehicle"))
         self.dashboard_car_button.setObjectName("secondary")
         self.dashboard_car_button.setCheckable(True)
         self.dashboard_car_button.setChecked(True)
         self.dashboard_car_button.clicked.connect(lambda _checked=False: self._set_dashboard_content_mode(0))
 
-        self.dashboard_creator_button = QPushButton("제작자별 콘텐츠")
+        self.dashboard_creator_button = QPushButton(tr("dashboard.by_creator"))
         self.dashboard_creator_button.setObjectName("secondary")
         self.dashboard_creator_button.setCheckable(True)
         self.dashboard_creator_button.clicked.connect(lambda _checked=False: self._set_dashboard_content_mode(1))
@@ -966,7 +967,7 @@ class MainWindow(QMainWindow):
         self.dashboard_mode_group.addButton(self.dashboard_creator_button)
 
         self.car_search = QLineEdit()
-        self.car_search.setPlaceholderText("Car ID / 차량명 검색")
+        self.car_search.setPlaceholderText(tr("dashboard.search_vehicle"))
         self.car_search.setFixedWidth(260)
         self._connect_debounced_search(
             self.car_search,
@@ -981,13 +982,13 @@ class MainWindow(QMainWindow):
 
         self.dashboard_content_stack = QStackedWidget()
 
-        self.car_table = self._table(("Car ID", "차량", "리버리", "튜닝"))
+        self.car_table = self._table((tr("table.car_id"), tr("table.vehicle"), tr("table.livery"), tr("table.tuning")))
         self.car_table.itemSelectionChanged.connect(self._update_selected_car)
         self._configure_dashboard_table(self.car_table)
 
         self.car_sort_bar = DashboardSortBar(
             self.car_table,
-            ("Car ID", "차량", "리버리", "튜닝"),
+            (tr("table.car_id"), tr("table.vehicle"), tr("table.livery"), tr("table.tuning")),
         )
         self.car_sort_bar.sortRequested.connect(self._sort_car_dashboard)
         self.car_sort_bar.set_active_sort(
@@ -1005,13 +1006,13 @@ class MainWindow(QMainWindow):
 
         # Exactly the same column geometry in creator mode:
         #   Car ID -> 합계 / 차량 -> 제작자명 / 리버리 -> 리버리 / 튜닝 -> 튜닝
-        self.creator_table = self._table(("합계", "제작자명", "리버리", "튜닝"))
+        self.creator_table = self._table((tr("table.total"), tr("table.creator"), tr("table.livery"), tr("table.tuning")))
         self.creator_table.itemSelectionChanged.connect(self._update_selected_creator)
         self._configure_dashboard_table(self.creator_table)
 
         self.creator_sort_bar = DashboardSortBar(
             self.creator_table,
-            ("합계", "제작자명", "리버리", "튜닝"),
+            (tr("table.total"), tr("table.creator"), tr("table.livery"), tr("table.tuning")),
         )
         self.creator_sort_bar.sortRequested.connect(self._sort_creator_dashboard)
         self.creator_sort_bar.set_active_sort(
@@ -1031,7 +1032,7 @@ class MainWindow(QMainWindow):
 
         right = QFrame(); right.setObjectName("panel")
         right_l = QVBoxLayout(right); right_l.setContentsMargins(14, 14, 14, 14)
-        self.selected_title = QLabel("차량을 선택하세요")
+        self.selected_title = QLabel(tr("dashboard.select_vehicle"))
         self.selected_title.setStyleSheet("font-size:13pt;font-weight:700;")
         self.selected_hint = QLabel("")
         self.selected_hint.setWordWrap(True); self.selected_hint.setObjectName("muted")
@@ -1039,24 +1040,24 @@ class MainWindow(QMainWindow):
         right_l.addWidget(self.selected_title)
         right_l.addWidget(self.selected_hint)
 
-        self.saved_livery_section = QLabel("저장 리버리")
+        self.saved_livery_section = QLabel(tr("dashboard.saved_livery"))
         self.saved_livery_section.setStyleSheet(
             "background:#eee9ff; color:#5f39d8; font-weight:700; "
             "padding:6px 9px; border-radius:6px;"
         )
         right_l.addWidget(self.saved_livery_section)
 
-        self.selected_liveries = self._table(("", "리버리 이름", "제작자"))
+        self.selected_liveries = self._table(("", tr("table.livery_name"), tr("table.creator_short")))
         right_l.addWidget(self.selected_liveries, 1)
 
-        self.saved_tuning_section = QLabel("저장 튜닝")
+        self.saved_tuning_section = QLabel(tr("dashboard.saved_tuning"))
         self.saved_tuning_section.setStyleSheet(
             "background:#eee9ff; color:#5f39d8; font-weight:700; "
             "padding:6px 9px; border-radius:6px;"
         )
         right_l.addWidget(self.saved_tuning_section)
 
-        self.selected_tunings = self._table(("", "이름", "제작자", "크기"))
+        self.selected_tunings = self._table(("", tr("table.name"), tr("table.creator_short"), tr("table.size")))
         right_l.addWidget(self.selected_tunings, 1)
 
         body.addWidget(left, 5)
