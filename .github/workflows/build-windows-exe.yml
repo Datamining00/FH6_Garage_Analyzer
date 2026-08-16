@@ -5,13 +5,13 @@ on:
   push:
     branches:
       - main
-      - build-v1.1
+      - icon-node24-fix
     paths:
       - ".github/workflows/build-windows-exe.yml"
       - ".github/build-assets/v1.1/**"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -19,10 +19,10 @@ jobs:
 
     steps:
       - name: Checkout build assets
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -44,7 +44,7 @@ jobs:
           $appDir = $app.Directory.FullName
           "APP_DIR=$appDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-      - name: Reconstruct v1.1 patch and final icon
+      - name: Reconstruct v1.1 patch and transparent icon
         shell: pwsh
         run: |
           @'
@@ -61,13 +61,11 @@ jobs:
               parts = sorted(asset_dir.glob(prefix + ".part*"))
               if not parts:
                   raise RuntimeError(f"No build asset parts found for {prefix}")
-              encoded = "".join(
-                  part.read_text(encoding="ascii").strip() for part in parts
-              )
+              encoded = "".join(part.read_text(encoding="ascii").strip() for part in parts)
               return gzip.decompress(base64.b64decode(encoded))
 
           patch = decode_parts("patch")
-          icon = decode_parts("icon")
+          icon = decode_parts("icon64")
 
           (workspace / "v1.1.patch").write_bytes(patch)
           icon_path = app_dir / "icons" / "FH6_Assistant.ico"
@@ -75,11 +73,11 @@ jobs:
 
           if len(patch) < 60000:
               raise RuntimeError(f"Reconstructed patch is unexpectedly small: {len(patch)}")
-          if len(icon) < 20000 or icon[:4] != b"\x00\x00\x01\x00":
+          if len(icon) < 6000 or icon[:4] != b"\x00\x00\x01\x00":
               raise RuntimeError("Reconstructed FH6_Assistant.ico is invalid")
 
           print(f"Patch bytes: {len(patch)}")
-          print(f"Icon bytes: {len(icon)}")
+          print(f"Transparent icon bytes: {len(icon)}")
           '@ | Set-Content -Path reconstruct_assets.py -Encoding UTF8
 
           python reconstruct_assets.py
@@ -135,7 +133,7 @@ jobs:
           Write-Host "EXE SHA-256: $hash"
 
       - name: Upload Windows build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: FH6_Assistant_Windows_v1.1
           path: |
@@ -143,31 +141,3 @@ jobs:
             artifact/FH6 Assistant v1.1.exe.sha256
           if-no-files-found: error
           compression-level: 0
-
-      - name: Publish GitHub Release v1.1
-        if: github.ref == 'refs/heads/main'
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          @'
-          FH6 Assistant v1.1
-
-          - 초기 리버리/튜닝 썸네일 표시 문제 수정
-          - FH6 세이브 썸네일 수정/백업/복구 기능 제거
-          - FH6 Assistant 전용 프로그램/EXE 아이콘 적용
-          - 2026-08-16 기준 최신 HDR Car Ordinals 660개 기본 내장
-          - Windows 단일 EXE 배포
-
-          차량 ID 및 튜닝 데이터 구조 출처와 감사 표기는 저장소 README를 참고하세요.
-          '@ | Set-Content -Path release-notes.md -Encoding UTF8
-
-          $tag = "v1.1"
-          gh release view $tag *> $null
-          if ($LASTEXITCODE -eq 0) {
-            gh release edit $tag --title "FH6 Assistant v1.1" --notes-file release-notes.md
-            gh release upload $tag "artifact\FH6 Assistant v1.1.exe" "artifact\FH6 Assistant v1.1.exe.sha256" --clobber
-          }
-          else {
-            gh release create $tag "artifact\FH6 Assistant v1.1.exe" "artifact\FH6 Assistant v1.1.exe.sha256" --target $env:GITHUB_SHA --title "FH6 Assistant v1.1" --notes-file release-notes.md
-          }
