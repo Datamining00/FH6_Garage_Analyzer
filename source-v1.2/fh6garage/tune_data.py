@@ -5,6 +5,8 @@ import math
 import struct
 from pathlib import Path
 
+from .i18n import tr, tune_label
+
 
 EXPECTED_TUNE_DATA_SIZE = 598
 
@@ -71,19 +73,22 @@ class ParsedTuneData:
 def parse_tune_data(data: bytes) -> ParsedTuneData:
     if len(data) != EXPECTED_TUNE_DATA_SIZE:
         raise TuneDataError(
-            f"Data 파일 크기가 {len(data)}바이트입니다. 예상 크기는 "
-            f"{EXPECTED_TUNE_DATA_SIZE}바이트입니다."
+            tr(
+                "tune_data.size_error",
+                actual=len(data),
+                expected=EXPECTED_TUNE_DATA_SIZE,
+            )
         )
     parts = tuple(
-        (offset, label, struct.unpack_from("<I", data, offset)[0])
+        (offset, tune_label(label), struct.unpack_from("<I", data, offset)[0])
         for offset, label in PART_FIELDS
     )
     values = tuple(
-        (offset, label, struct.unpack_from("<f", data, offset)[0])
+        (offset, tune_label(label), struct.unpack_from("<f", data, offset)[0])
         for offset, label in TUNE_FIELDS
     )
     if any(not math.isfinite(value) for _offset, _label, value in values):
-        raise TuneDataError("튜닝 값에 NaN 또는 무한대가 포함되어 있습니다.")
+        raise TuneDataError(tr("tune_data.nonfinite_error"))
     return ParsedTuneData(
         format_version=data[0],
         locked=bool(data[1]),
