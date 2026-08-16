@@ -7,6 +7,7 @@ on:
     paths:
       - ".github/workflows/apply-i18n-stage3.yml"
       - ".github/scripts/apply_i18n_stage3.py"
+      - ".github/scripts/fix_i18n_stage3_patterns.py"
 
 permissions:
   contents: write
@@ -25,6 +26,9 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: "3.12"
+
+      - name: Fix escaped-newline patterns
+        run: python .github/scripts/fix_i18n_stage3_patterns.py
 
       - name: Apply stage 3 patch
         run: python .github/scripts/apply_i18n_stage3.py
