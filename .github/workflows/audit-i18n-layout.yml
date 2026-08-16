@@ -1,0 +1,45 @@
+name: Audit FH6 Assistant i18n layout
+
+on:
+  push:
+    branches:
+      - v1.2-work
+    paths:
+      - ".github/workflows/audit-i18n-layout.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout work branch
+        uses: actions/checkout@v6
+        with:
+          ref: v1.2-work
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r source-v1.2/requirements.txt
+
+      - name: Audit Korean and English layouts
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python .github/scripts/audit_i18n_layout.py
+
+      - name: Upload layout screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: FH6-i18n-layout-audit
+          path: ${{ runner.temp }}/fh6-i18n-layout
+          if-no-files-found: error
