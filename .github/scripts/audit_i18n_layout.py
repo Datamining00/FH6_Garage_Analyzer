@@ -4,12 +4,13 @@ import os
 import sys
 from pathlib import Path
 
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 ROOT = Path(__file__).resolve().parents[2] / "source-v1.2"
 sys.path.insert(0, str(ROOT))
 
 from PySide6.QtCore import QPoint, QSize, Qt
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QApplication,
     QAbstractButton,
@@ -153,6 +154,7 @@ def audit_state(window: MainWindow, language: str, size: QSize, page: int) -> li
 
 def main() -> int:
     app = QApplication([])
+    app.setFont(QFont("Segoe UI", 10))
     app.setApplicationName("FH6 Assistant Layout Audit")
     app.setOrganizationName("FH6AssistantCI")
 
