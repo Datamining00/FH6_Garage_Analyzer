@@ -988,7 +988,9 @@ class MainWindow(QMainWindow):
         body = QHBoxLayout()
         left = QFrame(); left.setObjectName("panel")
         left_l = QVBoxLayout(left); left_l.setContentsMargins(14, 14, 14, 14)
-        row = QHBoxLayout()
+        dashboard_controls = QGridLayout()
+        dashboard_controls.setHorizontalSpacing(7)
+        dashboard_controls.setVerticalSpacing(7)
 
         # Dashboard aggregation selector.  Vehicle aggregation remains the default,
         # while creator aggregation summarizes custom liveries and saved tunings.
@@ -1011,17 +1013,24 @@ class MainWindow(QMainWindow):
 
         self.car_search = QLineEdit()
         self.car_search.setPlaceholderText(tr("dashboard.search_vehicle"))
-        self.car_search.setFixedWidth(260)
+        self.car_search.setMinimumWidth(0)
+        self.car_search.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Fixed,
+        )
         self._connect_debounced_search(
             self.car_search,
             self._filter_dashboard_table,
         )
 
-        row.addWidget(self.dashboard_car_button)
-        row.addWidget(self.dashboard_creator_button)
-        row.addStretch(1)
-        row.addWidget(self.car_search)
-        left_l.addLayout(row)
+        # Keep the mode selectors on their own compact row and let the search
+        # field use the full panel width below. This avoids English text forcing
+        # the minimum window wider than the declared 960 px compact layout.
+        dashboard_controls.addWidget(self.dashboard_car_button, 0, 0)
+        dashboard_controls.addWidget(self.dashboard_creator_button, 0, 1)
+        dashboard_controls.setColumnStretch(2, 1)
+        dashboard_controls.addWidget(self.car_search, 1, 0, 1, 3)
+        left_l.addLayout(dashboard_controls)
 
         self.dashboard_content_stack = QStackedWidget()
 
@@ -1074,6 +1083,9 @@ class MainWindow(QMainWindow):
         left_l.addWidget(self.dashboard_content_stack)
 
         right = QFrame(); right.setObjectName("panel")
+        # The detail tables need enough horizontal room for Livery/Creator and
+        # Name/Creator/Size headers even at the 960 px minimum window width.
+        right.setMinimumWidth(280)
         right_l = QVBoxLayout(right); right_l.setContentsMargins(14, 14, 14, 14)
         self.selected_title = QLabel(tr("dashboard.select_vehicle"))
         self.selected_title.setStyleSheet("font-size:13pt;font-weight:700;")
