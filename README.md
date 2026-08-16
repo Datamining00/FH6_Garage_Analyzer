@@ -83,6 +83,8 @@ v1.1 개선을 통해 별도의 설치 과정은 필요하지 않게 되었습�
 
 디지털 서명이 없어 일부 백신 프로그램 또는 Windows Defender의 머신러닝·휴리스틱 검사에서 PyInstaller 기반 실행 파일이 오탐될 수 있습니다.
 
+virustotal 검사 결과: https://www.virustotal.com/gui/file/12d3483f30df3d2c11358915e5922459b69257fcf90208a4be00488123aca054
+
 SHA-256 파일은 프로그램 실행에 필요한 파일이 아니며 무결성 확인을 위한 선택 사항입니다.
 
 
