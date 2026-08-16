@@ -25,7 +25,7 @@ FH6의 실제 게임 저장 데이터와 프로그램의 사용자 설정 데이
 
 ## 설치 및 실행
 
-1. GitHub Releases에서 `FH6 Assistant v1.1.exe`를 내려받습니다.
+1. GitHub Releases에서 `FH6.Assistant.v1.2.exe`를 내려받습니다.
 2. 내려받은 EXE 파일을 실행합니다.
 3. 최초 실행 후 `세이브 폴더 선택`을 눌러 FH6의 로컬 저장 경로를 지정합니다.
 
@@ -83,7 +83,7 @@ v1.1 개선을 통해 별도의 설치 과정은 필요하지 않게 되었습�
 
 디지털 서명이 없어 일부 백신 프로그램 또는 Windows Defender의 머신러닝·휴리스틱 검사에서 PyInstaller 기반 실행 파일이 오탐될 수 있습니다.
 
-virustotal 검사 결과: https://www.virustotal.com/gui/file/12d3483f30df3d2c11358915e5922459b69257fcf90208a4be00488123aca054
+virustotal 검사 결과: https://www.virustotal.com/gui/file/e8196c2910e11b4b0bc86ca0f04af1017c13345e853d1ae5369f227c964424a6
 
 SHA-256 파일은 프로그램 실행에 필요한 파일이 아니며 무결성 확인을 위한 선택 사항입니다.
 
