@@ -8,6 +8,7 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 
 try:
+    from PySide6.QtCore import QSettings
     from PySide6.QtWidgets import QApplication
     from PySide6.QtGui import QFont, QIcon
 except ModuleNotFoundError as exc:
@@ -21,6 +22,7 @@ except ModuleNotFoundError as exc:
         raise SystemExit(2) from exc
     raise
 
+from fh6garage.i18n import DEFAULT_LANGUAGE, set_language
 from fh6garage.ui import MainWindow
 
 
@@ -38,6 +40,10 @@ def main() -> int:
     app.setApplicationName("FH6 Assistant")
     app.setApplicationVersion("1.1")
     app.setOrganizationName("LocalOnly")
+
+    # Resolve the persisted UI language before constructing any translated widgets.
+    settings = QSettings()
+    set_language(settings.value("language", DEFAULT_LANGUAGE, str))
 
     root = resource_root()
     icon_path = root / "icons" / "FH6_Assistant.ico"

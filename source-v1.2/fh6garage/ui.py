@@ -55,7 +55,7 @@ from .game_navigation import (
     NavigationItem,
     send_arrow_keys_to_fh6,
 )
-from .i18n import tr
+from .i18n import SUPPORTED_LANGUAGES, get_language, normalize_language, tr
 from .models import LiveryRecord, ScanResult, TuningRecord
 from .preferences import LocalPreferences
 from .scanner import SaveLayoutError, scan_save
@@ -727,6 +727,19 @@ class MainWindow(QMainWindow):
         field.returnPressed.connect(apply_now)
         self._search_debounce_timers[id(field)] = timer
 
+    @Slot(int)
+    def _on_language_preference_changed(self, index: int) -> None:
+        """Persist a language choice and apply it cleanly on the next launch."""
+        if index < 0:
+            return
+        raw_language = self.language_combo.itemData(index)
+        if not isinstance(raw_language, str):
+            return
+        normalized = normalize_language(raw_language)
+        self.settings.setValue("language", normalized)
+        if normalized != get_language():
+            self._show_status(tr("language.restart_required"), 6000)
+
     @Slot(bool)
     def _set_always_on_top(self, enabled: bool, *, persist: bool = True) -> None:
         """Apply the topmost flag without changing the current window size."""
@@ -823,6 +836,33 @@ class MainWindow(QMainWindow):
             self.nav_buttons.append(button)
             side.addWidget(button)
         side.addStretch(1)
+
+        self.language_label = QLabel(tr("language.label"))
+        self.language_label.setStyleSheet(
+            "color:#8d91a0; padding:0 6px 2px 6px; font-size:9pt;"
+        )
+        side.addWidget(self.language_label)
+
+        self.language_combo = QComboBox()
+        self.language_combo.setAccessibleName(tr("language.label"))
+        for language_code, display_name in SUPPORTED_LANGUAGES.items():
+            self.language_combo.addItem(display_name, language_code)
+        active_language_index = self.language_combo.findData(get_language())
+        if active_language_index >= 0:
+            self.language_combo.setCurrentIndex(active_language_index)
+        self.language_combo.setStyleSheet(
+            "QComboBox { background:#242632; color:#f0f1f5; "
+            "border:1px solid #343746; border-radius:7px; padding:6px 8px; }"
+            "QComboBox:hover { border-color:#6e4bf2; }"
+            "QComboBox::drop-down { border:0; width:22px; }"
+            "QComboBox QAbstractItemView { background:#242632; color:#f0f1f5; "
+            "selection-background-color:#6e4bf2; selection-color:white; }"
+        )
+        self.language_combo.currentIndexChanged.connect(
+            self._on_language_preference_changed
+        )
+        side.addWidget(self.language_combo)
+
         self.always_on_top_box = QCheckBox(tr("sidebar.always_on_top"))
         self.always_on_top_box.setStyleSheet(
             "QCheckBox { color:#c7c9d4; spacing:7px; padding:7px 6px; }"

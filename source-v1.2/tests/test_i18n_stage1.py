@@ -38,7 +38,6 @@ class I18nStage1Tests(unittest.TestCase):
     def test_main_ui_uses_translation_keys_for_stage1_controls(self) -> None:
         source = UI_SOURCE.read_text(encoding="utf-8")
         required = (
-            'from .i18n import tr',
             'tr("nav.dashboard")',
             'tr("sidebar.always_on_top")',
             'tr("save.placeholder")',
