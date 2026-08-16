@@ -1,4 +1,5 @@
 name: Inventory remaining FH6 Assistant i18n strings
+# Final Stage 3 audit
 
 on:
   push:
@@ -86,6 +87,6 @@ jobs:
           git add I18N_REMAINING_STAGE3.md
           git diff --cached --quiet
           if ($LASTEXITCODE -ne 0) {
-            git commit -m "Audit remaining i18n strings after stage 3"
+            git commit -m "Final i18n audit after stage 3"
             git push origin HEAD:v1.2-work
           }
