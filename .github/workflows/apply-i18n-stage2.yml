@@ -1,0 +1,118 @@
+name: Apply FH6 Assistant i18n stage 2
+
+on:
+  push:
+    branches:
+      - v1.2-work
+    paths:
+      - ".github/workflows/apply-i18n-stage2.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout work branch
+        uses: actions/checkout@v6
+        with:
+          ref: v1.2-work
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Patch livery and tuning UI strings
+        shell: pwsh
+        run: |
+          @'
+          from pathlib import Path
+
+          path = Path("source-v1.2/fh6garage/ui.py")
+          text = path.read_text(encoding="utf-8")
+
+          replacements = [
+              ('        (1, "check", True, "원 표시"),', '        (1, "check", True, "status.check"),'),
+              ('        (5, "triangle", True, "삼각형 표시"),', '        (5, "triangle", True, "status.triangle"),'),
+              ('        (7, "excluded", True, "X 표시"),', '        (7, "excluded", True, "status.excluded"),'),
+              ('        (10, "check", False, "분류 없음"),', '        (10, "check", False, "status.none"),'),
+              ('        (3, "memo", True, "메모 있음"),', '        (3, "memo", True, "status.memo_yes"),'),
+              ('        (4, "memo", False, "메모 없음"),', '        (4, "memo", False, "status.memo_no"),'),
+              ('        self.setText("필터")', '        self.setText(tr("common.filter"))'),
+              ('        self.setToolTip("상태 필터 · 여러 항목을 동시에 선택할 수 있습니다.")', '        self.setToolTip(tr("status.filter_tip"))'),
+              ('            entries.append((9, "duplicate", True, "중복 리버리만"))', '            entries.append((9, "duplicate", True, "status.duplicate_livery_only"))'),
+              ('        for mode, kind, active, meaning in entries:\n            label = "중복 리버리" if mode == 9 else meaning', '        for mode, kind, active, meaning_key in entries:\n            meaning = tr(meaning_key)\n            label = tr("status.duplicate_livery") if mode == 9 else meaning'),
+              ('        self.setText("필터" if not selected else f"필터 {selected}")', '        self.setText(tr("common.filter") if not selected else tr("common.filter_count", count=selected))'),
+              ('        layout.addLayout(self._page_header("저장 리버리", ""))', '        layout.addLayout(self._page_header(tr("dashboard.saved_livery"), ""))'),
+              ('        self.livery_table = self._saved_content_table("리버리 이름")', '        self.livery_table = self._saved_content_table(tr("table.livery_name"))'),
+              ('                "저장 튜닝",', '                tr("dashboard.saved_tuning"),'),
+              ('        self.tuning_table = self._saved_content_table("튜닝 이름")', '        self.tuning_table = self._saved_content_table(tr("table.tuning_name"))'),
+              ('                "상태",\n                "차량명",\n                "제작자",\n                name_header,\n                "설명",\n                "메모",\n                "생성일",\n                "다운로드일",', '                tr("table.status"),\n                tr("table.vehicle_name"),\n                tr("table.creator_short"),\n                name_header,\n                tr("table.description"),\n                tr("table.memo"),\n                tr("table.created"),\n                tr("table.downloaded"),'),
+              ('            "이름 / 제작자 / Car ID / 차량명 / 설명 / 메모 검색"', '            tr("content.search_placeholder")'),
+              ('        sort_label = QLabel("정렬:")', '        sort_label = QLabel(tr("content.sort_label"))'),
+              ('            ("default", "기본"),\n            ("brand", "브랜드명"),\n            ("creator", "제작자명"),\n            ("download", "다운로드"),', '            ("default", tr("content.sort_default")),\n            ("brand", tr("content.sort_brand")),\n            ("creator", tr("content.sort_creator")),\n            ("download", tr("content.sort_download")),'),
+              ('        group_button = QPushButton("동일 차량끼리 묶기")', '        group_button = QPushButton(tr("content.group_vehicle"))'),
+              ('            "같은 차량의 항목을 모으고 차량명과 현재 표시 개수를 구분 제목으로 표시합니다."', '            tr("content.group_vehicle_tip")'),
+              ('        path = QFileDialog.getExistingDirectory(self, "FH6 세이브 폴더 선택", start)', '        path = QFileDialog.getExistingDirectory(self, tr("save.folder_dialog"), start)'),
+              ('        self._begin_busy("세이브와 썸네일을 불러오는 중…")', '        self._begin_busy(tr("scan.loading"))'),
+              ('        self._show_status("세이브 스캔 중…")', '        self._show_status(tr("scan.scanning"))'),
+              ('        self._show_status(f"완료 — {sum(x.kind == \'Livery\' for x in result.liveries)} liveries / {len(result.tunings)} tunings", 8000)', '        self._show_status(tr("scan.complete", liveries=sum(x.kind == "Livery" for x in result.liveries), tunings=len(result.tunings)), 8000)'),
+              ('        self._show_status("스캔 실패", 5000)', '        self._show_status(tr("scan.failed"), 5000)'),
+              ('        QMessageBox.critical(self, "세이브 스캔 실패", message)', '        QMessageBox.critical(self, tr("scan.failed_title"), message)'),
+              ('        self._begin_busy("리버리 목록을 다시 구성하는 중…")', '        self._begin_busy(tr("content.rebuilding_livery"))'),
+              ('        label = "리버리" if content_type == "livery" else "튜닝"\n        self._begin_busy(f"{label} 목록을 정렬하는 중…")', '        noun = tr("content.noun_livery") if content_type == "livery" else tr("content.noun_tuning")\n        self._begin_busy(tr("content.sorting", noun=noun))'),
+              ('        labels = {\n            "default": "기본",\n            "brand": "브랜드명",\n            "creator": "제작자명",\n            "download": "다운로드",\n        }', '        labels = {\n            "default": tr("content.sort_default"),\n            "brand": tr("content.sort_brand"),\n            "creator": tr("content.sort_creator"),\n            "download": tr("content.sort_download"),\n        }'),
+              ('        noun = "리버리" if content_type == "livery" else "튜닝"', '        noun = tr("content.noun_livery") if content_type == "livery" else tr("content.noun_tuning")'),
+              ('                f"{labels[group_key]} · {noun} {len(group_cards)}개"', '                tr("content.group_header", vehicle=labels[group_key], noun=noun, count=len(group_cards))'),
+              ('                else "파일 생성 시각을 확인할 수 없습니다."', '                else tr("file.timestamp_unavailable")'),
+              ('        title = QLabel(f"리버리: {record.header.name or \'(제목 없음)\'}")', '        title = QLabel(tr("detail.livery_prefix", name=record.header.name or tr("detail.no_title")))'),
+              ('        layout.addWidget(QLabel("설명"))', '        layout.addWidget(QLabel(tr("detail.description")))'),
+              ('            (record.header.description or "").strip() or "설명 없음"', '            (record.header.description or "").strip() or tr("detail.no_description")'),
+              ('        uploaded = record.header.created or "확인 불가"', '        uploaded = record.header.created or tr("common.unavailable")'),
+              ('        layout.addWidget(QLabel(f"제작자 업로드 날짜: {uploaded}"))', '        layout.addWidget(QLabel(tr("detail.uploaded", date=uploaded)))'),
+              ('        dialog.setWindowTitle("튜닝 세부 정보")', '        dialog.setWindowTitle(tr("detail.tuning_title"))'),
+              ('            "[기본 정보]",', '            tr("detail.basic_info"),'),
+              ('            f"제목: {record.header.name or \'(제목 없음)\'}",', '            tr("detail.title_line", value=record.header.name or tr("detail.no_title")),'),
+              ('            f"제작자: {record.header.creator or \'—\'}",', '            tr("detail.creator_line", value=record.header.creator or "—"),'),
+              ('            f"설명: {(record.header.description or \'\').strip() or \'설명 없음\'}",', '            tr("detail.description_line", value=(record.header.description or "").strip() or tr("detail.no_description")),'),
+              ('            f"제작자 업로드 날짜: {record.header.created or \'확인 불가\'}",', '            tr("detail.uploaded", date=record.header.created or tr("common.unavailable")),'),
+              ('            lines.extend(("[Data 파일]", "Data 파일을 찾을 수 없습니다."))', '            lines.extend((tr("detail.data_file"), tr("detail.data_missing")))'),
+              ('                lines.extend(("[Data 파일]", f"세부 정보를 읽을 수 없습니다: {exc}"))', '                lines.extend((tr("detail.data_file"), tr("detail.read_failed", error=exc)))'),
+              ('                        "[Data 파일]",\n                        f"형식 버전: {parsed.format_version}",\n                        f"잠금 상태: {\'잠김\' if parsed.locked else \'잠기지 않음\'}",\n                        f"차량 Ordinal ID: {parsed.car_ordinal_id}",\n                        "",\n                        "[장착 부품 ID]",', '                        tr("detail.data_file"),\n                        tr("detail.format_version", value=parsed.format_version),\n                        tr("detail.lock_state", value=tr("detail.locked") if parsed.locked else tr("detail.unlocked")),\n                        tr("detail.car_ordinal", value=parsed.car_ordinal_id),\n                        "",\n                        tr("detail.installed_parts"),'),
+              ('                lines.extend(("", "[세부 튜닝 값]"))', '                lines.extend(("", tr("detail.tuning_values")))'),
+              ('                            "[검증 참고]",\n                            f"header Car ID: {record.header.car_id}",\n                            f"Data Ordinal ID: {parsed.car_ordinal_id}",', '                            tr("detail.validation"),\n                            tr("detail.header_car_id", value=record.header.car_id),\n                            tr("detail.data_ordinal", value=parsed.car_ordinal_id),'),
+          ]
+
+          for old, new in replacements:
+              count = text.count(old)
+              if count == 0:
+                  raise SystemExit(f"Expected source fragment was not found: {old}")
+              text = text.replace(old, new, 1)
+
+          text = text.replace('close_button = QPushButton("닫기")', 'close_button = QPushButton(tr("common.close"))')
+          path.write_text(text, encoding="utf-8")
+          '@ | Set-Content -Path apply_stage2.py -Encoding UTF8
+          python apply_stage2.py
+          Remove-Item apply_stage2.py -Force
+
+      - name: Compile and run regression tests
+        shell: pwsh
+        run: |
+          Set-Location source-v1.2
+          python -m compileall -q .
+          python -m unittest discover -s tests -v
+
+      - name: Commit stage 2 source patch
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add source-v1.2/fh6garage/ui.py
+          git diff --cached --quiet
+          if ($LASTEXITCODE -ne 0) {
+            git commit -m "Localize livery tuning pages and detail dialogs"
+            git push origin HEAD:v1.2-work
+          }
