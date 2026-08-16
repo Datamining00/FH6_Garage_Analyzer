@@ -45,7 +45,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add source-v1.2/app.py source-v1.2/fh6garage/ui.py source-v1.2/tests/test_language_selector.py
+          git add source-v1.2/app.py source-v1.2/fh6garage/ui.py source-v1.2/tests/test_i18n_stage1.py source-v1.2/tests/test_language_selector.py
           git diff --cached --quiet
           if ($LASTEXITCODE -ne 0) {
             git commit -m "Add persistent language selector"
