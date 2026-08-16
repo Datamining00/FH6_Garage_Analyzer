@@ -48,9 +48,9 @@ jobs:
       - name: Verify v1.1 source baseline remains untouched
         shell: pwsh
         run: |
-          $expected = (Select-String -Path "SOURCE_BASELINE_v1.1.sha256" -Pattern "fh6garage\\scanner.py$").Line.Split(' ')[0]
-          $actual = (Get-FileHash "source-v1.1\fh6garage\scanner.py" -Algorithm SHA256).Hash.ToLower()
+          $expected = "757cf0349b9b2240273c99f892497e3f89438333"
+          $actual = (git rev-parse "HEAD:source-v1.1").Trim()
           if ($actual -ne $expected) {
-            throw "v1.1 baseline scanner.py changed. Expected $expected, got $actual"
+            throw "v1.1 baseline tree changed. Expected $expected, got $actual"
           }
-          Write-Host "v1.1 baseline preserved: $actual"
+          Write-Host "v1.1 baseline tree preserved: $actual"
