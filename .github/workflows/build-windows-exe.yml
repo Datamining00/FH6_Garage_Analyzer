@@ -1,0 +1,101 @@
+name: Build Windows EXE
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/build-windows-exe.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download current v1.0 source package
+        shell: pwsh
+        run: |
+          $url = "https://github.com/Datamining00/FH6_Garage_Analyzer/releases/download/FH6_Assistant/FH6_Assistant_v1.0.zip"
+          Invoke-WebRequest -Uri $url -OutFile source.zip
+          Expand-Archive -Path source.zip -DestinationPath source -Force
+
+          $app = Get-ChildItem -Path source -Filter app.py -Recurse | Select-Object -First 1
+          if (-not $app) {
+            throw "app.py was not found in the release archive."
+          }
+
+          $appDir = $app.Directory.FullName
+          if (-not (Test-Path (Join-Path $appDir "requirements.txt"))) {
+            throw "requirements.txt was not found next to app.py."
+          }
+          if (-not (Test-Path (Join-Path $appDir "data\car_names.json"))) {
+            throw "data\car_names.json was not found."
+          }
+          if (-not (Test-Path (Join-Path $appDir "icons\icon_A_garage.ico"))) {
+            throw "icons\icon_A_garage.ico was not found."
+          }
+
+          "APP_DIR=$appDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          Set-Location $env:APP_DIR
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install --upgrade pyinstaller
+
+      - name: Build FH6 Assistant
+        shell: pwsh
+        run: |
+          Set-Location $env:APP_DIR
+
+          pyinstaller `
+            --noconfirm `
+            --clean `
+            --windowed `
+            --onedir `
+            --name "FH6 Assistant" `
+            --icon "icons\icon_A_garage.ico" `
+            --add-data "data:data" `
+            app.py
+
+          $exe = Join-Path $env:APP_DIR "dist\FH6 Assistant\FH6 Assistant.exe"
+          if (-not (Test-Path $exe)) {
+            throw "FH6 Assistant.exe was not created."
+          }
+
+      - name: Prepare artifact
+        shell: pwsh
+        run: |
+          $output = Join-Path $env:GITHUB_WORKSPACE "artifact\FH6 Assistant"
+          New-Item -ItemType Directory -Force -Path $output | Out-Null
+          Copy-Item -Path (Join-Path $env:APP_DIR "dist\FH6 Assistant\*") -Destination $output -Recurse -Force
+
+          @"
+          FH6 Assistant
+          =============
+
+          FH6 Assistant.exe를 실행하면 됩니다.
+
+          별도의 Python 또는 PySide6 설치가 필요하지 않습니다.
+          run.bat 및 VBS 파일도 필요하지 않습니다.
+
+          프로그램 설정과 메모는 기존과 동일하게
+          %LOCALAPPDATA%\FH6GarageAnalyzer 에 저장됩니다.
+          "@ | Set-Content -Path (Join-Path $output "README.txt") -Encoding UTF8
+
+      - name: Upload Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: FH6_Assistant_Windows_v1.0
+          path: artifact/FH6 Assistant
+          if-no-files-found: error
+          compression-level: 9
