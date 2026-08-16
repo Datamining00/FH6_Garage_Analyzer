@@ -1227,7 +1227,7 @@ class MainWindow(QMainWindow):
         """Create the common list component used by Livery and Tuning.
 
         Visible columns intentionally stay identical:
-        상태 | 차량명 | 제작자 | 이름 | 설명 | 메모 | 생성일 | 다운로드일
+        Status | Vehicle | Creator | Name | Description | Memo | Created | Downloaded
 
         The future detail column is deliberately omitted until the supporting
         database/schema mapping is available.
@@ -4651,7 +4651,7 @@ class MainWindow(QMainWindow):
                 clean_note = (note or "").strip()
                 memo_button.setIcon(self._detail_memo_icon(bool(clean_note)))
                 memo_button.setToolTip(
-                    (clean_note + "\n\n클릭하여 메모 수정")
+                    (clean_note + tr("memo.edit_suffix"))
                     if clean_note
                     else tr("memo.none_add")
                 )
