@@ -54,3 +54,5 @@ jobs:
             throw "v1.1 baseline tree changed. Expected $expected, got $actual"
           }
           Write-Host "v1.1 baseline tree preserved: $actual"
+
+# Final v1.2 pre-build verification trigger.
