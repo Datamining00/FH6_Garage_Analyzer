@@ -42,5 +42,3 @@ jobs:
         run: |
           Set-Location source-v1.2
           python -m unittest discover -s tests -v
-
-# Manual verification trigger after persistent language selector integration.
