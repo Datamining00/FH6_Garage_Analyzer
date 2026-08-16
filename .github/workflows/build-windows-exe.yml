@@ -1,73 +1,113 @@
-name: Build Windows EXE
+name: Build FH6 Assistant v1.1
 
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
+      - build-v1.1
     paths:
       - ".github/workflows/build-windows-exe.yml"
+      - ".github/build-assets/v1.1/**"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
     runs-on: windows-latest
 
     steps:
+      - name: Checkout build assets
+        uses: actions/checkout@v4
+
       - name: Set up Python 3.12
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Download current v1.0 source package
+      - name: Download exact v1.0 source package
         shell: pwsh
         run: |
           $url = "https://github.com/Datamining00/FH6_Garage_Analyzer/releases/download/FH6_Assistant/FH6_Assistant_v1.0.zip"
           Invoke-WebRequest -Uri $url -OutFile source.zip
+
+          $expected = "048b440aacb7787354292f954d0408b9fdd57be36078cdc66beeaa7c3eab1f72"
+          $actual = (Get-FileHash source.zip -Algorithm SHA256).Hash.ToLower()
+          if ($actual -ne $expected) {
+            throw "v1.0 source digest mismatch. Expected $expected, got $actual"
+          }
+
           Expand-Archive -Path source.zip -DestinationPath source -Force
-
           $app = Get-ChildItem -Path source -Filter app.py -Recurse | Select-Object -First 1
-          if (-not $app) { throw "app.py was not found in the release archive." }
-
+          if (-not $app) { throw "app.py was not found in the v1.0 release archive." }
           $appDir = $app.Directory.FullName
-          if (-not (Test-Path (Join-Path $appDir "requirements.txt"))) { throw "requirements.txt was not found next to app.py." }
-          if (-not (Test-Path (Join-Path $appDir "data\car_names.json"))) { throw "data\car_names.json was not found." }
-          if (-not (Test-Path (Join-Path $appDir "icons\icon_A_garage.ico"))) { throw "icons\icon_A_garage.ico was not found." }
-          if (-not (Test-Path (Join-Path $appDir "fh6garage\ui.py"))) { throw "fh6garage\ui.py was not found." }
-
           "APP_DIR=$appDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-      - name: Patch initial thumbnail refresh
+      - name: Reconstruct v1.1 patch and final icon
         shell: pwsh
         run: |
-          $patchScript = @'
+          @'
+          import base64
+          import gzip
+          import os
           from pathlib import Path
 
-          p = Path("fh6garage/ui.py")
-          s = p.read_text(encoding="utf-8")
+          workspace = Path(os.environ["GITHUB_WORKSPACE"])
+          app_dir = Path(os.environ["APP_DIR"])
+          asset_dir = workspace / ".github" / "build-assets" / "v1.1"
 
-          old = """        self.pages = QStackedWidget()\n        self.pages.addWidget(self._dashboard_page())\n        self.pages.addWidget(self._livery_page())\n        self.pages.addWidget(self._tuning_page())\n        content_layout.addWidget(self.pages, 1)\n"""
-          new = """        self.pages = QStackedWidget()\n        self.pages.addWidget(self._dashboard_page())\n        self.pages.addWidget(self._livery_page())\n        self.pages.addWidget(self._tuning_page())\n        self.pages.currentChanged.connect(self._on_main_page_changed)\n        content_layout.addWidget(self.pages, 1)\n"""
-          if old not in s:
-              raise SystemExit("QStackedWidget initialization block was not found")
-          s = s.replace(old, new, 1)
+          def decode_parts(prefix: str) -> bytes:
+              parts = sorted(asset_dir.glob(prefix + ".part*"))
+              if not parts:
+                  raise RuntimeError(f"No build asset parts found for {prefix}")
+              encoded = "".join(
+                  part.read_text(encoding="ascii").strip() for part in parts
+              )
+              return gzip.decompress(base64.b64decode(encoded))
 
-          anchor = """    def _schedule_visible_livery_thumbnails(self) -> None:\n        QTimer.singleShot(0, self._refresh_visible_livery_thumbnails)\n"""
-          insert = """    @Slot(int)\n    def _on_main_page_changed(self, index: int) -> None:\n        if index == 1:\n            QTimer.singleShot(0, self._sync_livery_grid_card_widths)\n            QTimer.singleShot(0, self._refresh_visible_livery_thumbnails)\n            QTimer.singleShot(30, self._refresh_visible_livery_thumbnails)\n        elif index == 2:\n            QTimer.singleShot(0, self._sync_tuning_grid_card_widths)\n            QTimer.singleShot(0, self._refresh_visible_tuning_thumbnails)\n            QTimer.singleShot(30, self._refresh_visible_tuning_thumbnails)\n\n    def _schedule_visible_livery_thumbnails(self) -> None:\n        QTimer.singleShot(0, self._refresh_visible_livery_thumbnails)\n"""
-          if anchor not in s:
-              raise SystemExit("thumbnail scheduling method was not found")
-          s = s.replace(anchor, insert, 1)
+          patch = decode_parts("patch")
+          icon = decode_parts("icon")
 
-          p.write_text(s, encoding="utf-8")
-          '@
+          (workspace / "v1.1.patch").write_bytes(patch)
+          icon_path = app_dir / "icons" / "FH6_Assistant.ico"
+          icon_path.write_bytes(icon)
 
+          if len(patch) < 60000:
+              raise RuntimeError(f"Reconstructed patch is unexpectedly small: {len(patch)}")
+          if len(icon) < 20000 or icon[:4] != b"\x00\x00\x01\x00":
+              raise RuntimeError("Reconstructed FH6_Assistant.ico is invalid")
+
+          print(f"Patch bytes: {len(patch)}")
+          print(f"Icon bytes: {len(icon)}")
+          '@ | Set-Content -Path reconstruct_assets.py -Encoding UTF8
+
+          python reconstruct_assets.py
+
+      - name: Apply final v1.1 source changes
+        shell: pwsh
+        run: |
           Set-Location $env:APP_DIR
-          $patchScript | Set-Content -Path patch_thumbnails.py -Encoding UTF8
-          python patch_thumbnails.py
-          Remove-Item patch_thumbnails.py
-          python -m compileall -q .
+          git apply (Join-Path $env:GITHUB_WORKSPACE "v1.1.patch")
 
-      - name: Install dependencies
+          if (Test-Path "fh6garage\thumbnail_labeler.py") {
+            throw "Obsolete thumbnail write module still exists after applying the v1.1 patch."
+          }
+
+          python -m compileall -q .
+          python -c "import json,pathlib; d=json.loads(pathlib.Path('data/car_names.json').read_text(encoding='utf-8')); assert len(d)==660, f'Expected 660 embedded cars, got {len(d)}'; print(f'Embedded car database: {len(d)} entries')"
+
+          if (-not (Select-String -Path "fh6garage\ui.py" -Pattern "FH6 Assistant v1.1" -Quiet)) {
+            throw "v1.1 window title was not found in ui.py."
+          }
+          if (-not (Test-Path "FH6_Assistant_v1.1.spec")) {
+            throw "FH6_Assistant_v1.1.spec was not created."
+          }
+          if (-not (Test-Path "version_info.txt")) {
+            throw "version_info.txt was not created."
+          }
+
+      - name: Install build dependencies
         shell: pwsh
         run: |
           Set-Location $env:APP_DIR
@@ -75,47 +115,59 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install --upgrade pyinstaller
 
-      - name: Build FH6 Assistant
+      - name: Build single Windows EXE
         shell: pwsh
         run: |
           Set-Location $env:APP_DIR
-          pyinstaller `
-            --noconfirm `
-            --clean `
-            --windowed `
-            --onedir `
-            --name "FH6 Assistant" `
-            --icon "icons\icon_A_garage.ico" `
-            --add-data "data:data" `
-            app.py
+          pyinstaller --clean --noconfirm .\FH6_Assistant_v1.1.spec
 
-          $exe = Join-Path $env:APP_DIR "dist\FH6 Assistant\FH6 Assistant.exe"
-          if (-not (Test-Path $exe)) { throw "FH6 Assistant.exe was not created." }
+          $exe = Join-Path $env:APP_DIR "dist\FH6 Assistant v1.1.exe"
+          if (-not (Test-Path $exe)) {
+            throw "FH6 Assistant v1.1.exe was not created."
+          }
 
-      - name: Prepare artifact
-        shell: pwsh
-        run: |
-          $output = Join-Path $env:GITHUB_WORKSPACE "artifact\FH6 Assistant"
-          New-Item -ItemType Directory -Force -Path $output | Out-Null
-          Copy-Item -Path (Join-Path $env:APP_DIR "dist\FH6 Assistant\*") -Destination $output -Recurse -Force
+          $artifactDir = Join-Path $env:GITHUB_WORKSPACE "artifact"
+          New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+          Copy-Item $exe (Join-Path $artifactDir "FH6 Assistant v1.1.exe") -Force
 
-          @"
-          FH6 Assistant
-          =============
+          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
+          "$hash  FH6 Assistant v1.1.exe" | Set-Content -Path (Join-Path $artifactDir "FH6 Assistant v1.1.exe.sha256") -Encoding ascii
+          Write-Host "EXE SHA-256: $hash"
 
-          FH6 Assistant.exe를 실행하면 됩니다.
-
-          별도의 Python 또는 PySide6 설치가 필요하지 않습니다.
-          run.bat 및 VBS 파일도 필요하지 않습니다.
-
-          프로그램 설정과 메모는 기존과 동일하게
-          %LOCALAPPDATA%\FH6GarageAnalyzer 에 저장됩니다.
-          "@ | Set-Content -Path (Join-Path $output "README.txt") -Encoding UTF8
-
-      - name: Upload Windows build
-        uses: actions/upload-artifact@v6
+      - name: Upload Windows build artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: FH6_Assistant_Windows_v1.0
-          path: artifact/FH6 Assistant
+          name: FH6_Assistant_Windows_v1.1
+          path: |
+            artifact/FH6 Assistant v1.1.exe
+            artifact/FH6 Assistant v1.1.exe.sha256
           if-no-files-found: error
-          compression-level: 9
+          compression-level: 0
+
+      - name: Publish GitHub Release v1.1
+        if: github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          @'
+          FH6 Assistant v1.1
+
+          - 초기 리버리/튜닝 썸네일 표시 문제 수정
+          - FH6 세이브 썸네일 수정/백업/복구 기능 제거
+          - FH6 Assistant 전용 프로그램/EXE 아이콘 적용
+          - 2026-08-16 기준 최신 HDR Car Ordinals 660개 기본 내장
+          - Windows 단일 EXE 배포
+
+          차량 ID 및 튜닝 데이터 구조 출처와 감사 표기는 저장소 README를 참고하세요.
+          '@ | Set-Content -Path release-notes.md -Encoding UTF8
+
+          $tag = "v1.1"
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release edit $tag --title "FH6 Assistant v1.1" --notes-file release-notes.md
+            gh release upload $tag "artifact\FH6 Assistant v1.1.exe" "artifact\FH6 Assistant v1.1.exe.sha256" --clobber
+          }
+          else {
+            gh release create $tag "artifact\FH6 Assistant v1.1.exe" "artifact\FH6 Assistant v1.1.exe.sha256" --target $env:GITHUB_SHA --title "FH6 Assistant v1.1" --notes-file release-notes.md
+          }
