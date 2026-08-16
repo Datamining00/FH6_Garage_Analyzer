@@ -222,30 +222,31 @@ class MultiStatusFilterButton(QToolButton):
     selectionChanged = Signal()
 
     FILTERS = (
-        (1, "check", True, "원 표시"),
-        (5, "triangle", True, "삼각형 표시"),
-        (7, "excluded", True, "X 표시"),
-        (10, "check", False, "분류 없음"),
-        (3, "memo", True, "메모 있음"),
-        (4, "memo", False, "메모 없음"),
+        (1, "check", True, "status.check"),
+        (5, "triangle", True, "status.triangle"),
+        (7, "excluded", True, "status.excluded"),
+        (10, "check", False, "status.none"),
+        (3, "memo", True, "status.memo_yes"),
+        (4, "memo", False, "status.memo_no"),
     )
 
     def __init__(self, include_duplicate: bool, parent=None) -> None:
         super().__init__(parent)
-        self.setText("필터")
+        self.setText(tr("common.filter"))
         self.setObjectName("secondaryFilterButton")
         self.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-        self.setToolTip("상태 필터 · 여러 항목을 동시에 선택할 수 있습니다.")
+        self.setToolTip(tr("status.filter_tip"))
         self._actions: dict[int, QPushButton] = {}
         menu = PersistentFilterMenu(self)
         menu.setToolTipsVisible(True)
         menu.setMinimumWidth(178)
         entries = list(self.FILTERS)
         if include_duplicate:
-            entries.append((9, "duplicate", True, "중복 리버리만"))
-        for mode, kind, active, meaning in entries:
-            label = "중복 리버리" if mode == 9 else meaning
+            entries.append((9, "duplicate", True, "status.duplicate_livery_only"))
+        for mode, kind, active, meaning_key in entries:
+            meaning = tr(meaning_key)
+            label = tr("status.duplicate_livery") if mode == 9 else meaning
             row = QPushButton(label)
             row.setCheckable(True)
             row.setIcon(QIcon(_classification_pixmap(kind, active)))
@@ -292,7 +293,7 @@ class MultiStatusFilterButton(QToolButton):
 
     def _changed(self) -> None:
         selected = len(self.selected_modes())
-        self.setText("필터" if not selected else f"필터 {selected}")
+        self.setText(tr("common.filter") if not selected else tr("common.filter_count", count=selected))
         self.selectionChanged.emit()
 
     def selected_modes(self) -> set[int]:
@@ -1069,7 +1070,7 @@ class MainWindow(QMainWindow):
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addLayout(self._page_header("저장 리버리", ""))
+        layout.addLayout(self._page_header(tr("dashboard.saved_livery"), ""))
 
         (
             controls,
@@ -1080,7 +1081,7 @@ class MainWindow(QMainWindow):
         ) = self._build_saved_content_controls("livery")
         layout.addLayout(controls)
 
-        self.livery_table = self._saved_content_table("리버리 이름")
+        self.livery_table = self._saved_content_table(tr("table.livery_name"))
         self.livery_table.setParent(page)
         self.livery_table.hide()
 
@@ -1141,7 +1142,7 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addLayout(
             self._page_header(
-                "저장 튜닝",
+                tr("dashboard.saved_tuning"),
                 "",
             )
         )
@@ -1154,7 +1155,7 @@ class MainWindow(QMainWindow):
             self.tuning_sort_buttons,
         ) = self._build_saved_content_controls("tuning")
         layout.addLayout(controls)
-        self.tuning_table = self._saved_content_table("튜닝 이름")
+        self.tuning_table = self._saved_content_table(tr("table.tuning_name"))
         self.tuning_table.setParent(page)
         self.tuning_table.hide()
 
@@ -1231,14 +1232,14 @@ class MainWindow(QMainWindow):
         """
         table = self._table(
             (
-                "상태",
-                "차량명",
-                "제작자",
+                tr("table.status"),
+                tr("table.vehicle_name"),
+                tr("table.creator_short"),
                 name_header,
-                "설명",
-                "메모",
-                "생성일",
-                "다운로드일",
+                tr("table.description"),
+                tr("table.memo"),
+                tr("table.created"),
+                tr("table.downloaded"),
             )
         )
         table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -1290,7 +1291,7 @@ class MainWindow(QMainWindow):
 
         search = QLineEdit()
         search.setPlaceholderText(
-            "이름 / 제작자 / Car ID / 차량명 / 설명 / 메모 검색"
+            tr("content.search_placeholder")
         )
         self._connect_debounced_search(
             search,
@@ -1307,7 +1308,7 @@ class MainWindow(QMainWindow):
         search_row.addWidget(status_filter)
         controls.addLayout(search_row)
 
-        sort_label = QLabel("정렬:")
+        sort_label = QLabel(tr("content.sort_label"))
         sort_label.setObjectName("muted")
         action_row.addWidget(sort_label)
 
@@ -1316,10 +1317,10 @@ class MainWindow(QMainWindow):
         sort_buttons: dict[str, QPushButton] = {}
 
         for mode, label_text in (
-            ("default", "기본"),
-            ("brand", "브랜드명"),
-            ("creator", "제작자명"),
-            ("download", "다운로드"),
+            ("default", tr("content.sort_default")),
+            ("brand", tr("content.sort_brand")),
+            ("creator", tr("content.sort_creator")),
+            ("download", tr("content.sort_download")),
         ):
             button = QPushButton(label_text)
             button.setObjectName("secondary")
@@ -1334,7 +1335,7 @@ class MainWindow(QMainWindow):
             sort_buttons[mode] = button
             action_row.addWidget(button)
 
-        group_button = QPushButton("동일 차량끼리 묶기")
+        group_button = QPushButton(tr("content.group_vehicle"))
         group_button.setObjectName("secondary")
         group_button.setCheckable(True)
         group_button.setChecked(
@@ -1344,7 +1345,7 @@ class MainWindow(QMainWindow):
             )
         )
         group_button.setToolTip(
-            "같은 차량의 항목을 모으고 차량명과 현재 표시 개수를 구분 제목으로 표시합니다."
+            tr("content.group_vehicle_tip")
         )
         group_button.toggled.connect(
             lambda checked, kind=content_type:
@@ -1384,7 +1385,7 @@ class MainWindow(QMainWindow):
     @Slot()
     def choose_save_folder(self) -> None:
         start = self.path_edit.text() or str(Path.home())
-        path = QFileDialog.getExistingDirectory(self, "FH6 세이브 폴더 선택", start)
+        path = QFileDialog.getExistingDirectory(self, tr("save.folder_dialog"), start)
         if path:
             self.path_edit.setText(path)
             self.settings.setValue("last_save_path", path)
@@ -1400,8 +1401,8 @@ class MainWindow(QMainWindow):
     def start_scan(self, path: Path) -> None:
         if self._scan_thread and self._scan_thread.isRunning():
             return
-        self._begin_busy("세이브와 썸네일을 불러오는 중…")
-        self._show_status("세이브 스캔 중…")
+        self._begin_busy(tr("scan.loading"))
+        self._show_status(tr("scan.scanning"))
         thread = QThread(self)
         worker = ScanWorker(path, self.car_db)
         worker.moveToThread(thread)
@@ -1431,13 +1432,13 @@ class MainWindow(QMainWindow):
             self._populate_all()
         finally:
             self._end_busy()
-        self._show_status(f"완료 — {sum(x.kind == 'Livery' for x in result.liveries)} liveries / {len(result.tunings)} tunings", 8000)
+        self._show_status(tr("scan.complete", liveries=sum(x.kind == "Livery" for x in result.liveries), tunings=len(result.tunings)), 8000)
 
     @Slot(str)
     def _scan_failed(self, message: str) -> None:
         self._end_busy()
-        self._show_status("스캔 실패", 5000)
-        QMessageBox.critical(self, "세이브 스캔 실패", message)
+        self._show_status(tr("scan.failed"), 5000)
+        QMessageBox.critical(self, tr("scan.failed_title"), message)
 
     def _populate_all(self) -> None:
         assert self.result is not None
@@ -1449,7 +1450,7 @@ class MainWindow(QMainWindow):
         self.card_tuning.value.setText(str(len(r.tunings)))
         self._populate_car_table()
         self._populate_creator_table()
-        self._begin_busy("리버리 목록을 다시 구성하는 중…")
+        self._begin_busy(tr("content.rebuilding_livery"))
         try:
             self._populate_livery_table()
         finally:
@@ -1820,8 +1821,8 @@ class MainWindow(QMainWindow):
         if mode not in {"default", "brand", "creator", "download"}:
             return
 
-        label = "리버리" if content_type == "livery" else "튜닝"
-        self._begin_busy(f"{label} 목록을 정렬하는 중…")
+        noun = tr("content.noun_livery") if content_type == "livery" else tr("content.noun_tuning")
+        self._begin_busy(tr("content.sorting", noun=noun))
         try:
             # Download order is a flat chronology. Disable grouping when the
             # mode is selected, but do not lock it: the user may re-enable the
@@ -1877,10 +1878,10 @@ class MainWindow(QMainWindow):
             else self._tuning_sort_descending
         )
         labels = {
-            "default": "기본",
-            "brand": "브랜드명",
-            "creator": "제작자명",
-            "download": "다운로드",
+            "default": tr("content.sort_default"),
+            "brand": tr("content.sort_brand"),
+            "creator": tr("content.sort_creator"),
+            "download": tr("content.sort_download"),
         }
         for key, button in buttons.items():
             arrow = ("↓" if descending else "↑") if key == mode else ""
@@ -2302,7 +2303,7 @@ class MainWindow(QMainWindow):
             downloaded_item.setToolTip(
                 downloaded_text
                 if record.downloaded_at is not None
-                else "파일 생성 시각을 확인할 수 없습니다."
+                else tr("file.timestamp_unavailable")
             )
             table.setItem(row, 7, downloaded_item)
 
@@ -2505,7 +2506,7 @@ class MainWindow(QMainWindow):
             if content_type == "livery"
             else self._tuning_group_headers
         )
-        noun = "리버리" if content_type == "livery" else "튜닝"
+        noun = tr("content.noun_livery") if content_type == "livery" else tr("content.noun_tuning")
         row = 0
         for group_key, group_cards in grouped.items():
             header = headers.get(group_key)
@@ -2520,7 +2521,7 @@ class MainWindow(QMainWindow):
                 header.setMinimumHeight(38)
                 headers[group_key] = header
             header.setText(
-                f"{labels[group_key]} · {noun} {len(group_cards)}개"
+                tr("content.group_header", vehicle=labels[group_key], noun=noun, count=len(group_cards))
             )
             layout.addWidget(header, row, 0, 1, 2)
             header.setVisible(True)
@@ -4045,19 +4046,19 @@ class MainWindow(QMainWindow):
         vehicle = QLabel(self._car_label(record.header.car_id))
         vehicle.setStyleSheet("font-size:13pt;font-weight:700;")
         layout.addWidget(vehicle)
-        title = QLabel(f"리버리: {record.header.name or '(제목 없음)'}")
+        title = QLabel(tr("detail.livery_prefix", name=record.header.name or tr("detail.no_title")))
         title.setObjectName("muted")
         layout.addWidget(title)
-        layout.addWidget(QLabel("설명"))
+        layout.addWidget(QLabel(tr("detail.description")))
         description = QPlainTextEdit()
         description.setReadOnly(True)
         description.setPlainText(
-            (record.header.description or "").strip() or "설명 없음"
+            (record.header.description or "").strip() or tr("detail.no_description")
         )
         layout.addWidget(description, 1)
-        uploaded = record.header.created or "확인 불가"
-        layout.addWidget(QLabel(f"제작자 업로드 날짜: {uploaded}"))
-        close_button = QPushButton("닫기")
+        uploaded = record.header.created or tr("common.unavailable")
+        layout.addWidget(QLabel(tr("detail.uploaded", date=uploaded)))
+        close_button = QPushButton(tr("common.close"))
         close_button.setObjectName("primary")
         close_button.clicked.connect(dialog.accept)
         row = QHBoxLayout()
@@ -4068,7 +4069,7 @@ class MainWindow(QMainWindow):
 
     def _show_tuning_details(self, record: TuningRecord) -> None:
         dialog = QDialog(self)
-        dialog.setWindowTitle("튜닝 세부 정보")
+        dialog.setWindowTitle(tr("detail.tuning_title"))
         dialog.setModal(True)
         dialog.resize(720, 720)
         dialog.setStyleSheet(APP_STYLE)
@@ -4084,36 +4085,36 @@ class MainWindow(QMainWindow):
         details.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
 
         lines = [
-            "[기본 정보]",
-            f"제목: {record.header.name or '(제목 없음)'}",
-            f"제작자: {record.header.creator or '—'}",
-            f"설명: {(record.header.description or '').strip() or '설명 없음'}",
-            f"제작자 업로드 날짜: {record.header.created or '확인 불가'}",
+            tr("detail.basic_info"),
+            tr("detail.title_line", value=record.header.name or tr("detail.no_title")),
+            tr("detail.creator_line", value=record.header.creator or "—"),
+            tr("detail.description_line", value=(record.header.description or "").strip() or tr("detail.no_description")),
+            tr("detail.uploaded", date=record.header.created or tr("common.unavailable")),
             "",
         ]
         if record.data_path is None:
-            lines.extend(("[Data 파일]", "Data 파일을 찾을 수 없습니다."))
+            lines.extend((tr("detail.data_file"), tr("detail.data_missing")))
         else:
             try:
                 parsed = read_tune_data(record.data_path)
             except TuneDataError as exc:
-                lines.extend(("[Data 파일]", f"세부 정보를 읽을 수 없습니다: {exc}"))
+                lines.extend((tr("detail.data_file"), tr("detail.read_failed", error=exc)))
             else:
                 lines.extend(
                     (
-                        "[Data 파일]",
-                        f"형식 버전: {parsed.format_version}",
-                        f"잠금 상태: {'잠김' if parsed.locked else '잠기지 않음'}",
-                        f"차량 Ordinal ID: {parsed.car_ordinal_id}",
+                        tr("detail.data_file"),
+                        tr("detail.format_version", value=parsed.format_version),
+                        tr("detail.lock_state", value=tr("detail.locked") if parsed.locked else tr("detail.unlocked")),
+                        tr("detail.car_ordinal", value=parsed.car_ordinal_id),
                         "",
-                        "[장착 부품 ID]",
+                        tr("detail.installed_parts"),
                     )
                 )
                 lines.extend(
                     f"0x{offset:04X}  {label}: 0x{value:08X}"
                     for offset, label, value in parsed.parts
                 )
-                lines.extend(("", "[세부 튜닝 값]"))
+                lines.extend(("", tr("detail.tuning_values")))
                 lines.extend(
                     f"0x{offset:04X}  {label}: {value:.6g}"
                     for offset, label, value in parsed.values
@@ -4122,14 +4123,14 @@ class MainWindow(QMainWindow):
                     lines.extend(
                         (
                             "",
-                            "[검증 참고]",
-                            f"header Car ID: {record.header.car_id}",
-                            f"Data Ordinal ID: {parsed.car_ordinal_id}",
+                            tr("detail.validation"),
+                            tr("detail.header_car_id", value=record.header.car_id),
+                            tr("detail.data_ordinal", value=parsed.car_ordinal_id),
                         )
                     )
         details.setPlainText("\n".join(lines))
         layout.addWidget(details, 1)
-        close_button = QPushButton("닫기")
+        close_button = QPushButton(tr("common.close"))
         close_button.setObjectName("primary")
         close_button.clicked.connect(dialog.accept)
         row = QHBoxLayout()
