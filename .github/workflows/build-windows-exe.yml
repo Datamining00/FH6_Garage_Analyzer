@@ -95,7 +95,7 @@ jobs:
           }
 
           python -m compileall -q .
-          python -c "import json,pathlib; d=json.loads(pathlib.Path('data/car_names.json').read_text(encoding='utf-8')); assert len(d)==660, f'Expected 660 embedded cars, got {len(d)}'; print(f'Embedded car database: {len(d)} entries')"
+          python -c "import json,pathlib; d=json.loads(pathlib.Path('data/car_names.json').read_text(encoding='utf-8')); cars=d.get('cars',{}); assert d.get('count')==660; assert len(cars)==660; print('Embedded car database:', len(cars), 'entries')"
 
           if (-not (Select-String -Path "fh6garage\ui.py" -Pattern "FH6 Assistant v1.1" -Quiet)) {
             throw "v1.1 window title was not found in ui.py."
