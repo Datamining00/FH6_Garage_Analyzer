@@ -9,7 +9,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 ROOT = Path(__file__).resolve().parents[2] / "source-v1.2"
 sys.path.insert(0, str(ROOT))
 
-from PySide6.QtCore import QPoint, QSize
+from PySide6.QtCore import QPoint, QSize, Qt
 from PySide6.QtWidgets import (
     QApplication,
     QAbstractButton,
@@ -42,8 +42,7 @@ def widget_path(widget: QWidget) -> str:
         if name:
             label += f"#{name}"
         parts.append(label)
-        parent = current.parentWidget()
-        current = parent
+        current = current.parentWidget()
     return "/".join(reversed(parts))
 
 
@@ -71,7 +70,6 @@ def audit_widget_width(widget: QWidget, issues: list[str]) -> None:
         return
 
     hint = widget.sizeHint().width()
-    # Native controls can render a few px below sizeHint without clipping.
     tolerance = 8
     if hint > widget.width() + tolerance:
         issues.append(
@@ -86,14 +84,12 @@ def audit_parent_bounds(window: QMainWindow, issues: list[str]) -> None:
         parent = widget.parentWidget()
         if parent is None or not parent.isVisible():
             continue
-        # Scroll-area content is intentionally larger than its viewport.
         if parent.inherits("QAbstractScrollArea") or widget.inherits("QScrollBar"):
             continue
         top_left = widget.mapTo(parent, QPoint(0, 0))
         rect = widget.rect().translated(top_left)
         parent_rect = parent.rect()
         if rect.right() > parent_rect.right() + 2 or rect.bottom() > parent_rect.bottom() + 2:
-            # QMenu/QCombo popup internals and stacked hidden-page geometry are not layout defects.
             if widget.inherits("QMenu") or parent.inherits("QComboBoxPrivateContainer"):
                 continue
             issues.append(
@@ -110,7 +106,7 @@ def audit_table_headers(window: QMainWindow, issues: list[str]) -> None:
             continue
         model = table.model()
         for col in range(table.columnCount()):
-            text = str(model.headerData(col, 1) or "")
+            text = str(model.headerData(col, Qt.Orientation.Horizontal) or "")
             if not text:
                 continue
             needed = header.fontMetrics().horizontalAdvance(text) + 22
@@ -142,8 +138,10 @@ def audit_state(window: MainWindow, language: str, size: QSize, page: int) -> li
             f"MIN_HINT {min_hint.width()}x{min_hint.height()} exceeds declared 960x680"
         )
 
-    for widget in window.findChildren((QPushButton, QToolButton, QCheckBox, QComboBox, QLabel, QLineEdit)):
-        audit_widget_width(widget, issues)
+    audited_types = (QPushButton, QToolButton, QCheckBox, QComboBox, QLabel, QLineEdit)
+    for widget in window.findChildren(QWidget):
+        if isinstance(widget, audited_types):
+            audit_widget_width(widget, issues)
     audit_table_headers(window, issues)
     audit_parent_bounds(window, issues)
 
