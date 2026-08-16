@@ -6,6 +6,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from .car_db import CarDatabase
+from .i18n import tr
 from .models import (
     CarContentSummary,
     LiveryRecord,
@@ -98,7 +99,7 @@ def _resolve_car_id(container_name: str, kind: str, header_car_id: int | None, c
 def resolve_layout(selected: Path) -> tuple[Path, Path, str]:
     selected = selected.expanduser().resolve()
     if not selected.is_dir():
-        raise SaveLayoutError("선택한 경로가 폴더가 아닙니다.")
+        raise SaveLayoutError(tr("scanner.invalid_folder"))
 
     # Direct ContainersRoot selection.
     if selected.name.lower() == "containersroot":
@@ -127,7 +128,7 @@ def resolve_layout(selected: Path) -> tuple[Path, Path, str]:
         if versions:
             return child, versions[0] / "ContainersRoot", versions[0].name
 
-    raise SaveLayoutError("ContainersRoot를 찾지 못했습니다. FH6 세이브 루트/current/버전 폴더 중 하나를 선택하세요.")
+    raise SaveLayoutError(tr("scanner.containers_missing"))
 
 
 def _detect_thumbnail(container: Path, tuning: bool) -> Path | None:
@@ -162,12 +163,12 @@ def scan_save(selected_path: Path, car_db: CarDatabase) -> ScanResult:
             kind = kind_map[raw_kind.lower()]
             header_path = container / "header"
             if not header_path.is_file():
-                warnings.append(f"{container.name}: header 없음")
+                warnings.append(tr("scanner.header_missing", container=container.name))
                 continue
             try:
                 header = read_header_file(header_path, kind)
             except (OSError, ParseError) as exc:
-                warnings.append(f"{container.name}: header 파싱 실패 ({exc})")
+                warnings.append(tr("scanner.header_parse_failed", container=container.name, error=exc))
                 continue
 
             parsed_car_id = header.car_id
@@ -175,7 +176,7 @@ def scan_save(selected_path: Path, car_db: CarDatabase) -> ScanResult:
             if resolved_car_id != parsed_car_id:
                 header.car_id = resolved_car_id
                 warnings.append(
-                    f"{container.name}: header Car ID {parsed_car_id} 대신 컨테이너 CarOrdinal {resolved_car_id} 사용"
+                    tr("scanner.car_id_fallback", container=container.name, header_id=parsed_car_id, car_id=resolved_car_id)
                 )
 
             if kind == "Tuning":

@@ -544,7 +544,7 @@ class CopyValueLabel(QLabel):
         self.copy_value = value
         super().__init__(f"{prefix}: {value}", parent)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setToolTip(f"클릭하여 {prefix} 복사")
+        self.setToolTip(tr("common.copy_value", label=prefix))
 
     def setCopyValue(self, value: str) -> None:
         self.copy_value = value
@@ -558,7 +558,7 @@ class CopyValueLabel(QLabel):
                 window._show_copy_toast()
             elif isinstance(window, QMainWindow):
                 bar = window.statusBar()
-                bar.showMessage("클립보드에 복사되었습니다", 1000)
+                bar.showMessage(tr("common.copied"), 1000)
                 QTimer.singleShot(1000, bar.hide)
             event.accept()
             return
@@ -681,7 +681,9 @@ class MainWindow(QMainWindow):
             # Persist only the path. Re-read the live save on every launch.
             QTimer.singleShot(0, lambda saved=Path(last): self.start_scan(saved))
 
-    def _begin_busy(self, message: str = "처리 중…") -> None:
+    def _begin_busy(self, message: str | None = None) -> None:
+        if message is None:
+            message = tr("common.processing")
         self._busy_depth += 1
         if not hasattr(self, "_busy_overlay"):
             return
@@ -1523,7 +1525,7 @@ class MainWindow(QMainWindow):
         if section == 0:
             return (total, creator.casefold())
         if section == 1:
-            return (creator == "(제작자 없음)", creator.casefold())
+            return (creator == tr("creator.none"), creator.casefold())
         if section == 2:
             return (livery_count, creator.casefold())
         if section == 3:
@@ -1545,7 +1547,7 @@ class MainWindow(QMainWindow):
 
     @Slot(int, object)
     def _sort_car_dashboard(self, section: int, order: Qt.SortOrder) -> None:
-        self._begin_busy("차량 목록을 정렬하는 중…")
+        self._begin_busy(tr("dashboard.sorting_vehicles"))
         try:
             self._dashboard_car_sort_section = int(section)
             self._dashboard_car_sort_order = order
@@ -1558,7 +1560,7 @@ class MainWindow(QMainWindow):
 
     @Slot(int, object)
     def _sort_creator_dashboard(self, section: int, order: Qt.SortOrder) -> None:
-        self._begin_busy("제작자 목록을 정렬하는 중…")
+        self._begin_busy(tr("dashboard.sorting_creators"))
         try:
             self._dashboard_creator_sort_section = int(section)
             self._dashboard_creator_sort_order = order
@@ -1632,13 +1634,13 @@ class MainWindow(QMainWindow):
         stats: dict[str, dict[str, object]] = {}
 
         def ensure_creator(raw_name: str) -> dict[str, object]:
-            display = (raw_name or "").strip() or "(제작자 없음)"
+            display = (raw_name or "").strip() or tr("creator.none")
             key = display.casefold()
             bucket = stats.get(key)
             if bucket is None:
                 bucket = {"name": display, "livery": 0, "tuning": 0}
                 stats[key] = bucket
-            elif bucket["name"] == "(제작자 없음)" and display != "(제작자 없음)":
+            elif bucket["name"] == tr("creator.none") and display != tr("creator.none"):
                 bucket["name"] = display
             return bucket
 
@@ -1656,7 +1658,7 @@ class MainWindow(QMainWindow):
             (str(bucket["name"]), int(bucket["livery"]), int(bucket["tuning"]))
             for bucket in stats.values()
         ]
-        rows.sort(key=lambda row: (row[0] == "(제작자 없음)", row[0].casefold()))
+        rows.sort(key=lambda row: (row[0] == tr("creator.none"), row[0].casefold()))
         return rows
 
     def _populate_creator_table(self) -> None:
@@ -1965,8 +1967,8 @@ class MainWindow(QMainWindow):
         if self._game_navigation_pending:
             QMessageBox.information(
                 self,
-                "인게임 이동 대기 중",
-                "이미 예약된 인게임 이동이 있습니다.",
+                tr("navigation.pending_title"),
+                tr("navigation.pending_message"),
             )
             return
         session = self._game_navigation_sessions.get(content_type)
@@ -1974,18 +1976,18 @@ class MainWindow(QMainWindow):
         if session is None or record is None or not session.contains(key):
             QMessageBox.warning(
                 self,
-                "인게임 이동 불가",
-                "현재 스캔 목록에서 대상 위치를 계산할 수 없습니다. 새로고침 후 다시 시도하세요.",
+                tr("navigation.unavailable_title"),
+                tr("navigation.unavailable_message"),
             )
             return
         dialog = QDialog(self)
-        dialog.setWindowTitle("리버리 위치로 이동")
+        dialog.setWindowTitle(tr("navigation.dialog_title"))
         dialog.setModal(True)
         dialog.setMinimumWidth(520)
         layout = QVBoxLayout(dialog)
         layout.setContentsMargins(16, 14, 16, 14)
         layout.setSpacing(10)
-        target_name = record.header.name or "(제목 없음)"
+        target_name = record.header.name or tr("detail.no_title")
         vehicle_name = self._car_label(record.car_id)
 
         target_panel = QFrame()
@@ -2001,19 +2003,11 @@ class MainWindow(QMainWindow):
         target_layout.addWidget(title_label)
         layout.addWidget(target_panel)
 
-        description = QLabel(
-            "FH6 리버리 목록의 첫 번째 항목을 기준으로 이동합니다. "
-            "버튼을 누르면 설정한 대기 시간 후 FH6 창을 활성화하고 "
-            "방향키 입력을 시작합니다.\n\n"
-            "리버리를 적용하고 목록으로 돌아오면 해당 항목이 선택됩니다."
-        )
+        description = QLabel(tr("navigation.description"))
         description.setWordWrap(True)
         layout.addWidget(description)
 
-        delete_notice = QLabel(
-            "삭제 위치로 이동한 항목은 현재 목록에서 제외됩니다. "
-            "실제 삭제를 취소한 경우 프로그램에서 목록을 새로 고치십시오."
-        )
+        delete_notice = QLabel(tr("navigation.delete_notice"))
         delete_notice.setWordWrap(True)
         delete_notice.setStyleSheet(
             "background: #fff7e8; color: #7a4b00; border: 1px solid #f0d6a6; "
@@ -2027,49 +2021,46 @@ class MainWindow(QMainWindow):
         settings_layout.setContentsMargins(12, 9, 12, 9)
         settings_layout.setHorizontalSpacing(12)
         settings_layout.setVerticalSpacing(7)
-        settings_title = QLabel("실행 설정")
+        settings_title = QLabel(tr("navigation.settings_title"))
         settings_title.setStyleSheet("font-weight: 700;")
         settings_layout.addWidget(settings_title, 0, 0, 1, 2)
 
-        settings_layout.addWidget(QLabel("대기 시간"), 1, 0)
+        settings_layout.addWidget(QLabel(tr("navigation.delay")), 1, 0)
         delay_spin = QDoubleSpinBox()
         delay_spin.setRange(0.1, 30.0)
         delay_spin.setDecimals(1)
         delay_spin.setSingleStep(0.1)
-        delay_spin.setSuffix("초")
+        delay_spin.setSuffix(tr("common.seconds_suffix"))
         delay_spin.setValue(
             self.settings.value("game_navigation_delay", 1.0, float)
         )
         settings_layout.addWidget(delay_spin, 1, 1)
 
-        settings_layout.addWidget(QLabel("방향키 간격"), 2, 0)
+        settings_layout.addWidget(QLabel(tr("navigation.arrow_interval")), 2, 0)
         arrow_interval_spin = QSpinBox()
         arrow_interval_spin.setRange(20, 500)
-        arrow_interval_spin.setSuffix("밀리초")
+        arrow_interval_spin.setSuffix(tr("common.milliseconds_suffix"))
         arrow_interval_spin.setValue(
             self.settings.value("game_navigation_arrow_interval_ms", 70, int)
         )
         settings_layout.addWidget(arrow_interval_spin, 2, 1)
 
-        auto_activate_box = QCheckBox("FH6 창 자동 활성화")
+        auto_activate_box = QCheckBox(tr("navigation.auto_activate"))
         auto_activate_box.setChecked(
             self.settings.value("game_navigation_auto_activate", True, bool)
         )
-        auto_activate_box.setToolTip(
-            "대기 시간이 지나면 FH6 창을 찾아 전경으로 전환합니다.\n"
-            "항상 위 표시가 활성화된 경우 이동 전에 이 창을 최소화합니다."
-        )
+        auto_activate_box.setToolTip(tr("navigation.auto_activate_tip"))
         settings_layout.addWidget(auto_activate_box, 3, 0, 1, 2)
         settings_layout.setColumnStretch(1, 1)
         layout.addWidget(settings_panel)
 
         choice: dict[str, str] = {"mode": ""}
         button_row = QHBoxLayout()
-        delete_button = QPushButton("삭제 위치로 이동")
+        delete_button = QPushButton(tr("navigation.move_delete"))
         delete_button.setObjectName("secondary")
-        apply_button = QPushButton("적용 위치로 이동")
+        apply_button = QPushButton(tr("navigation.move_apply"))
         apply_button.setObjectName("primary")
-        cancel_button = QPushButton("취소")
+        cancel_button = QPushButton(tr("common.cancel"))
         cancel_button.setObjectName("secondary")
         delete_button.clicked.connect(
             lambda: (choice.__setitem__("mode", "delete"), dialog.accept())
@@ -2092,7 +2083,7 @@ class MainWindow(QMainWindow):
         try:
             planned_keys = session.plan_from_first(key)
         except GameNavigationError as exc:
-            QMessageBox.warning(self, "인게임 이동 불가", str(exc))
+            QMessageBox.warning(self, tr("navigation.unavailable_title"), str(exc))
             return
         self.settings.setValue("game_navigation_delay", delay)
         self.settings.setValue("game_navigation_auto_activate", auto_activate)
@@ -2103,11 +2094,11 @@ class MainWindow(QMainWindow):
         self._game_navigation_pending = True
         generation = self._game_navigation_generation
         mode = choice["mode"]
-        delay_text = f"{delay:g}초"
+        delay_text = tr("navigation.delay_text", value=f"{delay:g}")
         wait_message = (
-            f"{delay_text} 후 FH6 창을 자동 활성화하여 이동합니다"
+            tr("navigation.wait_auto", delay=delay_text)
             if auto_activate
-            else f"{delay_text} 후 이동합니다 — 지금 FH6 창으로 전환하세요"
+            else tr("navigation.wait_manual", delay=delay_text)
         )
         self._show_status(wait_message, int((delay + 8) * 1000))
         QTimer.singleShot(
@@ -2130,11 +2121,11 @@ class MainWindow(QMainWindow):
     ) -> None:
         self._game_navigation_pending = False
         if generation != self._game_navigation_generation:
-            self._show_status("새로고침으로 예약된 인게임 이동이 취소되었습니다", 5000)
+            self._show_status(tr("navigation.cancelled_refresh"), 5000)
             return
         session = self._game_navigation_sessions.get(content_type)
         if session is None or not session.contains(key):
-            self._show_status("대상이 변경되어 인게임 이동을 취소했습니다", 5000)
+            self._show_status(tr("navigation.cancelled_changed"), 5000)
             return
         try:
             window_title = send_arrow_keys_to_fh6(
@@ -2143,8 +2134,8 @@ class MainWindow(QMainWindow):
                 auto_activate=auto_activate,
             )
         except GameNavigationError as exc:
-            QMessageBox.warning(self, "인게임 이동 취소", str(exc))
-            self._show_status("FH6 활성 창을 확인하지 못해 키 입력을 취소했습니다", 5000)
+            QMessageBox.warning(self, tr("navigation.cancel_title"), str(exc))
+            self._show_status(tr("navigation.focus_failed"), 5000)
             return
 
         deleted = mode == "delete"
@@ -2154,12 +2145,9 @@ class MainWindow(QMainWindow):
         )
         count = len(planned_keys)
         if deleted:
-            message = (
-                f"{count}회 이동 완료 — 삭제 대상으로 세션 목록에 반영했습니다 "
-                f"({window_title})"
-            )
+            message = tr("navigation.complete_deleted", count=count, window=window_title)
         else:
-            message = f"{count}회 이동 완료 — 적용 대상 위치입니다 ({window_title})"
+            message = tr("navigation.complete_applied", count=count, window=window_title)
         self._show_status(message, 8000)
 
 
@@ -2193,7 +2181,7 @@ class MainWindow(QMainWindow):
                 | Qt.ItemFlag.ItemIsEnabled
             )
             check_item.setData(Qt.ItemDataRole.UserRole, key)
-            check_item.setText("상태")
+            check_item.setText(tr("table.status"))
             check_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             table.setItem(row, 0, check_item)
             table.setCellWidget(
@@ -2705,9 +2693,9 @@ class MainWindow(QMainWindow):
         check_box.setIcon(_classification_toggle_icon("check"))
         check_box.setIconSize(QSize(22, 22))
         check_box.setChecked(annotation.checked)
-        check_box.setToolTip("체크 상태 전환")
-        item_label = "리버리" if content_type == "livery" else "튜닝"
-        check_box.setAccessibleName(f"{item_label} 체크 상태")
+        check_box.setToolTip(tr("status.toggle_check"))
+        item_label = tr("content.noun_livery") if content_type == "livery" else tr("content.noun_tuning")
+        check_box.setAccessibleName(tr("status.accessible_check", noun=item_label))
         check_box.setFixedSize(34, 34)
         check_box.setStyleSheet(
             "QToolButton { background:rgba(255,255,255,238); color:#9aa0aa; "
@@ -2726,8 +2714,8 @@ class MainWindow(QMainWindow):
         triangle_box.setIcon(_classification_toggle_icon("triangle"))
         triangle_box.setIconSize(QSize(22, 22))
         triangle_box.setChecked(annotation.triangle)
-        triangle_box.setToolTip("삼각형 분류 상태 전환")
-        triangle_box.setAccessibleName(f"{item_label} 삼각형 분류 상태")
+        triangle_box.setToolTip(tr("status.toggle_triangle"))
+        triangle_box.setAccessibleName(tr("status.accessible_triangle", noun=item_label))
         triangle_box.setFixedSize(34, 34)
         triangle_box.setStyleSheet(
             "QToolButton { background:rgba(255,255,255,238); color:#9aa0aa; "
@@ -2746,8 +2734,8 @@ class MainWindow(QMainWindow):
         excluded_box.setIcon(_classification_toggle_icon("excluded"))
         excluded_box.setIconSize(QSize(22, 22))
         excluded_box.setChecked(annotation.excluded)
-        excluded_box.setToolTip("X 분류 상태 전환")
-        excluded_box.setAccessibleName(f"{item_label} X 분류 상태")
+        excluded_box.setToolTip(tr("status.toggle_excluded"))
+        excluded_box.setAccessibleName(tr("status.accessible_excluded", noun=item_label))
         excluded_box.setFixedSize(34, 34)
         excluded_box.setStyleSheet(
             "QToolButton { background:rgba(255,255,255,238); color:#9aa0aa; "
@@ -2764,8 +2752,8 @@ class MainWindow(QMainWindow):
         zoom_button = QToolButton()
         zoom_button.setIcon(QIcon(_classification_pixmap("search", True, 24)))
         zoom_button.setIconSize(QSize(21, 21))
-        zoom_button.setToolTip("미리보기 크게 보기")
-        zoom_button.setAccessibleName("미리보기 크게 보기")
+        zoom_button.setToolTip(tr("preview.enlarge"))
+        zoom_button.setAccessibleName(tr("preview.enlarge"))
         zoom_button.setFixedSize(34, 34)
         zoom_button.setStyleSheet(
             "QToolButton { background:rgba(255,255,255,238); color:#555a68; "
@@ -2780,11 +2768,11 @@ class MainWindow(QMainWindow):
         memo_button.setIcon(self._detail_memo_icon(bool(annotation.note.strip())))
         memo_button.setIconSize(QSize(18, 18))
         memo_button.setToolTip(
-            (annotation.note.strip() + "\n\n클릭하여 메모 수정")
+            (annotation.note.strip() + tr("memo.edit_suffix"))
             if annotation.note.strip()
-            else "메모 없음\n\n클릭하여 메모 추가"
+            else tr("memo.none_add")
         )
-        memo_button.setAccessibleName(f"{item_label} 메모")
+        memo_button.setAccessibleName(tr("memo.accessible", noun=item_label))
         memo_button.setFixedSize(34, 34)
         memo_button.setStyleSheet(
             "QToolButton { background:rgba(255,255,255,238); color:#555a68; "
@@ -2799,8 +2787,8 @@ class MainWindow(QMainWindow):
         game_move_button = QToolButton()
         game_move_button.setIcon(QIcon(_classification_pixmap("move", True, 24)))
         game_move_button.setIconSize(QSize(23, 23))
-        game_move_button.setToolTip("인게임에서 이 썸네일 위치로 이동")
-        game_move_button.setAccessibleName(f"{item_label} 인게임 위치로 이동")
+        game_move_button.setToolTip(tr("content.game_move_tip"))
+        game_move_button.setAccessibleName(tr("content.game_move_accessible", noun=item_label))
         game_move_button.setFixedSize(38, 38)
         game_move_button.setStyleSheet(
             "QToolButton { background:rgba(255,255,255,242); color:#5f39d8; "
@@ -2814,14 +2802,14 @@ class MainWindow(QMainWindow):
 
         if content_type == "livery":
             info_active = bool((record.header.description or "").strip())
-            info_tooltip = "리버리 설명 및 제작자 업로드 날짜 보기"
+            info_tooltip = tr("content.livery_info_tip")
         else:
             info_active = bool(
                 isinstance(record, TuningRecord)
                 and record.data_path is not None
                 and record.data_size == 598
             )
-            info_tooltip = "튜닝 Data 세부 정보 보기"
+            info_tooltip = tr("content.tuning_info_tip")
         info_button = QToolButton()
         info_kind = "livery_info" if content_type == "livery" else "tuning_info"
         info_button.setIcon(QIcon(_classification_pixmap(info_kind, info_active, 24)))
@@ -2881,13 +2869,13 @@ class MainWindow(QMainWindow):
         content_name = record.header.name or "(unnamed)"
         creator_name = record.header.creator or "—"
         vehicle_name = self._car_label(record.header.car_id)
-        vehicle = CopyValueLabel("차량명", vehicle_name)
+        vehicle = CopyValueLabel(tr("card.vehicle_label"), vehicle_name)
         vehicle.setStyleSheet(
             "QLabel { background:transparent; color:#171924; border:0; padding:4px 2px 1px 2px; "
             "font-size:11.5pt; font-weight:700; }"
         )
         vehicle.setFixedHeight(31)
-        vehicle.setToolTip(f"클릭하여 차량명 복사\n{vehicle_name}")
+        vehicle.setToolTip(tr("common.copy_value_detail", label=tr("card.vehicle_label"), value=vehicle_name))
         vehicle.setMinimumWidth(0)
         vehicle.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         outer.addWidget(vehicle)
@@ -2896,24 +2884,24 @@ class MainWindow(QMainWindow):
         meta_row.setContentsMargins(0, 0, 0, 0)
         meta_row.setSpacing(7)
 
-        title_box = CopyValueLabel("제목", content_name)
+        title_box = CopyValueLabel(tr("card.title_label"), content_name)
         title_box.setStyleSheet(
             "QLabel { background:transparent; color:#343744; border:0; padding:2px; "
             "font-size:10pt; font-weight:600; }"
         )
         title_box.setFixedHeight(28)
-        title_box.setToolTip(f"클릭하여 제목 복사\n{content_name}")
+        title_box.setToolTip(tr("common.copy_value_detail", label=tr("card.title_label"), value=content_name))
         title_box.setMinimumWidth(0)
         title_box.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         meta_row.addWidget(title_box, 3)
 
-        creator_box = CopyValueLabel("제작자명", creator_name)
+        creator_box = CopyValueLabel(tr("card.creator_label"), creator_name)
         creator_box.setStyleSheet(
             "QLabel { background:transparent; color:#6d7282; border:0; padding:2px; "
             "font-size:9.5pt; font-weight:500; }"
         )
         creator_box.setFixedHeight(28)
-        creator_box.setToolTip(f"클릭하여 제작자명 복사\n{creator_name}")
+        creator_box.setToolTip(tr("common.copy_value_detail", label=tr("card.creator_label"), value=creator_name))
         creator_box.setMinimumWidth(0)
         creator_box.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         meta_row.addWidget(creator_box, 2)
@@ -3199,7 +3187,7 @@ class MainWindow(QMainWindow):
         if card is not None:
             self._refresh_card_search_text(card, key)
         self._sync_table_annotation(key)
-        self._show_status("메모 저장 완료", 2500)
+        self._show_status(tr("memo.saved"), 2500)
         self._filter_livery_views(self.livery_search.text(), preserve_scroll=True)
 
 
@@ -3260,10 +3248,10 @@ class MainWindow(QMainWindow):
                     button.setToolTip(
                         (
                             note
-                            + "\n\n클릭하여 메모 수정"
+                            + tr("memo.edit_suffix")
                         )
                         if note
-                        else "메모 없음\n\n클릭하여 메모 추가"
+                        else tr("memo.none_add")
                     )
             break
 
@@ -3283,10 +3271,10 @@ class MainWindow(QMainWindow):
         creator = (source_record.header.creator or "").strip()
         note = (source_note or "").strip()
         if not creator:
-            QMessageBox.information(self, "제작자 정보 없음", "이 리버리에는 제작자 정보가 없어 일괄 적용할 수 없습니다.")
+            QMessageBox.information(self, tr("memo.creator_missing_title"), tr("memo.creator_missing_apply"))
             return
         if not note:
-            QMessageBox.information(self, "메모 없음", "적용할 메모를 먼저 입력하세요.")
+            QMessageBox.information(self, tr("memo.missing_title"), tr("memo.enter_first"))
             return
 
         # Save the source editor first, then append the same note block to every
@@ -3305,11 +3293,16 @@ class MainWindow(QMainWindow):
             self.annotations.set(key, note=merged, save=False)
         self.annotations.save()
         self._refresh_annotation_widgets()
-        self._show_status(f"{creator} 제작자 리버리에 메모 적용 완료", 3500)
+        self._show_status(tr("memo.apply_status", creator=creator), 3500)
         QMessageBox.information(
             self,
-            "동일 제작자 메모 적용",
-            f"제작자: {creator}\n대상 리버리: {sum(1 for r in self._custom_liveries() if (r.header.creator or '').strip().casefold() == creator_key)}개\n새로 추가된 메모: {affected}개\n\n기존 메모는 유지되었습니다.",
+            tr("memo.apply_title"),
+            tr(
+                "memo.apply_message",
+                creator=creator,
+                targets=sum(1 for r in self._custom_liveries() if (r.header.creator or "").strip().casefold() == creator_key),
+                affected=affected,
+            ),
         )
 
     def _clear_notes_for_same_creator(self, source_key: str) -> None:
@@ -3318,7 +3311,7 @@ class MainWindow(QMainWindow):
             return
         creator = (source_record.header.creator or "").strip()
         if not creator:
-            QMessageBox.information(self, "제작자 정보 없음", "이 리버리에는 제작자 정보가 없어 일괄 제거할 수 없습니다.")
+            QMessageBox.information(self, tr("memo.creator_missing_title"), tr("memo.creator_missing_remove"))
             return
 
         creator_key = creator.casefold()
@@ -3331,14 +3324,13 @@ class MainWindow(QMainWindow):
             if self.annotations.get(self._annotation_key(record)).note.strip()
         )
         if with_notes == 0:
-            QMessageBox.information(self, "제거할 메모 없음", f"{creator} 제작자의 저장된 메모가 없습니다.")
+            QMessageBox.information(self, tr("memo.none_to_remove_title"), tr("memo.none_to_remove_message", creator=creator))
             return
 
         answer = QMessageBox.question(
             self,
-            "동일 제작자 메모 전부 제거",
-            f"제작자: {creator}\n메모가 있는 리버리: {with_notes}개\n\n"
-            "이 제작자의 모든 리버리 메모를 제거하시겠습니까?\n체크 상태는 유지됩니다.",
+            tr("memo.clear_title"),
+            tr("memo.clear_message", creator=creator, count=with_notes),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -3350,7 +3342,7 @@ class MainWindow(QMainWindow):
             self.annotations.set(key, note="", save=False)
         self.annotations.save()
         self._refresh_annotation_widgets()
-        self._show_status(f"{creator} 제작자의 메모 {with_notes}개 제거 완료", 3500)
+        self._show_status(tr("memo.clear_status", creator=creator, count=with_notes), 3500)
 
 
     def _refresh_annotation_widgets(self) -> None:
@@ -3386,7 +3378,7 @@ class MainWindow(QMainWindow):
                         note = (annotation.note or "").strip()
                         button.setIcon(self._detail_memo_icon(bool(note)))
                         button.setToolTip(
-                            (note + "\\n\\n클릭하여 메모 수정") if note else "메모 없음\\n\\n클릭하여 메모 추가"
+                            (note + tr("memo.edit_suffix")) if note else tr("memo.none_add")
                         )
         finally:
             self.livery_table.blockSignals(False)
@@ -3422,7 +3414,7 @@ class MainWindow(QMainWindow):
     def _apply_selected_table_note_to_creator(self) -> None:
         rows = self.livery_table.selectionModel().selectedRows()
         if not rows:
-            QMessageBox.information(self, "리버리 선택", "세부 보기에서 리버리를 하나 선택하세요.")
+            QMessageBox.information(self, tr("memo.select_livery_title"), tr("memo.select_livery_message"))
             return
         row = rows[0].row()
         key_item = self.livery_table.item(row, 0)
@@ -3604,19 +3596,16 @@ class MainWindow(QMainWindow):
             # Stored value is UTC ISO-8601, e.g. 2026-08-12T14:21:04Z.
             date_text = raw[:10] if len(raw) >= 10 else raw
             self.db_last_update_label.setText(
-                f"/ 마지막 업데이트: {date_text}"
+                tr("db.last_update", date=date_text)
             )
-            tooltip = f"로컬 DB 다운로드 시각: {raw}"
+            tooltip = tr("db.local_download_time", value=raw)
             if status.cache_source_last_modified:
-                tooltip += (
-                    "\n원본 Last-Modified: "
-                    + status.cache_source_last_modified
-                )
+                tooltip += tr("db.source_last_modified", value=status.cache_source_last_modified)
             self.db_last_update_label.setToolTip(tooltip)
         else:
-            self.db_last_update_label.setText("/ 마지막 업데이트: 확인 불가")
+            self.db_last_update_label.setText(tr("db.last_update_unavailable"))
             self.db_last_update_label.setToolTip(
-                "아직 수동 차량 DB 업데이트를 적용하지 않았습니다."
+                tr("db.not_updated_tip")
             )
 
     @Slot()
@@ -3629,9 +3618,8 @@ class MainWindow(QMainWindow):
             return
         answer = QMessageBox.question(
             self,
-            "차량 DB 업데이트",
-            "공개 GitHub의 FH6 CarOrdinal JSON을 내려받아 LocalAppData의 차량명 캐시만 갱신합니다.\n\n"
-            "세이브 파일, 세이브 경로, XUID, 리버리/튜닝 데이터는 전송하지 않습니다. 계속하시겠습니까?",
+            tr("db.update_title"),
+            tr("db.update_prompt"),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.Yes,
         )
@@ -3639,9 +3627,9 @@ class MainWindow(QMainWindow):
             return
 
         self.db_update_button.setEnabled(False)
-        self.db_update_button.setText("업데이트 확인 중…")
-        self._begin_busy("차량 DB를 내려받아 갱신하는 중…")
-        self._show_status("차량 DB 다운로드 중…")
+        self.db_update_button.setText(tr("db.checking"))
+        self._begin_busy(tr("db.updating_busy"))
+        self._show_status(tr("db.downloading"))
         thread = QThread(self)
         worker = CarDatabaseUpdateWorker(self.car_db.cache_path)
         worker.moveToThread(thread)
@@ -3662,11 +3650,11 @@ class MainWindow(QMainWindow):
         self._end_busy()
         self.car_db = CarDatabase(self.project_root / "data" / "car_names.json")
         self._refresh_db_status()
-        self._show_status(f"차량 DB 업데이트 완료 — {update.count} vehicles", 8000)
+        self._show_status(tr("db.update_complete_status", count=update.count), 8000)
         QMessageBox.information(
             self,
-            "차량 DB 업데이트 완료",
-            f"{update.count}개의 Car ID 매핑을 적용했습니다.\n저장 위치: {update.cache_path}",
+            tr("db.update_complete_title"),
+            tr("db.update_complete_message", count=update.count, path=update.cache_path),
         )
         if self.path_edit.text():
             self.start_scan(Path(self.path_edit.text()))
@@ -3674,8 +3662,8 @@ class MainWindow(QMainWindow):
     @Slot(str)
     def _car_db_update_failed(self, message: str) -> None:
         self._end_busy()
-        self._show_status("차량 DB 업데이트 실패", 6000)
-        QMessageBox.critical(self, "차량 DB 업데이트 실패", message)
+        self._show_status(tr("db.update_failed"), 6000)
+        QMessageBox.critical(self, tr("db.update_failed"), message)
 
     @Slot()
     def _car_db_update_cleanup(self) -> None:
@@ -3683,13 +3671,13 @@ class MainWindow(QMainWindow):
         self._db_update_worker = None
         if hasattr(self, "db_update_button"):
             self.db_update_button.setEnabled(True)
-            self.db_update_button.setText("차량 DB 업데이트 확인")
+            self.db_update_button.setText(tr("db.check_update"))
 
     @Slot()
     def open_car_db_override(self) -> None:
         """Spreadsheet-style Car ID -> vehicle-name editor with explicit Save."""
         dialog = QDialog(self)
-        dialog.setWindowTitle("차량명 사용자 오버라이드")
+        dialog.setWindowTitle(tr("db.override_title"))
         dialog.resize(820, 680)
         dialog.setStyleSheet(
             APP_STYLE
@@ -3719,7 +3707,7 @@ class MainWindow(QMainWindow):
         root.setContentsMargins(12, 12, 12, 12)
         root.setSpacing(10)
 
-        table = self._table(("Car ID", "차량명"))
+        table = self._table((tr("table.car_id"), tr("table.vehicle_name")))
         table.setAlternatingRowColors(True)
         table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
         table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -3740,7 +3728,7 @@ class MainWindow(QMainWindow):
         footer.setContentsMargins(0, 0, 0, 0)
         footer.addStretch(1)
 
-        save_button = QPushButton("저장")
+        save_button = QPushButton(tr("common.save"))
         save_button.setObjectName("primary")
         save_button.setEnabled(False)
         save_button.setMinimumWidth(92)
@@ -3776,9 +3764,9 @@ class MainWindow(QMainWindow):
 
             if car_id in initial_overrides:
                 name_item.setBackground(QColor("#f3efff"))
-                name_item.setToolTip("사용자 오버라이드 적용 중")
+                name_item.setToolTip(tr("db.override_applied_tip"))
             else:
-                name_item.setToolTip("더블클릭하여 차량명 수정")
+                name_item.setToolTip(tr("db.override_edit_tip"))
 
             table.setItem(row, 0, id_item)
             table.setItem(row, 1, name_item)
@@ -3807,8 +3795,8 @@ class MainWindow(QMainWindow):
                 if not value:
                     QMessageBox.warning(
                         dialog,
-                        "차량명 확인",
-                        f"Car ID {car_id}의 차량명이 비어 있습니다.",
+                        tr("db.name_check_title"),
+                        tr("db.name_empty_message", car_id=car_id),
                     )
                     table.setCurrentCell(row, 1)
                     table.editItem(name_item)
@@ -3830,12 +3818,12 @@ class MainWindow(QMainWindow):
                 car_id = int(id_item.data(Qt.ItemDataRole.UserRole))
                 if car_id in overrides:
                     name_item.setBackground(QColor("#f3efff"))
-                    name_item.setToolTip("사용자 오버라이드 적용 중")
+                    name_item.setToolTip(tr("db.override_applied_tip"))
                 else:
                     name_item.setBackground(
                         QColor(Qt.GlobalColor.transparent)
                     )
-                    name_item.setToolTip("더블클릭하여 차량명 수정")
+                    name_item.setToolTip(tr("db.override_edit_tip"))
 
         def save_overrides() -> None:
             desired = collect_overrides()
@@ -3847,7 +3835,7 @@ class MainWindow(QMainWindow):
             except (OSError, ValueError) as exc:
                 QMessageBox.critical(
                     dialog,
-                    "오버라이드 저장 실패",
+                    tr("db.override_save_failed"),
                     str(exc),
                 )
                 return
@@ -3857,7 +3845,7 @@ class MainWindow(QMainWindow):
             saved_any["value"] = True
             save_button.setEnabled(False)
             self._show_status(
-                f"사용자 오버라이드 저장 완료 — {len(desired)}개",
+                tr("db.override_saved", count=len(desired)),
                 2000,
             )
 
@@ -3883,14 +3871,14 @@ class MainWindow(QMainWindow):
         self.car_search.blockSignals(False)
 
         if index == 0:
-            self.car_search.setPlaceholderText("Car ID / 차량명 검색")
+            self.car_search.setPlaceholderText(tr("dashboard.search_vehicle"))
             self.selected_hint.clear()
             self.selected_hint.hide()
             if self.car_table.rowCount() and not self.car_table.selectionModel().selectedRows():
                 self.car_table.selectRow(0)
             self._update_selected_car()
         else:
-            self.car_search.setPlaceholderText("제작자명 검색")
+            self.car_search.setPlaceholderText(tr("dashboard.search_creator"))
             self.selected_hint.clear()
             self.selected_hint.hide()
             if self.creator_table.rowCount() and not self.creator_table.selectionModel().selectedRows():
@@ -3908,7 +3896,7 @@ class MainWindow(QMainWindow):
         car_id=int(item.data(Qt.ItemDataRole.UserRole))
         summary=next((x for x in self.result.car_summaries if x.car_id==car_id),None)
         self.selected_title.setText(
-            f"차량명: {summary.label if summary else self._car_label(car_id)}"
+            tr("dashboard.selected_vehicle", value=summary.label if summary else self._car_label(car_id))
         )
         self.selected_hint.clear()
         self.selected_hint.hide()
@@ -3930,7 +3918,7 @@ class MainWindow(QMainWindow):
         creator_key = creator.casefold()
 
         def same_creator(raw_name: str) -> bool:
-            display = (raw_name or "").strip() or "(제작자 없음)"
+            display = (raw_name or "").strip() or tr("creator.none")
             return display.casefold() == creator_key
 
         liveries = [
@@ -3941,7 +3929,7 @@ class MainWindow(QMainWindow):
             record for record in self.result.tunings
             if same_creator(record.header.creator or "")
         ]
-        self.selected_title.setText(f"제작자명: {creator}")
+        self.selected_title.setText(tr("dashboard.selected_creator", value=creator))
         self.selected_hint.clear()
         self.selected_hint.hide()
         self._fill_selected_liveries(liveries)
@@ -4035,7 +4023,7 @@ class MainWindow(QMainWindow):
 
     def _show_livery_metadata(self, record: LiveryRecord) -> None:
         dialog = QDialog(self)
-        dialog.setWindowTitle("리버리 정보")
+        dialog.setWindowTitle(tr("detail.livery_info_title"))
         dialog.setModal(True)
         dialog.resize(560, 360)
         dialog.setStyleSheet(APP_STYLE)
@@ -4185,22 +4173,22 @@ class MainWindow(QMainWindow):
         if not path or not path.is_file():
             QMessageBox.information(
                 self,
-                "이미지 없음",
-                "이 항목의 썸네일을 찾을 수 없습니다.",
+                tr("image.none_title"),
+                tr("image.none_message"),
             )
             return
 
         try:
             image = QImage.fromData(path.read_bytes())
         except OSError as exc:
-            QMessageBox.warning(self, "이미지 읽기 실패", str(exc))
+            QMessageBox.warning(self, tr("image.read_failed"), str(exc))
             return
 
         if image.isNull():
             QMessageBox.warning(
                 self,
-                "이미지 읽기 실패",
-                "썸네일 이미지 형식을 읽을 수 없습니다.",
+                tr("image.read_failed"),
+                tr("image.format_failed"),
             )
             return
 
@@ -4233,25 +4221,25 @@ class MainWindow(QMainWindow):
 
         minus_button = QToolButton()
         minus_button.setText("−")
-        minus_button.setToolTip("축소")
-        minus_button.setAccessibleName("이미지 축소")
+        minus_button.setToolTip(tr("image.zoom_out"))
+        minus_button.setAccessibleName(tr("image.zoom_out_accessible"))
         minus_button.setFixedSize(38, 34)
         minus_button.clicked.connect(lambda: viewer.zoom_by(0.8))
 
         actual_button = QPushButton("100%")
         actual_button.setObjectName("secondary")
-        actual_button.setToolTip("원본 픽셀 크기")
+        actual_button.setToolTip(tr("image.actual_size"))
         actual_button.clicked.connect(viewer.actual_size)
 
-        fit_button = QPushButton("맞춤")
+        fit_button = QPushButton(tr("image.fit"))
         fit_button.setObjectName("secondary")
-        fit_button.setToolTip("창에 맞추기")
+        fit_button.setToolTip(tr("image.fit_tip"))
         fit_button.clicked.connect(viewer.fit_image)
 
         plus_button = QToolButton()
         plus_button.setText("+")
-        plus_button.setToolTip("확대")
-        plus_button.setAccessibleName("이미지 확대")
+        plus_button.setToolTip(tr("image.zoom_in"))
+        plus_button.setAccessibleName(tr("image.zoom_in_accessible"))
         plus_button.setFixedSize(38, 34)
         plus_button.clicked.connect(lambda: viewer.zoom_by(1.25))
 
@@ -4270,9 +4258,7 @@ class MainWindow(QMainWindow):
         controls.addWidget(plus_button)
         controls.addStretch(1)
 
-        hint = QLabel(
-            "마우스 휠: 확대/축소 · 드래그: 이동 · 더블클릭: 100%"
-        )
+        hint = QLabel(tr("image.hint"))
         hint.setObjectName("muted")
         hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -4336,9 +4322,9 @@ class MainWindow(QMainWindow):
     ) -> Optional[str]:
         dialog = QDialog(self)
         dialog.setWindowTitle(
-            "리버리 메모"
+            tr("memo.livery_title")
             if content_type == "livery"
-            else "튜닝 메모"
+            else tr("memo.tuning_title")
         )
         dialog.setModal(True)
         dialog.resize(520, 260)
@@ -4360,21 +4346,21 @@ class MainWindow(QMainWindow):
         root.setContentsMargins(14, 14, 14, 14)
         root.setSpacing(10)
 
-        label = QLabel("메모")
+        label = QLabel(tr("memo.label"))
         label.setStyleSheet("font-weight:600; color:#4f5567;")
         root.addWidget(label)
 
         editor = QTextEdit()
-        editor.setPlaceholderText("메모")
+        editor.setPlaceholderText(tr("memo.label"))
         editor.setPlainText(current_note or "")
         root.addWidget(editor, 1)
 
         buttons = QHBoxLayout()
         buttons.addStretch(1)
 
-        cancel_btn = QPushButton("취소")
+        cancel_btn = QPushButton(tr("common.cancel"))
         cancel_btn.setObjectName("secondary")
-        save_btn = QPushButton("저장")
+        save_btn = QPushButton(tr("common.save"))
         save_btn.setObjectName("primary")
 
         buttons.addWidget(cancel_btn)
@@ -4442,12 +4428,9 @@ class MainWindow(QMainWindow):
         button.setIcon(_classification_toggle_icon("check"))
         button.setIconSize(QSize(22, 22))
         button.setChecked(bool(checked))
-        button.setToolTip("체크 상태 전환")
-        button.setAccessibleName(
-            "리버리 체크 상태"
-            if content_type == "livery"
-            else "튜닝 체크 상태"
-        )
+        button.setToolTip(tr("status.toggle_check"))
+        noun = tr("content.noun_livery") if content_type == "livery" else tr("content.noun_tuning")
+        button.setAccessibleName(tr("status.accessible_check", noun=noun))
         button.setFixedSize(34, 34)
         button.setStyleSheet(
             "QToolButton { background:rgba(255,255,255,238); color:#9aa0aa; "
@@ -4478,12 +4461,9 @@ class MainWindow(QMainWindow):
         button.setIcon(_classification_toggle_icon("triangle"))
         button.setIconSize(QSize(22, 22))
         button.setChecked(bool(enabled))
-        button.setToolTip("삼각형 분류 상태 전환")
-        button.setAccessibleName(
-            "리버리 삼각형 분류 상태"
-            if content_type == "livery"
-            else "튜닝 삼각형 분류 상태"
-        )
+        button.setToolTip(tr("status.toggle_triangle"))
+        noun = tr("content.noun_livery") if content_type == "livery" else tr("content.noun_tuning")
+        button.setAccessibleName(tr("status.accessible_triangle", noun=noun))
         button.setFixedSize(34, 34)
         button.setStyleSheet(
             "QToolButton { background:rgba(255,255,255,238); color:#9aa0aa; "
@@ -4513,13 +4493,10 @@ class MainWindow(QMainWindow):
         button.setIcon(self._detail_memo_icon(bool(note)))
         button.setIconSize(QSize(18, 18))
         button.setToolTip(
-            (note + "\\n\\n클릭하여 메모 수정") if note else "메모 없음\\n\\n클릭하여 메모 추가"
+            (note + tr("memo.edit_suffix")) if note else tr("memo.none_add")
         )
-        button.setAccessibleName(
-            "리버리 메모"
-            if content_type == "livery"
-            else "튜닝 메모"
-        )
+        noun = tr("content.noun_livery") if content_type == "livery" else tr("content.noun_tuning")
+        button.setAccessibleName(tr("memo.accessible", noun=noun))
         button.setFixedSize(34, 34)
         button.setStyleSheet(
             "QToolButton { background:rgba(255,255,255,238); color:#555a68; "
@@ -4547,10 +4524,9 @@ class MainWindow(QMainWindow):
         button.setIcon(_classification_toggle_icon("excluded"))
         button.setIconSize(QSize(22, 22))
         button.setChecked(bool(enabled))
-        button.setToolTip("X 분류 상태 전환")
-        button.setAccessibleName(
-            "리버리 X 분류 상태" if content_type == "livery" else "튜닝 X 분류 상태"
-        )
+        button.setToolTip(tr("status.toggle_excluded"))
+        noun = tr("content.noun_livery") if content_type == "livery" else tr("content.noun_tuning")
+        button.setAccessibleName(tr("status.accessible_excluded", noun=noun))
         button.setFixedSize(34, 34)
         button.setStyleSheet(
             "QToolButton { background:rgba(255,255,255,238); color:#9aa0aa; "
@@ -4677,11 +4653,11 @@ class MainWindow(QMainWindow):
                 memo_button.setToolTip(
                     (clean_note + "\n\n클릭하여 메모 수정")
                     if clean_note
-                    else "메모 없음\n\n클릭하여 메모 추가"
+                    else tr("memo.none_add")
                 )
 
         self._show_status(
-            "메모 저장 완료",
+            tr("memo.saved"),
             1800,
         )
         self._refresh_after_annotation_change(
@@ -4720,7 +4696,7 @@ class MainWindow(QMainWindow):
         item.setTextAlignment(
             Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter
         )
-        item.setToolTip("체크됨" if checked else "미체크")
+        item.setToolTip(tr("status.checked") if checked else tr("status.unchecked"))
 
     def _set_detail_memo_item(
         self,
@@ -4734,9 +4710,9 @@ class MainWindow(QMainWindow):
         )
         item.setData(Qt.ItemDataRole.UserRole + 1, note)
         if note:
-            item.setToolTip(note + "\\n\\n클릭하여 메모 수정")
+            item.setToolTip(note + tr("memo.edit_suffix"))
         else:
-            item.setToolTip("메모 없음\\n\\n클릭하여 메모 추가")
+            item.setToolTip(tr("memo.none_add"))
 
 
     def _icon_for(self, path: Optional[Path]) -> QIcon:

@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
+from .i18n import tr
 from .models import CarName
 
 
@@ -96,7 +97,7 @@ class CarDatabase:
             self._cached_count = 0
             if cached:
                 self._load_warnings.append(
-                    "기존 업데이트 DB가 내장 DB보다 오래되어 사용하지 않음"
+                    tr("car_db.cache_older_warning")
                 )
         self._cache_updated_at = str(meta.get("downloaded_at", ""))
         self._cache_source_last_modified = str(meta.get("source_last_modified", ""))
@@ -151,9 +152,9 @@ class CarDatabase:
             car_id = int(raw_id)
             label = str(raw_label).strip()
             if car_id <= 0:
-                raise ValueError("Car ID는 1 이상의 정수여야 합니다.")
+                raise ValueError(tr("car_db.id_positive"))
             if not label:
-                raise ValueError(f"Car ID {car_id}의 차량명은 비워둘 수 없습니다.")
+                raise ValueError(tr("car_db.name_required_id", car_id=car_id))
             normalized[car_id] = label
 
         self._write_user_overrides(normalized)
@@ -163,9 +164,9 @@ class CarDatabase:
         car_id = int(car_id)
         label = str(label).strip()
         if car_id <= 0:
-            raise ValueError("Car ID는 1 이상의 정수여야 합니다.")
+            raise ValueError(tr("car_db.id_positive"))
         if not label:
-            raise ValueError("차량명은 비워둘 수 없습니다.")
+            raise ValueError(tr("car_db.name_required"))
 
         overrides = self.user_overrides()
         overrides[car_id] = label
@@ -245,22 +246,22 @@ class CarDatabase:
             with urllib.request.urlopen(req, timeout=timeout) as response:
                 raw = response.read(MAX_DOWNLOAD_BYTES + 1)
                 if len(raw) > MAX_DOWNLOAD_BYTES:
-                    raise CarDatabaseError("차량 DB 응답이 예상 크기(1 MiB)를 초과했습니다.")
+                    raise CarDatabaseError(tr("car_db.response_too_large"))
                 last_modified = response.headers.get("Last-Modified", "")
         except Exception as exc:
             if isinstance(exc, CarDatabaseError):
                 raise
-            raise CarDatabaseError(f"차량 DB 다운로드 실패: {exc}") from exc
+            raise CarDatabaseError(tr("car_db.download_failed", error=exc)) from exc
 
         try:
             source = json.loads(raw.decode("utf-8-sig"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise CarDatabaseError(f"차량 DB JSON 파싱 실패: {exc}") from exc
+            raise CarDatabaseError(tr("car_db.json_failed", error=exc)) from exc
 
         normalized = cls._normalize_remote_mapping(source)
         if len(normalized) < 500:
             raise CarDatabaseError(
-                f"차량 DB 항목이 {len(normalized)}개뿐입니다. 불완전한 응답으로 판단하여 적용하지 않았습니다."
+                tr("car_db.too_few", count=len(normalized))
             )
 
         downloaded_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
@@ -302,7 +303,7 @@ class CarDatabase:
     @classmethod
     def _normalize_remote_mapping(cls, source: object) -> dict[int, CarName]:
         if not isinstance(source, dict):
-            raise CarDatabaseError("차량 DB 최상위 JSON이 object가 아닙니다.")
+            raise CarDatabaseError(tr("car_db.root_not_object"))
 
         result: dict[int, CarName] = {}
         # Upstream format is {"full display name": "CarOrdinal"}.
@@ -319,7 +320,7 @@ class CarDatabase:
             previous = result.get(car_id)
             if previous is not None and previous.label != label:
                 raise CarDatabaseError(
-                    f"동일 Car ID {car_id}에 서로 다른 이름이 존재합니다: '{previous.label}' / '{label}'"
+                    tr("car_db.duplicate_id", car_id=car_id, first=previous.label, second=label)
                 )
             result[car_id] = cls._make_car_name(car_id, label, "community update")
         return result
@@ -371,10 +372,10 @@ class CarDatabase:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
-            self._load_warnings.append(f"업데이트 DB를 읽지 못함: {exc}")
+            self._load_warnings.append(tr("car_db.cache_read_failed", error=exc))
             return {}, {}
         if not isinstance(data, dict):
-            self._load_warnings.append("업데이트 DB 형식이 잘못됨")
+            self._load_warnings.append(tr("car_db.cache_format_invalid"))
             return {}, {}
         cars = data.get("cars", {})
         parsed = self._parse_id_mapping(cars, "community update")
@@ -382,9 +383,9 @@ class CarDatabase:
         if declared is not None:
             try:
                 if int(declared) != len(parsed):
-                    self._load_warnings.append("업데이트 DB count 메타데이터가 실제 항목 수와 다름")
+                    self._load_warnings.append(tr("car_db.count_mismatch"))
             except (TypeError, ValueError):
-                self._load_warnings.append("업데이트 DB count 메타데이터가 잘못됨")
+                self._load_warnings.append(tr("car_db.count_invalid"))
         return parsed, data
 
     def _load_override(self, path: Path) -> dict[int, CarName]:
@@ -393,7 +394,7 @@ class CarDatabase:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
-            self._load_warnings.append(f"사용자 override를 읽지 못함: {exc}")
+            self._load_warnings.append(tr("car_db.override_read_failed", error=exc))
             return {}
         if isinstance(data, dict) and "cars" in data:
             data = data.get("cars", {})

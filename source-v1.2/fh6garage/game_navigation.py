@@ -5,6 +5,8 @@ import sys
 import time
 from typing import Iterable
 
+from .i18n import tr
+
 
 class GameNavigationError(RuntimeError):
     pass
@@ -42,10 +44,10 @@ class GameGridSession:
 
     def plan_to(self, target_key: str) -> list[str]:
         if not self.items:
-            raise GameNavigationError("이동 가능한 항목이 없습니다.")
+            raise GameNavigationError(tr("navigation.no_items"))
         keys = [item.key for item in self.items]
         if target_key not in keys:
-            raise GameNavigationError("대상이 현재 인게임 목록에 없습니다.")
+            raise GameNavigationError(tr("navigation.target_missing"))
         if self.current_key not in keys:
             self.current_key = keys[0]
 
@@ -148,7 +150,7 @@ def _find_fh6_window(user32, ctypes) -> tuple[int, str]:
     callback = callback_type(visit)
     user32.EnumWindows(callback, 0)
     if not matches:
-        raise GameNavigationError("실행 중인 Forza Horizon 6 창을 찾지 못했습니다.")
+        raise GameNavigationError(tr("navigation.window_not_found"))
     # Prefer an exact game title if auxiliary windows ever contain the same text.
     matches.sort(key=lambda item: (item[1].casefold() != "forza horizon 6", len(item[1])))
     return matches[0]
@@ -183,7 +185,7 @@ def _activate_fh6_window(
         time.sleep(0.05)
     title = _window_title(user32, ctypes, window_handle)
     raise GameNavigationError(
-        f"Forza Horizon 6 창을 활성화하지 못했습니다: {title or '(제목 없음)'}"
+        tr("navigation.activation_failed", title=title or tr("detail.no_title"))
     )
 
 
@@ -195,7 +197,7 @@ def send_arrow_keys_to_fh6(
 ) -> str:
     """Activate FH6 when requested, verify focus, then send arrow keys."""
     if sys.platform != "win32":
-        raise GameNavigationError("인게임 키 입력은 Windows에서만 지원됩니다.")
+        raise GameNavigationError(tr("navigation.windows_only"))
 
     import ctypes
 
@@ -209,10 +211,10 @@ def send_arrow_keys_to_fh6(
         title = _window_title(user32, ctypes, target_window) if target_window else ""
 
     if not target_window:
-        raise GameNavigationError("활성 창을 확인할 수 없습니다.")
+        raise GameNavigationError(tr("navigation.no_active_window"))
     if not _is_fh6_title(title):
         raise GameNavigationError(
-            f"활성 창이 Forza Horizon 6이 아닙니다: {title or '(제목 없음)'}"
+            tr("navigation.wrong_window", title=title or tr("detail.no_title"))
         )
 
     virtual_keys = {
@@ -226,14 +228,14 @@ def send_arrow_keys_to_fh6(
     def ensure_focus() -> None:
         if int(user32.GetForegroundWindow() or 0) != int(target_window):
             raise GameNavigationError(
-                "이동 중 활성 창이 변경되어 남은 입력을 중단했습니다."
+                tr("navigation.focus_changed")
             )
 
     def press_arrow(name: str) -> None:
         ensure_focus()
         vk = virtual_keys.get(name)
         if vk is None:
-            raise GameNavigationError(f"지원하지 않는 이동 키: {name}")
+            raise GameNavigationError(tr("navigation.unsupported_key", key=name))
         hold_time = min(0.015, max(0.005, interval / 3))
         user32.keybd_event(vk, 0, 0, 0)
         time.sleep(hold_time)
