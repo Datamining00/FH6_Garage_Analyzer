@@ -118,7 +118,7 @@ jobs:
         shell: bash
         run: |
           python -m compileall -q source-v1.2
-          python -m unittest source-v1.2/tests/test_v1_3_restart_environment.py -v
+          python source-v1.2/tests/test_v1_3_restart_environment.py -v
           git diff --check
 
       - name: Commit patched source
