@@ -107,6 +107,8 @@ def _window_title(user32, ctypes, window_handle: int) -> str:
 def _configure_user32(user32, ctypes) -> None:
     """Declare pointer-sized Win32 signatures for 64-bit Python."""
     handle = ctypes.c_void_p
+    dword = ctypes.c_ulong
+
     user32.GetForegroundWindow.restype = handle
     user32.GetWindowTextLengthW.argtypes = [handle]
     user32.GetWindowTextLengthW.restype = ctypes.c_int
@@ -118,11 +120,22 @@ def _configure_user32(user32, ctypes) -> None:
     user32.GetWindowTextW.restype = ctypes.c_int
     user32.IsWindowVisible.argtypes = [handle]
     user32.IsWindowVisible.restype = ctypes.c_bool
+    user32.IsIconic.argtypes = [handle]
+    user32.IsIconic.restype = ctypes.c_bool
     user32.ShowWindow.argtypes = [handle, ctypes.c_int]
+    user32.ShowWindow.restype = ctypes.c_bool
     user32.BringWindowToTop.argtypes = [handle]
+    user32.BringWindowToTop.restype = ctypes.c_bool
     user32.SetForegroundWindow.argtypes = [handle]
+    user32.SetForegroundWindow.restype = ctypes.c_bool
     user32.SetActiveWindow.argtypes = [handle]
     user32.SetActiveWindow.restype = handle
+    user32.SetFocus.argtypes = [handle]
+    user32.SetFocus.restype = handle
+    user32.GetWindowThreadProcessId.argtypes = [handle, ctypes.POINTER(dword)]
+    user32.GetWindowThreadProcessId.restype = dword
+    user32.AttachThreadInput.argtypes = [dword, dword, ctypes.c_bool]
+    user32.AttachThreadInput.restype = ctypes.c_bool
     user32.keybd_event.argtypes = [
         ctypes.c_ubyte,
         ctypes.c_ubyte,
@@ -151,39 +164,106 @@ def _find_fh6_window(user32, ctypes) -> tuple[int, str]:
     user32.EnumWindows(callback, 0)
     if not matches:
         raise GameNavigationError(tr("navigation.window_not_found"))
-    # Prefer an exact game title if auxiliary windows ever contain the same text.
+    # Prefer the exact game title if auxiliary windows ever contain the same text.
     matches.sort(key=lambda item: (item[1].casefold() != "forza horizon 6", len(item[1])))
     return matches[0]
+
+
+def _window_thread_id(user32, ctypes, window_handle: int) -> int:
+    process_id = ctypes.c_ulong(0)
+    return int(
+        user32.GetWindowThreadProcessId(
+            window_handle,
+            ctypes.byref(process_id),
+        )
+        or 0
+    )
 
 
 def _activate_fh6_window(
     user32,
     ctypes,
     window_handle: int,
-    timeout: float = 2.0,
+    timeout: float = 2.5,
 ) -> None:
-    show_restore = 9
-    virtual_alt = 0x12
-    key_up = 0x0002
-    user32.ShowWindow(window_handle, show_restore)
-    user32.BringWindowToTop(window_handle)
+    """Activate FH6 without injecting Alt or changing its window mode.
 
-    # A short Alt press is a documented user-input transition from Windows'
-    # perspective and improves SetForegroundWindow reliability without clicks.
-    user32.keybd_event(virtual_alt, 0, 0, 0)
+    The previous implementation briefly synthesized the Alt key to satisfy
+    SetForegroundWindow restrictions.  In a normal bordered window that can
+    interact with the Windows system menu (Move/Size/Minimize/Maximize/Close).
+
+    Instead, temporarily attach the input queues of this GUI thread, the
+    current foreground thread, and the FH6 window thread.  This works for
+    windowed, borderless-fullscreen, and fullscreen windows while preserving
+    the game's existing size/maximized state.  SW_RESTORE is used only when
+    the game is actually minimized.
+    """
+    target = int(window_handle or 0)
+    if not target:
+        raise GameNavigationError(tr("navigation.no_active_window"))
+
+    if int(user32.GetForegroundWindow() or 0) == target:
+        time.sleep(0.08)
+        return
+
+    # Exclusive fullscreen can be minimized when another application receives
+    # focus. Restore only in that case; never restore a normal/maximized
+    # window because doing so changes the user's chosen window mode/geometry.
+    if bool(user32.IsIconic(target)):
+        user32.ShowWindow(target, 9)  # SW_RESTORE
+        time.sleep(0.10)
+
+    kernel32 = ctypes.windll.kernel32
+    kernel32.GetCurrentThreadId.restype = ctypes.c_ulong
+    current_thread = int(kernel32.GetCurrentThreadId() or 0)
+
+    foreground = int(user32.GetForegroundWindow() or 0)
+    foreground_thread = (
+        _window_thread_id(user32, ctypes, foreground)
+        if foreground
+        else 0
+    )
+    target_thread = _window_thread_id(user32, ctypes, target)
+
+    attached_pairs: list[tuple[int, int]] = []
+
+    def attach(first: int, second: int) -> None:
+        if not first or not second or first == second:
+            return
+        pair = (first, second)
+        reverse_pair = (second, first)
+        if pair in attached_pairs or reverse_pair in attached_pairs:
+            return
+        if user32.AttachThreadInput(first, second, True):
+            attached_pairs.append(pair)
+
+    # Joining the queues removes the need for synthetic modifier keys and lets
+    # Windows perform a normal foreground transition regardless of whether FH6
+    # is bordered, borderless, or exclusive fullscreen.
+    attach(current_thread, foreground_thread)
+    attach(current_thread, target_thread)
+
     try:
-        user32.SetForegroundWindow(window_handle)
-        user32.SetActiveWindow(window_handle)
+        user32.BringWindowToTop(target)
+        user32.SetForegroundWindow(target)
+        user32.SetActiveWindow(target)
+        user32.SetFocus(target)
     finally:
-        user32.keybd_event(virtual_alt, 0, key_up, 0)
+        for first, second in reversed(attached_pairs):
+            user32.AttachThreadInput(first, second, False)
 
     deadline = time.monotonic() + max(0.5, timeout)
     while time.monotonic() < deadline:
-        if int(user32.GetForegroundWindow() or 0) == int(window_handle):
-            time.sleep(0.35)
+        if int(user32.GetForegroundWindow() or 0) == target:
+            # Give DirectInput/XInput-style game loops a short frame window to
+            # observe the focus transition before keyboard navigation begins.
+            time.sleep(0.18)
             return
+        # A harmless retry is useful after exclusive fullscreen restoration.
+        user32.SetForegroundWindow(target)
         time.sleep(0.05)
-    title = _window_title(user32, ctypes, window_handle)
+
+    title = _window_title(user32, ctypes, target)
     raise GameNavigationError(
         tr("navigation.activation_failed", title=title or tr("detail.no_title"))
     )
@@ -195,7 +275,11 @@ def send_arrow_keys_to_fh6(
     *,
     auto_activate: bool = True,
 ) -> str:
-    """Activate FH6 when requested, verify focus, then send arrow keys."""
+    """Activate FH6 when requested, verify focus, then send arrow keys.
+
+    The same path is used for normal windowed, borderless fullscreen, and
+    fullscreen modes. No mouse clicks or synthetic Alt input are generated.
+    """
     if sys.platform != "win32":
         raise GameNavigationError(tr("navigation.windows_only"))
 
@@ -227,9 +311,7 @@ def send_arrow_keys_to_fh6(
 
     def ensure_focus() -> None:
         if int(user32.GetForegroundWindow() or 0) != int(target_window):
-            raise GameNavigationError(
-                tr("navigation.focus_changed")
-            )
+            raise GameNavigationError(tr("navigation.focus_changed"))
 
     def press_arrow(name: str) -> None:
         ensure_focus()
