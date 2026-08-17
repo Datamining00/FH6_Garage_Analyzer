@@ -7,6 +7,7 @@ on:
       - v1.3-work
     paths:
       - ".github/workflows/build-v1.3-windows.yml"
+      - "source-v1.2/**"
 
 permissions:
   contents: read
