@@ -6,6 +6,7 @@ on:
       - v1.3-work
     paths:
       - "tools/apply_v1_3_features.py"
+      - "tools/fix_v1_3_patch.py"
       - ".github/workflows/apply-v1.3-features.yml"
 
 permissions:
@@ -33,15 +34,18 @@ jobs:
           python -m pip install -r source-v1.2/requirements.txt
 
       - name: Apply v1.3 feature patch
-        run: python tools/apply_v1_3_features.py
+        run: |
+          python tools/apply_v1_3_features.py
+          python tools/fix_v1_3_patch.py
 
       - name: Compile Python source
         run: python -m compileall -q source-v1.2
 
       - name: Run regression tests
+        working-directory: source-v1.2
         env:
           QT_QPA_PLATFORM: offscreen
-        run: python -m unittest discover -s source-v1.2/tests -v
+        run: python -m unittest discover -s tests -v
 
       - name: Commit verified feature changes
         shell: bash
