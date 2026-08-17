@@ -1,0 +1,92 @@
+name: Apply v1.3 topmost navigation fix
+
+on:
+  push:
+    branches:
+      - v1.3-work
+    paths:
+      - ".github/workflows/apply-v1.3-topmost-navigation-fix.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  apply-fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout v1.3 work branch
+        uses: actions/checkout@v6
+        with:
+          ref: v1.3-work
+          persist-credentials: true
+
+      - name: Patch always-on-top navigation behavior
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          ui_path = Path("source-v1.2/fh6garage/ui.py")
+          ui = ui_path.read_text(encoding="utf-8")
+          old = "        if self.always_on_top_box.isChecked():\n            self.showMinimized()\n"
+          if old not in ui:
+              raise SystemExit("Expected navigation minimization block was not found.")
+          ui = ui.replace(old, "", 1)
+          ui_path.write_text(ui, encoding="utf-8")
+
+          i18n_path = Path("source-v1.2/fh6garage/i18n.py")
+          i18n = i18n_path.read_text(encoding="utf-8")
+          old_tip = '''    "sidebar.always_on_top_tip": {
+              "ko": "인게임 이동을 시작하면 포르자 화면을 가리지 않도록 분석기 창을 최소화합니다.",
+              "en": "When in-game navigation starts, the analyzer window is minimized so it does not cover Forza.",
+          },'''
+          new_tip = '''    "sidebar.always_on_top_tip": {
+              "ko": "활성화하면 다른 창 위에 표시되며, 인게임 이동 중에도 창을 숨기지 않습니다.",
+              "en": "Keep the assistant above other windows and visible during in-game navigation.",
+          },'''
+          if old_tip not in i18n:
+              raise SystemExit("Expected always-on-top tooltip block was not found.")
+          i18n = i18n.replace(old_tip, new_tip, 1)
+          i18n_path.write_text(i18n, encoding="utf-8")
+
+          test_path = Path("source-v1.2/tests/test_v1_3_topmost_navigation.py")
+          test_path.write_text('''from __future__ import annotations
+
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+class V13TopmostNavigationTests(unittest.TestCase):
+    def test_navigation_does_not_minimize_always_on_top_window(self) -> None:
+        source = (ROOT / "fh6garage" / "ui.py").read_text(encoding="utf-8")
+        legacy = "if self.always_on_top_box.isChecked():\\n            self.showMinimized()"
+        self.assertNotIn(legacy, source)
+
+    def test_always_on_top_tooltip_matches_new_behavior(self) -> None:
+        source = (ROOT / "fh6garage" / "i18n.py").read_text(encoding="utf-8")
+        self.assertIn("인게임 이동 중에도 창을 숨기지 않습니다", source)
+        self.assertNotIn("분석기 창을 최소화합니다", source)
+
+
+if __name__ == "__main__":
+    unittest.main()
+''', encoding="utf-8")
+          PY
+
+      - name: Validate patched source
+        shell: bash
+        run: |
+          python -m compileall -q source-v1.2
+          python -m unittest source-v1.2/tests/test_v1_3_topmost_navigation.py -v
+          git diff --check
+
+      - name: Commit patched source
+        shell: bash
+        run: |
+          git config user.name "AAA"
+          git config user.email "49602959+Datamining00@users.noreply.github.com"
+          git add source-v1.2/fh6garage/ui.py source-v1.2/fh6garage/i18n.py source-v1.2/tests/test_v1_3_topmost_navigation.py
+          git commit -m "Keep assistant visible during game navigation"
+          git push origin HEAD:v1.3-work
