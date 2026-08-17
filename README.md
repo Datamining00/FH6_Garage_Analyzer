@@ -1,3 +1,5 @@
+# FH6 Garage Analyzer
+
 FH6의 로컬 저장 폴더를 분석하여 보유 차량, 저장된 리버리, 튜닝 및 제작자 정보를 확인할 수 있는 Windows용 데스크톱 프로그램입니다.
 
 > 이 프로젝트는 비공식 커뮤니티 도구이며 Microsoft, Xbox Game Studios, Playground Games 또는 Forza와 제휴 관계가 없으며 해당 기관의 보증을 받지 않았습니다. 프로그램 사용으로 발생하는 문제나 불이익에 대한 책임은 사용자에게 있습니다.
@@ -89,7 +91,6 @@ SHA-256 파일은 프로그램 실행에 필요한 파일이 아니며 무결성
 
 Microsoft Security Intelligence의 파일 분석을 요청 결과입니다
 <img width="1142" height="1218" alt="4" src="https://github.com/user-attachments/assets/52d8ba09-338a-4c8c-a0c6-49917826bdd2" />
-# FH6 Garage Analyzer
 
 Microsoft 분석 결과:
 
