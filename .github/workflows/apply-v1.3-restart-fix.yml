@@ -54,7 +54,7 @@ jobs:
               "        # A PyInstaller onefile restart must be a fresh top-level instance.\n"
               "        # Otherwise PyInstaller 6.9+ may reuse the current _MEI directory,\n"
               "        # which is removed as the old instance exits.\n"
-              "        frozen = bool(getattr(sys, \\\"frozen\\\", False))\n"
+              '        frozen = bool(getattr(sys, "frozen", False))\n'
               "        if frozen:\n"
               "            program = sys.executable\n"
               "            arguments = QApplication.arguments()[1:]\n"
@@ -62,10 +62,10 @@ jobs:
               "            program = sys.executable\n"
               "            arguments = QApplication.arguments()\n"
               "\n"
-              "        reset_key = \\\"PYINSTALLER_RESET_ENVIRONMENT\\\"\n"
+              '        reset_key = "PYINSTALLER_RESET_ENVIRONMENT"\n'
               "        previous_reset = os.environ.get(reset_key)\n"
               "        if frozen:\n"
-              "            os.environ[reset_key] = \\\"1\\\"\n"
+              '            os.environ[reset_key] = "1"\n'
               "        try:\n"
               "            result = QProcess.startDetached(program, arguments)\n"
               "        finally:\n"
@@ -100,9 +100,9 @@ jobs:
               "    def test_onefile_restart_resets_pyinstaller_environment(self) -> None:\n"
               "        source = (ROOT / 'fh6garage' / 'v1_3_ui_patch.py').read_text(encoding='utf-8')\n"
               "        self.assertIn('PYINSTALLER_RESET_ENVIRONMENT', source)\n"
-              "        self.assertIn('os.environ[reset_key] = \\\"1\\\"', source)\n"
+              "        self.assertIn('os.environ[reset_key] = \"1\"', source)\n"
               "        self.assertIn('program = sys.executable', source)\n"
-              "        self.assertLess(source.index('os.environ[reset_key] = \\\"1\\\"'), source.index('QProcess.startDetached(program, arguments)'))\n\n"
+              "        self.assertLess(source.index('os.environ[reset_key] = \"1\"'), source.index('QProcess.startDetached(program, arguments)'))\n\n"
               "    def test_restart_restores_parent_environment_after_spawn(self) -> None:\n"
               "        source = (ROOT / 'fh6garage' / 'v1_3_ui_patch.py').read_text(encoding='utf-8')\n"
               "        self.assertIn('previous_reset = os.environ.get(reset_key)', source)\n"
