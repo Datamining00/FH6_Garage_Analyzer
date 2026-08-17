@@ -9,8 +9,8 @@ if (-not (Test-Path $venv)) {
 $python = Join-Path $venv "Scripts\python.exe"
 & $python -m pip install --upgrade pip
 & $python -m pip install -r .\requirements.txt pyinstaller
-& $python -m PyInstaller --clean --noconfirm .\FH6_Assistant_v1.2.spec
+& $python -m PyInstaller --clean --noconfirm .\FH6_Assistant_v1.3.spec
 
 Write-Host ""
 Write-Host "Build complete:"
-Write-Host (Join-Path $PSScriptRoot "dist\FH6 Assistant v1.2.exe")
+Write-Host (Join-Path $PSScriptRoot "dist\FH6 Assistant v1.3.exe")

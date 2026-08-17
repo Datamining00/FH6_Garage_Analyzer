@@ -659,7 +659,7 @@ class MainWindow(QMainWindow):
         self._dashboard_creator_sort_section = 1
         self._dashboard_creator_sort_order = Qt.SortOrder.AscendingOrder
 
-        self.setWindowTitle("FH6 Assistant v1.2")
+        self.setWindowTitle("FH6 Assistant v1.3")
         self.resize(1460, 900)
         # Allow a narrower compact layout while preventing the two-row toolbar
         # and card metadata from being vertically clipped.
@@ -876,7 +876,7 @@ class MainWindow(QMainWindow):
         )
         self.always_on_top_box.toggled.connect(self._set_always_on_top)
         side.addWidget(self.always_on_top_box)
-        version = QLabel("v1.2\nLIVERY & TUNING")
+        version = QLabel("v1.3\nLIVERY & TUNING")
         version.setStyleSheet("color:#777b8b; padding:8px;")
         side.addWidget(version)
         outer.addWidget(sidebar)
@@ -3540,14 +3540,14 @@ class MainWindow(QMainWindow):
             ),
         )
 
-    def _clear_notes_for_same_creator(self, source_key: str) -> None:
+    def _clear_notes_for_same_creator(self, source_key: str) -> bool:
         source_record = self._record_for_annotation_key(source_key)
         if source_record is None:
-            return
+            return False
         creator = (source_record.header.creator or "").strip()
         if not creator:
             QMessageBox.information(self, tr("memo.creator_missing_title"), tr("memo.creator_missing_remove"))
-            return
+            return False
 
         creator_key = creator.casefold()
         targets = [
@@ -3560,7 +3560,7 @@ class MainWindow(QMainWindow):
         )
         if with_notes == 0:
             QMessageBox.information(self, tr("memo.none_to_remove_title"), tr("memo.none_to_remove_message", creator=creator))
-            return
+            return False
 
         answer = QMessageBox.question(
             self,
@@ -3570,7 +3570,7 @@ class MainWindow(QMainWindow):
             QMessageBox.StandardButton.No,
         )
         if answer != QMessageBox.StandardButton.Yes:
-            return
+            return False
 
         for record in targets:
             key = self._annotation_key(record)
@@ -3578,6 +3578,8 @@ class MainWindow(QMainWindow):
         self.annotations.save()
         self._refresh_annotation_widgets()
         self._show_status(tr("memo.clear_status", creator=creator, count=with_notes), 3500)
+        return True
+
 
 
     def _refresh_annotation_widgets(self) -> None:
@@ -4718,11 +4720,11 @@ class MainWindow(QMainWindow):
                 refresh_creator_count()
 
             def clear_creator_notes() -> None:
-                self._clear_notes_for_same_creator(key)
-                # The selected livery was cleared by the creator-wide action too.
-                # Keep the open editor in sync so pressing Save cannot restore it.
-                editor.clear()
-                refresh_creator_count()
+                if self._clear_notes_for_same_creator(key):
+                    # The selected livery was cleared by the creator-wide action too.
+                    # Keep the open editor in sync so pressing Save cannot restore it.
+                    editor.clear()
+                    refresh_creator_count()
 
             append_btn.clicked.connect(append_to_creator)
             clear_btn.clicked.connect(clear_creator_notes)
