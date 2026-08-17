@@ -1,0 +1,137 @@
+name: Apply v1.3 PyInstaller restart fix
+
+on:
+  push:
+    branches:
+      - v1.3-work
+    paths:
+      - ".github/workflows/apply-v1.3-restart-fix.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  apply-fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout v1.3 work branch
+        uses: actions/checkout@v6
+        with:
+          ref: v1.3-work
+          persist-credentials: true
+
+      - name: Patch restart behavior
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("source-v1.2/fh6garage/v1_3_ui_patch.py")
+          source = path.read_text(encoding="utf-8")
+
+          if "import os\n" not in source:
+              source = source.replace("import ctypes\nimport sys\n", "import ctypes\nimport os\nimport sys\n", 1)
+
+          old = '''    def restart_for_language_change(self) -> None:
+        self.settings.sync()
+        program = QApplication.applicationFilePath()
+        arguments = QApplication.arguments()[1:]
+        result = QProcess.startDetached(program, arguments)
+        started = result[0] if isinstance(result, tuple) else bool(result)
+        if not started:
+            QMessageBox.warning(
+                self,
+                _restart_failed_title(),
+                _restart_failed_message(),
+            )
+            return
+        QApplication.quit()
+'''
+          new = '''    def restart_for_language_change(self) -> None:
+        self.settings.sync()
+
+        # PyInstaller 6.9+ treats a process spawned from the same onefile
+        # executable as a worker by default. A restart must be marked as a new
+        # top-level application instance, otherwise the new process can try to
+        # reuse the current _MEI extraction directory and fail while the old
+        # instance is shutting down (\"Failed to start embedded python interpreter\").
+        frozen = bool(getattr(sys, "frozen", False))
+        if frozen:
+            program = sys.executable
+            arguments = QApplication.arguments()[1:]
+        else:
+            program = sys.executable
+            arguments = QApplication.arguments()
+
+        reset_key = "PYINSTALLER_RESET_ENVIRONMENT"
+        previous_reset = os.environ.get(reset_key)
+        if frozen:
+            os.environ[reset_key] = "1"
+        try:
+            result = QProcess.startDetached(program, arguments)
+        finally:
+            if frozen:
+                if previous_reset is None:
+                    os.environ.pop(reset_key, None)
+                else:
+                    os.environ[reset_key] = previous_reset
+
+        started = result[0] if isinstance(result, tuple) else bool(result)
+        if not started:
+            QMessageBox.warning(
+                self,
+                _restart_failed_title(),
+                _restart_failed_message(),
+            )
+            return
+        QApplication.quit()
+'''
+          if old not in source:
+              raise SystemExit("Expected language restart function was not found.")
+          source = source.replace(old, new, 1)
+          path.write_text(source, encoding="utf-8")
+
+          test = Path("source-v1.2/tests/test_v1_3_restart_environment.py")
+          test.write_text('''from __future__ import annotations
+
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+class V13RestartEnvironmentTests(unittest.TestCase):
+    def test_onefile_restart_resets_pyinstaller_environment(self) -> None:
+        source = (ROOT / "fh6garage" / "v1_3_ui_patch.py").read_text(encoding="utf-8")
+        self.assertIn('reset_key = "PYINSTALLER_RESET_ENVIRONMENT"', source)
+        self.assertIn('os.environ[reset_key] = "1"', source)
+        self.assertIn('program = sys.executable', source)
+        self.assertLess(source.index('os.environ[reset_key] = "1"'), source.index('QProcess.startDetached(program, arguments)'))
+
+    def test_restart_restores_parent_environment_after_spawn(self) -> None:
+        source = (ROOT / "fh6garage" / "v1_3_ui_patch.py").read_text(encoding="utf-8")
+        self.assertIn('previous_reset = os.environ.get(reset_key)', source)
+        self.assertIn('os.environ.pop(reset_key, None)', source)
+        self.assertIn('os.environ[reset_key] = previous_reset', source)
+
+
+if __name__ == "__main__":
+    unittest.main()
+''', encoding="utf-8")
+          PY
+
+      - name: Validate patched source
+        shell: bash
+        run: |
+          python -m compileall -q source-v1.2
+          python -m unittest source-v1.2/tests/test_v1_3_restart_environment.py -v
+          git diff --check
+
+      - name: Commit patched source
+        shell: bash
+        run: |
+          git config user.name "AAA"
+          git config user.email "49602959+Datamining00@users.noreply.github.com"
+          git add source-v1.2/fh6garage/v1_3_ui_patch.py source-v1.2/tests/test_v1_3_restart_environment.py
+          git commit -m "Fix onefile language restart environment"
+          git push origin HEAD:v1.3-work
