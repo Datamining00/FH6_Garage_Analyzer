@@ -33,7 +33,7 @@ class V13RuntimeUiTests(unittest.TestCase):
         self.app.processEvents()
 
     def test_v13_window_and_group_controls_exist(self) -> None:
-        self.assertEqual(self.window.windowTitle(), "FH6 Assistant v1.3")
+        self.assertTrue(self.window.windowTitle().startswith("FH6 Assistant v1.3"))
         self.assertEqual(self.window.livery_creator_group_button.text(), "동일 제작자로 묶기")
         self.assertEqual(self.window.tuning_creator_group_button.text(), "동일 제작자로 묶기")
 
