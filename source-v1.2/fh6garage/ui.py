@@ -2274,8 +2274,6 @@ class MainWindow(QMainWindow):
             lambda t=content_type, k=key, keys=planned_keys, m=mode, g=generation, a=auto_activate, ar=arrow_interval_ms:
             self._execute_game_navigation(t, k, keys, m, g, a, ar),
         )
-        if self.always_on_top_box.isChecked():
-            self.showMinimized()
 
     def _execute_game_navigation(
         self,

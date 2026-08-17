@@ -30,8 +30,8 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
     "nav.tuning": {"ko": "튜닝", "en": "Tuning"},
     "sidebar.always_on_top": {"ko": "항상 위에 표시", "en": "Always on top"},
     "sidebar.always_on_top_tip": {
-        "ko": "인게임 이동을 시작하면 포르자 화면을 가리지 않도록 분석기 창을 최소화합니다.",
-        "en": "When in-game navigation starts, the analyzer window is minimized so it does not cover Forza.",
+        "ko": "활성화하면 다른 창 위에 표시되며, 인게임 이동 중에도 창을 숨기지 않습니다.",
+        "en": "Keep the assistant above other windows and visible during in-game navigation.",
     },
     "save.placeholder": {
         "ko": "FH6 세이브 루트/current/버전/ContainersRoot 폴더를 선택하세요",
