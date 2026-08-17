@@ -21,6 +21,12 @@ ui = replace_once(
     '''            def clear_creator_notes() -> None:\n                self._clear_notes_for_same_creator(key)\n                # The selected livery was cleared by the creator-wide action too.\n                # Keep the open editor in sync so pressing Save cannot restore it.\n                editor.clear()\n                refresh_creator_count()\n''',
     "clear creator notes editor sync",
 )
+ui = replace_once(
+    ui,
+    '''            else:\n                header.setText(\n                    tr(\n                        "content.group_header",\n                        vehicle=labels[group_key],\n                        noun=noun,\n                        count=len(group_cards),\n                    )\n                )\n''',
+    '''            else:\n                header.setText(\n                    tr("content.group_header", vehicle=labels[group_key], noun=noun, count=len(group_cards))\n                )\n''',
+    "legacy group header i18n contract",
+)
 UI_PATH.write_text(ui, encoding="utf-8")
 
 test = TEST_PATH.read_text(encoding="utf-8")
