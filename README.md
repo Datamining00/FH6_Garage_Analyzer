@@ -1,3 +1,4 @@
+<img width="1142" height="1218" alt="4" src="https://github.com/user-attachments/assets/52d8ba09-338a-4c8c-a0c6-49917826bdd2" />
 # FH6 Garage Analyzer
 
 FH6의 로컬 저장 폴더를 분석하여 보유 차량, 저장된 리버리, 튜닝 및 제작자 정보를 확인할 수 있는 Windows용 데스크톱 프로그램입니다.
