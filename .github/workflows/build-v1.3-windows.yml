@@ -110,3 +110,5 @@ jobs:
             artifact/FH6 Assistant v1.3.exe.sha256
           if-no-files-found: error
           compression-level: 0
+
+# validation trigger: topmost navigation fix
