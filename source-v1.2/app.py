@@ -24,6 +24,7 @@ except ModuleNotFoundError as exc:
 
 from fh6garage.i18n import DEFAULT_LANGUAGE, set_language
 from fh6garage.ui import MainWindow
+from fh6garage.v1_3_ui_patch import apply_v1_3_ui_patches
 
 
 def resource_root() -> Path:
@@ -44,6 +45,11 @@ def main() -> int:
     # Resolve the persisted UI language before constructing any translated widgets.
     settings = QSettings()
     set_language(settings.value("language", DEFAULT_LANGUAGE, str))
+
+    # Apply the v1.3 responsive-card, language/restart and Windows topmost fixes
+    # before the first MainWindow is constructed so every signal binds to the
+    # updated methods from the start.
+    apply_v1_3_ui_patches(MainWindow)
 
     root = resource_root()
     icon_path = root / "icons" / "FH6_Assistant.ico"
