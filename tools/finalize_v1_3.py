@@ -49,16 +49,14 @@ ui = replace_once(
 method_start = ui.index('    def _clear_notes_for_same_creator(self, source_key: str) -> bool:\n')
 method_end = ui.index('\n\n\n    def _refresh_annotation_widgets', method_start)
 method = ui[method_start:method_end]
-if method.count('            return\n') != 4:
+early_return = '            return\n'
+early_count = method.count(early_return)
+if early_count != 4:
     raise RuntimeError(
-        "creator clear early exits: expected four plain returns, "
-        f"found {method.count('            return\\n')}"
+        f"creator clear early exits: expected four plain returns, found {early_count}"
     )
-method = method.replace('            return\n', '            return False\n')
-status_line = '        self._show_status(tr("memo.clear_status", creator=creator, count=with_notes), 3500)\n'
-if status_line not in method:
-    raise RuntimeError("creator clear success status line not found")
-method = method.replace(status_line, status_line + '        return True\n', 1)
+method = method.replace(early_return, '            return False\n')
+method = method.rstrip() + '\n        return True\n'
 ui = ui[:method_start] + method + ui[method_end:]
 UI_PATH.write_text(ui, encoding="utf-8")
 
