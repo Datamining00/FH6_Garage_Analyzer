@@ -105,7 +105,7 @@ Microsoft 분석 결과:
 - **SHA-256:** `e8196c2910e11b4b0bc86ca0f04af1017c13345e853d1ae5369f227c964424a6`
 
 Microsoft는 제출된 파일이 **악성코드 또는 PUA 기준에 해당하지 않는다**고 판정했으며,
-기존 Microsoft Defender 탐지를 제거함.
+기존 Microsoft Defender 탐지를 제거.
 
 ## 자료 출처 및 감사
 
