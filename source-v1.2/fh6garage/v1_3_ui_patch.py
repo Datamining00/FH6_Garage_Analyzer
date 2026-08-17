@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ctypes
+import os
 import sys
 from ctypes import wintypes
 from typing import Any
@@ -143,9 +144,31 @@ def apply_v1_3_ui_patches(MainWindow) -> None:
 
     def restart_for_language_change(self) -> None:
         self.settings.sync()
-        program = QApplication.applicationFilePath()
-        arguments = QApplication.arguments()[1:]
-        result = QProcess.startDetached(program, arguments)
+
+        # A PyInstaller onefile restart must be a fresh top-level instance.
+        # Otherwise PyInstaller 6.9+ may reuse the current _MEI directory,
+        # which is removed as the old instance exits.
+        frozen = bool(getattr(sys, "frozen", False))
+        if frozen:
+            program = sys.executable
+            arguments = QApplication.arguments()[1:]
+        else:
+            program = sys.executable
+            arguments = QApplication.arguments()
+
+        reset_key = "PYINSTALLER_RESET_ENVIRONMENT"
+        previous_reset = os.environ.get(reset_key)
+        if frozen:
+            os.environ[reset_key] = "1"
+        try:
+            result = QProcess.startDetached(program, arguments)
+        finally:
+            if frozen:
+                if previous_reset is None:
+                    os.environ.pop(reset_key, None)
+                else:
+                    os.environ[reset_key] = previous_reset
+
         started = result[0] if isinstance(result, tuple) else bool(result)
         if not started:
             QMessageBox.warning(
