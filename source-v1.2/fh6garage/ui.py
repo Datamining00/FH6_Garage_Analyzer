@@ -926,6 +926,45 @@ class MainWindow(QMainWindow):
             layout.addWidget(subtitle_label)
         return layout
 
+    def _dashboard_saved_section_header(
+        self,
+        title: str,
+        content_type: str,
+    ) -> QFrame:
+        section = QFrame()
+        section.setObjectName("dashboardSavedSection")
+        section.setStyleSheet(
+            "QFrame#dashboardSavedSection { background:#eee9ff; border:0; "
+            "border-radius:6px; }"
+            "QLabel { background:transparent; color:#5f39d8; font-weight:700; }"
+            "QPushButton { background:#ffffff; color:#5f39d8; border:1px solid #d5c9ff; "
+            "border-radius:6px; padding:3px 8px; font-size:9pt; font-weight:650; }"
+            "QPushButton:hover { background:#f8f5ff; border-color:#8c74ee; }"
+        )
+        row = QHBoxLayout(section)
+        row.setContentsMargins(9, 4, 5, 4)
+        row.setSpacing(8)
+
+        label = QLabel(title)
+        row.addWidget(label)
+        row.addStretch(1)
+
+        jump_button = QPushButton(tr("dashboard.instant_move"))
+        noun = (
+            tr("content.noun_livery")
+            if content_type == "livery"
+            else tr("content.noun_tuning")
+        )
+        jump_button.setToolTip(
+            tr("dashboard.instant_move_tip", noun=noun)
+        )
+        jump_button.clicked.connect(
+            lambda _checked=False, kind=content_type:
+            self._jump_to_dashboard_selection(kind)
+        )
+        row.addWidget(jump_button)
+        return section
+
     def _dashboard_page(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
@@ -1095,20 +1134,18 @@ class MainWindow(QMainWindow):
         right_l.addWidget(self.selected_title)
         right_l.addWidget(self.selected_hint)
 
-        self.saved_livery_section = QLabel(tr("dashboard.saved_livery"))
-        self.saved_livery_section.setStyleSheet(
-            "background:#eee9ff; color:#5f39d8; font-weight:700; "
-            "padding:6px 9px; border-radius:6px;"
+        self.saved_livery_section = self._dashboard_saved_section_header(
+            tr("dashboard.saved_livery"),
+            "livery",
         )
         right_l.addWidget(self.saved_livery_section)
 
         self.selected_liveries = self._table(("", tr("table.livery_name"), tr("table.creator_short")))
         right_l.addWidget(self.selected_liveries, 1)
 
-        self.saved_tuning_section = QLabel(tr("dashboard.saved_tuning"))
-        self.saved_tuning_section.setStyleSheet(
-            "background:#eee9ff; color:#5f39d8; font-weight:700; "
-            "padding:6px 9px; border-radius:6px;"
+        self.saved_tuning_section = self._dashboard_saved_section_header(
+            tr("dashboard.saved_tuning"),
+            "tuning",
         )
         right_l.addWidget(self.saved_tuning_section)
 
@@ -1389,6 +1426,14 @@ class MainWindow(QMainWindow):
             sort_buttons[mode] = button
             action_row.addWidget(button)
 
+        separator = QLabel("││")
+        separator.setObjectName("sortGroupSeparator")
+        separator.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        separator.setStyleSheet(
+            "color:#b1a8c9; font-weight:700; padding:0 2px;"
+        )
+        action_row.addWidget(separator)
+
         group_button = QPushButton(tr("content.group_vehicle"))
         group_button.setObjectName("secondary")
         group_button.setCheckable(True)
@@ -1407,6 +1452,35 @@ class MainWindow(QMainWindow):
         )
         setattr(self, f"{content_type}_group_button", group_button)
         action_row.addWidget(group_button)
+
+        creator_group_button = QPushButton(tr("content.group_creator"))
+        creator_group_button.setObjectName("secondary")
+        creator_group_button.setCheckable(True)
+        creator_group_button.setChecked(
+            self.local_preferences.get_bool(
+                f"{content_type}_group_by_creator",
+                False,
+            )
+        )
+        if group_button.isChecked() and creator_group_button.isChecked():
+            creator_group_button.setChecked(False)
+            self.local_preferences.set_bool(
+                f"{content_type}_group_by_creator",
+                False,
+            )
+        creator_group_button.setToolTip(
+            tr("content.group_creator_tip")
+        )
+        creator_group_button.toggled.connect(
+            lambda checked, kind=content_type:
+            self._set_creator_grouping(kind, checked)
+        )
+        setattr(
+            self,
+            f"{content_type}_creator_group_button",
+            creator_group_button,
+        )
+        action_row.addWidget(creator_group_button)
 
         action_row.addStretch(1)
         controls.addLayout(action_row)
@@ -1429,6 +1503,47 @@ class MainWindow(QMainWindow):
             f"{content_type}_group_by_vehicle",
             enabled,
         )
+        if enabled:
+            other = getattr(
+                self,
+                f"{content_type}_creator_group_button",
+                None,
+            )
+            if other is not None and other.isChecked():
+                other.blockSignals(True)
+                other.setChecked(False)
+                other.blockSignals(False)
+                self.local_preferences.set_bool(
+                    f"{content_type}_group_by_creator",
+                    False,
+                )
+        search = (
+            self.livery_search
+            if content_type == "livery"
+            else self.tuning_search
+        )
+        self._filter_saved_content_views(content_type, search.text())
+
+    @Slot(str, bool)
+    def _set_creator_grouping(
+        self,
+        content_type: str,
+        enabled: bool,
+    ) -> None:
+        self.local_preferences.set_bool(
+            f"{content_type}_group_by_creator",
+            enabled,
+        )
+        if enabled:
+            other = getattr(self, f"{content_type}_group_button", None)
+            if other is not None and other.isChecked():
+                other.blockSignals(True)
+                other.setChecked(False)
+                other.blockSignals(False)
+                self.local_preferences.set_bool(
+                    f"{content_type}_group_by_vehicle",
+                    False,
+                )
         search = (
             self.livery_search
             if content_type == "livery"
@@ -1882,15 +1997,16 @@ class MainWindow(QMainWindow):
             # mode is selected, but do not lock it: the user may re-enable the
             # grouping button immediately afterwards.
             if mode == "download":
-                group_button = getattr(self, f"{content_type}_group_button")
-                if group_button.isChecked():
-                    group_button.blockSignals(True)
-                    group_button.setChecked(False)
-                    group_button.blockSignals(False)
-                    self.local_preferences.set_bool(
-                        f"{content_type}_group_by_vehicle",
-                        False,
-                    )
+                for button_name, pref_name in (
+                    (f"{content_type}_group_button", f"{content_type}_group_by_vehicle"),
+                    (f"{content_type}_creator_group_button", f"{content_type}_group_by_creator"),
+                ):
+                    group_button = getattr(self, button_name)
+                    if group_button.isChecked():
+                        group_button.blockSignals(True)
+                        group_button.setChecked(False)
+                        group_button.blockSignals(False)
+                        self.local_preferences.set_bool(pref_name, False)
             if content_type == "livery":
                 self._livery_sort_descending = (
                     not self._livery_sort_descending
@@ -2390,6 +2506,12 @@ class MainWindow(QMainWindow):
                 else "unknown",
             )
             card.setProperty("vehicleGroupLabel", self._car_label(record.car_id))
+            creator_label = (record.header.creator or "").strip() or tr("creator.none")
+            card.setProperty(
+                "creatorGroupKey",
+                f"creator:{creator_label.casefold()}",
+            )
+            card.setProperty("creatorGroupLabel", creator_label)
             card.setProperty("checked", self.annotations.get(key).checked)
             card.setProperty("triangle", self.annotations.get(key).triangle)
             card.setProperty("excluded", self.annotations.get(key).excluded)
@@ -2423,6 +2545,12 @@ class MainWindow(QMainWindow):
                 else "unknown",
             )
             card.setProperty("vehicleGroupLabel", self._car_label(record.car_id))
+            creator_label = (record.header.creator or "").strip() or tr("creator.none")
+            card.setProperty(
+                "creatorGroupKey",
+                f"creator:{creator_label.casefold()}",
+            )
+            card.setProperty("creatorGroupLabel", creator_label)
             card.setProperty("checked", annotation.checked)
             card.setProperty("triangle", annotation.triangle)
             card.setProperty("excluded", annotation.excluded)
@@ -2524,21 +2652,37 @@ class MainWindow(QMainWindow):
             if content_type == "livery"
             else self.tuning_grid_layout
         )
-        group_button = getattr(self, f"{content_type}_group_button")
-        if not group_button.isChecked():
+        vehicle_group_button = getattr(self, f"{content_type}_group_button")
+        creator_group_button = getattr(
+            self,
+            f"{content_type}_creator_group_button",
+        )
+        group_by_vehicle = vehicle_group_button.isChecked()
+        group_by_creator = creator_group_button.isChecked()
+
+        if not group_by_vehicle and not group_by_creator:
             for index, card in enumerate(cards):
                 layout.addWidget(card, index // 2, index % 2)
                 card.setVisible(True)
             return
 
+        if group_by_creator:
+            key_property = "creatorGroupKey"
+            label_property = "creatorGroupLabel"
+            fallback_label = tr("creator.none")
+        else:
+            key_property = "vehicleGroupKey"
+            label_property = "vehicleGroupLabel"
+            fallback_label = "Unknown vehicle"
+
         grouped: dict[str, list[QFrame]] = {}
         labels: dict[str, str] = {}
         for card in cards:
-            group_key = str(card.property("vehicleGroupKey") or "unknown")
+            group_key = str(card.property(key_property) or "unknown")
             grouped.setdefault(group_key, []).append(card)
             labels.setdefault(
                 group_key,
-                str(card.property("vehicleGroupLabel") or "Unknown vehicle"),
+                str(card.property(label_property) or fallback_label),
             )
 
         headers: dict[str, QLabel] = (
@@ -2560,9 +2704,19 @@ class MainWindow(QMainWindow):
                 )
                 header.setMinimumHeight(38)
                 headers[group_key] = header
-            header.setText(
-                tr("content.group_header", vehicle=labels[group_key], noun=noun, count=len(group_cards))
-            )
+            if group_by_creator:
+                header.setText(
+                    tr(
+                        "content.creator_group_header",
+                        creator=labels[group_key],
+                        noun=noun,
+                        count=len(group_cards),
+                    )
+                )
+            else:
+                header.setText(
+                    tr("content.group_header", vehicle=labels[group_key], noun=noun, count=len(group_cards))
+                )
             layout.addWidget(header, row, 0, 1, 2)
             header.setVisible(True)
             row += 1
@@ -3316,6 +3470,17 @@ class MainWindow(QMainWindow):
             key,
         )
 
+    def _creator_livery_note_count(self, creator: str) -> int:
+        creator_key = (creator or "").strip().casefold()
+        if not creator_key:
+            return 0
+        return sum(
+            1
+            for record in self._custom_liveries()
+            if (record.header.creator or "").strip().casefold() == creator_key
+            and self.annotations.get(self._annotation_key(record)).note.strip()
+        )
+
     def _apply_note_to_same_creator(self, source_key: str, source_note: str) -> None:
         source_record = self._record_for_annotation_key(source_key)
         if source_record is None:
@@ -3329,14 +3494,32 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, tr("memo.missing_title"), tr("memo.enter_first"))
             return
 
-        # Save the source editor first, then append the same note block to every
-        # livery by the same creator. Existing target notes remain untouched in front.
+        creator_key = creator.casefold()
+        targets = [
+            record
+            for record in self._custom_liveries()
+            if (record.header.creator or "").strip().casefold() == creator_key
+        ]
+        answer = QMessageBox.question(
+            self,
+            tr("memo.append_confirm_title"),
+            tr(
+                "memo.append_confirm_message",
+                creator=creator,
+                targets=len(targets),
+                existing=self._creator_livery_note_count(creator),
+            ),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+
+        # Keep the source editor as the authoritative text for the selected item.
+        # Every other target preserves its existing memo and receives this text below it.
         self.annotations.set(source_key, note=note, save=False)
         affected = 0
-        creator_key = creator.casefold()
-        for record in self._custom_liveries():
-            if (record.header.creator or "").strip().casefold() != creator_key:
-                continue
+        for record in targets:
             key = self._annotation_key(record)
             current = self.annotations.get(key).note
             merged = append_note(current, note)
@@ -3352,7 +3535,7 @@ class MainWindow(QMainWindow):
             tr(
                 "memo.apply_message",
                 creator=creator,
-                targets=sum(1 for r in self._custom_liveries() if (r.header.creator or "").strip().casefold() == creator_key),
+                targets=len(targets),
                 affected=affected,
             ),
         )
@@ -3914,6 +4097,57 @@ class MainWindow(QMainWindow):
                 self.start_scan(Path(self.path_edit.text()))
 
 
+    def _dashboard_selection_search_text(self) -> str:
+        if self.dashboard_content_stack.currentIndex() == 0:
+            rows = self.car_table.selectionModel().selectedRows()
+            if not rows:
+                return ""
+            item = self.car_table.item(rows[0].row(), 0)
+            if item is None:
+                return ""
+            try:
+                car_id = int(item.data(Qt.ItemDataRole.UserRole))
+            except (TypeError, ValueError):
+                return ""
+            return self._car_label(car_id).strip()
+
+        rows = self.creator_table.selectionModel().selectedRows()
+        if not rows:
+            return ""
+        item = self.creator_table.item(rows[0].row(), 1)
+        if item is None:
+            return ""
+        creator = str(
+            item.data(Qt.ItemDataRole.UserRole) or item.text() or ""
+        ).strip()
+        if creator == tr("creator.none"):
+            return ""
+        return creator
+
+    def _jump_to_dashboard_selection(self, content_type: str) -> None:
+        if content_type not in {"livery", "tuning"}:
+            return
+        query = self._dashboard_selection_search_text()
+        if not query:
+            QMessageBox.information(
+                self,
+                tr("dashboard.instant_move_unavailable_title"),
+                tr("dashboard.instant_move_unavailable_message"),
+            )
+            return
+
+        page_index = 1 if content_type == "livery" else 2
+        search = self.livery_search if content_type == "livery" else self.tuning_search
+
+        self.nav_buttons[page_index].setChecked(True)
+        self.pages.setCurrentIndex(page_index)
+        search.blockSignals(True)
+        search.setText(query)
+        search.blockSignals(False)
+        self._filter_saved_content_views(content_type, query)
+        search.setFocus(Qt.FocusReason.ShortcutFocusReason)
+        search.selectAll()
+
     def _set_dashboard_content_mode(self, index: int) -> None:
         if index not in (0, 1):
             return
@@ -4371,6 +4605,7 @@ class MainWindow(QMainWindow):
         self,
         current_note: str,
         content_type: str,
+        key: str = "",
     ) -> Optional[str]:
         dialog = QDialog(self)
         dialog.setWindowTitle(
@@ -4379,7 +4614,7 @@ class MainWindow(QMainWindow):
             else tr("memo.tuning_title")
         )
         dialog.setModal(True)
-        dialog.resize(520, 260)
+        dialog.resize(620 if content_type == "livery" else 520, 360 if content_type == "livery" else 260)
         dialog.setStyleSheet(
             APP_STYLE
             + """
@@ -4398,14 +4633,102 @@ class MainWindow(QMainWindow):
         root.setContentsMargins(14, 14, 14, 14)
         root.setSpacing(10)
 
-        label = QLabel(tr("memo.label"))
-        label.setStyleSheet("font-weight:600; color:#4f5567;")
-        root.addWidget(label)
+        livery_record = (
+            self._record_for_content_key("livery", key)
+            if content_type == "livery" and key
+            else None
+        )
+        creator = ""
+        creator_count_label: Optional[QLabel] = None
+
+        if isinstance(livery_record, LiveryRecord):
+            creator = (livery_record.header.creator or "").strip()
+            info_row = QHBoxLayout()
+            vehicle_label = QLabel(self._car_label(livery_record.header.car_id))
+            vehicle_label.setStyleSheet(
+                "font-size:11.5pt; font-weight:700; color:#303341;"
+            )
+            creator_label = QLabel(
+                tr(
+                    "memo.creator_value",
+                    creator=creator or tr("creator.none"),
+                )
+            )
+            creator_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+            creator_label.setStyleSheet(
+                "font-weight:700; color:#5f39d8;"
+            )
+            info_row.addWidget(vehicle_label, 1)
+            info_row.addWidget(creator_label, 0)
+            root.addLayout(info_row)
+
+            creator_count_label = QLabel()
+            creator_count_label.setObjectName("muted")
+            root.addWidget(creator_count_label)
+        else:
+            label = QLabel(tr("memo.label"))
+            label.setStyleSheet("font-weight:600; color:#4f5567;")
+            root.addWidget(label)
 
         editor = QTextEdit()
         editor.setPlaceholderText(tr("memo.label"))
         editor.setPlainText(current_note or "")
         root.addWidget(editor, 1)
+
+        def refresh_creator_count() -> None:
+            if creator_count_label is None or not creator:
+                if creator_count_label is not None:
+                    creator_count_label.setText(
+                        tr("memo.creator_note_count", count=0)
+                    )
+                return
+            creator_count_label.setText(
+                tr(
+                    "memo.creator_note_count",
+                    count=self._creator_livery_note_count(creator),
+                )
+            )
+
+        if isinstance(livery_record, LiveryRecord):
+            refresh_creator_count()
+            bulk_buttons = QHBoxLayout()
+
+            append_btn = QPushButton(tr("memo.add_same_creator"))
+            append_btn.setObjectName("secondary")
+            append_btn.setStyleSheet(
+                "QPushButton { background:#f1faf4; color:#287a45; border:1px solid #9ed5b0; "
+                "border-radius:8px; padding:8px 10px; font-weight:650; }"
+                "QPushButton:hover { background:#e8f7ed; border-color:#65b47e; }"
+            )
+            clear_btn = QPushButton(tr("memo.clear_same_creator"))
+            clear_btn.setObjectName("secondary")
+            clear_btn.setStyleSheet(
+                "QPushButton { background:#fff4f8; color:#a23867; border:1px solid #e4a5c1; "
+                "border-radius:8px; padding:8px 10px; font-weight:650; }"
+                "QPushButton:hover { background:#ffeaf3; border-color:#cb6d98; }"
+            )
+            append_btn.setEnabled(bool(creator))
+            clear_btn.setEnabled(bool(creator))
+
+            def append_to_creator() -> None:
+                self._apply_note_to_same_creator(
+                    key,
+                    editor.toPlainText(),
+                )
+                refresh_creator_count()
+
+            def clear_creator_notes() -> None:
+                self._clear_notes_for_same_creator(key)
+                # The selected livery was cleared by the creator-wide action too.
+                # Keep the open editor in sync so pressing Save cannot restore it.
+                editor.clear()
+                refresh_creator_count()
+
+            append_btn.clicked.connect(append_to_creator)
+            clear_btn.clicked.connect(clear_creator_notes)
+            bulk_buttons.addWidget(append_btn)
+            bulk_buttons.addWidget(clear_btn)
+            root.addLayout(bulk_buttons)
 
         buttons = QHBoxLayout()
         buttons.addStretch(1)
@@ -4680,6 +5003,7 @@ class MainWindow(QMainWindow):
         note = self._edit_content_note_dialog(
             current,
             content_type,
+            key,
         )
         if note is None:
             return
