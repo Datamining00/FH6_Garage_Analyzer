@@ -65,21 +65,17 @@ class V131PatchTests(unittest.TestCase):
         self.window.setGeometry(QRect(80, 90, 1100, 720))
         self.app.processEvents()
         self.window._fh6_v131_save_window_geometry()
-
         stored = self.window.settings.value(WINDOW_GEOMETRY_KEY)
         self.assertIsInstance(stored, QRect)
         self.assertGreaterEqual(stored.width(), self.window.minimumWidth())
         self.assertGreaterEqual(stored.height(), self.window.minimumHeight())
-        self.assertFalse(
-            self.window.settings.value(WINDOW_MAXIMIZED_KEY, True, bool)
-        )
+        self.assertFalse(self.window.settings.value(WINDOW_MAXIMIZED_KEY, True, bool))
 
     def test_saved_geometry_is_restored_on_next_window(self) -> None:
         expected = QRect(40, 40, 1050, 700)
         self.window.settings.setValue(WINDOW_GEOMETRY_KEY, expected)
         self.window.settings.setValue(WINDOW_MAXIMIZED_KEY, False)
         self.window.settings.sync()
-
         restored = MainWindow(project_root=ROOT)
         try:
             rect = restored.geometry()
@@ -94,7 +90,6 @@ class V131PatchTests(unittest.TestCase):
         timer = self.window._fh6_v131_resize_timer
         self.assertTrue(timer.isSingleShot())
         self.assertEqual(timer.interval(), RESIZE_DEBOUNCE_MS)
-
         self.window.pages.setCurrentIndex(1)
         self.window.resize(2200, 900)
         self.app.processEvents()
@@ -117,25 +112,23 @@ class V131PatchTests(unittest.TestCase):
 
 
 class V131BuildMetadataTests(unittest.TestCase):
-    def test_app_keeps_v131_patch_before_v14_preview2(self) -> None:
+    def test_app_keeps_patch_order_before_web_canvas_test(self) -> None:
         source = (ROOT / "app.py").read_text(encoding="utf-8")
-        self.assertIn('app.setApplicationVersion("1.4 Preview 2")', source)
+        self.assertIn('app.setApplicationVersion("1.4 Web Canvas Test")', source)
         self.assertIn("apply_v1_3_ui_patches(MainWindow)", source)
         self.assertIn("apply_v1_3_1_patches(MainWindow)", source)
         self.assertIn("apply_v1_4_patches(MainWindow)", source)
         self.assertIn("apply_v1_4_preview2_patch(MainWindow)", source)
-        self.assertLess(
-            source.index("apply_v1_3_ui_patches(MainWindow)"),
-            source.index("apply_v1_3_1_patches(MainWindow)"),
-        )
-        self.assertLess(
-            source.index("apply_v1_3_1_patches(MainWindow)"),
-            source.index("apply_v1_4_patches(MainWindow)"),
-        )
-        self.assertLess(
-            source.index("apply_v1_4_patches(MainWindow)"),
-            source.index("apply_v1_4_preview2_patch(MainWindow)"),
-        )
+        self.assertIn("apply_v1_4_web_canvas_test_patch(MainWindow)", source)
+        ordered = [
+            "apply_v1_3_ui_patches(MainWindow)",
+            "apply_v1_3_1_patches(MainWindow)",
+            "apply_v1_4_patches(MainWindow)",
+            "apply_v1_4_preview2_patch(MainWindow)",
+            "apply_v1_4_web_canvas_test_patch(MainWindow)",
+        ]
+        for first, second in zip(ordered, ordered[1:]):
+            self.assertLess(source.index(first), source.index(second))
 
     def test_final_v14_metadata_is_reserved_for_release(self) -> None:
         source = (ROOT / "version_info.txt").read_text(encoding="utf-8")
