@@ -4,9 +4,11 @@ from typing import Any
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QDialog,
     QFrame,
     QGridLayout,
+    QHeaderView,
     QHBoxLayout,
     QLabel,
     QPlainTextEdit,
@@ -59,7 +61,6 @@ def _analysis_text(key: str, **values) -> str:
         "empty": "사용 안 함",
         "used_state": "사용",
         "state": "상태",
-        "unavailable": "내부 분석 불가",
         "missing": "C_livery 파일이 없어 내부 정보를 분석할 수 없습니다.",
         "failed": "C_livery 분석 실패: {error}",
         "mismatch": "참고: 헤더의 데칼 수({header:,})와 C_livery 영역 합계({internal:,})가 다릅니다.",
@@ -75,7 +76,6 @@ def _analysis_text(key: str, **values) -> str:
         "empty": "Unused",
         "used_state": "Used",
         "state": "State",
-        "unavailable": "Internal analysis unavailable",
         "missing": "C_livery is missing, so internal information cannot be analyzed.",
         "failed": "C_livery analysis failed: {error}",
         "mismatch": "Note: header decal count ({header:,}) differs from the C_livery section total ({internal:,}).",
@@ -146,15 +146,16 @@ def _build_analysis_panel(record: Any) -> QFrame:
         )
     )
     table.verticalHeader().setVisible(False)
-    table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-    table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
+    table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+    table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
     table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
     table.setShowGrid(False)
     table.setMinimumHeight(278)
-    table.horizontalHeader().setStretchLastSection(True)
-    table.horizontalHeader().setSectionResizeMode(0, table.horizontalHeader().ResizeMode.Stretch)
-    table.horizontalHeader().setSectionResizeMode(1, table.horizontalHeader().ResizeMode.ResizeToContents)
-    table.horizontalHeader().setSectionResizeMode(2, table.horizontalHeader().ResizeMode.ResizeToContents)
+    header = table.horizontalHeader()
+    header.setStretchLastSection(True)
+    header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+    header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+    header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
 
     for row, section in enumerate(LIVERY_SECTION_NAMES):
         count = int(analysis.section_counts.get(section, 0))
