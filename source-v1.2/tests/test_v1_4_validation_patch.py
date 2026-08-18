@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import io
 import unittest
 
@@ -7,6 +8,7 @@ from PIL import Image
 import numpy as np
 
 from fh6garage.livery_analysis import LIVERY_SECTION_NAMES
+from fh6garage.livery_preview import preview_backend_available
 from fh6garage.v1_4_validation_patch import _overlay_validation_warning, compare_counts
 
 
@@ -39,6 +41,28 @@ class V14ValidationPatchTests(unittest.TestCase):
     def test_numpy_runtime_dependency_is_available(self) -> None:
         values = np.array([1, 2, 3], dtype=np.float32)
         self.assertEqual(float(values.sum()), 6.0)
+
+    def test_pinned_renderer_can_generate_png_when_vendor_is_present(self) -> None:
+        if not preview_backend_available():
+            self.skipTest("Pinned KFPS vendor tree is not present in this source checkout")
+
+        renderer = importlib.import_module("json_preview_renderer")
+        png = renderer.render_typecode_layers_canvas(
+            [
+                {
+                    "type": 1048677,
+                    "type_word": 0x65,
+                    "data": [0.0, 0.0, 2.0, 1.0, 0.0, 0.0, 0],
+                    "color": [220, 90, 120, 255],
+                    "mask": False,
+                }
+            ],
+            width=640,
+            height=320,
+            strict_assets=False,
+        )
+        self.assertIsNotNone(png)
+        self.assertTrue(png.startswith(b"\x89PNG"))
 
 
 if __name__ == "__main__":
