@@ -148,13 +148,45 @@ def decode_livery_preview(path: Path | str) -> DecodedLiveryPreview:
         return _decode_cached(*signature)
 
 
+def _expanded_crop_box(
+    bbox: tuple[int, int, int, int],
+    image_size: tuple[int, int],
+    *,
+    padding: int = 48,
+    minimum_size: tuple[int, int] = (480, 240),
+) -> tuple[int, int, int, int]:
+    """Expand an alpha bounding box while preserving enough surrounding context."""
+    image_width, image_height = image_size
+    left, top, right, bottom = bbox
+
+    def axis(start: int, end: int, limit: int, pad: int, minimum: int) -> tuple[int, int]:
+        padded_start = max(0, int(start) - pad)
+        padded_end = min(limit, int(end) + pad)
+        target = min(limit, max(padded_end - padded_start, minimum))
+        center = (float(start) + float(end)) / 2.0
+        new_start = int(round(center - target / 2.0))
+        new_start = max(0, min(new_start, limit - target))
+        return new_start, new_start + target
+
+    crop_left, crop_right = axis(left, right, image_width, padding, minimum_size[0])
+    crop_top, crop_bottom = axis(top, bottom, image_height, padding, minimum_size[1])
+    return crop_left, crop_top, crop_right, crop_bottom
+
+
 def _checkerboard_preview(png_bytes: bytes) -> bytes:
-    """Composite transparent artwork over a neutral checkerboard for visibility."""
+    """Crop transparent margins, then composite artwork over a neutral checkerboard."""
     try:
         from PIL import Image, ImageDraw
 
         with Image.open(io.BytesIO(png_bytes)) as source:
             artwork = source.convert("RGBA")
+
+        alpha_bbox = artwork.getchannel("A").getbbox()
+        if alpha_bbox:
+            crop_box = _expanded_crop_box(alpha_bbox, artwork.size)
+            if crop_box != (0, 0, artwork.width, artwork.height):
+                artwork = artwork.crop(crop_box)
+
         background = Image.new("RGBA", artwork.size, (54, 56, 64, 255))
         draw = ImageDraw.Draw(background)
         tile = 32
