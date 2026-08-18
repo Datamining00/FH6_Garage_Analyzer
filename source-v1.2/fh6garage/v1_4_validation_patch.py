@@ -67,7 +67,7 @@ def _overlay_validation_warning(png_bytes: bytes, message: str) -> bytes:
         image.paste(overlay, (0, height - banner_h))
         draw = ImageDraw.Draw(image)
         font = ImageFont.load_default()
-        text = message
+        text = message.encode("ascii", errors="replace").decode("ascii")
         if len(text) > 150:
             text = text[:147] + "..."
         draw.text((14, height - banner_h + 12), text, fill=(255, 239, 208), font=font)
@@ -134,9 +134,10 @@ def apply_v1_4_validation_patch() -> None:
             warning = f"검증 경고: C_livery 기록 {expected:,} / placement 해석 {actual:,}"
         else:
             warning = f"Verification warning: C_livery recorded {expected:,} / decoded {actual:,}"
+        overlay_message = f"VERIFY: C_livery recorded {expected:,} / decoded {actual:,}"
         return replace(
             result,
-            png_bytes=_overlay_validation_warning(result.png_bytes, warning),
+            png_bytes=_overlay_validation_warning(result.png_bytes, overlay_message),
             warnings=tuple(dict.fromkeys((*result.warnings, warning))),
         )
 
