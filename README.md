@@ -15,24 +15,32 @@ FH6의 로컬 저장 폴더를 분석하여 보유 차량, 저장된 리버리, 
 
 ## v1.4 개발 기능
 
-`v1.4-work` 브랜치에서는 기존 썸네일 표시와 별도로 `C_livery` 내부 데이터를 읽기 전용으로 분석하는 기능을 개발하고 있습니다.
+`v1.4-work` 브랜치에서는 기존 썸네일 표시와 별도로 `C_livery` 내부 데이터를 읽기 전용으로 분석하고, 대상 차량의 실제 FH6 projection mask를 이용해 영역별 리버리를 재구성하는 기능을 개발하고 있습니다.
 
 * 리버리의 11개 투영 영역별 placement 수 확인
   * Front / Back / Top / Left / Right / Spoiler
   * FrontWindshield / BackWindshield / TopWindow / LeftWindow / RightWindow
 * 총 placement 수와 사용 중인 영역 수 표시
+* `C_livery`에 기록된 대상 Car ID를 이용해 동일 차량의 로컬 FH6 아카이브 탐색
+* `LiveryMasks/Masks.xml`과 영역별 `*.swatchbin`을 이용한 차량별 정확한 projection clipping
 * 기존 `bigThumb.webp` 확대창에서 사용 영역별 2D 리버리 재구성 보기
+* FH6 native 비닐 형상만 사용하며, 누락된 형상을 임의의 원·사각형으로 대체하지 않음
+* 게임 내장 raster decal이 사용된 경우 로컬 FH6 `Decals.zip`에서 원본 텍스처를 읽어 렌더링
 * 저장된 영역별 개수와 placement 디코더가 실제 복원한 개수를 자동 대조
-* 불일치가 있는 경우 정보창과 재구성 이미지에서 검증 경고 표시
-* 원본 `C_livery`, 헤더 및 썸네일 파일은 수정하지 않음
+* 불일치가 있거나 정확한 native 리소스를 확보하지 못한 경우 정상 이미지처럼 대체하지 않고 오류 표시
+* 원본 `C_livery`, 헤더, 썸네일 및 FH6 설치 파일은 수정하지 않음
 
-영역별 이미지는 `C_livery` placement를 해당 투영 좌표계의 2D 평면에 재구성한 결과이며, 차량의 3D 모델 표면에 도장을 적용한 렌더링은 아닙니다. 게임 내부 리소스를 별도로 요구하는 일부 래스터 로고는 현재 미리보기에서 생략될 수 있으며 생략 수를 표시합니다.
+영역별 이미지는 차량별 실제 FH6 projection rectangle과 mask에 맞춰 잘라낸 2D 결과입니다. 따라서 리버리 제작자가 차체 밖까지 크게 배치한 도형도 게임에서 적용되는 영역에 맞게 잘립니다. 이 기능은 리버리 구성 확인을 위한 정면/후면/상단/좌우/유리별 2D 보기이며, 게임 카메라와 동일한 3D 시점 렌더링은 아닙니다.
+
+정확한 영역별 미리보기에는 사용자의 로컬 FH6 설치 파일이 필요합니다. 프로그램은 가능한 경우 FH6 설치 위치를 자동 탐색하며, 자동 탐색에 실패하면 이미지 창의 `FH6 설치 폴더 지정` 버튼에서 Forza Horizon 6 폴더 또는 `Content` 폴더를 지정할 수 있습니다. 선택 경로는 `%LOCALAPPDATA%\FH6GarageAnalyzer\fh6_game_folder.txt`에 저장됩니다.
 
 ## 파일 변경 범위
 
 일반적인 검색, 정렬, 표시 및 분석 기능은 FH6의 게임 저장 파일과 썸네일 파일을 변경하지 않습니다.
 
 프로그램은 FH6의 리버리 및 튜닝 썸네일을 표시 목적으로만 읽으며 원본 썸네일을 수정하지 않습니다.
+
+v1.4의 정확한 리버리 재구성 기능은 로컬 FH6 차량 ZIP, `LiveryMasks`, `Decals.zip`을 읽기 전용으로 사용하며 게임 설치 파일을 변경하거나 복사해 배포하지 않습니다.
 
 원, 삼각형, X 및 메모를 이용한 분류 정보는 프로그램의 로컬 설정 파일에만 저장됩니다.
 
@@ -90,6 +98,7 @@ FH6의 실제 게임 저장 데이터와 프로그램의 사용자 설정 데이
 
 * Windows 11, 10
 * FH6 로컬 저장 폴더에 대한 읽기 권한
+* v1.4 영역별 정확한 리버리 미리보기 사용 시 로컬 FH6 설치 파일에 대한 읽기 권한
 
 ## 보안 및 백신 관련 안내
 
@@ -108,7 +117,7 @@ SHA-256 파일은 프로그램 실행에 필요한 파일이 아니며 무결성
 
 유용한 자료를 공개한 HDR에게 감사드립니다.
 
-v1.4의 `C_livery` placement 해석 및 2D 미리보기 기능은 [Kloudy's Forza Painter Suite](https://github.com/heyitshestia/kloudys-forza-painter-suite)의 MIT 라이선스 코드와 비닐 형상 리소스를 특정 커밋으로 고정하여 사용합니다. 해당 구성요소의 MIT 라이선스 전문은 v1.4 빌드에 함께 포함됩니다.
+v1.4의 `C_livery` placement 해석, native 비닐 렌더링, 차량 projection mask 처리 및 raster decal 처리는 [Kloudy's Forza Painter Suite](https://github.com/heyitshestia/kloudys-forza-painter-suite)의 MIT 라이선스 코드를 특정 커밋으로 고정하여 사용합니다. 해당 구성요소의 MIT 라이선스 전문은 v1.4 빌드에 함께 포함됩니다.
 
 본 프로젝트의 개발 과정에서 생성형 AI 도구인 OpenAI ChatGPT의 도움을 받았습니다.
 
