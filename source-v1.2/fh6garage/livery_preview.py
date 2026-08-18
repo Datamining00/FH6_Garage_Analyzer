@@ -214,31 +214,38 @@ def render_livery_section(path: Path | str, section: str) -> RenderedLiverySecti
         raise LiveryPreviewError("이 영역에는 표시할 리버리 배치가 없습니다.")
 
     _decoder, renderer = _load_backend()
-    skipped_raster = sum(1 for layer in layers if bool(layer.get("is_raster_logo")))
+    raster_count = sum(1 for layer in layers if bool(layer.get("is_raster_logo")))
+    if raster_count:
+        raise LiveryPreviewError(
+            f"{section} 영역에는 게임 내장 래스터 로고 {raster_count}개가 포함되어 있어 "
+            "현재 버전에서는 정확한 미리보기를 생성할 수 없습니다."
+        )
+
     try:
+        # Do not permit the renderer to substitute circles/rectangles for
+        # missing FH6 shape resources. A visibly broken preview is worse than
+        # reporting that exact reconstruction is unavailable.
         rendered = renderer.render_typecode_layers_canvas(
             layers,
             width=2048,
             height=1024,
-            strict_assets=False,
+            strict_assets=True,
         )
     except Exception as exc:
-        raise LiveryPreviewError(f"{section} 영역 렌더링에 실패했습니다: {exc}") from exc
+        raise LiveryPreviewError(
+            f"{section} 영역의 정확한 미리보기를 생성하지 못했습니다. "
+            f"필요한 FH6 도형 리소스를 확인해 주세요: {exc}"
+        ) from exc
     if not rendered:
         raise LiveryPreviewError(f"{section} 영역에서 표시 가능한 이미지를 만들지 못했습니다.")
 
     visible_png = _checkerboard_preview(rendered)
-    warnings = list(decoded.warnings)
-    if skipped_raster:
-        warnings.append(
-            f"게임 내장 래스터 로고 {skipped_raster}개는 현재 미리보기에서 생략되었습니다."
-        )
     return RenderedLiverySection(
         section=section,
         png_bytes=visible_png,
         placement_count=len(layers),
-        skipped_raster_logos=skipped_raster,
-        warnings=tuple(dict.fromkeys(warnings)),
+        skipped_raster_logos=0,
+        warnings=decoded.warnings,
     )
 
 
