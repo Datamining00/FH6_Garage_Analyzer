@@ -55,6 +55,45 @@ def compare_counts(expected_counts: dict[str, int], decoded_sections: dict[str, 
     return expected_total, decoded_total, mismatches
 
 
+def composition_stats(decoded_sections: dict[str, tuple[dict, ...]]) -> tuple[int, int, int, int]:
+    """Return vector count, raster-logo count, unique shape words and mask count."""
+    total = 0
+    raster = 0
+    masks = 0
+    shape_words: set[int] = set()
+    for section in LIVERY_SECTION_NAMES:
+        for layer in decoded_sections.get(section, ()):
+            total += 1
+            if bool(layer.get("is_raster_logo")):
+                raster += 1
+            if bool(layer.get("mask")):
+                masks += 1
+            value = layer.get("type_word")
+            if value is None:
+                try:
+                    value = int(layer.get("type", 0)) & 0xFFFF
+                except (TypeError, ValueError):
+                    value = None
+            try:
+                if value is not None:
+                    shape_words.add(int(value) & 0xFFFF)
+            except (TypeError, ValueError):
+                pass
+    return total - raster, raster, len(shape_words), masks
+
+
+def _composition_text(vector: int, raster: int, unique_shapes: int, masks: int) -> str:
+    if _ko():
+        return (
+            f"구성: 벡터 {vector:,} · 내장 래스터 {raster:,} · "
+            f"도형 코드 {unique_shapes:,}종 · 마스크 {masks:,}"
+        )
+    return (
+        f"Composition: {vector:,} vector · {raster:,} built-in raster · "
+        f"{unique_shapes:,} shape codes · {masks:,} masks"
+    )
+
+
 def _overlay_validation_warning(png_bytes: bytes, message: str) -> bytes:
     try:
         from PIL import Image, ImageDraw, ImageFont
@@ -102,7 +141,18 @@ def apply_v1_4_validation_patch() -> None:
                 analysis.section_counts,
                 decoded.sections,
             )
+            vector_count, raster_count, unique_shapes, mask_count = composition_stats(decoded.sections)
+
+            composition = QLabel(
+                _composition_text(vector_count, raster_count, unique_shapes, mask_count)
+            )
+            composition.setObjectName("v14CompositionStats")
+            composition.setWordWrap(True)
+            composition.setStyleSheet("color:#5e6372;font-size:9pt;")
+            layout.addWidget(composition)
+
             label = QLabel(_summary_text(expected_total, decoded_total, mismatches))
+            label.setObjectName("v14PlacementVerification")
             label.setWordWrap(True)
             if mismatches:
                 label.setStyleSheet("color:#8a5b16;font-size:9pt;")
@@ -114,6 +164,7 @@ def apply_v1_4_validation_patch() -> None:
                 ("placement 상세 검증 대기: " if _ko() else "Detailed placement verification unavailable: ")
                 + str(exc)
             )
+            label.setObjectName("v14PlacementVerification")
             label.setWordWrap(True)
             label.setStyleSheet("color:#737787;font-size:8.8pt;")
             layout.addWidget(label)
