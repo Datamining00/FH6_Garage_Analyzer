@@ -83,8 +83,6 @@ class V131PatchTests(unittest.TestCase):
         restored = MainWindow(project_root=ROOT)
         try:
             rect = restored.geometry()
-            # Offscreen CI may clamp a saved position to its synthetic screen,
-            # but the requested normal size must survive whenever it fits.
             self.assertGreaterEqual(rect.width(), restored.minimumWidth())
             self.assertGreaterEqual(rect.height(), restored.minimumHeight())
         finally:
@@ -119,12 +117,13 @@ class V131PatchTests(unittest.TestCase):
 
 
 class V131BuildMetadataTests(unittest.TestCase):
-    def test_app_keeps_v131_patch_before_v14(self) -> None:
+    def test_app_keeps_v131_patch_before_v14_preview2(self) -> None:
         source = (ROOT / "app.py").read_text(encoding="utf-8")
-        self.assertIn('app.setApplicationVersion("1.4")', source)
+        self.assertIn('app.setApplicationVersion("1.4 Preview 2")', source)
         self.assertIn("apply_v1_3_ui_patches(MainWindow)", source)
         self.assertIn("apply_v1_3_1_patches(MainWindow)", source)
         self.assertIn("apply_v1_4_patches(MainWindow)", source)
+        self.assertIn("apply_v1_4_preview2_patch(MainWindow)", source)
         self.assertLess(
             source.index("apply_v1_3_ui_patches(MainWindow)"),
             source.index("apply_v1_3_1_patches(MainWindow)"),
@@ -133,8 +132,12 @@ class V131BuildMetadataTests(unittest.TestCase):
             source.index("apply_v1_3_1_patches(MainWindow)"),
             source.index("apply_v1_4_patches(MainWindow)"),
         )
+        self.assertLess(
+            source.index("apply_v1_4_patches(MainWindow)"),
+            source.index("apply_v1_4_preview2_patch(MainWindow)"),
+        )
 
-    def test_windows_version_metadata_tracks_current_v14_build(self) -> None:
+    def test_final_v14_metadata_is_reserved_for_release(self) -> None:
         source = (ROOT / "version_info.txt").read_text(encoding="utf-8")
         self.assertIn("filevers=(1, 4, 0, 0)", source)
         self.assertIn("prodvers=(1, 4, 0, 0)", source)
