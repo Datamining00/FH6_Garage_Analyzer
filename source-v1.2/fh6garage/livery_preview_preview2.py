@@ -9,7 +9,7 @@ from pathlib import Path
 
 from .exact_livery_preview import (
     ExactLiveryPreviewError,
-    apply_exact_vehicle_projection,
+    _projection_record,
     raster_resolver_for_game,
     require_fh6_game_folder,
 )
@@ -27,11 +27,11 @@ from .livery_preview import (
 )
 
 
-PREVIEW2_CACHE_VERSION = "v14-preview2-r1"
+PREVIEW2_CACHE_VERSION = "v14-render-rules-r2"
 QUALITY_DIMENSIONS = {
-    "fast": (2048, 1024),
-    "balanced": (3072, 1536),
-    "high": (4096, 2048),
+    "fast": (2048, 1024, 1.0),
+    "balanced": (3072, 1536, 1.5),
+    "high": (4096, 2048, 2.0),
 }
 DEFAULT_QUALITY = "balanced"
 _CACHE_LOCK = threading.RLock()
@@ -94,12 +94,18 @@ def _read_disk_cache(path: Path) -> bytes | None:
     return data
 
 
-def _prune_disk_cache(root: Path, *, max_files: int = 240, max_bytes: int = 512 * 1024 * 1024) -> None:
+def _prune_disk_cache(
+    root: Path,
+    *,
+    max_files: int = 240,
+    max_bytes: int = 512 * 1024 * 1024,
+) -> None:
     try:
-        files = [item for item in root.glob("*.png") if item.is_file()]
         entries = []
         total = 0
-        for item in files:
+        for item in root.glob("*.png"):
+            if not item.is_file():
+                continue
             try:
                 stat = item.stat()
             except OSError:
@@ -119,44 +125,20 @@ def _prune_disk_cache(root: Path, *, max_files: int = 240, max_bytes: int = 512 
 
 
 def _write_disk_cache(path: Path, data: bytes) -> None:
+    temporary = path.with_suffix(".tmp")
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = path.with_suffix(".tmp")
         temporary.write_bytes(data)
         os.replace(temporary, path)
         _prune_disk_cache(path.parent)
     except OSError:
         try:
             temporary.unlink(missing_ok=True)
-        except Exception:
+        except OSError:
             pass
 
 
-def _resize_to_exact_atlas(png_bytes: bytes, quality: str) -> bytes:
-    width, height = QUALITY_DIMENSIONS[normalize_quality(quality)]
-    if (width, height) == (2048, 1024):
-        return png_bytes
-
-    try:
-        from PIL import Image
-
-        with Image.open(io.BytesIO(png_bytes)) as source:
-            image = source.convert("RGBA")
-            if image.size != (width, height):
-                raise LiveryPreviewError(
-                    f"고해상도 렌더 캔버스 크기가 올바르지 않습니다: {image.size}"
-                )
-            image = image.resize((2048, 1024), Image.Resampling.LANCZOS)
-            buffer = io.BytesIO()
-            image.save(buffer, format="PNG", compress_level=3)
-            return buffer.getvalue()
-    except LiveryPreviewError:
-        raise
-    except Exception as exc:
-        raise LiveryPreviewError(f"고해상도 리버리 다운샘플링에 실패했습니다: {exc}") from exc
-
-
-def _checkerboard_preview_fast(png_bytes: bytes) -> bytes:
+def _checkerboard_preview(png_bytes: bytes) -> bytes:
     try:
         from PIL import Image, ImageDraw
 
@@ -185,6 +167,118 @@ def _checkerboard_preview_fast(png_bytes: bytes) -> bytes:
         raise LiveryPreviewError(f"미리보기 배경 합성에 실패했습니다: {exc}") from exc
 
 
+def _projection_supersampled(
+    png_bytes: bytes,
+    section: str,
+    car_id: int,
+    *,
+    game_folder: Path,
+    scale: float,
+) -> bytes:
+    """Apply vehicle warp/mask before the supersampled image is reduced.
+
+    Preview 2 previously reduced the vector canvas to 2048x1024 first and then
+    performed KFPS's BILINEAR projection warp. That discarded much of the added
+    detail. This path scales the exact same projection transform and authoritative
+    mask, then downsamples only the finished projection crop.
+    """
+    import numpy as np
+    from PIL import Image
+
+    render_contract, slot, base_mask, projection, _mask_hash = _projection_record(
+        section, int(car_id), game_folder
+    )
+    base_width, base_height = tuple(render_contract.ATLAS_SIZE)
+    width = int(round(base_width * float(scale)))
+    height = int(round(base_height * float(scale)))
+    expected = (width, height)
+
+    try:
+        with Image.open(io.BytesIO(png_bytes)) as source:
+            artwork = source.convert("RGBA")
+        if artwork.size != expected:
+            raise LiveryPreviewError(
+                f"고해상도 section canvas 크기가 올바르지 않습니다: {artwork.size}; 예상 {expected}"
+            )
+
+        if abs(float(scale) - 1.0) < 1e-9:
+            clipped = render_contract._masked_atlas_layer(artwork, base_mask, slot, projection)
+            base_bounds = render_contract._projection_pixel_bounds(projection)
+            surface_alpha = base_mask.convert("L").point(lambda value: (int(value) * 72) // 255)
+            surface = Image.new("RGBA", clipped.size, (150, 154, 162, 0))
+            surface.putalpha(surface_alpha)
+            combined = Image.alpha_composite(surface, clipped).crop(base_bounds)
+        else:
+            affine = render_contract._atlas_to_local_affine(
+                slot,
+                width,
+                height,
+                float(projection.get("xorigin", 0.0)) * float(scale),
+                float(projection.get("yorigin", 0.0)) * float(scale),
+            )
+            warped = artwork.transform(
+                expected,
+                Image.Transform.AFFINE,
+                affine,
+                resample=Image.Resampling.BILINEAR,
+                fillcolor=(0, 0, 0, 0),
+            )
+            mask = base_mask.convert("L").resize(expected, Image.Resampling.BILINEAR)
+            rgba = np.asarray(warped, dtype=np.uint8).copy()
+            mask_values = np.asarray(mask, dtype=np.uint16)
+            rgba[..., 3] = (
+                (rgba[..., 3].astype(np.uint16) * mask_values + 127) // 255
+            ).astype(np.uint8)
+            clipped = Image.fromarray(rgba, mode="RGBA")
+
+            base_bounds = render_contract._projection_pixel_bounds(projection)
+            scaled_bounds = tuple(int(round(value * float(scale))) for value in base_bounds)
+            surface_alpha = mask.point(lambda value: (int(value) * 72) // 255)
+            surface = Image.new("RGBA", expected, (150, 154, 162, 0))
+            surface.putalpha(surface_alpha)
+            combined = Image.alpha_composite(surface, clipped).crop(scaled_bounds)
+            final_size = (
+                max(1, base_bounds[2] - base_bounds[0]),
+                max(1, base_bounds[3] - base_bounds[1]),
+            )
+            combined = combined.resize(final_size, Image.Resampling.LANCZOS)
+
+        buffer = io.BytesIO()
+        combined.save(buffer, format="PNG", compress_level=3)
+        return buffer.getvalue()
+    except LiveryPreviewError:
+        raise
+    except Exception as exc:
+        raise LiveryPreviewError(
+            f"{section} 영역의 supersampled projection 적용에 실패했습니다: {exc}"
+        ) from exc
+
+
+def _preflight_raster_layers(layers, raster_resolver) -> None:
+    for layer_index, layer in enumerate(layers, 1):
+        if not bool(layer.get("is_raster_logo")):
+            continue
+        try:
+            raster_id = int(layer.get("raster_id"))
+        except (TypeError, ValueError):
+            raise LiveryPreviewError(
+                f"layer {layer_index}의 FH6 내장 래스터 데칼 ID가 올바르지 않습니다."
+            )
+        if raster_resolver(raster_id) is not None:
+            continue
+        detail = ""
+        describe = getattr(raster_resolver, "missing_description", None)
+        if callable(describe):
+            try:
+                detail = str(describe(raster_id)).strip()
+            except Exception:
+                detail = ""
+        suffix = f" {detail}" if detail else ""
+        raise LiveryPreviewError(
+            f"layer {layer_index}의 FH6 내장 래스터 데칼 {raster_id}을 찾지 못했습니다.{suffix}"
+        )
+
+
 @lru_cache(maxsize=32)
 def _render_cached(
     path_text: str,
@@ -195,7 +289,6 @@ def _render_cached(
     quality: str,
 ) -> RenderedLiverySection:
     quality = normalize_quality(quality)
-    source = Path(path_text)
     decoded = _decode_cached(path_text, file_size, mtime_ns)
     if section not in decoded.sections:
         raise LiveryPreviewError(f"지원하지 않는 리버리 영역입니다: {section}")
@@ -242,6 +335,7 @@ def _render_cached(
             raise LiveryPreviewError(
                 f"{section} 영역의 FH6 내장 래스터 데칼을 불러오지 못했습니다: {exc}"
             ) from exc
+        _preflight_raster_layers(layers, raster_resolver)
 
     prepared_layers, invisible_count = _validate_exact_assets_and_filter_noops(
         renderer,
@@ -253,7 +347,7 @@ def _render_cached(
             f"{section} 영역의 {len(layers):,}개 placement가 모두 완전 투명하여 표시할 픽셀이 없습니다."
         )
 
-    width, height = QUALITY_DIMENSIONS[quality]
+    width, height, scale = QUALITY_DIMENSIONS[quality]
     try:
         rendered = renderer.render_typecode_layers_canvas(
             prepared_layers,
@@ -269,18 +363,14 @@ def _render_cached(
     if not rendered:
         raise LiveryPreviewError(f"{section} 영역에서 표시 가능한 이미지를 만들지 못했습니다.")
 
-    rendered = _resize_to_exact_atlas(rendered, quality)
-    try:
-        projected = apply_exact_vehicle_projection(
-            rendered,
-            section,
-            analysis.car_id,
-            game_folder=game_folder,
-        )
-    except ExactLiveryPreviewError as exc:
-        raise LiveryPreviewError(str(exc)) from exc
-
-    preview_png = _checkerboard_preview_fast(projected)
+    projected = _projection_supersampled(
+        rendered,
+        section,
+        analysis.car_id,
+        game_folder=game_folder,
+        scale=scale,
+    )
+    preview_png = _checkerboard_preview(projected)
     _write_disk_cache(cache_path, preview_png)
 
     warnings = list(decoded.warnings)
