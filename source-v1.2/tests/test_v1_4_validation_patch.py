@@ -9,7 +9,11 @@ import numpy as np
 
 from fh6garage.livery_analysis import LIVERY_SECTION_NAMES
 from fh6garage.livery_preview import preview_backend_available
-from fh6garage.v1_4_validation_patch import _overlay_validation_warning, compare_counts
+from fh6garage.v1_4_validation_patch import (
+    _overlay_validation_warning,
+    compare_counts,
+    composition_stats,
+)
 
 
 class V14ValidationPatchTests(unittest.TestCase):
@@ -26,6 +30,20 @@ class V14ValidationPatchTests(unittest.TestCase):
         self.assertEqual(expected_total, 19)
         self.assertEqual(decoded_total, 18)
         self.assertEqual(mismatches, [("Right", 7, 6)])
+
+    def test_composition_stats_counts_vector_raster_shapes_and_masks(self) -> None:
+        decoded = {name: tuple() for name in LIVERY_SECTION_NAMES}
+        decoded["Left"] = (
+            {"type_word": 101, "mask": False, "is_raster_logo": False},
+            {"type_word": 101, "mask": True, "is_raster_logo": False},
+            {"type_word": 127, "mask": False, "is_raster_logo": False},
+        )
+        decoded["Right"] = (
+            {"type": 0x100000 + 127, "mask": False, "is_raster_logo": False},
+            {"type_word": 0x8123, "mask": False, "is_raster_logo": True},
+        )
+
+        self.assertEqual(composition_stats(decoded), (4, 1, 3, 1))
 
     def test_warning_overlay_preserves_png_dimensions(self) -> None:
         source = Image.new("RGB", (640, 320), (30, 32, 38))
