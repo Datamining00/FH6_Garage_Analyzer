@@ -27,6 +27,7 @@ from fh6garage.ui import MainWindow
 from fh6garage.v1_3_ui_patch import apply_v1_3_ui_patches
 from fh6garage.v1_3_1_patch import apply_v1_3_1_patches
 from fh6garage.v1_4_patch import apply_v1_4_patches
+from fh6garage.v1_4_preview2_patch import apply_v1_4_preview2_patch
 from fh6garage.v1_4_validation_patch import apply_v1_4_validation_patch
 
 
@@ -39,23 +40,18 @@ def resource_root() -> Path:
 
 def main() -> int:
     app = QApplication(sys.argv)
-    # Use a concrete positive base point size before applying application QSS.
     app.setFont(QFont("Segoe UI", 10))
     app.setApplicationName("FH6 Assistant")
-    app.setApplicationVersion("1.4")
+    app.setApplicationVersion("1.4 Preview 2")
     app.setOrganizationName("LocalOnly")
 
-    # Resolve the persisted UI language before constructing any translated widgets.
     settings = QSettings()
     set_language(settings.value("language", DEFAULT_LANGUAGE, str))
 
-    # v1.3 supplies the responsive-card, language/restart and Windows topmost
-    # behavior. v1.3.1 layers window-position persistence and resize optimization.
-    # v1.4 adds read-only C_livery section analysis, 2D section previews, and
-    # recorded-vs-decoded placement verification without modifying save files.
     apply_v1_3_ui_patches(MainWindow)
     apply_v1_3_1_patches(MainWindow)
     apply_v1_4_patches(MainWindow)
+    apply_v1_4_preview2_patch(MainWindow)
     apply_v1_4_validation_patch()
 
     root = resource_root()
