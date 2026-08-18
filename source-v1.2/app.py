@@ -27,6 +27,7 @@ from fh6garage.ui import MainWindow
 from fh6garage.v1_3_ui_patch import apply_v1_3_ui_patches
 from fh6garage.v1_3_1_patch import apply_v1_3_1_patches
 from fh6garage.v1_4_patch import apply_v1_4_patches
+from fh6garage.v1_4_validation_patch import apply_v1_4_validation_patch
 
 
 def resource_root() -> Path:
@@ -50,11 +51,12 @@ def main() -> int:
 
     # v1.3 supplies the responsive-card, language/restart and Windows topmost
     # behavior. v1.3.1 layers window-position persistence and resize optimization.
-    # v1.4 adds read-only C_livery internal-section analysis to the existing
-    # livery information dialog without changing the selected save files.
+    # v1.4 adds read-only C_livery section analysis, 2D section previews, and
+    # recorded-vs-decoded placement verification without modifying save files.
     apply_v1_3_ui_patches(MainWindow)
     apply_v1_3_1_patches(MainWindow)
     apply_v1_4_patches(MainWindow)
+    apply_v1_4_validation_patch()
 
     root = resource_root()
     icon_path = root / "icons" / "FH6_Assistant.ico"
