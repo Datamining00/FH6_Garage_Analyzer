@@ -1,0 +1,128 @@
+name: Build FH6 Assistant v1.4 Web Canvas Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [v1.4-work]
+    paths:
+      - ".github/workflows/build-v1.4-web-canvas-test.yml"
+      - "source-v1.2/**"
+  pull_request:
+    branches: [v1.4-work]
+    paths:
+      - ".github/workflows/build-v1.4-web-canvas-test.yml"
+      - "source-v1.2/**"
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-smoke-test:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout build target
+        uses: actions/checkout@v6
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Vendor pinned KFPS livery backend
+        shell: pwsh
+        run: |
+          $expected = "8965780b8966e09d2f2a17e4d0684cdd44d7437c"
+          $vendor = Join-Path $PWD "source-v1.2\vendor\kfps"
+          if (Test-Path $vendor) { Remove-Item $vendor -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path (Split-Path $vendor) | Out-Null
+          git clone --filter=blob:none --no-checkout https://github.com/heyitshestia/kloudys-forza-painter-suite.git $vendor
+          git -C $vendor sparse-checkout init --no-cone
+          @'
+          /json_preview_renderer.py
+          /geometry_json.py
+          /LICENSE
+          /tools/cgroup/
+          /tools/livery/
+          /tools/fabric-editor/shape-words.json
+          /tools/fabric-editor/shape-names.json
+          /tools/fabric-editor/Resources/Vinyls/
+          '@ | Set-Content -Path (Join-Path $vendor ".git\info\sparse-checkout") -Encoding ascii
+          git -C $vendor fetch --depth 1 origin $expected
+          git -C $vendor checkout --detach FETCH_HEAD
+          $actual = (git -C $vendor rev-parse HEAD).Trim()
+          if ($actual -ne $expected) { throw "Unexpected KFPS vendor commit: $actual" }
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          Set-Location source-v1.2
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install --upgrade pyinstaller
+
+      - name: Verify Edge Canvas2D runtime
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          Set-Location source-v1.2
+          python -c "from fh6garage.web_canvas_preview import find_edge_executable; p=find_edge_executable(); assert p, 'Microsoft Edge was not found'; print('Edge:', p)"
+          python -c "from fh6garage.web_canvas_preview import web_canvas_smoke_test; print('Web Canvas smoke:', web_canvas_smoke_test())"
+
+      - name: Compile and run regression suite
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          Set-Location source-v1.2
+          python -m compileall -q .
+          python -m unittest discover -s tests -v
+
+      - name: Build single Windows EXE
+        shell: pwsh
+        run: |
+          Set-Location source-v1.2
+          python -m PyInstaller --clean --noconfirm .\FH6_Assistant_v1.4_web_canvas_test.spec
+          $exe = Join-Path $PWD "dist\FH6 Assistant v1.4 Web Canvas Test.exe"
+          if (-not (Test-Path $exe)) { throw "Web Canvas test EXE was not created." }
+          if ((Get-Item $exe).Length -lt 10000000) { throw "Built EXE is unexpectedly small." }
+
+      - name: Verify Windows metadata
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path "source-v1.2\dist\FH6 Assistant v1.4 Web Canvas Test.exe"
+          $version = (Get-Item $exe).VersionInfo
+          if ($version.OriginalFilename -ne "FH6 Assistant v1.4 Web Canvas Test.exe") { throw "Unexpected OriginalFilename: $($version.OriginalFilename)" }
+          if (-not $version.ProductVersion.Contains("Web Canvas Test")) { throw "Unexpected ProductVersion: $($version.ProductVersion)" }
+
+      - name: Smoke test bundled EXE startup
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          $exe = Resolve-Path "source-v1.2\dist\FH6 Assistant v1.4 Web Canvas Test.exe"
+          $proc = Start-Process -FilePath $exe -PassThru
+          Start-Sleep -Seconds 8
+          $proc.Refresh()
+          if ($proc.HasExited) { throw "Bundled EXE exited during startup smoke test with code $($proc.ExitCode)." }
+          Stop-Process -Id $proc.Id -Force
+
+      - name: Prepare artifact and SHA-256
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path "source-v1.2\dist\FH6 Assistant v1.4 Web Canvas Test.exe"
+          New-Item -ItemType Directory -Force -Path artifact | Out-Null
+          Copy-Item $exe "artifact\FH6 Assistant v1.4 Web Canvas Test.exe" -Force
+          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
+          "$hash  FH6 Assistant v1.4 Web Canvas Test.exe" | Set-Content "artifact\FH6 Assistant v1.4 Web Canvas Test.exe.sha256" -Encoding ascii
+          Write-Host "SHA-256: $hash"
+
+      - name: Upload Web Canvas test build
+        uses: actions/upload-artifact@v6
+        with:
+          name: FH6_Assistant_Windows_v1.4_Web_Canvas_Test
+          path: |
+            artifact/FH6 Assistant v1.4 Web Canvas Test.exe
+            artifact/FH6 Assistant v1.4 Web Canvas Test.exe.sha256
+          if-no-files-found: error
+          compression-level: 0
