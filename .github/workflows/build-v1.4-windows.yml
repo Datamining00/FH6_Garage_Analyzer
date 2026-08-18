@@ -48,10 +48,7 @@ jobs:
           /geometry_json.py
           /LICENSE
           /tools/cgroup/
-          /tools/livery/__init__.py
-          /tools/livery/vehicle_assets.py
-          /tools/livery/render_contract.py
-          /tools/livery/raster_decals.py
+          /tools/livery/
           /tools/fabric-editor/shape-words.json
           /tools/fabric-editor/shape-names.json
           /tools/fabric-editor/Resources/Vinyls/
@@ -70,6 +67,8 @@ jobs:
             "tools\cgroup\forza_source_decoder.py",
             "tools\cgroup\shape_identity.py",
             "tools\livery\__init__.py",
+            "tools\livery\fh6_save_installer.py",
+            "tools\livery\package.py",
             "tools\livery\vehicle_assets.py",
             "tools\livery\render_contract.py",
             "tools\livery\raster_decals.py",
