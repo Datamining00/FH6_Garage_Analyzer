@@ -17,10 +17,11 @@ from fh6garage.livery_analysis import (
 COUNTS = (12, 5, 30, 101, 99, 4, 0, 2, 0, 7, 8)
 
 
-def _payload(counts=COUNTS) -> bytes:
+def _payload(counts=COUNTS, car_id: int = 0) -> bytes:
+    header = bytearray(b"vlrc" + b"\x00" * 24)
+    struct.pack_into("<I", header, 0x10, int(car_id))
     return (
-        b"vlrc"
-        + b"\x00" * 24
+        bytes(header)
         + b"gyvl"
         + b"\x11" * 73
         + b"yrvl"
@@ -43,10 +44,15 @@ class LiveryAnalysisTests(unittest.TestCase):
         self.assertEqual(result.total_placements, sum(COUNTS))
         self.assertEqual(result.populated_sections, 9)
 
+    def test_reads_target_car_id_from_vlrc_header(self) -> None:
+        result = analyze_livery_bytes(_payload(car_id=3650))
+        self.assertEqual(result.car_id, 3650)
+
     def test_reads_zlib_container(self) -> None:
-        result = analyze_livery_bytes(_container(_payload()))
+        result = analyze_livery_bytes(_container(_payload(car_id=3650)))
         self.assertEqual(result.total_placements, sum(COUNTS))
         self.assertEqual(tuple(result.section_counts), LIVERY_SECTION_NAMES)
+        self.assertEqual(result.car_id, 3650)
 
     def test_reads_file_without_modifying_it(self) -> None:
         raw = _container(_payload())
