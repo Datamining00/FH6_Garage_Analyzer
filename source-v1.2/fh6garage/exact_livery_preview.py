@@ -90,6 +90,16 @@ def set_fh6_game_folder(path: Path | str) -> Path:
     return normalized
 
 
+def saved_fh6_game_folder() -> Path | None:
+    value = _saved_game_folder_text()
+    if not value:
+        return None
+    try:
+        return _normalize_game_folder(value)
+    except ExactLiveryPreviewError:
+        return None
+
+
 def configured_fh6_game_folder() -> Path | None:
     """Return a verified FH6 install root, preferring the user's explicit choice."""
     return _configured_game_folder_cached(
@@ -159,6 +169,35 @@ def resolve_vehicle_asset(car_id: int, game_folder: Path | str | None = None):
     return asset
 
 
+@lru_cache(maxsize=24)
+def _vehicle_masks_cached(
+    game_folder_text: str,
+    car_id: int,
+    archive_size: int,
+    archive_mtime_ns: int,
+):
+    del archive_size, archive_mtime_ns
+    asset = resolve_vehicle_asset(int(car_id), Path(game_folder_text))
+    _vehicle_assets, render_contract, _raster_decals = _load_backend()
+    try:
+        return render_contract._archive_masks(asset)
+    except Exception as exc:
+        raise ExactLiveryPreviewError(
+            f"Car ID {int(car_id)}의 FH6 projection mask 세트를 읽지 못했습니다: {exc}"
+        ) from exc
+
+
+def _vehicle_masks(car_id: int, game_folder: Path | str):
+    game = Path(game_folder).resolve()
+    asset = resolve_vehicle_asset(int(car_id), game)
+    return _vehicle_masks_cached(
+        str(game),
+        int(car_id),
+        int(getattr(asset, "archive_size", 0)),
+        int(getattr(asset, "archive_mtime_ns", 0)),
+    )
+
+
 @lru_cache(maxsize=4)
 def _raster_resolver_cached(game_folder_text: str):
     _vehicle_assets, _render_contract, raster_decals = _load_backend()
@@ -184,30 +223,30 @@ def apply_exact_vehicle_projection(
 ) -> bytes:
     """Apply the exact car-specific FH6 Masks.xml/swatch projection to one section.
 
-    The incoming artwork is the canonical 2048x1024 FH6 section canvas.  The
+    The incoming artwork is the canonical 2048x1024 FH6 section canvas. The
     result is warped with the car's projection origin/axis convention and clipped
-    by the exact local LiveryMasks swatch.  No approximate world projection and
+    by the exact local LiveryMasks swatch. No approximate world projection and
     no generic body silhouette are substituted.
     """
     from PIL import Image
 
     game = Path(game_folder).resolve() if game_folder is not None else require_fh6_game_folder()
-    asset = resolve_vehicle_asset(int(car_id), game)
     _vehicle_assets, render_contract, _raster_decals = _load_backend()
     slot = getattr(render_contract, "SECTION_TO_SLOT", {}).get(str(section))
     if not slot:
         raise ExactLiveryPreviewError(f"지원하지 않는 FH6 livery section입니다: {section}")
-    try:
-        mask_record = render_contract._archive_masks(asset).get(slot)
-    except Exception as exc:
-        raise ExactLiveryPreviewError(
-            f"{section} 영역의 차량 projection mask를 읽지 못했습니다: {exc}"
-        ) from exc
+
+    mask_record = _vehicle_masks(int(car_id), game).get(slot)
     if mask_record is None:
         raise ExactLiveryPreviewError(
             f"이 차량은 {section} 영역의 정확한 FH6 projection mask를 제공하지 않습니다."
         )
     mask, projection, _mask_hash = mask_record
+    if mask.getbbox() is None:
+        raise ExactLiveryPreviewError(
+            f"이 차량의 {section} projection mask가 비어 있어 정확한 미리보기를 만들 수 없습니다."
+        )
+
     try:
         with Image.open(io.BytesIO(png_bytes)) as source:
             artwork = source.convert("RGBA")
@@ -218,10 +257,9 @@ def apply_exact_vehicle_projection(
         clipped = render_contract._masked_atlas_layer(artwork, mask, slot, projection)
         bounds = render_contract._projection_pixel_bounds(projection)
 
-        # Show the real projection silhouette behind the artwork.  The neutral
-        # surface is only a viewing aid; its alpha is derived from the exact FH6
-        # vehicle mask, so oversized decals remain clipped exactly where the game
-        # would stop them on this projection.
+        # Show the exact projection silhouette behind the artwork. The neutral
+        # surface is a viewing aid only; its alpha is derived from the local FH6
+        # vehicle mask, so oversized decals remain clipped at the game boundary.
         surface_alpha = mask.convert("L").point(lambda value: (int(value) * 72) // 255)
         surface = Image.new("RGBA", clipped.size, (150, 154, 162, 0))
         surface.putalpha(surface_alpha)
@@ -241,4 +279,5 @@ def clear_exact_preview_cache() -> None:
     with _LOCK:
         _configured_game_folder_cached.cache_clear()
         _vehicle_index.cache_clear()
+        _vehicle_masks_cached.cache_clear()
         _raster_resolver_cached.cache_clear()
