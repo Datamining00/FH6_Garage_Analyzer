@@ -95,6 +95,25 @@ class ExactLiveryPreviewTests(unittest.TestCase):
         self.assertEqual(selected, game.resolve())
         self.assertEqual(resolved, game.resolve())
 
+    def test_configured_path_lookup_does_not_load_or_discover_game_backend(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            local = Path(temp_dir) / "local"
+            game = Path(temp_dir) / "FH6" / "Content"
+            game.mkdir(parents=True)
+            preference = local / "FH6GarageAnalyzer" / "fh6_game_folder.txt"
+            preference.parent.mkdir(parents=True)
+            preference.write_text(str(game), encoding="utf-8")
+
+            with patch.dict(
+                "os.environ",
+                {"LOCALAPPDATA": str(local), "FH6_GAME_FOLDER": ""},
+                clear=False,
+            ), patch("fh6garage.exact_livery_preview._load_backend") as backend:
+                resolved = configured_fh6_game_folder()
+                backend.assert_not_called()
+
+        self.assertEqual(resolved, game)
+
     def test_exact_projection_clips_artwork_to_vehicle_mask(self) -> None:
         artwork = Image.new("RGBA", (64, 32), (220, 80, 100, 255))
         source = io.BytesIO()
