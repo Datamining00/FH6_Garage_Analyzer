@@ -51,8 +51,7 @@ def _source_root() -> Path:
 
 def _vendor_candidates() -> tuple[Path, ...]:
     candidates: list[Path] = []
-    source_vendor = _source_root() / "vendor" / "kfps"
-    candidates.append(source_vendor)
+    candidates.append(_source_root() / "vendor" / "kfps")
     frozen_root = getattr(sys, "_MEIPASS", None)
     if frozen_root:
         candidates.append(Path(frozen_root) / "vendor" / "kfps")
@@ -150,6 +149,12 @@ def decode_livery_preview(path: Path | str) -> DecodedLiveryPreview:
         return _decode_cached(*signature)
 
 
+@lru_cache(maxsize=16)
+def _analysis_cached(path_text: str, file_size: int, mtime_ns: int):
+    del file_size, mtime_ns
+    return analyze_livery_file(Path(path_text))
+
+
 def _expanded_crop_box(
     bbox: tuple[int, int, int, int],
     image_size: tuple[int, int],
@@ -205,10 +210,102 @@ def _checkerboard_preview(png_bytes: bytes) -> bytes:
         raise LiveryPreviewError(f"미리보기 배경 합성에 실패했습니다: {exc}") from exc
 
 
-def render_livery_section(path: Path | str, section: str) -> RenderedLiverySection:
-    """Render one section using native shapes and the target car's exact FH6 mask."""
-    source = Path(path)
-    decoded = decode_livery_preview(source)
+def _layer_color_alpha_is_zero(layer: dict[str, Any]) -> bool:
+    color = layer.get("color")
+    if not isinstance(color, (list, tuple)) or len(color) < 4:
+        return False
+    try:
+        alpha = float(color[3])
+    except (TypeError, ValueError):
+        return False
+    return alpha <= 0.0
+
+
+def _validate_exact_assets_and_filter_noops(
+    renderer,
+    layers: list[dict[str, Any]],
+    raster_resolver,
+) -> tuple[list[dict[str, Any]], int]:
+    """Validate every native asset, then remove only provably invisible no-op layers.
+
+    KFPS strict mode currently raises when a valid native resource resolves to an
+    entirely transparent alpha field. That condition is not a missing asset and
+    contributes no pixels in FH6, including when used as a zero-alpha mask. We
+    therefore keep strict *asset* validation here, but do not treat a mathematically
+    invisible placement as a fatal reconstruction error.
+    """
+    visible: list[dict[str, Any]] = []
+    invisible_count = 0
+
+    resolve_resource = getattr(renderer, "_resolve_vinyl_resource", None)
+    alpha_triangles_for = getattr(renderer, "_resource_alpha_triangles", None)
+    shape_word_for = getattr(renderer, "_shape_word_from_shape", None)
+    if not callable(resolve_resource) or not callable(alpha_triangles_for):
+        raise LiveryPreviewError("native FH6 도형 검증 함수를 불러오지 못했습니다.")
+
+    for layer_index, layer in enumerate(layers, 1):
+        if bool(layer.get("is_raster_logo")):
+            if raster_resolver is None:
+                raise LiveryPreviewError(
+                    f"layer {layer_index}의 FH6 내장 래스터 데칼 resolver가 없습니다."
+                )
+            try:
+                raster_id = int(layer.get("raster_id"))
+            except (TypeError, ValueError):
+                raise LiveryPreviewError(
+                    f"layer {layer_index}의 FH6 내장 래스터 데칼 ID가 올바르지 않습니다."
+                )
+            if raster_resolver(raster_id) is None:
+                raise LiveryPreviewError(
+                    f"layer {layer_index}의 FH6 내장 래스터 데칼 {raster_id}을 찾지 못했습니다."
+                )
+            visible.append(layer)
+            continue
+
+        try:
+            type_code = int(layer.get("type", 0))
+        except (TypeError, ValueError):
+            type_code = 0
+        resource = resolve_resource(type_code, layer)
+        alpha_triangles = alpha_triangles_for(*resource) if resource else None
+        if not alpha_triangles:
+            if callable(shape_word_for):
+                try:
+                    word = int(shape_word_for(layer, type_code)) & 0xFFFF
+                    identity = f"shape word 0x{word:04X}"
+                except Exception:
+                    identity = f"type {type_code}"
+            else:
+                identity = f"type {type_code}"
+            if resource:
+                identity = f"{resource[0]}/{resource[1]}"
+            raise LiveryPreviewError(
+                f"layer {layer_index}에 정확한 native FH6 도형 리소스가 없습니다: {identity}"
+            )
+
+        native_has_opacity = any(
+            any(int(value) > 0 for value in alpha_values)
+            for _triangle, alpha_values in alpha_triangles
+        )
+        if _layer_color_alpha_is_zero(layer) or not native_has_opacity:
+            invisible_count += 1
+            continue
+
+        visible.append(layer)
+
+    return visible, invisible_count
+
+
+@lru_cache(maxsize=24)
+def _render_section_cached(
+    path_text: str,
+    file_size: int,
+    mtime_ns: int,
+    section: str,
+    game_folder_text: str,
+) -> RenderedLiverySection:
+    source = Path(path_text)
+    decoded = _decode_cached(path_text, file_size, mtime_ns)
     if section not in decoded.sections:
         raise LiveryPreviewError(f"지원하지 않는 리버리 영역입니다: {section}")
 
@@ -217,7 +314,7 @@ def render_livery_section(path: Path | str, section: str) -> RenderedLiverySecti
         raise LiveryPreviewError("이 영역에는 표시할 리버리 배치가 없습니다.")
 
     try:
-        analysis = analyze_livery_file(source)
+        analysis = _analysis_cached(path_text, file_size, mtime_ns)
     except LiveryAnalysisError as exc:
         raise LiveryPreviewError(f"리버리의 대상 차량을 확인하지 못했습니다: {exc}") from exc
     if analysis.car_id <= 0:
@@ -225,11 +322,7 @@ def render_livery_section(path: Path | str, section: str) -> RenderedLiverySecti
             "C_livery에서 대상 Car ID를 확인할 수 없어 차량별 projection을 적용할 수 없습니다."
         )
 
-    try:
-        game_folder = require_fh6_game_folder()
-    except ExactLiveryPreviewError as exc:
-        raise LiveryPreviewError(str(exc)) from exc
-
+    game_folder = Path(game_folder_text)
     _decoder, renderer = _load_backend()
     raster_count = sum(1 for layer in layers if bool(layer.get("is_raster_logo")))
     raster_resolver = None
@@ -241,15 +334,27 @@ def render_livery_section(path: Path | str, section: str) -> RenderedLiverySecti
                 f"{section} 영역의 FH6 내장 래스터 데칼을 불러오지 못했습니다: {exc}"
             ) from exc
 
+    prepared_layers, invisible_count = _validate_exact_assets_and_filter_noops(
+        renderer,
+        layers,
+        raster_resolver,
+    )
+    if not prepared_layers:
+        raise LiveryPreviewError(
+            f"{section} 영역의 {len(layers):,}개 placement가 모두 완전 투명하여 표시할 픽셀이 없습니다."
+        )
+
     try:
-        # Fail closed: every vector geometry and every raster decal must resolve.
-        # Never substitute circles/rectangles for unknown native resources.
+        # Native resources were already validated above. Use the renderer's
+        # non-fatal visibility path so legitimate zero-alpha/off-canvas no-op
+        # placements do not abort an otherwise exact section reconstruction.
+        # Missing resources can never reach this call because preflight fails.
         rendered = renderer.render_typecode_layers_canvas(
-            layers,
+            prepared_layers,
             width=2048,
             height=1024,
             raster_resolver=raster_resolver,
-            strict_assets=True,
+            strict_assets=False,
         )
     except Exception as exc:
         raise LiveryPreviewError(
@@ -268,15 +373,45 @@ def render_livery_section(path: Path | str, section: str) -> RenderedLiverySecti
     except ExactLiveryPreviewError as exc:
         raise LiveryPreviewError(str(exc)) from exc
 
+    warnings = list(decoded.warnings)
+    if invisible_count:
+        warnings.append(
+            f"{section}: {invisible_count}개의 완전 투명 native placement는 시각적 no-op으로 제외했습니다."
+        )
+
     return RenderedLiverySection(
         section=section,
         png_bytes=_checkerboard_preview(projected),
         placement_count=len(layers),
         skipped_raster_logos=0,
-        warnings=decoded.warnings,
+        warnings=tuple(dict.fromkeys(warnings)),
     )
+
+
+def render_livery_section(path: Path | str, section: str) -> RenderedLiverySection:
+    """Render one section using native shapes and the target car's exact FH6 mask."""
+    source = Path(path)
+    if not source.is_file():
+        raise LiveryPreviewError("C_livery 파일을 찾을 수 없습니다.")
+
+    try:
+        game_folder = require_fh6_game_folder()
+    except ExactLiveryPreviewError as exc:
+        raise LiveryPreviewError(str(exc)) from exc
+
+    signature = _file_signature(source)
+    with _CACHE_LOCK:
+        return _render_section_cached(
+            signature[0],
+            signature[1],
+            signature[2],
+            str(section),
+            str(game_folder.resolve()),
+        )
 
 
 def clear_livery_preview_cache() -> None:
     with _CACHE_LOCK:
         _decode_cached.cache_clear()
+        _analysis_cached.cache_clear()
+        _render_section_cached.cache_clear()
