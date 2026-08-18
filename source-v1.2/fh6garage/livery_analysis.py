@@ -33,13 +33,14 @@ class LiveryAnalysis:
     payload_size: int
     gyvl_offset: int
     yrvl_offset: int
+    car_id: int = 0
 
 
 def unwrap_forza_container_bytes(raw: bytes) -> bytes:
     """Return the uncompressed FH6 payload without modifying the source file.
 
     FH6 save artifacts may either already contain the raw ``vlrc``/``gyvl``
-    payload or consist of one or more zlib-compressed blocks.  Each compressed
+    payload or consist of one or more zlib-compressed blocks. Each compressed
     block starts with two little-endian uint32 values: compressed size and
     expected uncompressed size.
     """
@@ -81,7 +82,7 @@ def unwrap_forza_container_bytes(raw: bytes) -> bytes:
 
 
 def analyze_livery_bytes(raw: bytes) -> LiveryAnalysis:
-    """Read the eleven FH6 livery projection-section placement counts."""
+    """Read the target car and eleven FH6 livery projection-section counts."""
     payload = unwrap_forza_container_bytes(raw)
 
     gyvl = payload.find(b"gyvl")
@@ -106,8 +107,14 @@ def analyze_livery_bytes(raw: bytes) -> LiveryAnalysis:
     }
     total = sum(section_counts.values())
 
+    # FH6 C_livery stores the exact target CarOrdinal at payload offset 0x10.
+    # Raw gyvl-only fixtures do not contain this outer header and therefore use 0.
+    car_id = 0
+    if payload.startswith(b"vlrc") and len(payload) >= 0x14:
+        car_id = int(struct.unpack_from("<I", payload, 0x10)[0])
+
     # Corrupt data can otherwise produce plausible-looking but enormous uint32
-    # values.  This guard is intentionally far above observed real liveries and
+    # values. This guard is intentionally far above observed real liveries and
     # serves only as a fail-closed structural sanity check.
     if total > 10_000_000:
         raise LiveryAnalysisError(
@@ -121,6 +128,7 @@ def analyze_livery_bytes(raw: bytes) -> LiveryAnalysis:
         payload_size=len(payload),
         gyvl_offset=gyvl,
         yrvl_offset=yrvl,
+        car_id=car_id,
     )
 
 
