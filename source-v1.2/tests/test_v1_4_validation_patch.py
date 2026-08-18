@@ -60,7 +60,7 @@ class V14ValidationPatchTests(unittest.TestCase):
         values = np.array([1, 2, 3], dtype=np.float32)
         self.assertEqual(float(values.sum()), 6.0)
 
-    def test_pinned_renderer_can_generate_png_when_vendor_is_present(self) -> None:
+    def test_pinned_renderer_can_generate_png_with_native_asset(self) -> None:
         if not preview_backend_available():
             self.skipTest("Pinned KFPS vendor tree is not present in this source checkout")
 
@@ -77,10 +77,31 @@ class V14ValidationPatchTests(unittest.TestCase):
             ],
             width=640,
             height=320,
-            strict_assets=False,
+            strict_assets=True,
         )
         self.assertIsNotNone(png)
         self.assertTrue(png.startswith(b"\x89PNG"))
+
+    def test_strict_renderer_rejects_missing_shape_instead_of_fallback(self) -> None:
+        if not preview_backend_available():
+            self.skipTest("Pinned KFPS vendor tree is not present in this source checkout")
+
+        renderer = importlib.import_module("json_preview_renderer")
+        with self.assertRaises(ValueError):
+            renderer.render_typecode_layers_canvas(
+                [
+                    {
+                        "type": 0x100000 + 0x7FFE,
+                        "type_word": 0x7FFE,
+                        "data": [0.0, 0.0, 2.0, 1.0, 0.0, 0.0, 0],
+                        "color": [255, 255, 255, 255],
+                        "mask": False,
+                    }
+                ],
+                width=640,
+                height=320,
+                strict_assets=True,
+            )
 
 
 if __name__ == "__main__":
