@@ -9,6 +9,14 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from .exact_livery_preview import (
+    ExactLiveryPreviewError,
+    apply_exact_vehicle_projection,
+    raster_resolver_for_game,
+    require_fh6_game_folder,
+)
+from .livery_analysis import LiveryAnalysisError, analyze_livery_file
+
 
 KFPS_VENDOR_COMMIT = "8965780b8966e09d2f2a17e4d0684cdd44d7437c"
 
@@ -52,13 +60,7 @@ def _vendor_candidates() -> tuple[Path, ...]:
 
 
 def _prepare_vendor_import_path() -> None:
-    """Expose the pinned KFPS source tree during source-mode development.
-
-    PyInstaller bundles the selected KFPS modules as hidden imports. In source
-    mode the exact upstream tree is placed under ``vendor/kfps`` by the v1.4
-    build workflow, so adding that directory to ``sys.path`` keeps both modes
-    on the same decoder/renderer implementation.
-    """
+    """Expose the pinned KFPS source tree during source-mode development."""
     for candidate in _vendor_candidates():
         if candidate.is_dir():
             text = str(candidate)
@@ -152,10 +154,10 @@ def _expanded_crop_box(
     bbox: tuple[int, int, int, int],
     image_size: tuple[int, int],
     *,
-    padding: int = 48,
+    padding: int = 32,
     minimum_size: tuple[int, int] = (480, 240),
 ) -> tuple[int, int, int, int]:
-    """Expand an alpha bounding box while preserving enough surrounding context."""
+    """Expand a visible bounding box while keeping enough surrounding context."""
     image_width, image_height = image_size
     left, top, right, bottom = bbox
 
@@ -174,7 +176,7 @@ def _expanded_crop_box(
 
 
 def _checkerboard_preview(png_bytes: bytes) -> bytes:
-    """Crop transparent margins, then composite artwork over a neutral checkerboard."""
+    """Composite the exact masked projection over a neutral checkerboard."""
     try:
         from PIL import Image, ImageDraw
 
@@ -204,6 +206,7 @@ def _checkerboard_preview(png_bytes: bytes) -> bytes:
 
 
 def render_livery_section(path: Path | str, section: str) -> RenderedLiverySection:
+    """Render one section using native shapes and the target car's exact FH6 mask."""
     source = Path(path)
     decoded = decode_livery_preview(source)
     if section not in decoded.sections:
@@ -213,36 +216,61 @@ def render_livery_section(path: Path | str, section: str) -> RenderedLiverySecti
     if not layers:
         raise LiveryPreviewError("이 영역에는 표시할 리버리 배치가 없습니다.")
 
-    _decoder, renderer = _load_backend()
-    raster_count = sum(1 for layer in layers if bool(layer.get("is_raster_logo")))
-    if raster_count:
+    try:
+        analysis = analyze_livery_file(source)
+    except LiveryAnalysisError as exc:
+        raise LiveryPreviewError(f"리버리의 대상 차량을 확인하지 못했습니다: {exc}") from exc
+    if analysis.car_id <= 0:
         raise LiveryPreviewError(
-            f"{section} 영역에는 게임 내장 래스터 로고 {raster_count}개가 포함되어 있어 "
-            "현재 버전에서는 정확한 미리보기를 생성할 수 없습니다."
+            "C_livery에서 대상 Car ID를 확인할 수 없어 차량별 projection을 적용할 수 없습니다."
         )
 
     try:
-        # Do not permit the renderer to substitute circles/rectangles for
-        # missing FH6 shape resources. A visibly broken preview is worse than
-        # reporting that exact reconstruction is unavailable.
+        game_folder = require_fh6_game_folder()
+    except ExactLiveryPreviewError as exc:
+        raise LiveryPreviewError(str(exc)) from exc
+
+    _decoder, renderer = _load_backend()
+    raster_count = sum(1 for layer in layers if bool(layer.get("is_raster_logo")))
+    raster_resolver = None
+    if raster_count:
+        try:
+            raster_resolver = raster_resolver_for_game(game_folder)
+        except ExactLiveryPreviewError as exc:
+            raise LiveryPreviewError(
+                f"{section} 영역의 FH6 내장 래스터 데칼을 불러오지 못했습니다: {exc}"
+            ) from exc
+
+    try:
+        # Fail closed: every vector geometry and every raster decal must resolve.
+        # Never substitute circles/rectangles for unknown native resources.
         rendered = renderer.render_typecode_layers_canvas(
             layers,
             width=2048,
             height=1024,
+            raster_resolver=raster_resolver,
             strict_assets=True,
         )
     except Exception as exc:
         raise LiveryPreviewError(
-            f"{section} 영역의 정확한 미리보기를 생성하지 못했습니다. "
-            f"필요한 FH6 도형 리소스를 확인해 주세요: {exc}"
+            f"{section} 영역의 native FH6 도형을 정확하게 렌더링하지 못했습니다: {exc}"
         ) from exc
     if not rendered:
         raise LiveryPreviewError(f"{section} 영역에서 표시 가능한 이미지를 만들지 못했습니다.")
 
-    visible_png = _checkerboard_preview(rendered)
+    try:
+        projected = apply_exact_vehicle_projection(
+            rendered,
+            section,
+            analysis.car_id,
+            game_folder=game_folder,
+        )
+    except ExactLiveryPreviewError as exc:
+        raise LiveryPreviewError(str(exc)) from exc
+
     return RenderedLiverySection(
         section=section,
-        png_bytes=visible_png,
+        png_bytes=_checkerboard_preview(projected),
         placement_count=len(layers),
         skipped_raster_logos=0,
         warnings=decoded.warnings,
