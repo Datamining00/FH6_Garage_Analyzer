@@ -9,11 +9,13 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QButtonGroup,
     QDialog,
+    QFileDialog,
     QFrame,
     QGridLayout,
     QHeaderView,
     QHBoxLayout,
     QLabel,
+    QMessageBox,
     QPlainTextEdit,
     QPushButton,
     QScrollArea,
@@ -25,13 +27,22 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .exact_livery_preview import (
+    ExactLiveryPreviewError,
+    configured_fh6_game_folder,
+    set_fh6_game_folder,
+)
 from .i18n import get_language, tr
 from .livery_analysis import (
     LIVERY_SECTION_NAMES,
     LiveryAnalysisError,
     analyze_livery_file,
 )
-from .livery_preview import LiveryPreviewError, render_livery_section
+from .livery_preview import (
+    LiveryPreviewError,
+    clear_livery_preview_cache,
+    render_livery_section,
+)
 from .models import LiveryRecord
 from .ui import APP_STYLE, ZoomableImageView
 
@@ -104,10 +115,15 @@ def _preview_text(key: str, **values) -> str:
         "no_thumbnail": "저장된 썸네일이 없습니다.",
         "status_thumbnail": "저장된 bigThumb.webp 썸네일",
         "status_section": "{section} · {count:,}개 배치",
-        "status_raster": " · 내장 래스터 로고 {count:,}개 생략",
-        "note": "영역별 이미지는 C_livery의 placement를 2D 평면에 재구성한 결과이며 차량의 3D 표면 렌더링은 아닙니다.",
-        "warning": "일부 요소가 완전히 재구성되지 않았을 수 있습니다.",
+        "status_raster": " · 내장 래스터 로고 {count:,}개",
+        "note": "영역별 이미지는 로컬 FH6 차량의 실제 LiveryMasks projection으로 잘라낸 2D 결과입니다. 3D 시점 이미지는 아닙니다.",
+        "warning": "정확한 native 도형이나 차량 mask가 없으면 대체 도형을 쓰지 않고 오류로 표시합니다.",
         "controls": "마우스 휠: 확대/축소 · 드래그: 이동 · 더블클릭: 100%",
+        "game_folder": "FH6 설치 폴더 지정",
+        "game_folder_title": "FH6 게임 또는 Content 폴더 선택",
+        "game_folder_set": "FH6 설치 폴더: {path}",
+        "game_folder_auto": "FH6 설치 폴더는 자동 탐색하며, 실패하면 직접 지정할 수 있습니다.",
+        "game_folder_error": "FH6 설치 폴더를 사용할 수 없습니다.\n\n{error}",
     }
     en = {
         "thumbnail": "Thumbnail",
@@ -116,10 +132,15 @@ def _preview_text(key: str, **values) -> str:
         "no_thumbnail": "No saved thumbnail is available.",
         "status_thumbnail": "Saved bigThumb.webp thumbnail",
         "status_section": "{section} · {count:,} placements",
-        "status_raster": " · {count:,} built-in raster logos omitted",
-        "note": "Section images reconstruct C_livery placements on a 2D plane; they are not a 3D vehicle-surface render.",
-        "warning": "Some elements may not be fully reconstructed.",
+        "status_raster": " · {count:,} built-in raster logos",
+        "note": "Section images are 2D results clipped by the exact LiveryMasks projection from the local FH6 vehicle. They are not 3D camera views.",
+        "warning": "If an exact native shape or vehicle mask is unavailable, the preview fails instead of substituting generic geometry.",
         "controls": "Mouse wheel: zoom · Drag: pan · Double-click: 100%",
+        "game_folder": "Set FH6 game folder",
+        "game_folder_title": "Choose the FH6 game or Content folder",
+        "game_folder_set": "FH6 game folder: {path}",
+        "game_folder_auto": "FH6 is auto-detected when possible; select its folder manually if detection fails.",
+        "game_folder_error": "The FH6 game folder cannot be used.\n\n{error}",
     }
     return (ko if _ko() else en)[key].format(**values)
 
@@ -362,7 +383,7 @@ def _show_livery_image(self: Any, record: Any) -> None:
     status_label.setObjectName("muted")
     status_label.setStyleSheet("color:#737787;font-size:9pt;")
 
-    warning_label = QLabel(_preview_text("note"))
+    warning_label = QLabel(_preview_text("note") + " " + _preview_text("warning"))
     warning_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
     warning_label.setWordWrap(True)
     warning_label.setStyleSheet("color:#777b88;font-size:8.8pt;")
@@ -491,10 +512,6 @@ def _show_livery_image(self: Any, record: Any) -> None:
                         )
                     status_label.setText(status)
                     QTimer.singleShot(0, viewer.fit_image)
-                if result.skipped_raster_logos:
-                    warning_label.setText(
-                        _preview_text("note") + " " + _preview_text("warning")
-                    )
             except Exception as exc:
                 failed = _placeholder(
                     _preview_text(
@@ -519,6 +536,63 @@ def _show_livery_image(self: Any, record: Any) -> None:
     controls = QHBoxLayout()
     controls.setContentsMargins(0, 0, 0, 0)
     controls.setSpacing(6)
+
+    game_folder_button = QPushButton(_preview_text("game_folder"))
+    game_folder_button.setObjectName("secondary")
+
+    def clear_section_pages() -> None:
+        for future in list(futures.values()):
+            future.cancel()
+        futures.clear()
+        for section in used_sections:
+            page = pages.pop(section, None)
+            if page is not None:
+                stack.removeWidget(page)
+                page.deleteLater()
+        clear_livery_preview_cache()
+
+    def choose_game_folder() -> None:
+        current = configured_fh6_game_folder()
+        selected = QFileDialog.getExistingDirectory(
+            dialog,
+            _preview_text("game_folder_title"),
+            str(current or ""),
+        )
+        if not selected:
+            return
+        try:
+            normalized = set_fh6_game_folder(selected)
+        except ExactLiveryPreviewError as exc:
+            QMessageBox.warning(
+                dialog,
+                _preview_text("game_folder"),
+                _preview_text("game_folder_error", error=str(exc)),
+            )
+            return
+        clear_section_pages()
+        status_label.setText(_preview_text("game_folder_set", path=str(normalized)))
+        checked = button_group.checkedButton()
+        for section, button in section_buttons.items():
+            if button is checked:
+                request_section(section)
+                break
+
+    game_folder_button.clicked.connect(choose_game_folder)
+    controls.addWidget(game_folder_button)
+
+    try:
+        detected_game_folder = configured_fh6_game_folder()
+    except ExactLiveryPreviewError:
+        detected_game_folder = None
+    game_folder_status = QLabel(
+        _preview_text(
+            "game_folder_set",
+            path=str(detected_game_folder),
+        ) if detected_game_folder else _preview_text("game_folder_auto")
+    )
+    game_folder_status.setObjectName("muted")
+    game_folder_status.setStyleSheet("color:#737787;font-size:8.6pt;")
+    controls.addWidget(game_folder_status)
     controls.addStretch(1)
 
     minus_button = QToolButton()
@@ -557,7 +631,6 @@ def _show_livery_image(self: Any, record: Any) -> None:
     controls.addWidget(actual_button)
     controls.addWidget(fit_button)
     controls.addWidget(plus_button)
-    controls.addStretch(1)
     layout.addLayout(controls)
     layout.addWidget(status_label)
     layout.addWidget(warning_label)
@@ -580,7 +653,7 @@ def _show_livery_image(self: Any, record: Any) -> None:
 
 
 def apply_v1_4_patches(MainWindow) -> None:
-    """Apply v1.4 read-only C_livery analysis and section-preview UI."""
+    """Apply v1.4 read-only analysis and exact local FH6 projection previews."""
     global _ORIGINAL_SHOW_LIVERY_IMAGE
 
     if getattr(MainWindow, "_fh6_v14_patched", False):
