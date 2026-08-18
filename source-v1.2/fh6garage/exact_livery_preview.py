@@ -68,15 +68,20 @@ def _load_backend():
     return vehicle_assets, render_contract, raster_decals
 
 
-def _normalize_game_folder(path: Path | str) -> Path:
+@lru_cache(maxsize=8)
+def _normalize_game_folder_cached(path_text: str) -> Path:
     vehicle_assets, _render_contract, _raster_decals = _load_backend()
     try:
-        return Path(vehicle_assets.normalize_fh6_game_folder(path)).resolve()
+        return Path(vehicle_assets.normalize_fh6_game_folder(path_text)).resolve()
     except Exception as exc:
         raise ExactLiveryPreviewError(
             "선택한 폴더에서 FH6 차량 아카이브를 찾지 못했습니다. "
             "Forza Horizon 6 폴더 또는 Content 폴더를 선택해 주세요."
         ) from exc
+
+
+def _normalize_game_folder(path: Path | str) -> Path:
+    return _normalize_game_folder_cached(str(Path(path).expanduser()))
 
 
 def set_fh6_game_folder(path: Path | str) -> Path:
@@ -90,24 +95,6 @@ def set_fh6_game_folder(path: Path | str) -> Path:
     return normalized
 
 
-def saved_fh6_game_folder() -> Path | None:
-    value = _saved_game_folder_text()
-    if not value:
-        return None
-    try:
-        return _normalize_game_folder(value)
-    except ExactLiveryPreviewError:
-        return None
-
-
-def configured_fh6_game_folder() -> Path | None:
-    """Return a verified FH6 install root, preferring the user's explicit choice."""
-    return _configured_game_folder_cached(
-        os.environ.get("FH6_GAME_FOLDER", ""),
-        _saved_game_folder_text(),
-    )
-
-
 def _saved_game_folder_text() -> str:
     preference = _saved_game_folder_path()
     try:
@@ -116,36 +103,73 @@ def _saved_game_folder_text() -> str:
         return ""
 
 
-@lru_cache(maxsize=4)
-def _configured_game_folder_cached(environment_value: str, saved_value: str) -> Path | None:
+def _quick_existing_path(value: str) -> Path | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        candidate = Path(text).expanduser()
+        return candidate if candidate.exists() else None
+    except OSError:
+        return None
+
+
+def saved_fh6_game_folder() -> Path | None:
+    """Return the saved path without scanning FH6 archives.
+
+    This is intentionally cheap so merely opening the thumbnail viewer does not
+    enumerate Steam/Xbox install locations or hundreds of vehicle ZIP files.
+    Exact validation is deferred until a section preview is actually requested.
+    """
+    return _quick_existing_path(_saved_game_folder_text())
+
+
+def configured_fh6_game_folder() -> Path | None:
+    """Return an explicitly configured path without automatic discovery.
+
+    UI code calls this while opening the image viewer, so this function must stay
+    effectively constant-time. Automatic discovery belongs to
+    :func:`require_fh6_game_folder`, which runs on the preview worker only after
+    the user requests a reconstructed section.
+    """
+    for value in (os.environ.get("FH6_GAME_FOLDER", ""), _saved_game_folder_text()):
+        candidate = _quick_existing_path(value)
+        if candidate is not None:
+            return candidate
+    return None
+
+
+@lru_cache(maxsize=1)
+def _discover_fh6_game_folder_cached() -> Path | None:
     vehicle_assets, _render_contract, _raster_decals = _load_backend()
-    for value in (environment_value.strip(), saved_value.strip()):
-        if not value:
-            continue
-        try:
-            return Path(vehicle_assets.normalize_fh6_game_folder(value)).resolve()
-        except Exception:
-            continue
     try:
         discovered = vehicle_assets.discover_fh6_game_folder()
     except Exception:
         discovered = None
-    if discovered:
-        try:
-            return Path(vehicle_assets.normalize_fh6_game_folder(discovered)).resolve()
-        except Exception:
-            pass
-    return None
+    if not discovered:
+        return None
+    try:
+        return _normalize_game_folder(discovered)
+    except ExactLiveryPreviewError:
+        return None
 
 
 def require_fh6_game_folder() -> Path:
-    game_folder = configured_fh6_game_folder()
-    if game_folder is None:
-        raise ExactLiveryPreviewError(
-            "원본과 일치하는 리버리 미리보기에는 로컬 FH6 설치 파일의 차량 projection mask가 필요합니다. "
-            "이미지 창에서 'FH6 설치 폴더 지정'을 눌러 게임 폴더 또는 Content 폴더를 선택해 주세요."
-        )
-    return game_folder
+    configured = configured_fh6_game_folder()
+    if configured is not None:
+        try:
+            return _normalize_game_folder(configured)
+        except ExactLiveryPreviewError:
+            pass
+
+    discovered = _discover_fh6_game_folder_cached()
+    if discovered is not None:
+        return discovered
+
+    raise ExactLiveryPreviewError(
+        "원본과 일치하는 리버리 미리보기에는 로컬 FH6 설치 파일의 차량 projection mask가 필요합니다. "
+        "이미지 창에서 'FH6 설치 폴더 지정'을 눌러 게임 폴더 또는 Content 폴더를 선택해 주세요."
+    )
 
 
 @lru_cache(maxsize=4)
@@ -277,7 +301,8 @@ def apply_exact_vehicle_projection(
 
 def clear_exact_preview_cache() -> None:
     with _LOCK:
-        _configured_game_folder_cached.cache_clear()
+        _normalize_game_folder_cached.cache_clear()
+        _discover_fh6_game_folder_cached.cache_clear()
         _vehicle_index.cache_clear()
         _vehicle_masks_cached.cache_clear()
         _raster_resolver_cached.cache_clear()
