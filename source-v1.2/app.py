@@ -38,6 +38,7 @@ from fh6garage.livery_render_acceleration_patch import apply_livery_render_accel
 from fh6garage.livery_raster_runtime_patch import apply_livery_raster_runtime_patch
 from fh6garage.livery_render_integrity_patch import apply_livery_render_integrity_patch
 from fh6garage.livery_preview_ui_polish import apply_livery_preview_ui_polish
+from fh6garage.livery_baseline_behavior_patch import apply_livery_baseline_behavior_patch
 
 
 def resource_root() -> Path:
@@ -79,6 +80,7 @@ def main() -> int:
     apply_livery_raster_runtime_patch()
     apply_livery_render_integrity_patch()
     apply_livery_preview_ui_polish()
+    apply_livery_baseline_behavior_patch()
 
     root = resource_root()
     icon_path = root / "icons" / "FH6_Assistant.ico"
