@@ -114,6 +114,64 @@ def _is_folder_button(button: QPushButton) -> bool:
     return text in {"fh6 폴더", "fh6 folder"}
 
 
+def _render_mode_kind(button: QPushButton) -> str | None:
+    text = str(button.text() or "").strip().casefold()
+    if text in {"빠르게 보기", "quick view"}:
+        return "fast"
+    if text in {"품질 모드", "quality"}:
+        return "quality"
+    return None
+
+
+def _unify_quick_view_into_scale(top_bar: QFrame) -> None:
+    """Migrate the legacy quick/quality toggle to one 1x..16x scale selector.
+
+    The old UI represented quick view as a hidden render mode whose effective
+    scale was exactly 1x. Keep compatibility with saved settings by switching
+    the internal mode to quality and selecting 1x when quick view had been
+    active, then hide both redundant mode buttons.
+    """
+    mode_buttons: dict[str, QPushButton] = {}
+    for button in top_bar.findChildren(QPushButton):
+        kind = _render_mode_kind(button)
+        if kind is not None:
+            mode_buttons[kind] = button
+
+    fast_button = mode_buttons.get("fast")
+    quality_button = mode_buttons.get("quality")
+    was_fast = bool(fast_button is not None and fast_button.isChecked())
+
+    # Switch the legacy internal state to quality before exposing 1x in the
+    # scale combo. In the production dialog these buttons are an exclusive,
+    # checkable group, so this also migrates the persisted render-mode setting.
+    if quality_button is not None and quality_button.isCheckable() and not quality_button.isChecked():
+        quality_button.click()
+
+    for button in mode_buttons.values():
+        button.hide()
+
+    combo = top_bar.findChild(QComboBox)
+    if combo is None:
+        return
+
+    previous_scale = combo.currentData()
+    if combo.findData(1) < 0:
+        label = "1× · 빠름" if fast_button is not None and "빠르게" in fast_button.text() else "1× · fast"
+        combo.insertItem(0, label, 1)
+
+    target_scale = 1 if was_fast else previous_scale
+    target_index = combo.findData(target_scale)
+    if target_index >= 0:
+        combo.setCurrentIndex(target_index)
+    combo.setEnabled(True)
+    combo.setToolTip(
+        "렌더 배율을 선택합니다. 1×가 가장 빠르며 8×/16×는 타일 기반 고배율 렌더를 사용합니다."
+        if fast_button is not None and "빠르게" in fast_button.text()
+        else
+        "Choose render scale. 1× is fastest; 8×/16× use tiled supersampling."
+    )
+
+
 def _polish_preview_dialog(dialog: QDialog) -> bool:
     top_bar = dialog.findChild(QFrame, "liveryPreviewTopBar")
     if top_bar is None:
@@ -141,6 +199,8 @@ def _polish_preview_dialog(dialog: QDialog) -> bool:
     for combo in top_bar.findChildren(QComboBox):
         combo.setObjectName("liveryPreviewScaleCombo")
         combo.setStyleSheet(_COMBO_STYLE)
+
+    _unify_quick_view_into_scale(top_bar)
 
     folder_button = next(
         (button for button in top_bar.findChildren(QPushButton) if _is_folder_button(button)),
