@@ -1,1 +1,0 @@
-Target: retained 1x/2x/4x final projection density, default 4x, Web Canvas disabled in app wiring.
