@@ -33,6 +33,7 @@ from fh6garage.v1_4_native_resolution_test_patch import apply_v1_4_native_resolu
 from fh6garage.v1_4_quality_pipeline_patch import apply_v1_4_quality_pipeline_patch
 from fh6garage.v1_4_preview_final_ui_patch import apply_v1_4_preview_final_ui_patch
 from fh6garage.livery_decoder_recovery_patch import apply_livery_decoder_recovery_patch
+from fh6garage.livery_raster_runtime_patch import apply_livery_raster_runtime_patch
 from fh6garage.livery_render_integrity_patch import apply_livery_render_integrity_patch
 
 
@@ -53,9 +54,9 @@ def main() -> int:
     settings = QSettings()
     set_language(settings.value("language", DEFAULT_LANGUAGE, str))
 
-    # Install the structural C_livery recovery before any UI action can decode
-    # a livery. The normal pinned KFPS parser remains the primary decoder; only
-    # provably flat FH6 sections are replaced by verified raw-placement recovery.
+    # Install structural decoding safeguards before any UI action can inspect a
+    # livery. Flat sections are recovered only when their raw byte contract can
+    # be proven, and stale pre-recovery render caches are invalidated.
     apply_livery_decoder_recovery_patch()
 
     apply_v1_3_ui_patches(MainWindow)
@@ -66,6 +67,11 @@ def main() -> int:
     apply_v1_4_native_resolution_test_patch(MainWindow)
     apply_v1_4_quality_pipeline_patch(MainWindow)
     apply_v1_4_preview_final_ui_patch(MainWindow)
+
+    # The same raster fail-soft policy is used from 1x through 16x. Missing
+    # visible raster decals are skipped with a warning, while missing raster
+    # masks remain fatal. Integrity/provenance verification wraps this final path.
+    apply_livery_raster_runtime_patch()
     apply_livery_render_integrity_patch()
 
     root = resource_root()
