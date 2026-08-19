@@ -30,6 +30,7 @@ from fh6garage.v1_4_patch import apply_v1_4_patches
 from fh6garage.v1_4_preview2_patch import apply_v1_4_preview2_patch
 from fh6garage.v1_4_validation_patch import apply_v1_4_validation_patch
 from fh6garage.v1_4_native_resolution_test_patch import apply_v1_4_native_resolution_test_patch
+from fh6garage.v1_4_projection_quality_test_patch import apply_v1_4_projection_quality_test_patch
 
 
 def resource_root() -> Path:
@@ -43,7 +44,7 @@ def main() -> int:
     app = QApplication(sys.argv)
     app.setFont(QFont("Segoe UI", 10))
     app.setApplicationName("FH6 Assistant")
-    app.setApplicationVersion("1.4 Native Resolution Test")
+    app.setApplicationVersion("1.4 Projection Quality Test")
     app.setOrganizationName("LocalOnly")
 
     settings = QSettings()
@@ -55,6 +56,7 @@ def main() -> int:
     apply_v1_4_preview2_patch(MainWindow)
     apply_v1_4_validation_patch()
     apply_v1_4_native_resolution_test_patch(MainWindow)
+    apply_v1_4_projection_quality_test_patch(MainWindow)
 
     root = resource_root()
     icon_path = root / "icons" / "FH6_Assistant.ico"
