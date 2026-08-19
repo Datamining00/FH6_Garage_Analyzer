@@ -9,12 +9,15 @@ from .livery_preview_quality_pipeline import (
     DEFAULT_QUALITY,
     render_livery_section_quality_pipeline,
 )
+from .livery_preview_raster_policy import (
+    filter_missing_visible_rasters,
+    preflight_raster_layers_fail_soft,
+)
 from .models import LiveryRecord
 
 TEST_VERSION_LABEL = "v1.4 Quality Pipeline Test"
 SHARPEN_SETTING_KEY = "livery_preview_quality_pipeline_sharpen"
 QUALITY_SETTING_KEY = "livery_preview_quality_pipeline_quality"
-FIXED_CACHE_VERSION = "v14-quality-pipeline-r2-mask-semantics"
 
 
 def _dispatch_renderer(path, section, quality):
@@ -33,19 +36,29 @@ def apply_v1_4_quality_pipeline_patch(MainWindow) -> None:
 
     from . import livery_preview as preview_core
     from . import livery_preview_quality_pipeline as quality_pipeline
+    from . import livery_preview_tiled_quality as tiled_quality
     from . import v1_4_preview2_patch as preview2_patch
+
+    def fail_soft_preflight(layers, raster_resolver) -> None:
+        _decoder, renderer = preview_core._load_backend()
+        preflight_raster_layers_fail_soft(renderer, layers, raster_resolver)
+
+    def fail_soft_validator(renderer, layers, raster_resolver):
+        filtered, _missing_ids = filter_missing_visible_rasters(renderer, layers, raster_resolver)
+        return validate_exact_assets_and_filter_noops(renderer, filtered, raster_resolver)
 
     # Correct the zero-alpha native mask handling for every preview path that is
     # active in this process. Normal native masks are geometry cutouts and must
     # not be removed merely because their color alpha is zero.
-    preview_core._validate_exact_assets_and_filter_noops = validate_exact_assets_and_filter_noops
-    quality_pipeline._validate_exact_assets_and_filter_noops = validate_exact_assets_and_filter_noops
+    preview_core._validate_exact_assets_and_filter_noops = fail_soft_validator
+    quality_pipeline._validate_exact_assets_and_filter_noops = fail_soft_validator
+    tiled_quality.validate_exact_assets_and_filter_noops = fail_soft_validator
 
-    # Previously cached images may have been rendered after incorrectly dropping
-    # valid zero-alpha geometry masks. Move to a new cache namespace and clear the
-    # in-memory LRU so those black/incorrect previews can never be reused.
-    quality_pipeline.CACHE_VERSION = FIXED_CACHE_VERSION
-    quality_pipeline.clear_quality_pipeline_cache()
+    # A missing non-mask built-in raster decal must not abort an otherwise useful
+    # section preview. Missing raster masks remain fatal because cutout semantics
+    # cannot be reconstructed safely without the source texture.
+    quality_pipeline._preflight_raster_layers = fail_soft_preflight
+    tiled_quality._preflight_raster_layers = fail_soft_preflight
 
     preview2_patch.render_livery_section_preview2 = _dispatch_renderer
     preview2_patch.DEFAULT_QUALITY = DEFAULT_QUALITY
