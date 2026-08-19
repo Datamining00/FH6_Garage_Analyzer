@@ -14,6 +14,7 @@ from .models import LiveryRecord
 TEST_VERSION_LABEL = "v1.4 Quality Pipeline Test"
 SHARPEN_SETTING_KEY = "livery_preview_quality_pipeline_sharpen"
 QUALITY_SETTING_KEY = "livery_preview_quality_pipeline_quality"
+FIXED_CACHE_VERSION = "v14-quality-pipeline-r2-mask-semantics"
 
 
 def _dispatch_renderer(path, section, quality):
@@ -39,6 +40,12 @@ def apply_v1_4_quality_pipeline_patch(MainWindow) -> None:
     # not be removed merely because their color alpha is zero.
     preview_core._validate_exact_assets_and_filter_noops = validate_exact_assets_and_filter_noops
     quality_pipeline._validate_exact_assets_and_filter_noops = validate_exact_assets_and_filter_noops
+
+    # Previously cached images may have been rendered after incorrectly dropping
+    # valid zero-alpha geometry masks. Move to a new cache namespace and clear the
+    # in-memory LRU so those black/incorrect previews can never be reused.
+    quality_pipeline.CACHE_VERSION = FIXED_CACHE_VERSION
+    quality_pipeline.clear_quality_pipeline_cache()
 
     preview2_patch.render_livery_section_preview2 = _dispatch_renderer
     preview2_patch.DEFAULT_QUALITY = DEFAULT_QUALITY
