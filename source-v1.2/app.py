@@ -32,6 +32,7 @@ from fh6garage.v1_4_validation_patch import apply_v1_4_validation_patch
 from fh6garage.v1_4_native_resolution_test_patch import apply_v1_4_native_resolution_test_patch
 from fh6garage.v1_4_quality_pipeline_patch import apply_v1_4_quality_pipeline_patch
 from fh6garage.v1_4_preview_final_ui_patch import apply_v1_4_preview_final_ui_patch
+from fh6garage.livery_decoder_recovery_patch import apply_livery_decoder_recovery_patch
 
 
 def resource_root() -> Path:
@@ -50,6 +51,11 @@ def main() -> int:
 
     settings = QSettings()
     set_language(settings.value("language", DEFAULT_LANGUAGE, str))
+
+    # Install the structural C_livery recovery before any UI action can decode
+    # a livery. The normal pinned KFPS parser remains the primary decoder; only
+    # provably flat FH6 sections are replaced by verified raw-placement recovery.
+    apply_livery_decoder_recovery_patch()
 
     apply_v1_3_ui_patches(MainWindow)
     apply_v1_3_1_patches(MainWindow)
