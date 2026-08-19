@@ -21,9 +21,10 @@ class StartupPerformanceWiringTests(unittest.TestCase):
             source.index("apply_livery_raster_runtime_patch()"),
         )
 
-    def test_startup_patch_replaces_blocking_hash_with_cache_lookup(self) -> None:
+    def test_startup_patch_replaces_blocking_hash_with_profiled_cache_lookup(self) -> None:
         source = (ROOT / "fh6garage" / "livery_startup_performance_patch.py").read_text(encoding="utf-8")
-        self.assertIn("scanner._file_sha256 = lookup_cached_sha256", source)
+        self.assertIn("scanner._file_sha256 = cached_hash_only", source)
+        self.assertIn("return lookup_cached_sha256(path)", source)
         self.assertIn("QTimer.singleShot(500", source)
         self.assertIn("QThread.Priority.LowPriority", source)
 
