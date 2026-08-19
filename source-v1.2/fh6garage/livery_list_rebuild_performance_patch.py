@@ -3,20 +3,32 @@ from __future__ import annotations
 import time
 from collections import Counter
 
+from PySide6.QtCore import QTimer
+
 from .performance_metrics import record_metric
+from .i18n import tr
 
 
 _APPLIED = False
+_FIRST_BATCH = 8
+_INCREMENTAL_BATCH = 8
+_RELAYOUT_EVERY = 32
+_BATCH_BUDGET_MS = 18.0
 
 
 def apply_livery_list_rebuild_performance_patch(MainWindow) -> None:
-    """Remove quadratic and hidden-widget work from the tile-only livery view.
+    """Keep large livery libraries responsive while rebuilding the card grid.
 
-    The visible livery UI is the card grid. The legacy QTableWidget is kept only
-    as an inert compatibility object, so rebuilding hundreds of hidden rows is
-    wasted work. The original relayout also performed two O(n) searches per
-    card: annotation-key -> record lookup and duplicate-hash recomputation.
-    Both are cached once per scan instead.
+    Three independent costs are addressed here:
+
+    * The hidden legacy QTableWidget is no longer rebuilt.
+    * annotation-key lookup and duplicate-hash detection are cached instead of
+      repeating O(n) work for every card.
+    * Most importantly, hundreds of complex Qt card widgets are not constructed
+      in one blocking main-thread loop.  A small first batch is created so the
+      visible page can paint immediately, then the remaining cards are appended
+      in short event-loop batches.  Generation tokens cancel stale batches when
+      a refresh/sort starts another rebuild.
     """
     global _APPLIED
     if _APPLIED:
@@ -62,23 +74,157 @@ def apply_livery_list_rebuild_performance_patch(MainWindow) -> None:
         self._fh6_duplicate_hashes_cache = duplicates
         return duplicates
 
-    def _populate_livery_table(self) -> None:
-        """Rebuild only the visible card grid.
+    def _append_livery_card(self, record) -> None:
+        key = self._annotation_key(record)
+        annotation = self.annotations.get(key)
+        card = self._make_livery_card(record, key)
+        card.setProperty(
+            "searchText",
+            self._livery_search_text(record, annotation.note),
+        )
+        card.setProperty("annotationKey", key)
+        card.setProperty(
+            "vehicleGroupKey",
+            f"id:{record.car_id}" if record.car_id is not None else "unknown",
+        )
+        card.setProperty("vehicleGroupLabel", self._car_label(record.car_id))
+        creator_label = (record.header.creator or "").strip() or tr("creator.none")
+        card.setProperty("creatorGroupKey", f"creator:{creator_label.casefold()}")
+        card.setProperty("creatorGroupLabel", creator_label)
+        card.setProperty("checked", annotation.checked)
+        card.setProperty("triangle", annotation.triangle)
+        card.setProperty("excluded", annotation.excluded)
+        self._livery_grid_cards.append(card)
+        self._livery_card_by_key[key] = card
 
-        _populate_livery_grid() already performs the final relayout using the
-        current search/filter state. Calling _filter_livery_views() immediately
-        afterwards used to relayout the same grid a second time and also filter
-        the permanently hidden legacy table.
-        """
+    def _finish_incremental_livery_grid(self, generation: int, started: float, total: int) -> None:
+        if generation != getattr(self, "_fh6_livery_grid_generation", -1):
+            return
+        self._relayout_livery_grid(self.livery_search.text())
+        self._fh6_livery_grid_building = False
+        record_metric(
+            "livery_list_rebuild_complete",
+            (time.perf_counter() - started) * 1000.0,
+            card_count=len(self._livery_grid_cards),
+            expected_count=total,
+            incremental=True,
+        )
+
+    def _continue_livery_grid(
+        self,
+        generation: int,
+        source_result,
+        records,
+        next_index: int,
+        started: float,
+        since_layout: int,
+    ) -> None:
+        if generation != getattr(self, "_fh6_livery_grid_generation", -1):
+            return
+        if getattr(self, "result", None) is not source_result:
+            return
+
+        batch_started = time.perf_counter()
+        created = 0
+        index = next_index
+        total = len(records)
+        while index < total and created < _INCREMENTAL_BATCH:
+            _append_livery_card(self, records[index])
+            index += 1
+            created += 1
+            if (time.perf_counter() - batch_started) * 1000.0 >= _BATCH_BUDGET_MS:
+                break
+
+        since_layout += created
+        if index >= total:
+            _finish_incremental_livery_grid(self, generation, started, total)
+            return
+
+        # Re-layout only periodically. Repacking the whole grid after every tiny
+        # batch would reintroduce an O(n^2)-like UI cost. The first batch is
+        # already visible, and additional cards appear in coarse increments.
+        if since_layout >= _RELAYOUT_EVERY:
+            self._relayout_livery_grid(self.livery_search.text())
+            since_layout = 0
+
+        QTimer.singleShot(
+            0,
+            lambda: _continue_livery_grid(
+                self,
+                generation,
+                source_result,
+                records,
+                index,
+                started,
+                since_layout,
+            ),
+        )
+
+    def _populate_livery_grid(self) -> None:
+        generation = int(getattr(self, "_fh6_livery_grid_generation", 0)) + 1
+        self._fh6_livery_grid_generation = generation
+        self._fh6_livery_grid_building = True
+
+        for card in self._livery_grid_cards:
+            card.deleteLater()
+        self._livery_grid_cards.clear()
+        self._livery_card_by_key.clear()
+        self._clear_livery_grid_layout()
+
+        records = list(self._sorted_liveries())
+        source_result = getattr(self, "result", None)
+        started = time.perf_counter()
+        total = len(records)
+
+        # Construct only enough cards to populate the initial viewport. This is
+        # the only blocking portion of a large rebuild.
+        first_count = min(_FIRST_BATCH, total)
+        for index in range(first_count):
+            _append_livery_card(self, records[index])
+
+        self._relayout_livery_grid(self.livery_search.text())
+        record_metric(
+            "livery_list_first_paint",
+            (time.perf_counter() - started) * 1000.0,
+            first_batch=first_count,
+            total_count=total,
+        )
+
+        if first_count >= total:
+            self._fh6_livery_grid_building = False
+            record_metric(
+                "livery_list_rebuild_complete",
+                (time.perf_counter() - started) * 1000.0,
+                card_count=first_count,
+                expected_count=total,
+                incremental=False,
+            )
+            return
+
+        QTimer.singleShot(
+            0,
+            lambda: _continue_livery_grid(
+                self,
+                generation,
+                source_result,
+                records,
+                first_count,
+                started,
+                0,
+            ),
+        )
+
+    def _populate_livery_table(self) -> None:
+        """Start the visible card-grid rebuild and return after first paint."""
         started = time.perf_counter()
         table = getattr(self, "livery_table", None)
         if table is not None and table.rowCount():
             table.setRowCount(0)
         self._populate_livery_grid()
         record_metric(
-            "livery_list_rebuild",
+            "livery_list_rebuild_blocking",
             (time.perf_counter() - started) * 1000.0,
-            card_count=len(getattr(self, "_livery_grid_cards", ())),
+            first_paint_cards=len(getattr(self, "_livery_grid_cards", ())),
             hidden_table_rows=0,
         )
 
@@ -97,6 +243,7 @@ def apply_livery_list_rebuild_performance_patch(MainWindow) -> None:
     MainWindow._invalidate_livery_lookup_caches = _invalidate_livery_lookup_caches
     MainWindow._record_for_content_key = _record_for_content_key
     MainWindow._duplicate_livery_hashes = _duplicate_livery_hashes
+    MainWindow._populate_livery_grid = _populate_livery_grid
     MainWindow._populate_livery_table = _populate_livery_table
     MainWindow._apply_pointing_cursors = _apply_pointing_cursors
     MainWindow._scan_finished = _scan_finished
