@@ -35,6 +35,7 @@ from fh6garage.v1_4_preview_final_ui_patch import apply_v1_4_preview_final_ui_pa
 from fh6garage.livery_decoder_recovery_patch import apply_livery_decoder_recovery_patch
 from fh6garage.livery_raster_runtime_patch import apply_livery_raster_runtime_patch
 from fh6garage.livery_render_integrity_patch import apply_livery_render_integrity_patch
+from fh6garage.livery_preview_ui_polish import apply_livery_preview_ui_polish
 
 
 def resource_root() -> Path:
@@ -73,6 +74,7 @@ def main() -> int:
     # masks remain fatal. Integrity/provenance verification wraps this final path.
     apply_livery_raster_runtime_patch()
     apply_livery_render_integrity_patch()
+    apply_livery_preview_ui_polish()
 
     root = resource_root()
     icon_path = root / "icons" / "FH6_Assistant.ico"
