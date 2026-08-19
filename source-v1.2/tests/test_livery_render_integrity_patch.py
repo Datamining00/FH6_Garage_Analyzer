@@ -3,7 +3,10 @@ from __future__ import annotations
 import unittest
 
 from fh6garage.livery_analysis import LIVERY_SECTION_NAMES
-from fh6garage.livery_render_integrity_patch import _integrity_failure_for_section
+from fh6garage.livery_render_integrity_patch import (
+    _integrity_failure_for_section,
+    _raster_provenance_failure,
+)
 
 
 def _counts(**overrides):
@@ -17,6 +20,21 @@ def _sections(**sizes):
     for name, size in sizes.items():
         result[name] = tuple({"source_section": name} for _ in range(int(size)))
     return result
+
+
+class _FakeDecoder:
+    @staticmethod
+    def is_livery_logo_at(body: bytes, offset: int, end: int) -> bool:
+        if offset < 0 or offset + 4 > end:
+            return False
+        if body[offset : offset + 2] not in (b"\x00\x02", b"\x01\x02"):
+            return False
+        raw = int.from_bytes(body[offset + 2 : offset + 4], "little", signed=False)
+        return bool(raw & 0x8000) and bool(raw & 0x7FFF)
+
+
+def _raster_record(raster_id: int) -> bytes:
+    return b"\x00\x02" + (0x8000 | int(raster_id)).to_bytes(2, "little") + bytes(28)
 
 
 class LiveryRenderIntegrityTests(unittest.TestCase):
@@ -51,6 +69,35 @@ class LiveryRenderIntegrityTests(unittest.TestCase):
             "Right",
         )
         self.assertIsNone(failure)
+
+    def test_raster_provenance_accepts_matching_source_record(self) -> None:
+        body = _raster_record(50)
+        failure = _raster_provenance_failure(
+            _FakeDecoder,
+            body,
+            [{"is_raster_logo": True, "raster_id": 50, "source_offset": 0}],
+        )
+        self.assertIsNone(failure)
+
+    def test_raster_provenance_detects_decoder_id_mismatch(self) -> None:
+        body = _raster_record(50)
+        failure = _raster_provenance_failure(
+            _FakeDecoder,
+            body,
+            [{"is_raster_logo": True, "raster_id": 3005, "source_offset": 0}],
+        )
+        self.assertIsNotNone(failure)
+        self.assertIn("source bytes identify raster 50", failure[2])
+
+    def test_raster_provenance_detects_non_raster_source_bytes(self) -> None:
+        body = b"\x00\x02" + (101).to_bytes(2, "little") + bytes(28)
+        failure = _raster_provenance_failure(
+            _FakeDecoder,
+            body,
+            [{"is_raster_logo": True, "raster_id": 3005, "source_offset": 0}],
+        )
+        self.assertIsNotNone(failure)
+        self.assertIn("not a raster placement", failure[2])
 
 
 if __name__ == "__main__":
