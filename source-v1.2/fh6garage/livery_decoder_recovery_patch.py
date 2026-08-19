@@ -204,6 +204,21 @@ def _recover_flat_sections(decoder, source: Path, decoded: Any) -> Any:
     return decoded
 
 
+def _bump_render_cache_revision() -> None:
+    """Keep corrected decoder output from reusing PNGs rendered by old parsing."""
+    try:
+        from . import livery_preview_quality_pipeline as quality_pipeline
+        from . import livery_preview_tiled_quality as tiled_quality
+
+        quality_pipeline.CACHE_VERSION = "v14-quality-pipeline-r2-decoder-recovery"
+        tiled_quality.CACHE_VERSION = "v14-tiled-quality-r3-decoder-recovery"
+        quality_pipeline.clear_quality_pipeline_cache()
+        tiled_quality.clear_tiled_quality_cache()
+    except Exception:
+        # Cache revision is defensive. A failure here must not disable decoding.
+        pass
+
+
 def apply_livery_decoder_recovery_patch() -> None:
     """Patch the pinned KFPS decoder with a conservative structural recovery path."""
     from .livery_preview import _load_backend
@@ -230,3 +245,4 @@ def apply_livery_decoder_recovery_patch() -> None:
 
     decoder.decode_forza_source = decode_forza_source_with_recovery
     setattr(decoder, _PATCH_FLAG, True)
+    _bump_render_cache_revision()
