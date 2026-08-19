@@ -73,8 +73,10 @@ def lookup_cached_sha256(path: Path | str) -> str:
         return ""
     cache_path = _cache_file()
     payload = _load_state(cache_path)
-    entry = payload.get("entries", {}).get(cache_key(source))
-    if not isinstance(entry, dict):
+    with _LOCK:
+        raw_entry = payload.get("entries", {}).get(cache_key(source))
+        entry = dict(raw_entry) if isinstance(raw_entry, dict) else None
+    if entry is None:
         return ""
     if int(entry.get("size", -1)) != signature[0] or int(entry.get("mtime_ns", -1)) != signature[1]:
         return ""
@@ -102,17 +104,24 @@ def enrich_sha256(
 ) -> tuple[dict[str, str], dict[str, int]]:
     """Resolve cached hashes and compute only stale/missing entries.
 
-    The cache is written once after the batch, avoiding the hundreds of small
-    writes that would otherwise accompany a large garage scan.
+    File bodies are hashed outside the cache lock. New entries are merged under
+    the lock once per batch, so startup cache lookups remain responsive while a
+    background enrichment worker is processing a large garage.
     """
     cache_path = _cache_file()
     payload = _load_state(cache_path)
-    entries = payload.setdefault("entries", {})
+    with _LOCK:
+        entries_snapshot = {
+            key: dict(value)
+            for key, value in payload.setdefault("entries", {}).items()
+            if isinstance(value, dict)
+        }
+
     result: dict[str, str] = {}
+    updates: dict[str, dict] = {}
     cache_hits = 0
     computed = 0
     bytes_hashed = 0
-    changed = False
 
     unique_paths: list[Path] = []
     seen: set[str] = set()
@@ -131,7 +140,7 @@ def enrich_sha256(
         before = _signature(source)
         if before is None:
             continue
-        existing = entries.get(key)
+        existing = entries_snapshot.get(key)
         if isinstance(existing, dict):
             digest = str(existing.get("sha256") or "")
             if (
@@ -151,18 +160,20 @@ def enrich_sha256(
         if after is None or after != before:
             # Do not cache a digest for a file that changed while it was read.
             continue
-        entries[key] = {
+        updates[key] = {
             "size": before[0],
             "mtime_ns": before[1],
             "sha256": digest,
         }
         result[key] = digest
         computed += 1
-        changed = True
 
-    if changed:
+    if updates:
         with _LOCK:
-            _save_state(cache_path, payload)
+            live_payload = _load_state(cache_path)
+            live_entries = live_payload.setdefault("entries", {})
+            live_entries.update(updates)
+            _save_state(cache_path, live_payload)
 
     return result, {
         "paths": len(unique_paths),
