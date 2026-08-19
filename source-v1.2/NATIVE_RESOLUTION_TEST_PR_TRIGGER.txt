@@ -1,0 +1,1 @@
+This file is harmless and exists only to keep the native-resolution validation path explicit on v1.4-work.
