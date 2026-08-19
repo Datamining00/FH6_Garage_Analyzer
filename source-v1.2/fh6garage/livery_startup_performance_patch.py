@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+import threading
 import time
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QThread, QTimer, Signal, Slot
+from PySide6.QtWidgets import QApplication
 
 from .livery_hash_cache import cache_key, enrich_sha256, lookup_cached_sha256
 from .performance_metrics import record_metric
 
 
 _APPLIED = False
+_PROFILE = threading.local()
 
 
 class _HashEnrichmentWorker(QObject):
@@ -36,11 +39,22 @@ class _HashEnrichmentWorker(QObject):
             self.failed.emit(f"{type(exc).__name__}: {exc}")
 
 
+def _profile_add(name: str, duration_ms: float) -> None:
+    profile = getattr(_PROFILE, "current", None)
+    if profile is None:
+        return
+    profile[name] = float(profile.get(name, 0.0)) + float(duration_ms)
+    count_key = f"{name}_count"
+    profile[count_key] = int(profile.get(count_key, 0)) + 1
+
+
 def apply_livery_startup_performance_patch(MainWindow) -> None:
     """Remove full-file hashing from the blocking garage scan.
 
     Cached hashes are reused using only file stat metadata. Missing hashes are
     enriched later on a low-priority worker after the cards are already visible.
+    The principal synchronous scan stages are timed so performance changes can
+    be verified on the user's actual save folder.
     """
     global _APPLIED
     if _APPLIED:
@@ -49,15 +63,55 @@ def apply_livery_startup_performance_patch(MainWindow) -> None:
     from . import scanner
     from . import ui
 
-    # scan_save resolves this global at call time, so replacing it here removes
-    # the O(total C_livery bytes) startup read without changing scanner.py.
-    scanner._file_sha256 = lookup_cached_sha256
+    original_read_header = scanner.read_header_file
+    original_detect_thumbnail = scanner._detect_thumbnail
+    original_file_timestamp = scanner._file_created_timestamp
+
+    def profiled_header(*args, **kwargs):
+        started = time.perf_counter()
+        try:
+            return original_read_header(*args, **kwargs)
+        finally:
+            _profile_add("header_parse_ms", (time.perf_counter() - started) * 1000.0)
+
+    def profiled_thumbnail(*args, **kwargs):
+        started = time.perf_counter()
+        try:
+            return original_detect_thumbnail(*args, **kwargs)
+        finally:
+            _profile_add("thumbnail_lookup_ms", (time.perf_counter() - started) * 1000.0)
+
+    def profiled_timestamp(*args, **kwargs):
+        started = time.perf_counter()
+        try:
+            return original_file_timestamp(*args, **kwargs)
+        finally:
+            _profile_add("file_timestamp_ms", (time.perf_counter() - started) * 1000.0)
+
+    def cached_hash_only(path):
+        started = time.perf_counter()
+        try:
+            return lookup_cached_sha256(path)
+        finally:
+            _profile_add("hash_cache_lookup_ms", (time.perf_counter() - started) * 1000.0)
+
+    # scan_save resolves these globals at call time. Hashing now performs only a
+    # stat + persistent-cache lookup instead of opening every C_livery body.
+    scanner.read_header_file = profiled_header
+    scanner._detect_thumbnail = profiled_thumbnail
+    scanner._file_created_timestamp = profiled_timestamp
+    scanner._file_sha256 = cached_hash_only
 
     original_scan_save = ui.scan_save
 
     def timed_scan_save(path, car_db):
         started = time.perf_counter()
-        result = original_scan_save(path, car_db)
+        profile: dict[str, float | int] = {}
+        _PROFILE.current = profile
+        try:
+            result = original_scan_save(path, car_db)
+        finally:
+            _PROFILE.current = None
         duration_ms = (time.perf_counter() - started) * 1000.0
         cached_hashes = sum(1 for record in result.liveries if record.content_sha256)
         record_metric(
@@ -67,6 +121,7 @@ def apply_livery_startup_performance_patch(MainWindow) -> None:
             tuning_count=len(result.tunings),
             cached_hashes=cached_hashes,
             missing_hashes=max(0, len(result.liveries) - cached_hashes),
+            **profile,
         )
         return result
 
@@ -120,7 +175,10 @@ def apply_livery_startup_performance_patch(MainWindow) -> None:
         if not paths:
             return
 
-        thread = QThread(self)
+        # Keep the thread unparented so closing the main window cannot destroy a
+        # still-running QThread object. aboutToQuit requests interruption and the
+        # worker checks it between files.
+        thread = QThread()
         worker = _HashEnrichmentWorker(paths)
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
@@ -131,6 +189,10 @@ def apply_livery_startup_performance_patch(MainWindow) -> None:
         worker.failed.connect(worker.deleteLater)
         thread.finished.connect(thread.deleteLater)
         thread.finished.connect(lambda: _cleanup_hash_thread(self))
+        app = QApplication.instance()
+        if app is not None:
+            app.aboutToQuit.connect(thread.requestInterruption)
+            app.aboutToQuit.connect(thread.quit)
         self._fh6_hash_thread = thread
         self._fh6_hash_worker = worker
         thread.start(QThread.Priority.LowPriority)
