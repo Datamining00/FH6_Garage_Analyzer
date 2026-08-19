@@ -112,23 +112,24 @@ class V131PatchTests(unittest.TestCase):
 
 
 class V131BuildMetadataTests(unittest.TestCase):
-    def test_app_keeps_patch_order_before_projection_quality_test(self) -> None:
+    def test_app_keeps_patch_order_before_quality_pipeline(self) -> None:
         source = (ROOT / "app.py").read_text(encoding="utf-8")
-        self.assertIn('app.setApplicationVersion("1.4 Projection Quality Test")', source)
+        self.assertIn('app.setApplicationVersion("1.4 Quality Pipeline Test")', source)
         self.assertIn("apply_v1_3_ui_patches(MainWindow)", source)
         self.assertIn("apply_v1_3_1_patches(MainWindow)", source)
         self.assertIn("apply_v1_4_patches(MainWindow)", source)
         self.assertIn("apply_v1_4_preview2_patch(MainWindow)", source)
         self.assertIn("apply_v1_4_native_resolution_test_patch(MainWindow)", source)
-        self.assertIn("apply_v1_4_projection_quality_test_patch(MainWindow)", source)
+        self.assertIn("apply_v1_4_quality_pipeline_patch(MainWindow)", source)
         self.assertNotIn("apply_v1_4_web_canvas_test_patch(MainWindow)", source)
+        self.assertNotIn("apply_v1_4_projection_quality_test_patch(MainWindow)", source)
         ordered = [
             "apply_v1_3_ui_patches(MainWindow)",
             "apply_v1_3_1_patches(MainWindow)",
             "apply_v1_4_patches(MainWindow)",
             "apply_v1_4_preview2_patch(MainWindow)",
             "apply_v1_4_native_resolution_test_patch(MainWindow)",
-            "apply_v1_4_projection_quality_test_patch(MainWindow)",
+            "apply_v1_4_quality_pipeline_patch(MainWindow)",
         ]
         for first, second in zip(ordered, ordered[1:]):
             self.assertLess(source.index(first), source.index(second))
