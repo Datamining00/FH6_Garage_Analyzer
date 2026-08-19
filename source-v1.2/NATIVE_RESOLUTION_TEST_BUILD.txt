@@ -1,3 +1,0 @@
-FH6 Assistant v1.4 Native Resolution Test
-
-Validation target: retain final section projection crop at 1x, 2x, or 4x raster density instead of downsampling it back to the canonical output resolution. Default test mode is 4x.
