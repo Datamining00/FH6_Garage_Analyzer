@@ -1,0 +1,172 @@
+name: Build FH6 Assistant v1.4 Native Resolution Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - v1.4-work
+    paths:
+      - ".github/workflows/build-v1.4-native-resolution-test.yml"
+      - "source-v1.2/**"
+  pull_request:
+    branches:
+      - v1.4-work
+    paths:
+      - ".github/workflows/build-v1.4-native-resolution-test.yml"
+      - "source-v1.2/**"
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-smoke-test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout build target
+        uses: actions/checkout@v6
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Vendor pinned KFPS livery backend
+        shell: pwsh
+        run: |
+          $expected = "8965780b8966e09d2f2a17e4d0684cdd44d7437c"
+          $vendor = Join-Path $PWD "source-v1.2\vendor\kfps"
+          if (Test-Path $vendor) {
+            Remove-Item $vendor -Recurse -Force
+          }
+          New-Item -ItemType Directory -Force -Path (Split-Path $vendor) | Out-Null
+
+          git clone --filter=blob:none --no-checkout https://github.com/heyitshestia/kloudys-forza-painter-suite.git $vendor
+          git -C $vendor sparse-checkout init --no-cone
+          @'
+          /json_preview_renderer.py
+          /geometry_json.py
+          /LICENSE
+          /tools/cgroup/
+          /tools/livery/
+          /tools/fabric-editor/shape-words.json
+          /tools/fabric-editor/shape-names.json
+          /tools/fabric-editor/Resources/Vinyls/
+          '@ | Set-Content -Path (Join-Path $vendor ".git\info\sparse-checkout") -Encoding ascii
+          git -C $vendor fetch --depth 1 origin $expected
+          git -C $vendor checkout --detach FETCH_HEAD
+
+          $actual = (git -C $vendor rev-parse HEAD).Trim()
+          if ($actual -ne $expected) {
+            throw "Unexpected KFPS vendor commit: $actual"
+          }
+          $required = @(
+            "json_preview_renderer.py",
+            "geometry_json.py",
+            "LICENSE",
+            "tools\cgroup\forza_source_decoder.py",
+            "tools\cgroup\shape_identity.py",
+            "tools\livery\__init__.py",
+            "tools\livery\fh6_save_installer.py",
+            "tools\livery\package.py",
+            "tools\livery\vehicle_assets.py",
+            "tools\livery\render_contract.py",
+            "tools\livery\raster_decals.py",
+            "tools\fabric-editor\shape-words.json",
+            "tools\fabric-editor\Resources\Vinyls"
+          )
+          foreach ($relative in $required) {
+            if (-not (Test-Path (Join-Path $vendor $relative))) {
+              throw "Missing vendored preview resource: $relative"
+            }
+          }
+          Write-Host "Pinned KFPS exact livery backend: $actual"
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          Set-Location source-v1.2
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install --upgrade pyinstaller
+
+      - name: Compile and run full regression suite
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          Set-Location source-v1.2
+          python -m compileall -q .
+          python -c "from fh6garage.livery_preview import preview_backend_available; assert preview_backend_available(); print('Pinned livery decoder/renderer import: OK')"
+          python -c "from fh6garage.exact_livery_preview import _load_backend; _load_backend(); print('Pinned exact vehicle projection backend import: OK')"
+          python -c "from fh6garage.livery_preview_native_resolution_test import quality_scale; assert quality_scale('high') == 4; print('Native resolution 4x path: OK')"
+          python -m unittest discover -s tests -v
+
+      - name: Build single Windows EXE
+        shell: pwsh
+        run: |
+          Set-Location source-v1.2
+          python -m PyInstaller --clean --noconfirm .\FH6_Assistant_v1.4_native_resolution_test.spec
+
+          $exe = Join-Path $PWD "dist\FH6 Assistant v1.4 Native Resolution Test.exe"
+          if (-not (Test-Path $exe)) {
+            throw "FH6 Assistant v1.4 Native Resolution Test.exe was not created."
+          }
+          $size = (Get-Item $exe).Length
+          if ($size -lt 10000000) {
+            throw "Built EXE is unexpectedly small: $size bytes"
+          }
+          Write-Host "Built EXE bytes: $size"
+
+      - name: Verify Windows version metadata
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path "source-v1.2\dist\FH6 Assistant v1.4 Native Resolution Test.exe"
+          $version = (Get-Item $exe).VersionInfo
+          Write-Host "FileVersion: $($version.FileVersion)"
+          Write-Host "ProductVersion: $($version.ProductVersion)"
+          Write-Host "OriginalFilename: $($version.OriginalFilename)"
+          if (-not $version.FileVersion.StartsWith("1.4")) {
+            throw "Unexpected FileVersion: $($version.FileVersion)"
+          }
+          if (-not $version.ProductVersion.StartsWith("1.4")) {
+            throw "Unexpected ProductVersion: $($version.ProductVersion)"
+          }
+          if ($version.OriginalFilename -ne "FH6 Assistant v1.4 Native Resolution Test.exe") {
+            throw "Unexpected OriginalFilename: $($version.OriginalFilename)"
+          }
+
+      - name: Smoke test bundled EXE startup
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          $exe = Resolve-Path "source-v1.2\dist\FH6 Assistant v1.4 Native Resolution Test.exe"
+          $proc = Start-Process -FilePath $exe -PassThru
+          Start-Sleep -Seconds 8
+          $proc.Refresh()
+          if ($proc.HasExited) {
+            throw "Bundled EXE exited during startup smoke test with code $($proc.ExitCode)."
+          }
+          Stop-Process -Id $proc.Id -Force
+          Write-Host "Bundled EXE remained running through the 8-second startup smoke test."
+
+      - name: Prepare artifact and SHA-256
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path "source-v1.2\dist\FH6 Assistant v1.4 Native Resolution Test.exe"
+          New-Item -ItemType Directory -Force -Path artifact | Out-Null
+          Copy-Item $exe "artifact\FH6 Assistant v1.4 Native Resolution Test.exe" -Force
+          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
+          "$hash  FH6 Assistant v1.4 Native Resolution Test.exe" | Set-Content -Path "artifact\FH6 Assistant v1.4 Native Resolution Test.exe.sha256" -Encoding ascii
+          Write-Host "SHA-256: $hash"
+
+      - name: Upload Native Resolution test build
+        uses: actions/upload-artifact@v6
+        with:
+          name: FH6_Assistant_Windows_v1.4_Native_Resolution_Test
+          path: |
+            artifact/FH6 Assistant v1.4 Native Resolution Test.exe
+            artifact/FH6 Assistant v1.4 Native Resolution Test.exe.sha256
+          if-no-files-found: error
+          compression-level: 0
