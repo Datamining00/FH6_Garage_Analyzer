@@ -27,14 +27,11 @@ def _shape_record(shape_id: int, *, lead: bytes = b"\x00\x02", x: float = 0.0) -
 def _flat_section(records: list[bytes]) -> bytes:
     count = len(records)
     child_blocks = (count + 7) // 8
-    assert child_blocks <= 0xFF
-    return (
-        struct.pack("<HB", count, child_blocks)
-        + bytes(child_blocks)
-        + b"\x00\x00"
-        + b"".join(records)
-        + bytes(18)
-    )
+    if child_blocks <= 0xFF:
+        header = struct.pack("<HB", count, child_blocks)
+    else:
+        header = struct.pack("<HH", count, child_blocks)
+    return header + bytes(child_blocks) + b"\x00\x00" + b"".join(records) + bytes(18)
 
 
 def _synthetic_clivery() -> bytes:
@@ -81,6 +78,26 @@ class LiveryDecoderRecoveryTests(unittest.TestCase):
         self.assertEqual(child_end, child_start + 3 * 32)
         self.assertTrue(bool(layers[0].get("mask")))
         self.assertEqual([layer.get("source_section") for layer in layers], ["Left"] * 3)
+
+    def test_wide_three_thousand_section_recovers_all_direct_records(self) -> None:
+        decoder, _renderer = _load_backend()
+        records = [
+            _shape_record(101 + (index % 8), x=float(index % 1000))
+            for index in range(3000)
+        ]
+        body = bytes(137) + _flat_section(records) + bytes(41)
+        candidates = _flat_group_candidates(body, 3000)
+        self.assertEqual(len(candidates), 1)
+        group_pos, child_start, header_size = candidates[0]
+        self.assertEqual(group_pos, 137)
+        self.assertEqual(header_size, 4)
+        self.assertEqual(child_start - group_pos, 4 + 375 + 2)
+        recovered = _decode_direct_children(decoder, body, child_start, 3000, "Left")
+        self.assertIsNotNone(recovered)
+        layers, _warnings, child_end = recovered
+        self.assertEqual(len(layers), 3000)
+        self.assertEqual(child_end, child_start + 3000 * 32)
+        self.assertTrue(all(layer.get("source_section") == "Left" for layer in layers))
 
     def test_decoder_patch_structurally_verifies_repeated_flat_sections(self) -> None:
         apply_livery_decoder_recovery_patch()
