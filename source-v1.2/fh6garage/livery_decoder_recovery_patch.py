@@ -39,6 +39,9 @@ def _flat_group_candidates(body: bytes, target: int) -> list[tuple[int, int, int
             return
         results.append((pos, child_start, header_size))
 
+    # FH6 uses the compact one-byte child-block field whenever it fits. Do not
+    # reinterpret that same byte sequence as a wide header: small all-zero flat
+    # groups can otherwise produce two candidates at the exact same offset.
     if child_blocks <= 0xFF:
         pattern = target.to_bytes(2, "little") + bytes((child_blocks,))
         start = 0
@@ -48,15 +51,15 @@ def _flat_group_candidates(body: bytes, target: int) -> list[tuple[int, int, int
                 break
             add_candidate(pos, 3)
             start = pos + 1
-
-    pattern = target.to_bytes(2, "little") + child_blocks.to_bytes(2, "little")
-    start = 0
-    while True:
-        pos = body.find(pattern, start)
-        if pos < 0:
-            break
-        add_candidate(pos, 4)
-        start = pos + 1
+    else:
+        pattern = target.to_bytes(2, "little") + child_blocks.to_bytes(2, "little")
+        start = 0
+        while True:
+            pos = body.find(pattern, start)
+            if pos < 0:
+                break
+            add_candidate(pos, 4)
+            start = pos + 1
 
     return sorted(set(results))
 
