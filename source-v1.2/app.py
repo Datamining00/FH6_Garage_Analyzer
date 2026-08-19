@@ -34,9 +34,11 @@ from fh6garage.v1_4_quality_pipeline_patch import apply_v1_4_quality_pipeline_pa
 from fh6garage.v1_4_preview_final_ui_patch import apply_v1_4_preview_final_ui_patch
 from fh6garage.livery_decoder_recovery_patch import apply_livery_decoder_recovery_patch
 from fh6garage.livery_tiled_runtime_patch import apply_livery_tiled_runtime_patch
+from fh6garage.livery_render_acceleration_patch import apply_livery_render_acceleration_patch
 from fh6garage.livery_raster_runtime_patch import apply_livery_raster_runtime_patch
 from fh6garage.livery_render_integrity_patch import apply_livery_render_integrity_patch
 from fh6garage.livery_preview_ui_polish import apply_livery_preview_ui_polish
+from fh6garage.livery_startup_performance_patch import apply_livery_startup_performance_patch
 
 
 def resource_root() -> Path:
@@ -70,10 +72,18 @@ def main() -> int:
     apply_v1_4_quality_pipeline_patch(MainWindow)
     apply_v1_4_preview_final_ui_patch(MainWindow)
 
+    # Remove full-file SHA-256 reads from the blocking garage scan. Cached
+    # digests are reused immediately and missing hashes are enriched after the
+    # cards have appeared.
+    apply_livery_startup_performance_patch(MainWindow)
+
     # Keep the native shape renderer separate from the vehicle projection
-    # contract in tiled 8x/16x execution, then apply the same raster policy to
-    # every scale. Integrity/provenance verification wraps this final path.
+    # contract in tiled 8x/16x execution. Then add conservative geometry culling
+    # and memory-aware CPU tile parallelism without changing ordered mask
+    # composition. The same raster policy and integrity verification wrap the
+    # final path.
     apply_livery_tiled_runtime_patch()
+    apply_livery_render_acceleration_patch()
     apply_livery_raster_runtime_patch()
     apply_livery_render_integrity_patch()
     apply_livery_preview_ui_polish()
