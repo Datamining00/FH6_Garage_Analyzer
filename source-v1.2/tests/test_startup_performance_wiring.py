@@ -21,17 +21,24 @@ class StartupPerformanceWiringTests(unittest.TestCase):
             source.index("apply_livery_raster_runtime_patch()"),
         )
 
-    def test_startup_patch_replaces_blocking_hash_with_profiled_cache_lookup(self) -> None:
+    def test_startup_patch_uses_cache_and_never_auto_hashes_after_scan(self) -> None:
         source = (ROOT / "fh6garage" / "livery_startup_performance_patch.py").read_text(encoding="utf-8")
         self.assertIn("scanner._file_sha256 = cached_hash_only", source)
         self.assertIn("return lookup_cached_sha256(path)", source)
-        self.assertIn("QTimer.singleShot(500", source)
+        self.assertNotIn("QTimer.singleShot(500", source)
+        self.assertIn("_fh6_request_livery_hash_enrichment", source)
         self.assertIn("QThread.Priority.LowPriority", source)
+        self.assertIn("_fh6_livery_grid_building", source)
+        self.assertIn("_fh6_thumbnail_queue_busy", source)
 
-    def test_existing_thumbnail_path_is_already_viewport_lazy(self) -> None:
-        source = (ROOT / "fh6garage" / "ui.py").read_text(encoding="utf-8")
-        self.assertIn("_refresh_visible_livery_thumbnails", source)
-        self.assertIn("_unload_livery_card_thumbnail", source)
+    def test_thumbnail_decode_is_viewport_lazy_and_queued(self) -> None:
+        ui_source = (ROOT / "fh6garage" / "ui.py").read_text(encoding="utf-8")
+        patch_source = (ROOT / "fh6garage" / "livery_list_rebuild_performance_patch.py").read_text(encoding="utf-8")
+        self.assertIn("_refresh_visible_livery_thumbnails", ui_source)
+        self.assertIn("_unload_livery_card_thumbnail", ui_source)
+        self.assertIn("_queue_thumbnail_load", patch_source)
+        self.assertIn("_drain_thumbnail_queue", patch_source)
+        self.assertIn("_THUMBNAIL_BATCH = 1", patch_source)
 
 
 if __name__ == "__main__":
