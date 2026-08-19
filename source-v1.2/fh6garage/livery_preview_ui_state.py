@@ -11,6 +11,7 @@ SECTION_DISPLAY_ROTATION_DEGREES = {
     "RightWindow": 180,
     "FrontWindshield": -90,
     "BackWindshield": 90,
+    "Spoiler": -90,
 }
 
 
