@@ -144,6 +144,10 @@ def apply_livery_startup_performance_patch(MainWindow) -> None:
             if digest:
                 record.content_sha256 = digest
 
+        # Hash enrichment changes duplicate membership. Drop the cached set so
+        # the next duplicate-aware relayout sees the newly available digests.
+        self._fh6_duplicate_hashes_cache = None
+
         stats = dict(payload.get("stats") or {})
         record_metric(
             "background_livery_hashes",
