@@ -38,8 +38,6 @@ from fh6garage.livery_render_acceleration_patch import apply_livery_render_accel
 from fh6garage.livery_raster_runtime_patch import apply_livery_raster_runtime_patch
 from fh6garage.livery_render_integrity_patch import apply_livery_render_integrity_patch
 from fh6garage.livery_preview_ui_polish import apply_livery_preview_ui_polish
-from fh6garage.livery_startup_performance_patch import apply_livery_startup_performance_patch
-from fh6garage.livery_list_rebuild_performance_patch import apply_livery_list_rebuild_performance_patch
 
 
 def resource_root() -> Path:
@@ -73,21 +71,9 @@ def main() -> int:
     apply_v1_4_quality_pipeline_patch(MainWindow)
     apply_v1_4_preview_final_ui_patch(MainWindow)
 
-    # Remove full-file SHA-256 reads from the blocking garage scan. Cached
-    # digests are reused immediately and missing hashes are enriched after the
-    # cards have appeared.
-    apply_livery_startup_performance_patch(MainWindow)
-
-    # The app is tile-only, so do not rebuild the hidden legacy livery table.
-    # Also cache annotation-key lookups and duplicate hashes once per scan so
-    # livery-card relayout no longer grows quadratically with garage size.
-    apply_livery_list_rebuild_performance_patch(MainWindow)
-
-    # Keep the native shape renderer separate from the vehicle projection
-    # contract in tiled 8x/16x execution. Then add conservative geometry culling
-    # and memory-aware CPU tile parallelism without changing ordered mask
-    # composition. The same raster policy and integrity verification wrap the
-    # final path.
+    # Keep the garage scan, card rebuild, and thumbnail startup path identical
+    # to the stable Sequential Fixes Test baseline. Rendering acceleration is
+    # intentionally isolated from startup/list loading.
     apply_livery_tiled_runtime_patch()
     apply_livery_render_acceleration_patch()
     apply_livery_raster_runtime_patch()
