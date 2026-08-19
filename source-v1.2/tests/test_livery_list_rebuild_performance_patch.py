@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class _Record:
     key: str
     content_sha256: str = ""
+    livery_path: object | None = None
 
 
 class LiveryListRebuildPerformancePatchTests(unittest.TestCase):
@@ -24,18 +25,27 @@ class LiveryListRebuildPerformancePatchTests(unittest.TestCase):
             source.index("apply_livery_list_rebuild_performance_patch(MainWindow)"),
         )
 
-    def test_large_grid_is_built_incrementally(self) -> None:
+    def test_large_grid_is_built_incrementally_and_yields_to_ui(self) -> None:
         source = (
             ROOT / "fh6garage" / "livery_list_rebuild_performance_patch.py"
         ).read_text(encoding="utf-8")
         self.assertIn("_FIRST_BATCH = 8", source)
         self.assertIn("_INCREMENTAL_BATCH = 8", source)
-        self.assertIn("QTimer.singleShot", source)
+        self.assertIn("_INCREMENTAL_DELAY_MS = 4", source)
         self.assertIn("_fh6_livery_grid_generation", source)
         self.assertIn("_BATCH_BUDGET_MS", source)
         self.assertIn('"livery_list_first_paint"', source)
         self.assertIn('"livery_list_rebuild_complete"', source)
         self.assertNotIn("_populate_saved_content_table(\"livery\")", source)
+
+    def test_thumbnail_decode_is_one_at_a_time(self) -> None:
+        source = (
+            ROOT / "fh6garage" / "livery_list_rebuild_performance_patch.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("_THUMBNAIL_BATCH = 1", source)
+        self.assertIn("_queue_thumbnail_load", source)
+        self.assertIn("_drain_thumbnail_queue", source)
+        self.assertIn("thumbnail_decode_batch", source)
 
     def test_lookup_and_duplicate_caches_are_not_quadratic(self) -> None:
         import fh6garage.livery_list_rebuild_performance_patch as patch
@@ -61,6 +71,12 @@ class LiveryListRebuildPerformancePatchTests(unittest.TestCase):
                 self.cursor_calls += 1
 
             def _populate_livery_grid(self):
+                pass
+
+            def _load_livery_card_thumbnail(self, card):
+                pass
+
+            def _unload_livery_card_thumbnail(self, card):
                 pass
 
             def _saved_content_records(self, content_type):
