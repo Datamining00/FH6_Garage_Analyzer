@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 
-_PATCH_FLAG = "_fh6assistant_flat_section_recovery_v1"
+_PATCH_FLAG = "_fh6assistant_flat_section_recovery_v2"
 
 
 def _u16(data: bytes, offset: int) -> int:
@@ -14,11 +14,11 @@ def _u16(data: bytes, offset: int) -> int:
 def _flat_group_candidates(body: bytes, target: int) -> list[tuple[int, int, int]]:
     """Return structurally strict flat markerless-group candidates.
 
-    The recovery path intentionally accepts only the safest C_livery layout:
-    a markerless root group whose declared child count equals the section's
-    placement count, whose child bitmap/control bytes are empty, and whose
-    children are direct 32-byte shape/raster records. Complex/nested sections
-    stay on the normal KFPS decoder path.
+    The recovery path accepts a markerless root group whose declared child count
+    equals the section placement count and whose child bitmap/control bytes are
+    empty. Its direct children may use either the normal 32-byte 00/01 02 livery
+    placement form or the valid 31-byte markerless 02 shape form used by FH6.
+    Complex/nested sections remain on the normal KFPS decoder path.
     """
     target = int(target)
     if target <= 0:
@@ -65,36 +65,51 @@ def _flat_group_candidates(body: bytes, target: int) -> list[tuple[int, int, int
 
 
 def _decode_direct_children(decoder, body: bytes, child_start: int, target: int, section: str):
-    """Decode one proven-flat section without heuristic group walking."""
+    """Decode one proven-flat section without heuristic group walking.
+
+    FH6 has two structurally valid direct vector placement encodings here:
+    32-byte 00/01 02 records and 31-byte markerless 02 records. The latter are
+    important because a decoder that reserves ``target * 32`` bytes can stop a
+    few bytes early and report deficits such as 3000 -> 2997.
+    """
     end = len(body)
     pos = int(child_start)
     root = decoder.GroupNode(source="livery_section_recovered", offset=pos, section=section)
 
     for _index in range(int(target)):
-        if pos + 32 > end:
-            return None
-        lead = body[pos : pos + 2]
-        # Flat recovery is deliberately strict: direct FH6 livery placements
-        # must use the full 32-byte 00/01 02 record form. Markerless 31-byte
-        # shapes and nested/group records remain the normal decoder's job.
-        if lead not in (b"\x00\x02", b"\x01\x02"):
+        if pos >= end:
             return None
 
-        if lead == b"\x01\x02" and root.items:
-            previous = root.items[-1]
-            if isinstance(previous, decoder.ShapeNode):
-                previous.mask = True
-                previous.flags |= 0x40
+        full_record = body[pos : pos + 2] in (b"\x00\x02", b"\x01\x02")
+        markerless_record = body[pos : pos + 1] == b"\x02"
+        if full_record:
+            if pos + 32 > end:
+                return None
+            lead = body[pos : pos + 2]
+            if lead == b"\x01\x02" and root.items:
+                previous = root.items[-1]
+                if isinstance(previous, decoder.ShapeNode):
+                    previous.mask = True
+                    previous.flags |= 0x40
 
-        flags = 0x01 if lead == b"\x01\x02" else 0
-        if decoder.is_livery_logo_at(body, pos, end):
-            node = decoder.decode_livery_logo_at(body, pos, is_mask=False, flags=flags)
-        elif decoder.is_valid_shape_at(body, pos, end):
-            node = decoder.decode_shape_at(body, pos, is_mask=False, flags=flags)
+            flags = 0x01 if lead == b"\x01\x02" else 0
+            if decoder.is_livery_logo_at(body, pos, end):
+                node = decoder.decode_livery_logo_at(body, pos, is_mask=False, flags=flags)
+            elif decoder.is_valid_shape_at(body, pos, end):
+                node = decoder.decode_shape_at(body, pos, is_mask=False, flags=flags)
+            else:
+                return None
+            record_size = 32
+        elif markerless_record:
+            if pos + 31 > end or not decoder.is_valid_shape_at(body, pos, end):
+                return None
+            node = decoder.decode_shape_at(body, pos, is_mask=False, flags=0)
+            record_size = 31
         else:
             return None
+
         root.items.append(node)
-        pos += 32
+        pos += record_size
 
     raw_layers = decoder.flatten_tree(root, layer_start=0, section=section)
     if len(raw_layers) != int(target):
@@ -128,13 +143,22 @@ def _recover_flat_sections(decoder, source: Path, decoded: Any) -> Any:
     recovered: dict[str, list[dict[str, Any]]] = {}
     recovery_notes: list[str] = []
     identity_notes: list[str] = []
-    minimum_position = -1
+    minimum_group_position = 0
+    populated_remnant = int(getattr(decoder, "LIVERY_POPULATED_REMNANT_SIZE", 18))
 
     for section, target_value in zip(section_names, counts):
         target = int(target_value)
         if target <= 0:
             continue
-        candidates = [item for item in _flat_group_candidates(body, target) if item[0] > minimum_position]
+
+        # A recovered section is authoritative only when its root starts after
+        # the complete payload of the previously recovered section. The older
+        # recovery compared only against the previous group header position,
+        # which was too weak for adjacent sections with identical counts.
+        candidates = [
+            item for item in _flat_group_candidates(body, target)
+            if item[0] >= minimum_group_position
+        ]
         accepted = None
         for group_pos, child_start, _header_size in candidates:
             attempt = _decode_direct_children(decoder, body, child_start, target, section)
@@ -147,7 +171,7 @@ def _recover_flat_sections(decoder, source: Path, decoded: Any) -> Any:
             continue
 
         group_pos, child_end, json_layers, warnings = accepted
-        minimum_position = group_pos
+        minimum_group_position = child_end + populated_remnant
         standard_count = len(by_section.get(section, ()))
         recovered[section] = list(json_layers)
         identity_notes.extend(warnings)
@@ -156,7 +180,7 @@ def _recover_flat_sections(decoder, source: Path, decoded: Any) -> Any:
                 f"{section}: decoder recovery restored {target:,}/{target:,} placements "
                 f"from verified flat section bytes (standard decoder: {standard_count:,})."
             )
-        elif standard_count == target:
+        else:
             # Count equality alone does not prove the original parser started at
             # the correct section. Replacing a structurally verified flat section
             # also protects following sections after an earlier boundary error.
@@ -196,7 +220,7 @@ def _recover_flat_sections(decoder, source: Path, decoded: Any) -> Any:
         section: {
             "declared": int(counts[section_names.index(section)]),
             "decoded": len(recovered[section]),
-            "strategy": "verified-flat-root-direct-children",
+            "strategy": "verified-flat-root-mixed-direct-children",
         }
         for section in recovered
     }
@@ -210,8 +234,8 @@ def _bump_render_cache_revision() -> None:
         from . import livery_preview_quality_pipeline as quality_pipeline
         from . import livery_preview_tiled_quality as tiled_quality
 
-        quality_pipeline.CACHE_VERSION = "v14-quality-pipeline-r2-decoder-recovery"
-        tiled_quality.CACHE_VERSION = "v14-tiled-quality-r3-decoder-recovery"
+        quality_pipeline.CACHE_VERSION = "v14-quality-pipeline-r3-decoder-recovery"
+        tiled_quality.CACHE_VERSION = "v14-tiled-quality-r5-decoder-recovery"
         quality_pipeline.clear_quality_pipeline_cache()
         tiled_quality.clear_tiled_quality_cache()
     except Exception:
