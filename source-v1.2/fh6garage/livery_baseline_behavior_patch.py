@@ -12,6 +12,7 @@ _FILTER = None
 _DECODER_FLAG = "_fh6assistant_source_order_normalized_v1"
 _ALLOWED_SCALES = (1, 2, 4, 8, 16)
 _SCALE_KEY = "livery_preview_quality_scale_v14"
+INACCURATE_WARNING_PREFIX = "[FH6_INACCURATE_PREVIEW]"
 
 
 def _offset_value(layer: dict[str, Any]) -> int | None:
@@ -26,13 +27,13 @@ def _offset_value(layer: dict[str, Any]) -> int | None:
 
 
 def normalize_decoded_layer_order(decoded: Any, section_names) -> tuple[Any, tuple[str, ...]]:
-    """Use physical C_livery placement order as the section z-order.
+    """Use physical C_livery placement order as section z-order when provable.
 
     Group transforms are already flattened into each placement's final transform
-    by the decoder.  Reordering only the finished placement records by their
-    source offsets therefore preserves geometry while preventing tree-walk order
-    from changing the serialized layer stack.  If offsets are incomplete or
-    ambiguous, the decoder's original order is retained rather than guessed.
+    by the decoder. Reordering only finished placement records by their source
+    offsets preserves geometry while preventing tree-walk order from changing
+    the serialized layer stack. If offsets are incomplete or ambiguous, retain
+    the decoder's original order rather than guessing.
     """
     layers = [layer for layer in list(getattr(decoded, "layers", ()) or ()) if isinstance(layer, dict)]
     if not layers:
@@ -84,25 +85,26 @@ def normalize_decoded_layer_order(decoded: Any, section_names) -> tuple[Any, tup
     return decoded, tuple(changed)
 
 
-def _section_state(expected_counts, decoded_sections, section: str, section_names):
-    """Return exact/partial/fatal status for one requested section."""
+def _section_issues(expected_counts, decoded_sections, section: str, section_names) -> tuple[tuple[str, int, int], ...]:
+    """Return count mismatches that can affect the requested section.
+
+    Mismatches are diagnostics only. They no longer block rendering: if the
+    requested section has decoded layers, the renderer is allowed to show them
+    and the UI marks the result as potentially inaccurate.
+    """
     names = tuple(section_names)
     try:
         requested_index = names.index(str(section))
     except ValueError:
-        return ("fatal", str(section), 0, 0, True)
+        return ((str(section), 0, 0),)
 
-    for index, name in enumerate(names[: requested_index + 1]):
+    issues: list[tuple[str, int, int]] = []
+    for name in names[: requested_index + 1]:
         expected = int(expected_counts.get(name, 0))
         actual = len(decoded_sections.get(name, ()))
-        if expected == actual:
-            continue
-        if index < requested_index:
-            return ("fatal", name, expected, actual, True)
-        if expected > 0 and 0 < actual < expected:
-            return ("partial", name, expected, actual, False)
-        return ("fatal", name, expected, actual, False)
-    return ("exact", str(section), int(expected_counts.get(section, 0)), len(decoded_sections.get(section, ())), False)
+        if expected != actual:
+            issues.append((name, expected, actual))
+    return tuple(issues)
 
 
 def _install_decoder_order_normalization() -> None:
@@ -125,66 +127,61 @@ def _install_decoder_order_normalization() -> None:
     setattr(decoder, _DECODER_FLAG, True)
 
 
-def _install_partial_render_policy() -> None:
+def _install_warning_only_integrity_policy() -> None:
     from . import livery_render_integrity_patch as integrity
     from . import livery_preview_tiled_quality as tiled
     from . import v1_4_preview_final_ui_patch as final_ui
     from .livery_analysis import LIVERY_SECTION_NAMES, analyze_livery_file
     from .livery_preview import LiveryPreviewError, decode_livery_preview
 
-    def verify_partial_friendly(path, section: str) -> None:
-        analysis = analyze_livery_file(path)
-        decoded = decode_livery_preview(path)
-        state, failed_section, expected, actual, cascaded = _section_state(
-            analysis.section_counts,
-            decoded.sections,
-            section,
-            LIVERY_SECTION_NAMES,
-        )
-        if state == "fatal":
-            if cascaded:
-                raise LiveryPreviewError(
-                    f"정확 미리보기 중단: 앞선 {failed_section} 영역이 C_livery 기록 "
-                    f"{expected:,}개 중 {actual:,}개만 구조적으로 해석되어 "
-                    f"이후 {section} 영역의 시작 경계를 신뢰할 수 없습니다."
-                )
-            raise LiveryPreviewError(
-                f"미리보기 중단: {failed_section} 영역의 C_livery 기록은 {expected:,}개지만 "
-                f"{actual:,}개가 해석되었습니다. 안전한 부분 렌더 조건에 해당하지 않습니다."
-            )
+    def verify_warning_only(path, section: str) -> None:
+        # Deliberately do not fail closed on section count/boundary mismatches.
+        # The underlying renderer will still fail naturally when there are no
+        # usable decoded layers or required rendering assets are unavailable.
+        return None
 
-        # A shortage in the requested section itself is allowed. Raster claims
-        # for the placements that did decode must still agree with source bytes.
-        integrity._verify_raster_provenance(path, section, decoded.sections.get(section, ()))
-
-    integrity.verify_section_integrity = verify_partial_friendly
+    integrity.verify_section_integrity = verify_warning_only
 
     original_scaled = tiled.render_livery_section_scaled
 
-    def render_scaled_partial(path, section: str, scale: int = 4):
+    def render_scaled_warning_only(path, section: str, scale: int = 4):
         analysis = analyze_livery_file(path)
         decoded = decode_livery_preview(path)
-        state, _name, expected, actual, _cascaded = _section_state(
+        issues = _section_issues(
             analysis.section_counts,
             decoded.sections,
             section,
             LIVERY_SECTION_NAMES,
         )
+        diagnostic_details: list[str] = []
+        for name, expected, actual in issues:
+            diagnostic_details.append(f"{name} {expected:,}->{actual:,}")
+
+        # Raster provenance is also an integrity diagnostic. Do not stop the
+        # preview merely because the decoder's claimed source position cannot be
+        # proven; record the uncertainty and let the actual renderer decide
+        # whether available assets are sufficient to produce an image.
+        try:
+            integrity._verify_raster_provenance(path, section, decoded.sections.get(section, ()))
+        except LiveryPreviewError as exc:
+            diagnostic_details.append(f"raster provenance: {exc}")
+
         result = original_scaled(path, section, scale)
-        if state == "partial":
+        actual_count = len(decoded.sections.get(section, ()))
+        if diagnostic_details:
             warning = (
-                f"{section}: 부분 미리보기 — C_livery 기록 {expected:,}개 중 "
-                f"구조적으로 해석된 {actual:,}개만 렌더링했습니다."
+                f"{INACCURATE_WARNING_PREFIX} 구조 해석 경고가 있어 정확하지 않을 수 있습니다. "
+                + "; ".join(diagnostic_details)
             )
             return replace(
                 result,
-                placement_count=int(actual),
+                placement_count=int(actual_count),
                 warnings=tuple(dict.fromkeys([*result.warnings, warning])),
             )
         return result
 
-    tiled.render_livery_section_scaled = render_scaled_partial
-    final_ui.render_livery_section_scaled = render_scaled_partial
+    tiled.render_livery_section_scaled = render_scaled_warning_only
+    final_ui.render_livery_section_scaled = render_scaled_warning_only
 
 
 def _saved_scale() -> int:
@@ -233,8 +230,6 @@ def _patch_scale_combo(dialog: QDialog) -> None:
 class _ScalePersistenceFilter(QObject):
     def eventFilter(self, watched, event):
         if event.type() == QEvent.Type.Show and isinstance(watched, QDialog):
-            # The existing UI-polish filter migrates the old quick/quality
-            # controls on the same Show event. Apply persistence just after it.
             QTimer.singleShot(20, lambda dialog=watched: _patch_scale_combo(dialog))
         return False
 
@@ -267,12 +262,12 @@ def _clear_preview_caches() -> None:
 
 
 def apply_livery_baseline_behavior_patch() -> None:
-    """Apply partial rendering, persistent scale and source-order z stacking."""
+    """Apply warning-only integrity, persistent scale and source-order stacking."""
     global _APPLIED
     if _APPLIED:
         return
     _install_decoder_order_normalization()
-    _install_partial_render_policy()
+    _install_warning_only_integrity_policy()
     _install_scale_persistence()
     _clear_preview_caches()
     _APPLIED = True
