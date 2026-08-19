@@ -49,12 +49,13 @@ def _profile_add(name: str, duration_ms: float) -> None:
 
 
 def apply_livery_startup_performance_patch(MainWindow) -> None:
-    """Remove full-file hashing from the blocking garage scan.
+    """Keep save scanning light and make expensive content hashing on-demand.
 
-    Cached hashes are reused using only file stat metadata. Missing hashes are
-    enriched later on a low-priority worker after the cards are already visible.
-    The principal synchronous scan stages are timed so performance changes can
-    be verified on the user's actual save folder.
+    Startup only reuses hashes that can be validated by path, size and mtime.
+    Missing C_livery hashes are deliberately *not* computed automatically after
+    scan completion.  On slower disks that old behaviour competed with WebP
+    thumbnail reads and incremental card creation, making both appear frozen.
+    Full hashing is now requested only by the duplicate-livery feature.
     """
     global _APPLIED
     if _APPLIED:
@@ -132,6 +133,7 @@ def apply_livery_startup_performance_patch(MainWindow) -> None:
     def _cleanup_hash_thread(self) -> None:
         self._fh6_hash_worker = None
         self._fh6_hash_thread = None
+        self._fh6_hash_request_pending = False
 
     def _refresh_after_hashes(self, source_result, payload) -> None:
         if self.result is not source_result:
@@ -155,9 +157,6 @@ def apply_livery_startup_performance_patch(MainWindow) -> None:
             **stats,
         )
 
-        # Duplicate filtering is the only user-facing feature that requires the
-        # hashes. Refresh it only when that filter is active so enrichment does
-        # not cause an unnecessary full card relayout.
         try:
             duplicate_active = 9 in self.livery_check_filter.selected_modes()
         except Exception:
@@ -168,6 +167,7 @@ def apply_livery_startup_performance_patch(MainWindow) -> None:
 
     def _start_hash_enrichment(self, source_result) -> None:
         if self.result is not source_result:
+            self._fh6_hash_request_pending = False
             return
         if getattr(self, "_fh6_hash_thread", None) is not None:
             return
@@ -177,11 +177,9 @@ def apply_livery_startup_performance_patch(MainWindow) -> None:
             if record.livery_path is not None and not record.content_sha256
         ]
         if not paths:
+            self._fh6_hash_request_pending = False
             return
 
-        # Keep the thread unparented so closing the main window cannot destroy a
-        # still-running QThread object. aboutToQuit requests interruption and the
-        # worker checks it between files.
         thread = QThread()
         worker = _HashEnrichmentWorker(paths)
         worker.moveToThread(thread)
@@ -201,6 +199,33 @@ def apply_livery_startup_performance_patch(MainWindow) -> None:
         self._fh6_hash_worker = worker
         thread.start(QThread.Priority.LowPriority)
 
+    def _request_hash_enrichment(self, source_result=None) -> None:
+        """Start hashing only when a feature explicitly asks for it.
+
+        If the incremental livery grid or thumbnail queue is still busy, defer
+        the request rather than creating disk contention during first paint.
+        """
+        result = source_result if source_result is not None else getattr(self, "result", None)
+        if result is None or getattr(self, "result", None) is not result:
+            return
+        if getattr(self, "_fh6_hash_thread", None) is not None:
+            return
+        if getattr(self, "_fh6_hash_request_pending", False):
+            return
+        self._fh6_hash_request_pending = True
+
+        def try_start() -> None:
+            if getattr(self, "result", None) is not result:
+                self._fh6_hash_request_pending = False
+                return
+            if getattr(self, "_fh6_livery_grid_building", False) or getattr(self, "_fh6_thumbnail_queue_busy", False):
+                QTimer.singleShot(250, try_start)
+                return
+            self._fh6_hash_request_pending = False
+            _start_hash_enrichment(self, result)
+
+        QTimer.singleShot(0, try_start)
+
     def patched_scan_finished(self, result) -> None:
         started = time.perf_counter()
         original_scan_finished(self, result)
@@ -210,10 +235,10 @@ def apply_livery_startup_performance_patch(MainWindow) -> None:
             livery_count=len(result.liveries),
             tuning_count=len(result.tunings),
         )
-        # Let the first visible cards and their already-lazy thumbnails settle
-        # before background hashing begins.
-        QTimer.singleShot(500, lambda source_result=result: _start_hash_enrichment(self, source_result))
+        # No automatic full-file hashing here. The duplicate filter requests it
+        # on demand so startup card and thumbnail I/O remains uncontended.
 
     MainWindow._scan_finished = patched_scan_finished
+    MainWindow._fh6_request_livery_hash_enrichment = _request_hash_enrichment
     MainWindow._fh6_startup_performance_patch_applied = True
     _APPLIED = True
