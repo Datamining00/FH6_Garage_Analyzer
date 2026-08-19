@@ -7,6 +7,7 @@ from pathlib import Path
 
 from fh6garage.livery_decoder_recovery_patch import (
     _decode_direct_children,
+    _decode_exact_target_stream,
     _flat_group_candidates,
     apply_livery_decoder_recovery_patch,
 )
@@ -24,7 +25,6 @@ def _shape_record(shape_id: int, *, lead: bytes = b"\x00\x02", x: float = 0.0) -
 
 
 def _markerless_shape_record(shape_id: int, *, x: float = 0.0) -> bytes:
-    # Valid 31-byte FH6 placement form: 02 + u16 id + six floats + BGRA.
     return (
         b"\x02"
         + struct.pack("<H", int(shape_id))
@@ -112,7 +112,23 @@ class LiveryDecoderRecoveryTests(unittest.TestCase):
         self.assertEqual(child_end, child_start + 3000 * 32 - len(markerless))
         self.assertTrue(all(layer.get("source_section") == "Left" for layer in layers))
 
-    def test_decoder_patch_structurally_verifies_repeated_flat_sections(self) -> None:
+    def test_exact_target_stream_consumes_all_sections_without_tail_guess(self) -> None:
+        decoder, _renderer = _load_backend()
+        payload = _synthetic_clivery()
+        body, counts, _meta = decoder.extract_livery_payload(payload)
+        recovered = _decode_exact_target_stream(decoder, body, counts)
+        self.assertIsNotNone(recovered)
+        layers, _warnings, ranges = recovered
+        self.assertEqual(len(layers), 6)
+        self.assertEqual(ranges["Left"]["decoded"], 3)
+        self.assertEqual(ranges["Right"]["decoded"], 3)
+        self.assertEqual(ranges["Right"]["end"], len(body) - 23 * 6)
+
+        # The safety contract is whole-body structural agreement. Any extra byte
+        # invalidates this recovery path rather than silently shifting sections.
+        self.assertIsNone(_decode_exact_target_stream(decoder, body + b"\x00", counts))
+
+    def test_decoder_patch_prefers_verified_exact_target_stream(self) -> None:
         apply_livery_decoder_recovery_patch()
         decoder, _renderer = _load_backend()
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -127,13 +143,11 @@ class LiveryDecoderRecoveryTests(unittest.TestCase):
                 by_section[section].append(layer)
         self.assertEqual(len(by_section["Left"]), 3)
         self.assertEqual(len(by_section["Right"]), 3)
-        recovered = decoded.report.get("fh6assistant_recovered_sections") or {}
-        self.assertEqual(recovered["Left"]["decoded"], 3)
-        self.assertEqual(recovered["Right"]["decoded"], 3)
-        self.assertEqual(
-            recovered["Right"]["strategy"],
-            "verified-flat-root-mixed-direct-children",
-        )
+        stream = decoded.report.get("fh6assistant_structural_stream_recovery") or {}
+        self.assertEqual(stream.get("strategy"), "exact-target-sequential-walk")
+        self.assertEqual(stream.get("consumed"), stream.get("body_size"))
+        self.assertEqual(stream["sections"]["Left"]["decoded"], 3)
+        self.assertEqual(stream["sections"]["Right"]["decoded"], 3)
 
 
 if __name__ == "__main__":
