@@ -33,6 +33,7 @@ from fh6garage.v1_4_native_resolution_test_patch import apply_v1_4_native_resolu
 from fh6garage.v1_4_quality_pipeline_patch import apply_v1_4_quality_pipeline_patch
 from fh6garage.v1_4_preview_final_ui_patch import apply_v1_4_preview_final_ui_patch
 from fh6garage.livery_decoder_recovery_patch import apply_livery_decoder_recovery_patch
+from fh6garage.livery_render_integrity_patch import apply_livery_render_integrity_patch
 
 
 def resource_root() -> Path:
@@ -65,6 +66,7 @@ def main() -> int:
     apply_v1_4_native_resolution_test_patch(MainWindow)
     apply_v1_4_quality_pipeline_patch(MainWindow)
     apply_v1_4_preview_final_ui_patch(MainWindow)
+    apply_livery_render_integrity_patch()
 
     root = resource_root()
     icon_path = root / "icons" / "FH6_Assistant.ico"
