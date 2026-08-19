@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from collections import Counter
+from collections import Counter, deque
 
 from PySide6.QtCore import QTimer
 
@@ -14,21 +14,17 @@ _FIRST_BATCH = 8
 _INCREMENTAL_BATCH = 8
 _RELAYOUT_EVERY = 32
 _BATCH_BUDGET_MS = 18.0
+_INCREMENTAL_DELAY_MS = 4
+_THUMBNAIL_BATCH = 1
+_THUMBNAIL_DELAY_MS = 6
 
 
 def apply_livery_list_rebuild_performance_patch(MainWindow) -> None:
     """Keep large livery libraries responsive while rebuilding the card grid.
 
-    Three independent costs are addressed here:
-
-    * The hidden legacy QTableWidget is no longer rebuilt.
-    * annotation-key lookup and duplicate-hash detection are cached instead of
-      repeating O(n) work for every card.
-    * Most importantly, hundreds of complex Qt card widgets are not constructed
-      in one blocking main-thread loop.  A small first batch is created so the
-      visible page can paint immediately, then the remaining cards are appended
-      in short event-loop batches.  Generation tokens cancel stale batches when
-      a refresh/sort starts another rebuild.
+    The visible grid is built incrementally, duplicate hashes are calculated
+    only when the duplicate filter is actually selected, and thumbnail decode
+    is queued one image at a time so WebP work cannot monopolize the GUI thread.
     """
     global _APPLIED
     if _APPLIED:
@@ -36,6 +32,8 @@ def apply_livery_list_rebuild_performance_patch(MainWindow) -> None:
 
     original_scan_finished = MainWindow._scan_finished
     original_apply_pointing_cursors = MainWindow._apply_pointing_cursors
+    original_load_thumbnail = MainWindow._load_livery_card_thumbnail
+    original_unload_thumbnail = MainWindow._unload_livery_card_thumbnail
 
     def _invalidate_livery_lookup_caches(self) -> None:
         self._fh6_record_lookup_cache_result = None
@@ -65,6 +63,24 @@ def apply_livery_list_rebuild_performance_patch(MainWindow) -> None:
         cached = getattr(self, "_fh6_duplicate_hashes_cache", None)
         if cached is not None:
             return cached
+
+        # Missing full-file hashes are not a startup concern. Request them only
+        # when the duplicate filter itself is active. The startup performance
+        # patch will wait until card/thumbnail work is idle before reading files.
+        try:
+            duplicate_active = 9 in self.livery_check_filter.selected_modes()
+        except Exception:
+            duplicate_active = False
+        if duplicate_active:
+            missing_hashes = any(
+                record.livery_path is not None and not record.content_sha256
+                for record in self._custom_liveries()
+            )
+            if missing_hashes:
+                request = getattr(self, "_fh6_request_livery_hash_enrichment", None)
+                if callable(request):
+                    request()
+
         counts = Counter(
             record.content_sha256
             for record in self._custom_liveries()
@@ -140,15 +156,14 @@ def apply_livery_list_rebuild_performance_patch(MainWindow) -> None:
             _finish_incremental_livery_grid(self, generation, started, total)
             return
 
-        # Re-layout only periodically. Repacking the whole grid after every tiny
-        # batch would reintroduce an O(n^2)-like UI cost. The first batch is
-        # already visible, and additional cards appear in coarse increments.
         if since_layout >= _RELAYOUT_EVERY:
             self._relayout_livery_grid(self.livery_search.text())
             since_layout = 0
 
+        # A small non-zero delay gives paint, input and one-thumbnail decode
+        # events a chance to run between batches instead of chaining 0-ms timers.
         QTimer.singleShot(
-            0,
+            _INCREMENTAL_DELAY_MS,
             lambda: _continue_livery_grid(
                 self,
                 generation,
@@ -176,8 +191,6 @@ def apply_livery_list_rebuild_performance_patch(MainWindow) -> None:
         started = time.perf_counter()
         total = len(records)
 
-        # Construct only enough cards to populate the initial viewport. This is
-        # the only blocking portion of a large rebuild.
         first_count = min(_FIRST_BATCH, total)
         for index in range(first_count):
             _append_livery_card(self, records[index])
@@ -202,7 +215,7 @@ def apply_livery_list_rebuild_performance_patch(MainWindow) -> None:
             return
 
         QTimer.singleShot(
-            0,
+            _INCREMENTAL_DELAY_MS,
             lambda: _continue_livery_grid(
                 self,
                 generation,
@@ -228,16 +241,77 @@ def apply_livery_list_rebuild_performance_patch(MainWindow) -> None:
             hidden_table_rows=0,
         )
 
+    def _drain_thumbnail_queue(self) -> None:
+        queue = getattr(self, "_fh6_thumbnail_queue", None)
+        if not queue:
+            self._fh6_thumbnail_queue_busy = False
+            return
+
+        self._fh6_thumbnail_queue_busy = True
+        batch_started = time.perf_counter()
+        decoded = 0
+        while queue and decoded < _THUMBNAIL_BATCH:
+            card = queue.popleft()
+            try:
+                if not getattr(card, "_fh6_thumbnail_pending", False):
+                    continue
+                card._fh6_thumbnail_pending = False
+                if not card.isVisible():
+                    continue
+                original_load_thumbnail(self, card)
+                decoded += 1
+            except RuntimeError:
+                # Qt object may have been deleted by a refresh while queued.
+                continue
+
+        record_metric(
+            "thumbnail_decode_batch",
+            (time.perf_counter() - batch_started) * 1000.0,
+            decoded=decoded,
+            remaining=len(queue),
+        )
+
+        if queue:
+            QTimer.singleShot(_THUMBNAIL_DELAY_MS, lambda: _drain_thumbnail_queue(self))
+        else:
+            self._fh6_thumbnail_queue_busy = False
+
+    def _queue_thumbnail_load(self, card) -> None:
+        try:
+            if getattr(card, "_fh6_thumbnail_loaded", False) or getattr(card, "_fh6_thumbnail_pending", False):
+                return
+            card._fh6_thumbnail_pending = True
+        except RuntimeError:
+            return
+
+        queue = getattr(self, "_fh6_thumbnail_queue", None)
+        if queue is None:
+            queue = deque()
+            self._fh6_thumbnail_queue = queue
+        queue.append(card)
+
+        if not getattr(self, "_fh6_thumbnail_queue_busy", False):
+            self._fh6_thumbnail_queue_busy = True
+            QTimer.singleShot(0, lambda: _drain_thumbnail_queue(self))
+
+    def _queued_unload_thumbnail(self, card) -> None:
+        try:
+            card._fh6_thumbnail_pending = False
+            original_unload_thumbnail(self, card)
+        except RuntimeError:
+            return
+
     def _apply_pointing_cursors(self, root) -> None:
-        # _make_saved_content_card() already applies cursors to every newly
-        # created card. Scanning the entire livery_grid_host again after all
-        # cards are created duplicates that QObject traversal.
         if root is getattr(self, "livery_grid_host", None):
             return
         return original_apply_pointing_cursors(self, root)
 
     def _scan_finished(self, result) -> None:
         _invalidate_livery_lookup_caches(self)
+        # Invalidate queued thumbnail work from an earlier scan. Stale cards are
+        # also protected by the per-card pending flag and RuntimeError guard.
+        self._fh6_thumbnail_queue = deque()
+        self._fh6_thumbnail_queue_busy = False
         return original_scan_finished(self, result)
 
     MainWindow._invalidate_livery_lookup_caches = _invalidate_livery_lookup_caches
@@ -245,6 +319,9 @@ def apply_livery_list_rebuild_performance_patch(MainWindow) -> None:
     MainWindow._duplicate_livery_hashes = _duplicate_livery_hashes
     MainWindow._populate_livery_grid = _populate_livery_grid
     MainWindow._populate_livery_table = _populate_livery_table
+    MainWindow._load_livery_card_thumbnail = _queue_thumbnail_load
+    MainWindow._unload_livery_card_thumbnail = _queued_unload_thumbnail
+    MainWindow._drain_thumbnail_queue = _drain_thumbnail_queue
     MainWindow._apply_pointing_cursors = _apply_pointing_cursors
     MainWindow._scan_finished = _scan_finished
     MainWindow._fh6_livery_list_rebuild_performance_patch_applied = True
