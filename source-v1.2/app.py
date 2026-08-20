@@ -38,6 +38,7 @@ from fh6garage.livery_render_acceleration_patch import apply_livery_render_accel
 from fh6garage.livery_raster_runtime_patch import apply_livery_raster_runtime_patch
 from fh6garage.livery_render_integrity_patch import apply_livery_render_integrity_patch
 from fh6garage.livery_preview_ui_polish import apply_livery_preview_ui_polish
+from fh6garage.livery_surface_order_diagnostic import install_surface_order_diagnostic
 from fh6garage.livery_baseline_behavior_patch import apply_livery_baseline_behavior_patch
 
 
@@ -52,7 +53,7 @@ def main() -> int:
     app = QApplication(sys.argv)
     app.setFont(QFont("Segoe UI", 10))
     app.setApplicationName("FH6 Assistant")
-    app.setApplicationVersion("1.4 Preview UX Test")
+    app.setApplicationVersion("1.4 Warning Only Surface Diagnostic")
     app.setOrganizationName("LocalOnly")
 
     settings = QSettings()
@@ -80,6 +81,11 @@ def main() -> int:
     apply_livery_raster_runtime_patch()
     apply_livery_render_integrity_patch()
     apply_livery_preview_ui_polish()
+
+    # Instrument the Warning Only Render Test source-offset normalization before
+    # the baseline patch installs it. This records pre/post section stacking but
+    # does not reverse, reorder, or otherwise change the rendered result.
+    install_surface_order_diagnostic()
     apply_livery_baseline_behavior_patch()
 
     root = resource_root()
