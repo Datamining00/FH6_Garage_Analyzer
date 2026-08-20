@@ -175,6 +175,8 @@ The record itself is confirmed. The semantic role of the additional trailing
 
 Status: `CONFIRMED` as sample evidence, not as a universal rule
 
+Validation input: uploaded raw file `C_livery(1)`.
+
 Raw file identity:
 
 ```text
@@ -210,6 +212,8 @@ tests and must never become production parsing conditions.
 ## Regression evidence: `Livery_2997_20260817150058`
 
 Status: `CONFIRMED` as sample evidence, not as a universal rule
+
+Validation input: uploaded raw file `C_livery(2)`.
 
 Raw file identity:
 
