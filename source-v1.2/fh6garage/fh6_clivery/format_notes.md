@@ -168,6 +168,9 @@ Evidence:
   recorded differential counts exactly.
 - In both validated files the additional trailing `u32` is `0`.
 
+The record itself is confirmed. The semantic role of the additional trailing
+`u32` remains deliberately uninterpreted.
+
 ## Regression evidence: Car ID 3761 / Fluorite AKE
 
 Status: `CONFIRMED` as sample evidence, not as a universal rule
