@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import hashlib
 import os
 from pathlib import Path
 import unittest
 
 from fh6garage.fh6_clivery import decode_clivery_file
+
+
+SAMPLE_3761_SHA256 = "565e75445c70501dc98c00cc76c1d162d703b1921fd55735fcccb857757dac18"
+SAMPLE_2997_SHA256 = "677751360dba1a7fe6eead246236094836e9e1433709a0fd8dc5a1b2635f7ded"
 
 
 def _sample_path(variable: str) -> Path | None:
@@ -15,11 +20,16 @@ def _sample_path(variable: str) -> Path | None:
     return path if path.is_file() else None
 
 
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 class RealLiveryRegressionTests(unittest.TestCase):
     def test_car_3761_fluorite_ake_when_sample_is_available(self) -> None:
         path = _sample_path("FH6_CLIVERY_3761")
         if path is None:
             self.skipTest("set FH6_CLIVERY_3761 to the real C_livery sample")
+        self.assertEqual(_sha256(path), SAMPLE_3761_SHA256)
         result = decode_clivery_file(path)
         self.assertEqual(result.car_id, 3761)
         self.assertEqual(result.gyvl_offset, 51)
@@ -34,7 +44,9 @@ class RealLiveryRegressionTests(unittest.TestCase):
         path = _sample_path("FH6_CLIVERY_2997")
         if path is None:
             self.skipTest("set FH6_CLIVERY_2997 to the real Livery_2997_20260817150058 C_livery sample")
+        self.assertEqual(_sha256(path), SAMPLE_2997_SHA256)
         result = decode_clivery_file(path)
+        self.assertEqual(result.car_id, 2997)
         self.assertEqual(result.gyvl_offset, 51)
         self.assertEqual(result.body_start, 72)
         self.assertEqual(result.body_end, 293929)
