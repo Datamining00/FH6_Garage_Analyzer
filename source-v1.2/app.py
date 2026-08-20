@@ -34,6 +34,7 @@ from fh6garage.v1_4_quality_pipeline_patch import apply_v1_4_quality_pipeline_pa
 from fh6garage.v1_4_preview_final_ui_patch import apply_v1_4_preview_final_ui_patch
 from fh6garage.livery_decoder_recovery_patch import apply_livery_decoder_recovery_patch
 from fh6garage.livery_bare_parent_transform_fix import apply_livery_bare_parent_transform_fix
+from fh6garage.livery_structural_parser_audit import install_livery_structural_parser_audit
 from fh6garage.livery_tiled_runtime_patch import apply_livery_tiled_runtime_patch
 from fh6garage.livery_render_acceleration_patch import apply_livery_render_acceleration_patch
 from fh6garage.livery_raster_runtime_patch import apply_livery_raster_runtime_patch
@@ -64,10 +65,15 @@ def main() -> int:
     # be proven, and stale pre-recovery render caches are invalidated.
     apply_livery_decoder_recovery_patch()
 
-    # Preserve the FH6 grammar variant where a bare 16-byte parent transform
-    # owns the next two child groups before an extended child transform.  This
-    # is decoder-only and does not alter render order or mask composition.
+    # Preserve the proven FH6 grammar variant where a bare 16-byte parent
+    # transform owns an implicit transform pair.  This remains deliberately
+    # narrow; unknown variants are audited below instead of guessed.
     apply_livery_bare_parent_transform_fix()
+
+    # Diagnostic-only safety net: scan C_livery streams for additional
+    # structurally plausible unframed transforms.  It never mutates the tree or
+    # renderer, but prevents new parser variants from failing silently.
+    install_livery_structural_parser_audit()
 
     apply_v1_3_ui_patches(MainWindow)
     apply_v1_3_1_patches(MainWindow)
