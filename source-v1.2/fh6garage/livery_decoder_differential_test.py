@@ -19,6 +19,19 @@ CURRENT_KFPS_COMMIT = "004b3b61a57d901e65957b6099805835f91e32f6"
 _PATCH_FLAG = "_fh6assistant_decoder_differential_test_v1"
 _LEGACY_LOCK = threading.RLock()
 _LEGACY_DECODER = None
+_SECTION_NAMES = (
+    "Front",
+    "Back",
+    "Top",
+    "Left",
+    "Right",
+    "Spoiler",
+    "FrontWindshield",
+    "BackWindshield",
+    "TopWindow",
+    "LeftWindow",
+    "RightWindow",
+)
 
 
 def _runtime_roots() -> tuple[Path, ...]:
@@ -50,9 +63,6 @@ def _load_legacy_decoder_module():
         if spec is None or spec.loader is None:
             raise RuntimeError("KFPS 3.1.27 decoder module could not be loaded.")
 
-        # The 3.1.27 decoder has a direct-script fallback that imports
-        # shape_identity from its own directory. Keep that path exposed only
-        # while the isolated legacy module is initialized.
         previous_path = list(sys.path)
         try:
             sys.path.insert(0, str(cgroup_dir))
@@ -68,12 +78,7 @@ def _load_legacy_decoder_module():
 
 
 def _apply_legacy_fh6assistant_decoder_rules(decoder: Any) -> None:
-    """Recreate the last 3.1.27 + FH6 Assistant decoder-only behavior.
-
-    The clean 3.1.31 runtime remains untouched. We temporarily redirect the
-    patch modules' backend lookup so each patch attaches to this isolated legacy
-    module, then restore the real backend lookup and render cache identities.
-    """
+    """Attach the last proven FH6 Assistant decoder rules only to KFPS 3.1.27."""
     from . import livery_preview
     from . import livery_preview_quality_pipeline as quality_pipeline
     from . import livery_preview_tiled_quality as tiled_quality
@@ -154,8 +159,8 @@ def _semantic_key(layer: dict[str, Any]) -> tuple[Any, ...]:
     )
 
 
-def _section_layers(decoded: Any, names: tuple[str, ...]) -> dict[str, list[dict[str, Any]]]:
-    result = {name: [] for name in names}
+def _section_layers(decoded: Any) -> dict[str, list[dict[str, Any]]]:
+    result = {name: [] for name in _SECTION_NAMES}
     for layer in list(getattr(decoded, "layers", ()) or ()):
         if not isinstance(layer, dict):
             continue
@@ -198,21 +203,11 @@ def _offset_buckets(layers: list[dict[str, Any]]) -> dict[int, list[dict[str, An
 
 
 def compare_decoded_sources(legacy: Any, current: Any, renderer: Any | None = None) -> dict[str, Any]:
-    names = tuple(
-        dict.fromkeys(
-            [
-                *getattr(_load_legacy_decoder_module(), "LIVERY_SECTION_NAMES", ()),
-                *getattr(current, "report", {}).get("section_names", ()) if isinstance(getattr(current, "report", {}), dict) else (),
-                "Front", "Back", "Top", "Left", "Right", "Spoiler",
-                "FrontWindshield", "BackWindshield", "TopWindow", "LeftWindow", "RightWindow",
-            ]
-        )
-    )
-    legacy_sections = _section_layers(legacy, names)
-    current_sections = _section_layers(current, names)
+    legacy_sections = _section_layers(legacy)
+    current_sections = _section_layers(current)
 
     section_summary: dict[str, Any] = {}
-    for name in names:
+    for name in _SECTION_NAMES:
         old_items = legacy_sections.get(name, [])
         new_items = current_sections.get(name, [])
         section_summary[name] = {
@@ -237,8 +232,8 @@ def compare_decoded_sources(legacy: Any, current: Any, renderer: Any | None = No
     for offset in all_offsets:
         old_bucket = legacy_by_offset.get(offset, [])
         new_bucket = current_by_offset.get(offset, [])
-        if len(old_bucket) != 1 or len(new_bucket) != 1:
-            duplicate_offset_cases += int(bool(old_bucket and new_bucket))
+        if old_bucket and new_bucket and (len(old_bucket) != 1 or len(new_bucket) != 1):
+            duplicate_offset_cases += 1
         if not old_bucket:
             new_in_current += len(new_bucket)
             differences.append({
@@ -271,13 +266,19 @@ def compare_decoded_sources(legacy: Any, current: Any, renderer: Any | None = No
                 })
         for item in old_bucket[pair_count:]:
             missing_in_current += 1
-            differences.append({"kind": "only_legacy_duplicate", "source_offset": offset, "legacy": _layer_snapshot(item, renderer)})
+            differences.append({
+                "kind": "only_legacy_duplicate",
+                "source_offset": offset,
+                "legacy": _layer_snapshot(item, renderer),
+            })
         for item in new_bucket[pair_count:]:
             new_in_current += 1
-            differences.append({"kind": "only_current_duplicate", "source_offset": offset, "current": _layer_snapshot(item, renderer)})
+            differences.append({
+                "kind": "only_current_duplicate",
+                "source_offset": offset,
+                "current": _layer_snapshot(item, renderer),
+            })
 
-    # Keep the file bounded while preserving the earliest structural divergence,
-    # which is normally the most useful parser forensic evidence.
     max_differences = 1200
     truncated = max(0, len(differences) - max_differences)
     if truncated:
@@ -381,7 +382,7 @@ def apply_livery_decoder_differential_test(MainWindow: type) -> None:
         if livery_path:
             try:
                 report_path = generate_decoder_differential_report(livery_path)
-            except Exception as exc:  # diagnostic failure must not block preview
+            except Exception as exc:
                 report_error = exc
 
         result = original(self, record)
@@ -390,8 +391,7 @@ def apply_livery_decoder_differential_test(MainWindow: type) -> None:
             QMessageBox.information(
                 self,
                 "Decoder Differential",
-                "3.1.27 patched vs 3.1.31 clean 비교 JSON을 저장했습니다.\n\n"
-                + str(report_path),
+                "3.1.27 patched vs 3.1.31 clean 비교 JSON을 저장했습니다.\n\n" + str(report_path),
             )
         elif report_error is not None:
             QMessageBox.warning(
