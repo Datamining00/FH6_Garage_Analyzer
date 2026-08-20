@@ -39,6 +39,7 @@ from fh6garage.livery_raster_runtime_patch import apply_livery_raster_runtime_pa
 from fh6garage.livery_render_integrity_patch import apply_livery_render_integrity_patch
 from fh6garage.livery_preview_ui_polish import apply_livery_preview_ui_polish
 from fh6garage.livery_baseline_behavior_patch import apply_livery_baseline_behavior_patch
+from fh6garage.livery_group_transform_diagnostic import install_group_transform_diagnostic
 
 
 def resource_root() -> Path:
@@ -81,6 +82,11 @@ def main() -> int:
     apply_livery_render_integrity_patch()
     apply_livery_preview_ui_polish()
     apply_livery_baseline_behavior_patch()
+
+    # Diagnostic-only outer wrapper: after all baseline decoder patches are in
+    # place, capture every GroupNode ancestry/transform chain used to produce the
+    # final flattened layers. This does not alter transforms, ordering, or output.
+    install_group_transform_diagnostic()
 
     root = resource_root()
     icon_path = root / "icons" / "FH6_Assistant.ico"
