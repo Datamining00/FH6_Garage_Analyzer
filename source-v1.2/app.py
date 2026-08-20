@@ -32,18 +32,12 @@ from fh6garage.v1_4_validation_patch import apply_v1_4_validation_patch
 from fh6garage.v1_4_native_resolution_test_patch import apply_v1_4_native_resolution_test_patch
 from fh6garage.v1_4_quality_pipeline_patch import apply_v1_4_quality_pipeline_patch
 from fh6garage.v1_4_preview_final_ui_patch import apply_v1_4_preview_final_ui_patch
-from fh6garage.livery_compact_shape_guard_patch import apply_livery_compact_shape_guard_patch
-from fh6garage.livery_section_boundary_fix_patch import apply_livery_section_boundary_fix_patch
-from fh6garage.livery_decoder_recovery_patch import apply_livery_decoder_recovery_patch
-from fh6garage.livery_bare_parent_transform_fix import apply_livery_bare_parent_transform_fix
-from fh6garage.livery_consecutive_transform_pair_fix import apply_livery_consecutive_transform_pair_fix
-from fh6garage.livery_structural_parser_audit import install_livery_structural_parser_audit
 from fh6garage.livery_tiled_runtime_patch import apply_livery_tiled_runtime_patch
 from fh6garage.livery_render_acceleration_patch import apply_livery_render_acceleration_patch
 from fh6garage.livery_raster_runtime_patch import apply_livery_raster_runtime_patch
 from fh6garage.livery_render_integrity_patch import apply_livery_render_integrity_patch
 from fh6garage.livery_preview_ui_polish import apply_livery_preview_ui_polish
-from fh6garage.livery_baseline_behavior_patch import apply_livery_baseline_behavior_patch
+from fh6garage.livery_kfps_3_1_31_clean_baseline import apply_kfps_3_1_31_clean_baseline
 
 
 def resource_root() -> Path:
@@ -63,36 +57,9 @@ def main() -> int:
     settings = QSettings()
     set_language(settings.value("language", DEFAULT_LANGUAGE, str))
 
-    # The markerless 0x02 compact form is ambiguous with FH6 control/group data.
-    # Keep explicit 00/01-02 placements untouched, but require compact words to
-    # resolve through the pinned native resource map before accepting ShapeNode.
-    apply_livery_compact_shape_guard_patch()
-
-    # Some populated sections begin the next section directly at the current
-    # parser position. Preserve an exact 32-byte next-section placement instead
-    # of consuming the legacy unconditional 18-byte remnant.
-    apply_livery_section_boundary_fix_patch()
-
-    # Install structural decoding safeguards before any UI action can inspect a
-    # livery. Flat sections are recovered only when their raw byte contract can
-    # be proven, and stale pre-recovery render caches are invalidated.
-    apply_livery_decoder_recovery_patch()
-
-    # Preserve the proven FH6 grammar variant where a bare 16-byte parent
-    # transform owns an implicit transform pair.  This remains deliberately
-    # narrow; unknown variants are audited below instead of guessed.
-    apply_livery_bare_parent_transform_fix()
-
-    # Preserve the second proven pair grammar: a normal zero-marker parent
-    # transform immediately followed by the exact extended child transform.
-    # Without this rule the pinned decoder recognizes both records but replaces
-    # the first pending transform with the second before the child group starts.
-    apply_livery_consecutive_transform_pair_fix()
-
-    # Diagnostic-only safety net: scan C_livery streams for additional
-    # structurally plausible unframed transforms.  It never mutates the tree or
-    # renderer, but prevents new parser variants from failing silently.
-    install_livery_structural_parser_audit()
+    # Clean-decoder A/B test: rely on KFPS 3.1.31's upstream C_livery grammar.
+    # Do not install any FH6 Assistant decoder recovery, transform, section,
+    # compact-shape, structural-audit, or source-offset-order patch here.
 
     apply_v1_3_ui_patches(MainWindow)
     apply_v1_3_1_patches(MainWindow)
@@ -103,15 +70,15 @@ def main() -> int:
     apply_v1_4_quality_pipeline_patch(MainWindow)
     apply_v1_4_preview_final_ui_patch(MainWindow)
 
-    # Keep the garage scan, card rebuild, and thumbnail startup path identical
-    # to the stable Sequential Fixes Test baseline. Rendering acceleration is
-    # intentionally isolated from startup/list loading.
+    # Keep the established v1.4 rendering/UI pipeline. Only the C_livery decoder
+    # source changes in this test; warning-only integrity and persistent quality
+    # scale remain enabled without rewriting decoded layer order.
     apply_livery_tiled_runtime_patch()
     apply_livery_render_acceleration_patch()
     apply_livery_raster_runtime_patch()
     apply_livery_render_integrity_patch()
     apply_livery_preview_ui_polish()
-    apply_livery_baseline_behavior_patch()
+    apply_kfps_3_1_31_clean_baseline()
 
     root = resource_root()
     icon_path = root / "icons" / "FH6_Assistant.ico"
