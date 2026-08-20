@@ -32,6 +32,7 @@ from fh6garage.v1_4_validation_patch import apply_v1_4_validation_patch
 from fh6garage.v1_4_native_resolution_test_patch import apply_v1_4_native_resolution_test_patch
 from fh6garage.v1_4_quality_pipeline_patch import apply_v1_4_quality_pipeline_patch
 from fh6garage.v1_4_preview_final_ui_patch import apply_v1_4_preview_final_ui_patch
+from fh6garage.livery_section_boundary_fix_patch import apply_livery_section_boundary_fix_patch
 from fh6garage.livery_decoder_recovery_patch import apply_livery_decoder_recovery_patch
 from fh6garage.livery_tiled_runtime_patch import apply_livery_tiled_runtime_patch
 from fh6garage.livery_render_acceleration_patch import apply_livery_render_acceleration_patch
@@ -58,6 +59,10 @@ def main() -> int:
 
     settings = QSettings()
     set_language(settings.value("language", DEFAULT_LANGUAGE, str))
+
+    # Correct only the structurally proven populated->populated boundary case
+    # before the existing conservative flat-section recovery is installed.
+    apply_livery_section_boundary_fix_patch()
 
     # Install structural decoding safeguards before any UI action can inspect a
     # livery. Flat sections are recovered only when their raw byte contract can
