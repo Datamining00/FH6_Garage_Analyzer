@@ -33,6 +33,7 @@ from fh6garage.v1_4_native_resolution_test_patch import apply_v1_4_native_resolu
 from fh6garage.v1_4_quality_pipeline_patch import apply_v1_4_quality_pipeline_patch
 from fh6garage.v1_4_preview_final_ui_patch import apply_v1_4_preview_final_ui_patch
 from fh6garage.livery_decoder_recovery_patch import apply_livery_decoder_recovery_patch
+from fh6garage.livery_bare_parent_transform_fix import apply_livery_bare_parent_transform_fix
 from fh6garage.livery_tiled_runtime_patch import apply_livery_tiled_runtime_patch
 from fh6garage.livery_render_acceleration_patch import apply_livery_render_acceleration_patch
 from fh6garage.livery_raster_runtime_patch import apply_livery_raster_runtime_patch
@@ -62,6 +63,11 @@ def main() -> int:
     # livery. Flat sections are recovered only when their raw byte contract can
     # be proven, and stale pre-recovery render caches are invalidated.
     apply_livery_decoder_recovery_patch()
+
+    # Preserve the FH6 grammar variant where a bare 16-byte parent transform
+    # owns the next two child groups before an extended child transform.  This
+    # is decoder-only and does not alter render order or mask composition.
+    apply_livery_bare_parent_transform_fix()
 
     apply_v1_3_ui_patches(MainWindow)
     apply_v1_3_1_patches(MainWindow)
