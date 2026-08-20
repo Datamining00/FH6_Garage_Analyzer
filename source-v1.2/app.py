@@ -36,6 +36,7 @@ from fh6garage.livery_decoder_recovery_patch import apply_livery_decoder_recover
 from fh6garage.livery_bare_parent_transform_fix import apply_livery_bare_parent_transform_fix
 from fh6garage.livery_consecutive_transform_pair_fix import apply_livery_consecutive_transform_pair_fix
 from fh6garage.livery_structural_parser_audit import install_livery_structural_parser_audit
+from fh6garage.livery_simple_layer_native_debug import install_simple_layer_native_debug
 from fh6garage.livery_tiled_runtime_patch import apply_livery_tiled_runtime_patch
 from fh6garage.livery_render_acceleration_patch import apply_livery_render_acceleration_patch
 from fh6garage.livery_raster_runtime_patch import apply_livery_raster_runtime_patch
@@ -81,6 +82,11 @@ def main() -> int:
     # structurally plausible unframed transforms.  It never mutates the tree or
     # renderer, but prevents new parser variants from failing silently.
     install_livery_structural_parser_audit()
+
+    # Simple follow-up diagnostics: keep rendering when a missing native shape
+    # is an ordinary visible layer (masks still fail closed), and create an
+    # automatic 8-way layer probe for Left/Right sections in the background.
+    install_simple_layer_native_debug()
 
     apply_v1_3_ui_patches(MainWindow)
     apply_v1_3_1_patches(MainWindow)
