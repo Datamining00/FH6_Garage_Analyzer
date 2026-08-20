@@ -89,7 +89,12 @@ def _find_gyvl(payload: bytes) -> tuple[int, int, int]:
                 + SECTION_COUNTER_BYTES
                 + SECTION_COUNTER_TRAILING_BYTES
             )
-            if body_end >= body_start and minimum_counter_end <= len(payload):
+            successor_tag = payload.find(b"yrvl", minimum_counter_end)
+            if (
+                body_end >= body_start
+                and minimum_counter_end <= len(payload)
+                and successor_tag >= minimum_counter_end
+            ):
                 candidates.append((pos, body_end))
         pos = payload.find(b"gyvl", pos + 1)
 

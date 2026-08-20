@@ -68,6 +68,12 @@ class CliverySectionTests(unittest.TestCase):
         self.assertEqual(len(document["sections"]), 11)
         self.assertIsInstance(document["diagnostics"], list)
 
+    def test_missing_counter_successor_tag_is_rejected(self) -> None:
+        payload = bytearray(make_payload())
+        payload[152:156] = b"xxxx"
+        with self.assertRaises(CliveryDecodeError):
+            decode_clivery_bytes(payload)
+
     def test_missing_gyvl_is_rejected(self) -> None:
         payload = bytearray(make_payload())
         payload[51:55] = b"xxxx"
