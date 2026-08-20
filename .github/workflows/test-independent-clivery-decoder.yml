@@ -1,4 +1,4 @@
-name: Test independent C_livery decoder
+name: Test independent FH6 decoders
 
 on:
   workflow_dispatch:
@@ -9,6 +9,7 @@ on:
       - ".github/workflows/test-independent-clivery-decoder.yml"
       - "source-v1.2/fh6garage/fh6_clivery/**"
       - "source-v1.2/tests/test_clivery_*.py"
+      - "source-v1.2/tests/test_group_parser.py"
       - "source-v1.2/tests/test_real_livery_regressions.py"
   pull_request:
     branches:
@@ -17,6 +18,7 @@ on:
       - ".github/workflows/test-independent-clivery-decoder.yml"
       - "source-v1.2/fh6garage/fh6_clivery/**"
       - "source-v1.2/tests/test_clivery_*.py"
+      - "source-v1.2/tests/test_group_parser.py"
       - "source-v1.2/tests/test_real_livery_regressions.py"
 
 permissions:
@@ -34,17 +36,18 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Compile independent decoder
+      - name: Compile independent decoders
         shell: pwsh
         run: |
           Set-Location source-v1.2
           python -m compileall -q fh6garage/fh6_clivery
 
-      - name: Run Milestone 1 tests without KFPS or FLS
+      - name: Run Milestone 1-2 tests without KFPS or FLS
         shell: pwsh
         run: |
           Set-Location source-v1.2
           python -m unittest discover -s tests -p "test_clivery_*.py" -v
+          python -m unittest discover -s tests -p "test_group_parser.py" -v
           python -m unittest discover -s tests -p "test_real_livery_regressions.py" -v
 
   existing-regressions:
