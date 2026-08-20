@@ -5,14 +5,14 @@ import io
 import json
 import threading
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from . import livery_preview as core
 from . import livery_preview_mask_semantics as mask_semantics
 from . import livery_preview_quality_pipeline as quality_pipeline
 from . import livery_preview_tiled_quality as tiled_quality
 from . import v1_4_preview_final_ui_patch as final_ui
-from .exact_livery_preview import ExactLiveryPreviewError, raster_resolver_for_game, require_fh6_game_folder
+from .exact_livery_preview import raster_resolver_for_game, require_fh6_game_folder
 from .livery_preview import LiveryPreviewError
 from .livery_preview_native_resolution_test import _checkerboard_native_resolution
 from .livery_preview_preview2 import _app_data_dir, _preflight_raster_layers
@@ -23,8 +23,8 @@ _TLS = threading.local()
 _PROBE_LOCK = threading.Lock()
 _PROBE_STARTED: set[tuple[str, str, int, int]] = set()
 
-_ORIGINAL_CORE_VALIDATOR = core._validate_exact_assets_and_filter_noops
-_ORIGINAL_SCALED_RENDER = tiled_quality.render_livery_section_scaled
+_ORIGINAL_CORE_VALIDATOR: Callable | None = None
+_ORIGINAL_SCALED_RENDER: Callable | None = None
 
 
 def _is_missing_native_error(exc: Exception) -> bool:
@@ -77,25 +77,28 @@ def _record_missing_native(renderer: Any, layer_index: int, layer: dict[str, Any
 
 
 def _tolerant_validator(renderer: Any, layers, raster_resolver):
-    """Skip only missing *visible* native shapes; missing masks remain fatal.
+    """Skip only missing visible native shapes; missing masks remain fatal.
 
-    This is intentionally a runtime test policy, not a permanent decoder rule.
-    Every layer is delegated to the existing strict validator one at a time so
-    all existing alpha, raster, and mask semantics remain unchanged.
+    This is deliberately a runtime test policy. Each placement is still sent
+    through the existing strict validator, so alpha, raster, and mask semantics
+    remain identical for every resource that exists.
     """
+
+    original = _ORIGINAL_CORE_VALIDATOR
+    if original is None:
+        raise LiveryPreviewError("simple native debug validator가 아직 설치되지 않았습니다.")
 
     visible: list[dict[str, Any]] = []
     skipped_or_invisible = 0
 
     for layer_index, layer in enumerate(list(layers), 1):
         try:
-            one_visible, one_skipped = _ORIGINAL_CORE_VALIDATOR(renderer, [layer], raster_resolver)
+            one_visible, one_skipped = original(renderer, [layer], raster_resolver)
         except LiveryPreviewError as exc:
             if not _is_missing_native_error(exc):
                 raise
             if mask_semantics._is_mask(renderer, layer):
-                word, identity = _shape_identity(renderer, layer)
-                del word
+                _word, identity = _shape_identity(renderer, layer)
                 raise LiveryPreviewError(
                     f"layer {layer_index}의 mask에 정확한 native FH6 도형 리소스가 없습니다: {identity}"
                 ) from exc
@@ -116,7 +119,13 @@ def _probe_output_dir(source: Path) -> Path:
     return folder
 
 
-def _render_subset(source: Path, section: str, layers: list[dict[str, Any]], car_id: int, game_folder: Path) -> bytes:
+def _render_subset(
+    source: Path,
+    section: str,
+    layers: list[dict[str, Any]],
+    car_id: int,
+    game_folder: Path,
+) -> bytes:
     _decoder, renderer = core._load_backend()
     raster_resolver = None
     if any(bool(layer.get("is_raster_logo")) for layer in layers):
@@ -199,7 +208,7 @@ def _generate_probe(source: Path, section: str) -> None:
         analysis = core._analysis_cached(*signature)
         if int(getattr(analysis, "car_id", 0) or 0) <= 0:
             return
-        game_folder = require_fh6_game_folder()
+        game_folder = Path(require_fh6_game_folder())
 
         chunk_count = min(8, len(layers))
         ranges: list[tuple[int, int]] = []
@@ -210,15 +219,18 @@ def _generate_probe(source: Path, section: str) -> None:
                 ranges.append((start, end))
 
         rendered: list[tuple[str, bytes]] = []
+        previous_log = getattr(_TLS, "missing_native", None)
         _TLS.missing_native = []
-        for start, end in ranges:
-            label = f"layers {start + 1}-{end}"
-            png = _render_subset(source, section, layers[start:end], analysis.car_id, Path(game_folder))
-            rendered.append((label, png))
+        try:
+            for start, end in ranges:
+                label = f"layers {start + 1}-{end}"
+                png = _render_subset(source, section, layers[start:end], analysis.car_id, game_folder)
+                rendered.append((label, png))
+        finally:
+            _TLS.missing_native = previous_log
 
         output_dir = _probe_output_dir(source)
-        sheet_path = output_dir / f"{section}-8way-layer-probe.png"
-        sheet_path.write_bytes(_make_contact_sheet(rendered))
+        (output_dir / f"{section}-8way-layer-probe.png").write_bytes(_make_contact_sheet(rendered))
         metadata = {
             "source": str(source),
             "section": section,
@@ -253,16 +265,19 @@ def _schedule_probe(source: Path, section: str) -> None:
         if key in _PROBE_STARTED:
             return
         _PROBE_STARTED.add(key)
-    thread = threading.Thread(
+    threading.Thread(
         target=_generate_probe,
         args=(source, section),
         name=f"fh6-layer-probe-{section.lower()}",
         daemon=True,
-    )
-    thread.start()
+    ).start()
 
 
-def _write_missing_native_log(source: Path, section: str, entries: list[dict[str, Any]]) -> None:
+def _write_missing_native_log(
+    source: Path,
+    section: str,
+    entries: list[dict[str, Any]],
+) -> None:
     if not entries:
         return
     output_dir = _probe_output_dir(source)
@@ -279,31 +294,40 @@ def _write_missing_native_log(source: Path, section: str, entries: list[dict[str
 
 
 def _scaled_render_with_simple_debug(path: Path | str, section: str, scale: int = 4):
+    original = _ORIGINAL_SCALED_RENDER
+    if original is None:
+        raise LiveryPreviewError("simple layer debug renderer가 아직 설치되지 않았습니다.")
+
     source = Path(path)
+    previous_log = getattr(_TLS, "missing_native", None)
     _TLS.missing_native = []
     try:
-        result = _ORIGINAL_SCALED_RENDER(source, section, scale)
+        result = original(source, section, scale)
         entries = list(getattr(_TLS, "missing_native", []) or [])
         _write_missing_native_log(source, section, entries)
         _schedule_probe(source, section)
         return result
     finally:
-        _TLS.missing_native = []
+        _TLS.missing_native = previous_log
 
 
 def install_simple_layer_native_debug() -> None:
-    global _PATCHED
+    global _PATCHED, _ORIGINAL_CORE_VALIDATOR, _ORIGINAL_SCALED_RENDER
     if _PATCHED:
         return
+
+    # Capture the fully patched runtime behavior rather than the import-time
+    # functions. This keeps all existing v1.4 render acceleration/policy patches.
+    _ORIGINAL_CORE_VALIDATOR = core._validate_exact_assets_and_filter_noops
+    _ORIGINAL_SCALED_RENDER = final_ui.render_livery_section_scaled
 
     core._validate_exact_assets_and_filter_noops = _tolerant_validator
     quality_pipeline._validate_exact_assets_and_filter_noops = _tolerant_validator
     mask_semantics.validate_exact_assets_and_filter_noops = _tolerant_validator
     tiled_quality.validate_exact_assets_and_filter_noops = _tolerant_validator
 
-    # The final preview UI imported this callable directly, so patch its module
-    # binding as well. The normal full render remains unchanged except for the
-    # missing-visible-native policy; the 8-way probe is generated in background.
+    # The final preview UI imported this callable directly, so its module-level
+    # binding must be replaced as well.
     final_ui.render_livery_section_scaled = _scaled_render_with_simple_debug
 
     try:
