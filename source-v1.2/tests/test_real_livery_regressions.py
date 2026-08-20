@@ -28,7 +28,7 @@ class RealLiveryRegressionTests(unittest.TestCase):
     def test_car_3761_fluorite_ake_when_sample_is_available(self) -> None:
         path = _sample_path("FH6_CLIVERY_3761")
         if path is None:
-            self.skipTest("set FH6_CLIVERY_3761 to the real C_livery sample")
+            self.skipTest("set FH6_CLIVERY_3761 to uploaded raw sample C_livery(1)")
         self.assertEqual(_sha256(path), SAMPLE_3761_SHA256)
         result = decode_clivery_file(path)
         self.assertEqual(result.car_id, 3761)
@@ -43,7 +43,7 @@ class RealLiveryRegressionTests(unittest.TestCase):
     def test_livery_2997_when_sample_is_available(self) -> None:
         path = _sample_path("FH6_CLIVERY_2997")
         if path is None:
-            self.skipTest("set FH6_CLIVERY_2997 to the real Livery_2997_20260817150058 C_livery sample")
+            self.skipTest("set FH6_CLIVERY_2997 to uploaded raw sample C_livery(2)")
         self.assertEqual(_sha256(path), SAMPLE_2997_SHA256)
         result = decode_clivery_file(path)
         self.assertEqual(result.car_id, 2997)
