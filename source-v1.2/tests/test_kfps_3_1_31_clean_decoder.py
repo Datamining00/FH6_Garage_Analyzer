@@ -4,6 +4,7 @@ import struct
 import unittest
 from pathlib import Path
 
+from fh6garage import livery_baseline_behavior_patch as baseline_behavior
 from fh6garage.livery_preview import _load_backend
 
 
@@ -25,6 +26,19 @@ class Kfps3131CleanDecoderTests(unittest.TestCase):
         for call in forbidden_calls:
             self.assertNotIn(call, app)
         self.assertIn("apply_kfps_3_1_31_clean_baseline()", app)
+
+    def test_clean_baseline_uses_existing_scale_persistence_installer(self) -> None:
+        wrapper = (
+            ROOT / "fh6garage" / "livery_kfps_3_1_31_clean_baseline.py"
+        ).read_text(encoding="utf-8")
+        self.assertTrue(
+            hasattr(baseline_behavior, "_install_scale_persistence_and_warning_ui")
+        )
+        self.assertIn(
+            "baseline._install_scale_persistence_and_warning_ui()",
+            wrapper,
+        )
+        self.assertNotIn("baseline._install_scale_persistence()", wrapper)
 
     def test_backend_has_3_1_31_group_occupancy_model(self) -> None:
         decoder, _renderer = _load_backend()
