@@ -405,6 +405,54 @@ class _Parser:
         self.add_record(kind, pos, size, evidence_state, marker)
         return transform, pos + size
 
+    def consume_group_to_shape_control(
+        self,
+        group: GroupNode,
+        pos: int,
+        child_index: int,
+    ) -> int:
+        """Consume one observed inter-child 0x00 only under bounded structural proof.
+
+        Real FH6 nested C_group samples can place a single 0x00 after a completed
+        group child and before the next bitmap-declared shape. The byte is consumed
+        only when the current offset is not itself a valid shape and a complete
+        documented shape record begins exactly one byte later. Its higher semantic
+        meaning remains unknown; no scanning or repeated skip is performed.
+        """
+        if child_index <= 0 or not group.children:
+            return pos
+        if not isinstance(group.children[-1], GroupNode):
+            return pos
+        if pos >= len(self.payload) or self.payload[pos] != 0x00:
+            return pos
+        if _try_shape(self.payload, pos) is not None:
+            return pos
+        if _try_shape(self.payload, pos + 1) is None:
+            return pos
+
+        record = self.add_record(
+            "group_to_shape_control",
+            pos,
+            1,
+            "CONFIRMED",
+            b"\x00",
+        )
+        group.control_records.append(record)
+        self.diagnostics.append(
+            Diagnostic(
+                severity="info",
+                code="CGROUP_GROUP_TO_SHAPE_CONTROL_CONFIRMED",
+                message=(
+                    "a single 0x00 between a completed group child and the next "
+                    "bitmap-declared shape was preserved as structural control; "
+                    "the following complete shape framing validated the boundary"
+                ),
+                offset=pos,
+                evidence_state="CONFIRMED",
+            )
+        )
+        return pos + 1
+
     def parse_children(
         self,
         group: GroupNode,
@@ -518,9 +566,11 @@ class _Parser:
                                         "a group has both a preceding transform and an inline transform; "
                                         "the inline record is preserved but not composed"
                                     ),
-                                    offset=inline_transform.source_span.offset
-                                    if inline_transform.source_span
-                                    else pos,
+                                    offset=(
+                                        inline_transform.source_span.offset
+                                        if inline_transform.source_span
+                                        else pos
+                                    ),
                                     evidence_state="PROVISIONAL",
                                 )
                             )
@@ -540,6 +590,8 @@ class _Parser:
                 )
                 group.children.append(child)
                 continue
+
+            pos = self.consume_group_to_shape_control(group, pos, child_index)
 
             if child_index == 0:
                 inline = self.consume_transform(
@@ -561,9 +613,11 @@ class _Parser:
                                     "a group has both a preceding transform and an inline transform; "
                                     "the inline record is preserved but not composed"
                                 ),
-                                offset=inline_transform.source_span.offset
-                                if inline_transform.source_span
-                                else pos,
+                                offset=(
+                                    inline_transform.source_span.offset
+                                    if inline_transform.source_span
+                                    else pos
+                                ),
                                 evidence_state="PROVISIONAL",
                             )
                         )
