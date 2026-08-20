@@ -53,7 +53,7 @@ def main() -> int:
     app = QApplication(sys.argv)
     app.setFont(QFont("Segoe UI", 10))
     app.setApplicationName("FH6 Assistant")
-    app.setApplicationVersion("1.4 Warning Only Surface Diagnostic")
+    app.setApplicationVersion("1.4 Preview UX Test")
     app.setOrganizationName("LocalOnly")
 
     settings = QSettings()
