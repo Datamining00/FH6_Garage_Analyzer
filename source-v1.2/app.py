@@ -34,6 +34,7 @@ from fh6garage.v1_4_quality_pipeline_patch import apply_v1_4_quality_pipeline_pa
 from fh6garage.v1_4_preview_final_ui_patch import apply_v1_4_preview_final_ui_patch
 from fh6garage.livery_decoder_recovery_patch import apply_livery_decoder_recovery_patch
 from fh6garage.livery_bare_parent_transform_fix import apply_livery_bare_parent_transform_fix
+from fh6garage.livery_consecutive_transform_pair_fix import apply_livery_consecutive_transform_pair_fix
 from fh6garage.livery_structural_parser_audit import install_livery_structural_parser_audit
 from fh6garage.livery_tiled_runtime_patch import apply_livery_tiled_runtime_patch
 from fh6garage.livery_render_acceleration_patch import apply_livery_render_acceleration_patch
@@ -69,6 +70,12 @@ def main() -> int:
     # transform owns an implicit transform pair.  This remains deliberately
     # narrow; unknown variants are audited below instead of guessed.
     apply_livery_bare_parent_transform_fix()
+
+    # Preserve the second proven pair grammar: a normal zero-marker parent
+    # transform immediately followed by the exact extended child transform.
+    # Without this rule the pinned decoder recognizes both records but replaces
+    # the first pending transform with the second before the child group starts.
+    apply_livery_consecutive_transform_pair_fix()
 
     # Diagnostic-only safety net: scan C_livery streams for additional
     # structurally plausible unframed transforms.  It never mutates the tree or
