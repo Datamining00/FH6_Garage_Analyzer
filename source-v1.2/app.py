@@ -40,6 +40,7 @@ from fh6garage.livery_render_integrity_patch import apply_livery_render_integrit
 from fh6garage.livery_preview_ui_polish import apply_livery_preview_ui_polish
 from fh6garage.livery_baseline_behavior_patch import apply_livery_baseline_behavior_patch
 from fh6garage.livery_group_transform_diagnostic import install_group_transform_diagnostic
+from fh6garage.livery_raw_transform_anomaly_diagnostic import install_raw_transform_anomaly_diagnostic
 
 
 def resource_root() -> Path:
@@ -87,6 +88,11 @@ def main() -> int:
     # place, capture every GroupNode ancestry/transform chain used to produce the
     # final flattened layers. This does not alter transforms, ordering, or output.
     install_group_transform_diagnostic()
+
+    # Add raw byte windows and parser candidate interpretations around structurally
+    # anomalous groups (for example, a unique 0xff-flags group) without changing
+    # decoder state, transforms, ordering, or rendering.
+    install_raw_transform_anomaly_diagnostic()
 
     root = resource_root()
     icon_path = root / "icons" / "FH6_Assistant.ico"
