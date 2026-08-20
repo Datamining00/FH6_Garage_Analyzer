@@ -22,6 +22,7 @@ def make_payload(
     payload = bytearray(size)
     payload[:4] = b"vlrc"
     struct.pack_into("<I", payload, 0x10, car_id)
+    struct.pack_into("<I", payload, gyvl_offset - 4, body_end - gyvl_offset)
     payload[gyvl_offset:gyvl_offset + 4] = b"gyvl"
     body_start = gyvl_offset + 0x15
     payload[body_start:body_start + 8] = b"ARTWORK!"
@@ -51,6 +52,18 @@ class CliverySectionTests(unittest.TestCase):
     def test_first_post_artwork_yrvl_is_body_end(self) -> None:
         result = decode_clivery_bytes(make_payload(body_end=137))
         self.assertEqual(result.body_end, 137)
+
+    def test_declared_gyvl_length_mismatch_is_rejected(self) -> None:
+        payload = bytearray(make_payload())
+        struct.pack_into("<I", payload, 47, 123456)
+        with self.assertRaises(CliveryDecodeError):
+            decode_clivery_bytes(payload)
+
+    def test_confirmed_boundary_and_counter_diagnostics(self) -> None:
+        result = decode_clivery_bytes(make_payload())
+        by_code = {item.code: item for item in result.diagnostics}
+        self.assertEqual(by_code["BODY_END_GYVL_LENGTH_CONFIRMED"].evidence_state, "CONFIRMED")
+        self.assertEqual(by_code["SECTION_COUNTER_LAYOUT_CONFIRMED"].evidence_state, "CONFIRMED")
 
     def test_container_and_inflated_inputs_have_same_semantics(self) -> None:
         payload = make_payload()
