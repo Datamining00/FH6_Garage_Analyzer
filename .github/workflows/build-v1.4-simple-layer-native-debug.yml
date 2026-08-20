@@ -1,4 +1,4 @@
-name: Build FH6 Assistant v1.4 Simple Layer Native Debug
+name: Build FH6 Assistant v1.4 Simple Layer Native Debug v2
 
 on:
   workflow_dispatch:
@@ -78,7 +78,7 @@ jobs:
           python -m compileall -q .
           python -m unittest discover -s tests -v
 
-      - name: Build simple-layer-native-debug EXE
+      - name: Build simple-layer-native-debug v2 EXE
         shell: pwsh
         run: |
           Set-Location source-v1.2
@@ -94,11 +94,11 @@ jobs:
           }
           Write-Host "Built EXE bytes: $size"
 
-      - name: Prepare simple-layer-native-debug artifact
+      - name: Prepare simple-layer-native-debug v2 artifact
         shell: pwsh
         run: |
           $source = Resolve-Path "source-v1.2\dist\FH6 Assistant v1.4.exe"
-          $name = "FH6 Assistant v1.4 Simple Layer Native Debug Test.exe"
+          $name = "FH6 Assistant v1.4 Simple Layer Native Debug v2 Test.exe"
           New-Item -ItemType Directory -Force -Path artifact | Out-Null
           $target = Join-Path $PWD "artifact\$name"
           Copy-Item $source $target -Force
@@ -106,12 +106,12 @@ jobs:
           "$hash  $name" | Set-Content -Path "artifact\$name.sha256" -Encoding ascii
           Write-Host "SHA-256: $hash"
 
-      - name: Upload simple-layer-native-debug build
+      - name: Upload simple-layer-native-debug v2 build
         uses: actions/upload-artifact@v6
         with:
-          name: FH6_Assistant_v1.4_Simple_Layer_Native_Debug_Test
+          name: FH6_Assistant_v1.4_Simple_Layer_Native_Debug_v2_Test
           path: |
-            artifact/FH6 Assistant v1.4 Simple Layer Native Debug Test.exe
-            artifact/FH6 Assistant v1.4 Simple Layer Native Debug Test.exe.sha256
+            artifact/FH6 Assistant v1.4 Simple Layer Native Debug v2 Test.exe
+            artifact/FH6 Assistant v1.4 Simple Layer Native Debug v2 Test.exe.sha256
           if-no-files-found: error
           compression-level: 0
