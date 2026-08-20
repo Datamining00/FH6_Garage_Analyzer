@@ -160,7 +160,7 @@ def decode_clivery_bytes(raw: bytes | bytearray | memoryview) -> CliveryMileston
             code="SECTION_COUNTER_TRAILING_VALUE",
             message=(
                 "one additional little-endian u32 follows the eleven section counters; "
-                f"its semantic role is not interpreted in Milestone 1 (value={trailing_counter})"
+                f"its position is confirmed but its higher-level semantic role is not interpreted in Milestone 1 (value={trailing_counter})"
             ),
             offset=counter_end,
             evidence_state="CONFIRMED",
