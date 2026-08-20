@@ -3,12 +3,14 @@ from __future__ import annotations
 import json
 import math
 import os
+import threading
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 
-_PATCH_FLAG = "_fh6assistant_structural_parser_audit_v1"
+_PATCH_FLAG = "_fh6assistant_structural_parser_audit_v2"
 _WARNING_PREFIX = "[FH6_STRUCTURAL_PARSE_AUDIT]"
+_TRACE_LOCAL = threading.local()
 
 
 def _finite(value: Any) -> float | None:
@@ -70,12 +72,7 @@ def _group_at(decoder: Any, data: bytes, pos: int, end: int) -> tuple[str, Any] 
 
 
 def _successor_after_bare_transform(decoder: Any, data: bytes, pos: int, end: int) -> dict[str, Any] | None:
-    """Describe a strongly structured child boundary after a bare 16-byte transform.
-
-    This is intentionally diagnostic.  It recognizes several plausible FH6
-    grammar continuations but does not assign parent ownership or mutate the
-    decoder tree.  Unknown grammar is surfaced instead of silently guessed.
-    """
+    """Describe a strongly structured child boundary after a bare transform."""
     child_pos = int(pos) + 16
     if child_pos >= end:
         return None
@@ -106,9 +103,17 @@ def _successor_after_bare_transform(decoder: Any, data: bytes, pos: int, end: in
     if child_transform is not None:
         size, transform, marker = child_transform
         successor_pos = child_pos + int(size)
-        # read_livery_transform already proves a group successor; record the
-        # concrete group when it begins exactly at the returned boundary.
         group = _group_at(decoder, data, successor_pos, end)
+        group_offset = successor_pos if group is not None else None
+
+        # read_livery_transform can prove a group one control byte after the
+        # returned transform span. Preserve that exact location in diagnostics.
+        if group is None and successor_pos + 1 < end:
+            shifted = _group_at(decoder, data, successor_pos + 1, end)
+            if shifted is not None:
+                group = shifted
+                group_offset = successor_pos + 1
+
         return {
             "kind": "bare_before_livery_transform",
             "score": 10,
@@ -116,24 +121,16 @@ def _successor_after_bare_transform(decoder: Any, data: bytes, pos: int, end: in
             "child_transform_size": int(size),
             "child_marker_hex": bytes(marker).hex(),
             "child_transform": _transform_dict(transform),
-            "following_group_offset": successor_pos if group is not None else None,
+            "following_group_offset": group_offset,
             "following_group_kind": group[0] if group is not None else None,
             "following_group_count": int(getattr(group[1], "count", 0) or 0) if group is not None else None,
         }
 
     try:
         if decoder.is_valid_shape_at(data, child_pos, end):
-            return {
-                "kind": "bare_before_shape",
-                "score": 8,
-                "successor_offset": child_pos,
-            }
+            return {"kind": "bare_before_shape", "score": 8, "successor_offset": child_pos}
         if decoder.is_livery_logo_at(data, child_pos, end):
-            return {
-                "kind": "bare_before_raster_logo",
-                "score": 8,
-                "successor_offset": child_pos,
-            }
+            return {"kind": "bare_before_raster_logo", "score": 8, "successor_offset": child_pos}
     except Exception:
         pass
 
@@ -157,7 +154,6 @@ def _successor_after_bare_transform(decoder: Any, data: bytes, pos: int, end: in
                 "following_group_count": int(getattr(group[1], "count", 0) or 0),
             }
 
-    # A one-byte livery control flag can sit between a transform and a group.
     if child_pos + 1 < end and data[child_pos] in (0x01, 0x02, 0x03, 0x0F, 0xFF):
         group = _group_at(decoder, data, child_pos + 1, end)
         if group is not None:
@@ -175,7 +171,6 @@ def _successor_after_bare_transform(decoder: Any, data: bytes, pos: int, end: in
 
 
 def _already_framed_at(decoder: Any, data: bytes, pos: int, end: int) -> bool:
-    """Return True when the stock decoder already has an unambiguous record here."""
     try:
         if decoder.is_valid_shape_at(data, pos, end) or decoder.is_livery_logo_at(data, pos, end):
             return True
@@ -188,18 +183,29 @@ def _already_framed_at(decoder: Any, data: bytes, pos: int, end: int) -> bool:
     return False
 
 
-def scan_unframed_transform_candidates(decoder: Any, body: bytes) -> list[dict[str, Any]]:
-    """Scan for plausible transforms the current livery grammar could skip.
+def scan_unframed_transform_candidates(
+    decoder: Any,
+    body: bytes,
+    candidate_offsets: Iterable[int] | None = None,
+    section_by_offset: dict[int, str | None] | None = None,
+) -> list[dict[str, Any]]:
+    """Return plausible transforms at parser boundaries that remain unframed.
 
-    Candidates are evidence, not fixes.  The scanner only records a transform
-    when a second, independently recognizable child boundary immediately
-    follows it.  This catches the class of bug that previously leaked float
-    bytes into parser flags without hard-coding a car, section, phrase, or
-    source offset.
+    With ``candidate_offsets=None`` the function performs the old exhaustive
+    scan used by synthetic tests. Runtime audit calls pass only positions that
+    the *actual patched parser* advanced through one byte at a time. This avoids
+    mistaking float/color bytes inside valid shapes and group records for new
+    grammar while still catching the exact failure mode where a real transform
+    is silently walked byte-by-byte.
     """
     end = len(body)
+    if candidate_offsets is None:
+        positions: Iterable[int] = range(0, max(0, end - 32))
+    else:
+        positions = sorted({int(value) for value in candidate_offsets if 0 <= int(value) <= end - 32})
+
     results: list[dict[str, Any]] = []
-    for pos in range(0, max(0, end - 32)):
+    for pos in positions:
         if _already_framed_at(decoder, body, pos, end):
             continue
         try:
@@ -211,8 +217,7 @@ def scan_unframed_transform_candidates(decoder: Any, body: bytes) -> list[dict[s
         successor = _successor_after_bare_transform(decoder, body, pos, end)
         if successor is None or int(successor.get("score") or 0) < 7:
             continue
-        # Suppress obvious identity coincidences unless the structural evidence
-        # is strongest.  Real omitted parents normally carry placement data.
+
         values = _transform_dict(transform)
         identity_like = (
             abs(float(values["x"] or 0.0)) < 1e-6
@@ -223,18 +228,20 @@ def scan_unframed_transform_candidates(decoder: Any, body: bytes) -> list[dict[s
         )
         if identity_like and int(successor.get("score") or 0) < 10:
             continue
+
         window_start = max(0, pos - 32)
         window_end = min(end, pos + 64)
-        results.append(
-            {
-                "offset": int(pos),
-                "transform": values,
-                "successor": successor,
-                "window_start": window_start,
-                "window_end": window_end,
-                "window_hex": body[window_start:window_end].hex(),
-            }
-        )
+        item = {
+            "offset": int(pos),
+            "transform": values,
+            "successor": successor,
+            "window_start": window_start,
+            "window_end": window_end,
+            "window_hex": body[window_start:window_end].hex(),
+        }
+        if section_by_offset is not None:
+            item["section"] = section_by_offset.get(int(pos))
+        results.append(item)
     return results
 
 
@@ -243,7 +250,8 @@ def _section_ranges(decoded: Any) -> list[dict[str, Any]]:
     for layer in list(getattr(decoded, "layers", ()) or ()):
         if not isinstance(layer, dict):
             continue
-        name = str(layer.get("section") or "")
+        # FH6 Assistant preserves original section provenance as source_section.
+        name = str(layer.get("source_section") or layer.get("section") or "")
         try:
             offset = int(layer.get("source_offset"))
         except (TypeError, ValueError):
@@ -270,12 +278,66 @@ def _assign_section(candidate_offset: int, ranges: list[dict[str, Any]]) -> str 
     return None
 
 
+def _section_from_state(state: Any) -> str | None:
+    try:
+        for node in reversed(list(getattr(state, "stack", ()) or ())):
+            value = getattr(node, "section", None)
+            if value:
+                return str(value)
+    except Exception:
+        return None
+    return None
+
+
+def _pending_snapshot(state: Any) -> dict[str, Any]:
+    try:
+        marker = bytes(getattr(state, "pending_marker", b"") or b"").hex()
+    except Exception:
+        marker = ""
+    try:
+        prefix = bytes(getattr(state, "pending_prefix", b"") or b"").hex()
+    except Exception:
+        prefix = ""
+    return {
+        "has_pending_transform": getattr(state, "pending_transform", None) is not None,
+        "pending_marker_hex": marker,
+        "pending_prefix_hex": prefix,
+        "pending_flags": int(getattr(state, "pending_flags", 0) or 0),
+        "pending_mask": bool(getattr(state, "pending_mask", False)),
+    }
+
+
+def unresolved_walk_offsets(events: list[dict[str, Any]], body_size: int) -> tuple[list[int], dict[int, str | None], dict[str, int]]:
+    """Return offsets that every observed parser pass consumed as one byte."""
+    relevant = [event for event in events if int(event.get("end", -1)) == int(body_size)]
+    by_pos: dict[int, list[dict[str, Any]]] = {}
+    for event in relevant:
+        by_pos.setdefault(int(event["pos"]), []).append(event)
+
+    unresolved: list[int] = []
+    sections: dict[int, str | None] = {}
+    recognized_multi_byte = 0
+    for pos, items in by_pos.items():
+        spans = [int(item["next_pos"]) - int(item["pos"]) for item in items]
+        if any(span > 1 for span in spans):
+            recognized_multi_byte += 1
+            continue
+        if spans and all(span == 1 for span in spans):
+            unresolved.append(pos)
+            sections[pos] = next((str(item["section"]) for item in items if item.get("section")), None)
+
+    summary = {
+        "walk_event_count": len(relevant),
+        "unique_walk_offsets": len(by_pos),
+        "single_byte_only_offsets": len(unresolved),
+        "recognized_multi_byte_offsets": recognized_multi_byte,
+    }
+    return sorted(unresolved), sections, summary
+
+
 def _diagnostic_dir() -> Path:
     base = os.environ.get("LOCALAPPDATA")
-    if base:
-        root = Path(base) / "FH6GarageAnalyzer"
-    else:
-        root = Path.home() / ".fh6garage"
+    root = Path(base) / "FH6GarageAnalyzer" if base else Path.home() / ".fh6garage"
     target = root / "livery_parser_audits"
     target.mkdir(parents=True, exist_ok=True)
     return target
@@ -289,33 +351,91 @@ def _diagnostic_path(source: Path) -> Path:
 
 
 def install_livery_structural_parser_audit() -> None:
-    """Add a non-invasive structural audit around C_livery decoding."""
+    """Add a non-invasive structural audit around actual C_livery parser walks."""
     from .livery_preview import _load_backend
 
     decoder, _renderer = _load_backend()
     if bool(getattr(decoder, _PATCH_FLAG, False)):
         return
 
+    original_walk_step = decoder.walk_step
+
+    def walk_step_with_trace(
+        data,
+        pos,
+        end,
+        state,
+        livery: bool = False,
+        game: str | None = None,
+        livery_invert_odd_rotation: bool = True,
+    ):
+        before = _pending_snapshot(state) if livery else None
+        section = _section_from_state(state) if livery else None
+        next_pos = original_walk_step(
+            data,
+            pos,
+            end,
+            state,
+            livery=livery,
+            game=game,
+            livery_invert_odd_rotation=livery_invert_odd_rotation,
+        )
+        events = getattr(_TRACE_LOCAL, "events", None)
+        if events is not None and livery:
+            events.append(
+                {
+                    "pos": int(pos),
+                    "next_pos": int(next_pos),
+                    "end": int(end),
+                    "section": section or _section_from_state(state),
+                    "before": before,
+                    "after": _pending_snapshot(state),
+                }
+            )
+        return next_pos
+
+    decoder.walk_step = walk_step_with_trace
     original_decode_forza_source = decoder.decode_forza_source
 
     def decode_forza_source_with_audit(path, allow_locked: bool = False, game: str | None = "fh6"):
-        decoded = original_decode_forza_source(path, allow_locked=allow_locked, game=game)
+        previous_events = getattr(_TRACE_LOCAL, "events", None)
+        events: list[dict[str, Any]] = []
+        _TRACE_LOCAL.events = events
+        try:
+            decoded = original_decode_forza_source(path, allow_locked=allow_locked, game=game)
+        finally:
+            if previous_events is None:
+                try:
+                    delattr(_TRACE_LOCAL, "events")
+                except AttributeError:
+                    pass
+            else:
+                _TRACE_LOCAL.events = previous_events
+
         try:
             if str(getattr(decoded, "source_kind", "")).casefold() != "clivery":
                 return decoded
             source = Path(getattr(decoded, "source_path", path))
             payload = decoder.unwrap_forza_container(source)
             body, counts, meta = decoder.extract_livery_payload(payload)
-            candidates = scan_unframed_transform_candidates(decoder, body)
             ranges = _section_ranges(decoded)
+            single_offsets, section_by_offset, walk_summary = unresolved_walk_offsets(events, len(body))
+            candidates = scan_unframed_transform_candidates(
+                decoder,
+                body,
+                candidate_offsets=single_offsets,
+                section_by_offset=section_by_offset,
+            )
             for item in candidates:
-                item["section"] = _assign_section(int(item["offset"]), ranges)
+                if not item.get("section"):
+                    item["section"] = _assign_section(int(item["offset"]), ranges)
 
             document = {
                 "purpose": (
-                    "Detect structurally plausible livery transforms that are not framed by the current decoder grammar. "
+                    "Detect structurally plausible livery transforms that the actual patched decoder still walks one byte at a time. "
                     "The audit does not change decoding, layer order, transforms, masks, or rendering."
                 ),
+                "audit_version": 2,
                 "behavior_changed_by_audit": False,
                 "source_name": source.name,
                 "source_path": str(source),
@@ -326,29 +446,39 @@ def install_livery_structural_parser_audit() -> None:
                 },
                 "payload_meta": meta,
                 "decoded_section_ranges": ranges,
+                "parser_walk_summary": walk_summary,
                 "unframed_transform_candidate_count": len(candidates),
                 "unframed_transform_candidates": candidates,
             }
             destination = _diagnostic_path(source)
             destination.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
 
+            report = dict(getattr(decoded, "report", {}) or {})
             if candidates:
-                report = dict(getattr(decoded, "report", {}) or {})
                 warnings = [str(item) for item in list(report.get("warnings") or ())]
                 sections = sorted({str(item.get("section")) for item in candidates if item.get("section")})
                 where = ", ".join(sections) if sections else "unknown section"
                 warnings.append(
-                    f"{_WARNING_PREFIX} {len(candidates)} unframed transform candidate(s) remain in {where}; "
+                    f"{_WARNING_PREFIX} {len(candidates)} unresolved transform candidate(s) remain in {where}; "
                     "rendering may be structurally ambiguous. See livery_parser_audits."
                 )
                 report["warnings"] = list(dict.fromkeys(warnings))
                 report["structural_parse_audit"] = {
+                    "audit_version": 2,
                     "candidate_count": len(candidates),
                     "sections": sections,
                     "diagnostic_path": str(destination),
                     "behavior_changed": False,
                 }
-                decoded.report = report
+            else:
+                report["structural_parse_audit"] = {
+                    "audit_version": 2,
+                    "candidate_count": 0,
+                    "sections": [],
+                    "diagnostic_path": str(destination),
+                    "behavior_changed": False,
+                }
+            decoded.report = report
         except Exception as exc:
             report = dict(getattr(decoded, "report", {}) or {})
             warnings = [str(item) for item in list(report.get("warnings") or ())]
