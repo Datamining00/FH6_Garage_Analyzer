@@ -38,6 +38,7 @@ from fh6garage.livery_consecutive_transform_pair_fix import apply_livery_consecu
 from fh6garage.livery_structural_parser_audit import install_livery_structural_parser_audit
 from fh6garage.livery_simple_layer_native_debug import install_simple_layer_native_debug
 from fh6garage.livery_simple_layer_native_debug_v2 import install_simple_layer_native_debug_v2
+from fh6garage.livery_simple_layer_native_debug_v3 import install_simple_layer_native_debug_v3
 from fh6garage.livery_tiled_runtime_patch import apply_livery_tiled_runtime_patch
 from fh6garage.livery_render_acceleration_patch import apply_livery_render_acceleration_patch
 from fh6garage.livery_raster_runtime_patch import apply_livery_raster_runtime_patch
@@ -104,10 +105,13 @@ def main() -> int:
     apply_livery_baseline_behavior_patch()
 
     # Simple follow-up diagnostics are installed last so they preserve the
-    # complete v1.4 runtime behavior underneath. v2 automatically refines the
-    # coarse dark-occluder range and records fatal missing mask context.
+    # complete v1.4 runtime behavior underneath. v3 recursively narrows the
+    # dark-occluder range to individual layers and improves fatal-mask context
+    # by resolving the C_livery body-relative source offset and comparing masks
+    # against the opposite side. Rendering policy itself is unchanged.
     install_simple_layer_native_debug()
     install_simple_layer_native_debug_v2()
+    install_simple_layer_native_debug_v3()
 
     root = resource_root()
     icon_path = root / "icons" / "FH6_Assistant.ico"
