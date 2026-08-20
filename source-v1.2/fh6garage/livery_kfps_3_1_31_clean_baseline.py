@@ -25,6 +25,6 @@ def apply_kfps_3_1_31_clean_baseline() -> None:
     tiled_quality.CACHE_VERSION = "v14-tiled-kfps-3.1.31-clean"
 
     baseline._install_warning_only_integrity_policy()
-    baseline._install_scale_persistence()
+    baseline._install_scale_persistence_and_warning_ui()
     baseline._clear_preview_caches()
     _APPLIED = True
