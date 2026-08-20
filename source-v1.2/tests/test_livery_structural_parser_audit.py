@@ -3,10 +3,13 @@ from __future__ import annotations
 import struct
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 from fh6garage.livery_preview import _load_backend
 from fh6garage.livery_structural_parser_audit import (
+    _section_ranges,
     scan_unframed_transform_candidates,
+    unresolved_walk_offsets,
 )
 
 
@@ -59,6 +62,47 @@ class StructuralParserAuditTests(unittest.TestCase):
         framed = b"\x00" + _transform(120.0, 5.0, 1.0, 0.0) + _counted_group(1) + _shape(101)
         candidates = scan_unframed_transform_candidates(self.decoder, framed)
         self.assertFalse(any(candidate["offset"] == 0 for candidate in candidates))
+
+    def test_runtime_scan_only_checks_actual_single_byte_walk_boundaries(self):
+        data = _transform(-373.5, 4.0, 1.0, 0.0) + _counted_group(1) + _shape(101)
+        self.assertFalse(
+            scan_unframed_transform_candidates(self.decoder, data, candidate_offsets=[])
+        )
+        candidates = scan_unframed_transform_candidates(
+            self.decoder,
+            data,
+            candidate_offsets=[0],
+            section_by_offset={0: "Right"},
+        )
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0]["offset"], 0)
+        self.assertEqual(candidates[0]["section"], "Right")
+
+    def test_multi_byte_recognition_suppresses_same_offset_from_unresolved_set(self):
+        events = [
+            {"pos": 40, "next_pos": 41, "end": 100, "section": "Right"},
+            {"pos": 40, "next_pos": 56, "end": 100, "section": "Right"},
+            {"pos": 80, "next_pos": 81, "end": 100, "section": "Right"},
+        ]
+        offsets, sections, summary = unresolved_walk_offsets(events, 100)
+        self.assertEqual(offsets, [80])
+        self.assertEqual(sections[80], "Right")
+        self.assertEqual(summary["recognized_multi_byte_offsets"], 1)
+        self.assertEqual(summary["single_byte_only_offsets"], 1)
+
+    def test_section_ranges_use_source_section_provenance(self):
+        decoded = SimpleNamespace(
+            layers=[
+                {"source_section": "Left", "source_offset": 100},
+                {"source_section": "Left", "source_offset": 132},
+                {"source_section": "Right", "source_offset": 200},
+            ]
+        )
+        ranges = _section_ranges(decoded)
+        self.assertEqual([item["section"] for item in ranges], ["Left", "Right"])
+        self.assertEqual(ranges[0]["min_source_offset"], 100)
+        self.assertEqual(ranges[0]["max_source_offset"], 132)
+        self.assertEqual(ranges[0]["layer_count"], 2)
 
     def test_app_wires_audit_after_bare_parent_fix(self):
         app_path = Path(__file__).resolve().parents[1] / "app.py"
