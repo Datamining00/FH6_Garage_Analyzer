@@ -12,11 +12,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class Kfps3131CleanDecoderTests(unittest.TestCase):
-    def test_app_does_not_install_legacy_decoder_patches(self) -> None:
+    def test_app_installs_only_boundary_decoder_compatibility(self) -> None:
         app = (ROOT / "app.py").read_text(encoding="utf-8")
         forbidden_calls = (
             "apply_livery_compact_shape_guard_patch()",
-            "apply_livery_section_boundary_fix_patch()",
             "apply_livery_decoder_recovery_patch()",
             "apply_livery_bare_parent_transform_fix()",
             "apply_livery_consecutive_transform_pair_fix()",
@@ -26,6 +25,11 @@ class Kfps3131CleanDecoderTests(unittest.TestCase):
         for call in forbidden_calls:
             self.assertNotIn(call, app)
         self.assertIn("apply_kfps_3_1_31_clean_baseline()", app)
+        self.assertIn("apply_livery_section_boundary_fix_patch()", app)
+        self.assertLess(
+            app.index("apply_kfps_3_1_31_clean_baseline()"),
+            app.index("apply_livery_section_boundary_fix_patch()"),
+        )
 
     def test_clean_baseline_uses_existing_scale_persistence_installer(self) -> None:
         wrapper = (
