@@ -32,6 +32,8 @@ from fh6garage.v1_4_validation_patch import apply_v1_4_validation_patch
 from fh6garage.v1_4_native_resolution_test_patch import apply_v1_4_native_resolution_test_patch
 from fh6garage.v1_4_quality_pipeline_patch import apply_v1_4_quality_pipeline_patch
 from fh6garage.v1_4_preview_final_ui_patch import apply_v1_4_preview_final_ui_patch
+from fh6garage.livery_compact_shape_guard_patch import apply_livery_compact_shape_guard_patch
+from fh6garage.livery_section_boundary_fix_patch import apply_livery_section_boundary_fix_patch
 from fh6garage.livery_decoder_recovery_patch import apply_livery_decoder_recovery_patch
 from fh6garage.livery_bare_parent_transform_fix import apply_livery_bare_parent_transform_fix
 from fh6garage.livery_consecutive_transform_pair_fix import apply_livery_consecutive_transform_pair_fix
@@ -60,6 +62,16 @@ def main() -> int:
 
     settings = QSettings()
     set_language(settings.value("language", DEFAULT_LANGUAGE, str))
+
+    # The markerless 0x02 compact form is ambiguous with FH6 control/group data.
+    # Keep explicit 00/01-02 placements untouched, but require compact words to
+    # resolve through the pinned native resource map before accepting ShapeNode.
+    apply_livery_compact_shape_guard_patch()
+
+    # Some populated sections begin the next section directly at the current
+    # parser position. Preserve an exact 32-byte next-section placement instead
+    # of consuming the legacy unconditional 18-byte remnant.
+    apply_livery_section_boundary_fix_patch()
 
     # Install structural decoding safeguards before any UI action can inspect a
     # livery. Flat sections are recovered only when their raw byte contract can
