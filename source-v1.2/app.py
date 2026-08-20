@@ -38,6 +38,7 @@ from fh6garage.livery_raster_runtime_patch import apply_livery_raster_runtime_pa
 from fh6garage.livery_render_integrity_patch import apply_livery_render_integrity_patch
 from fh6garage.livery_preview_ui_polish import apply_livery_preview_ui_polish
 from fh6garage.livery_kfps_3_1_31_clean_baseline import apply_kfps_3_1_31_clean_baseline
+from fh6garage.livery_section_boundary_fix_patch import apply_livery_section_boundary_fix_patch
 
 
 def resource_root() -> Path:
@@ -57,9 +58,11 @@ def main() -> int:
     settings = QSettings()
     set_language(settings.value("language", DEFAULT_LANGUAGE, str))
 
-    # Clean-decoder A/B test: rely on KFPS 3.1.31's upstream C_livery grammar.
-    # Do not install any FH6 Assistant decoder recovery, transform, section,
-    # compact-shape, structural-audit, or source-offset-order patch here.
+    # Compatibility candidate derived from differential real-data tests:
+    # keep KFPS 3.1.31's native group/transform/shape semantics, and restore only
+    # the proven populated-to-populated section-boundary preservation rule.
+    # Do not install decoder recovery, bare-parent/consecutive-transform fixes,
+    # compact-shape guard, structural audit, or source-offset normalization.
 
     apply_v1_3_ui_patches(MainWindow)
     apply_v1_3_1_patches(MainWindow)
@@ -70,15 +73,13 @@ def main() -> int:
     apply_v1_4_quality_pipeline_patch(MainWindow)
     apply_v1_4_preview_final_ui_patch(MainWindow)
 
-    # Keep the established v1.4 rendering/UI pipeline. Only the C_livery decoder
-    # source changes in this test; warning-only integrity and persistent quality
-    # scale remain enabled without rewriting decoded layer order.
     apply_livery_tiled_runtime_patch()
     apply_livery_render_acceleration_patch()
     apply_livery_raster_runtime_patch()
     apply_livery_render_integrity_patch()
     apply_livery_preview_ui_polish()
     apply_kfps_3_1_31_clean_baseline()
+    apply_livery_section_boundary_fix_patch()
 
     root = resource_root()
     icon_path = root / "icons" / "FH6_Assistant.ico"
