@@ -18,7 +18,7 @@ from .exact_livery_preview import (
 from .livery_analysis import LiveryAnalysisError, analyze_livery_file
 
 
-KFPS_VENDOR_COMMIT = "8965780b8966e09d2f2a17e4d0684cdd44d7437c"
+KFPS_VENDOR_COMMIT = "004b3b61a57d901e65957b6099805835f91e32f6"
 
 
 class LiveryPreviewError(RuntimeError):
@@ -345,10 +345,6 @@ def _render_section_cached(
         )
 
     try:
-        # Native resources were already validated above. Use the renderer's
-        # non-fatal visibility path so legitimate zero-alpha/off-canvas no-op
-        # placements do not abort an otherwise exact section reconstruction.
-        # Missing resources can never reach this call because preflight fails.
         rendered = renderer.render_typecode_layers_canvas(
             prepared_layers,
             width=2048,
