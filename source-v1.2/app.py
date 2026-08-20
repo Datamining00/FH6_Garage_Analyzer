@@ -35,6 +35,7 @@ from fh6garage.v1_4_preview_final_ui_patch import apply_v1_4_preview_final_ui_pa
 from fh6garage.livery_decoder_recovery_patch import apply_livery_decoder_recovery_patch
 from fh6garage.livery_bare_parent_transform_fix import apply_livery_bare_parent_transform_fix
 from fh6garage.livery_structural_parser_audit import install_livery_structural_parser_audit
+from fh6garage.livery_parent_ownership_diagnostic import install_livery_parent_ownership_diagnostic
 from fh6garage.livery_tiled_runtime_patch import apply_livery_tiled_runtime_patch
 from fh6garage.livery_render_acceleration_patch import apply_livery_render_acceleration_patch
 from fh6garage.livery_raster_runtime_patch import apply_livery_raster_runtime_patch
@@ -70,10 +71,15 @@ def main() -> int:
     # narrow; unknown variants are audited below instead of guessed.
     apply_livery_bare_parent_transform_fix()
 
-    # Diagnostic-only safety net: scan C_livery streams for additional
-    # structurally plausible unframed transforms.  It never mutates the tree or
-    # renderer, but prevents new parser variants from failing silently.
+    # Diagnostic-only safety net: inspect only byte positions that the patched
+    # decoder still walks one byte at a time. It never mutates the tree or
+    # renderer and therefore separates missing grammar from ownership errors.
     install_livery_structural_parser_audit()
+
+    # Record the final GroupNode parent/child ownership after all decoder
+    # recovery patches and structural auditing are active. This is non-invasive
+    # and is used to diagnose remaining correctly-framed but mis-owned groups.
+    install_livery_parent_ownership_diagnostic()
 
     apply_v1_3_ui_patches(MainWindow)
     apply_v1_3_1_patches(MainWindow)
