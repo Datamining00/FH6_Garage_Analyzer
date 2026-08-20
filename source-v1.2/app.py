@@ -38,6 +38,7 @@ from fh6garage.livery_raster_runtime_patch import apply_livery_raster_runtime_pa
 from fh6garage.livery_render_integrity_patch import apply_livery_render_integrity_patch
 from fh6garage.livery_preview_ui_polish import apply_livery_preview_ui_polish
 from fh6garage.livery_kfps_3_1_31_clean_baseline import apply_kfps_3_1_31_clean_baseline
+from fh6garage.livery_decoder_differential_test import apply_livery_decoder_differential_test
 
 
 def resource_root() -> Path:
@@ -57,9 +58,9 @@ def main() -> int:
     settings = QSettings()
     set_language(settings.value("language", DEFAULT_LANGUAGE, str))
 
-    # Clean-decoder A/B test: rely on KFPS 3.1.31's upstream C_livery grammar.
-    # Do not install any FH6 Assistant decoder recovery, transform, section,
-    # compact-shape, structural-audit, or source-offset-order patch here.
+    # The visible preview stays on clean KFPS 3.1.31. The differential test
+    # separately loads the previous 3.1.27 decoder plus the proven FH6 Assistant
+    # decoder rules and compares both results without switching runtime decoder.
 
     apply_v1_3_ui_patches(MainWindow)
     apply_v1_3_1_patches(MainWindow)
@@ -70,15 +71,16 @@ def main() -> int:
     apply_v1_4_quality_pipeline_patch(MainWindow)
     apply_v1_4_preview_final_ui_patch(MainWindow)
 
-    # Keep the established v1.4 rendering/UI pipeline. Only the C_livery decoder
-    # source changes in this test; warning-only integrity and persistent quality
-    # scale remain enabled without rewriting decoded layer order.
     apply_livery_tiled_runtime_patch()
     apply_livery_render_acceleration_patch()
     apply_livery_raster_runtime_patch()
     apply_livery_render_integrity_patch()
     apply_livery_preview_ui_polish()
     apply_kfps_3_1_31_clean_baseline()
+
+    # Diagnostic-only wrapper. Opening a livery preview emits a JSON comparison
+    # under LocalAppData and then opens the normal clean 3.1.31 preview.
+    apply_livery_decoder_differential_test(MainWindow)
 
     root = resource_root()
     icon_path = root / "icons" / "FH6_Assistant.ico"

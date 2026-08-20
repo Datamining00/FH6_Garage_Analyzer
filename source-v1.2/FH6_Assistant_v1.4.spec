@@ -3,11 +3,17 @@ from pathlib import Path
 
 project_root = Path(SPECPATH)
 vendor_root = project_root / 'vendor' / 'kfps'
+legacy_root = project_root / 'vendor' / 'kfps_legacy'
 
 if not vendor_root.is_dir():
     raise SystemExit(
         'Pinned KFPS livery preview backend is missing. '
         'Run the v1.4 build workflow or populate source-v1.2/vendor/kfps first.'
+    )
+if not legacy_root.is_dir():
+    raise SystemExit(
+        'Legacy KFPS 3.1.27 decoder bundle is missing. '
+        'Run the differential build workflow or populate source-v1.2/vendor/kfps_legacy first.'
     )
 
 required_vendor_files = [
@@ -27,9 +33,14 @@ required_vendor_files = [
     vendor_root / 'tools' / 'fabric-editor' / 'Resources' / 'Vinyls',
     vendor_root / 'LICENSE',
 ]
-missing = [str(path) for path in required_vendor_files if not path.exists()]
+required_legacy_files = [
+    legacy_root / 'tools' / 'cgroup' / 'forza_source_decoder.py',
+    legacy_root / 'tools' / 'cgroup' / 'shape_identity.py',
+    legacy_root / 'LICENSE',
+]
+missing = [str(path) for path in [*required_vendor_files, *required_legacy_files] if not path.exists()]
 if missing:
-    raise SystemExit('Incomplete KFPS preview backend:\n' + '\n'.join(missing))
+    raise SystemExit('Incomplete KFPS differential backend:\n' + '\n'.join(missing))
 
 datas = [
     (str(project_root / 'data' / 'car_names.json'), 'data'),
@@ -37,6 +48,9 @@ datas = [
     (str(vendor_root / 'tools' / 'fabric-editor' / 'shape-words.json'), 'tools/fabric-editor'),
     (str(vendor_root / 'tools' / 'fabric-editor' / 'Resources' / 'Vinyls'), 'tools/fabric-editor/Resources/Vinyls'),
     (str(vendor_root / 'LICENSE'), 'vendor/kfps'),
+    (str(legacy_root / 'tools' / 'cgroup' / 'forza_source_decoder.py'), 'vendor/kfps_legacy/tools/cgroup'),
+    (str(legacy_root / 'tools' / 'cgroup' / 'shape_identity.py'), 'vendor/kfps_legacy/tools/cgroup'),
+    (str(legacy_root / 'LICENSE'), 'vendor/kfps_legacy'),
 ]
 shape_names = vendor_root / 'tools' / 'fabric-editor' / 'shape-names.json'
 if shape_names.is_file():
