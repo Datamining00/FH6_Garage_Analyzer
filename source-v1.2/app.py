@@ -44,6 +44,7 @@ from fh6garage.livery_raster_runtime_patch import apply_livery_raster_runtime_pa
 from fh6garage.livery_render_integrity_patch import apply_livery_render_integrity_patch
 from fh6garage.livery_preview_ui_polish import apply_livery_preview_ui_polish
 from fh6garage.livery_baseline_behavior_patch import apply_livery_baseline_behavior_patch
+from fh6garage.livery_left_2761_exclusion_test import install_left_2761_exclusion_test
 
 
 def resource_root() -> Path:
@@ -112,6 +113,12 @@ def main() -> int:
     apply_livery_render_integrity_patch()
     apply_livery_preview_ui_polish()
     apply_livery_baseline_behavior_patch()
+
+    # Diagnostic-only comparison: suppress the exact final Left placement that
+    # the probe isolated as the visible occluder.  This does not alter parsing or
+    # establish a production ordering rule; it answers only whether that decoded
+    # placement is responsible for the in-game/render mismatch.
+    install_left_2761_exclusion_test()
 
     root = resource_root()
     icon_path = root / "icons" / "FH6_Assistant.ico"
