@@ -83,11 +83,6 @@ def main() -> int:
     # renderer, but prevents new parser variants from failing silently.
     install_livery_structural_parser_audit()
 
-    # Simple follow-up diagnostics: keep rendering when a missing native shape
-    # is an ordinary visible layer (masks still fail closed), and create an
-    # automatic 8-way layer probe for Left/Right sections in the background.
-    install_simple_layer_native_debug()
-
     apply_v1_3_ui_patches(MainWindow)
     apply_v1_3_1_patches(MainWindow)
     apply_v1_4_patches(MainWindow)
@@ -106,6 +101,12 @@ def main() -> int:
     apply_livery_render_integrity_patch()
     apply_livery_preview_ui_polish()
     apply_livery_baseline_behavior_patch()
+
+    # Simple follow-up diagnostics are installed last so they preserve the
+    # complete v1.4 runtime behavior underneath. Missing ordinary visible native
+    # shapes are skipped with a JSON log, while missing mask assets remain fatal.
+    # Left/Right renders also emit an automatic 8-way layer contact sheet.
+    install_simple_layer_native_debug()
 
     root = resource_root()
     icon_path = root / "icons" / "FH6_Assistant.ico"
