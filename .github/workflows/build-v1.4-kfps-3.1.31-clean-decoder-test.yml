@@ -11,6 +11,7 @@ on:
   pull_request:
     branches:
       - v1.4-parser-boundary-compact-fix
+      - v1.4-kfps-3.1.31-clean-decoder-test
     paths:
       - ".github/workflows/build-v1.4-kfps-3.1.31-clean-decoder-test.yml"
       - "source-v1.2/**"
