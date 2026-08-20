@@ -13,6 +13,10 @@ if not vendor_root.is_dir():
 required_vendor_files = [
     vendor_root / 'json_preview_renderer.py',
     vendor_root / 'geometry_json.py',
+    vendor_root / 'kfps_shapes' / '__init__.py',
+    vendor_root / 'kfps_shapes' / 'fd6.py',
+    vendor_root / 'kfps_shapes' / 'resources.py',
+    vendor_root / 'kfps_shapes' / 'schema.py',
     vendor_root / 'tools' / 'cgroup' / 'forza_source_decoder.py',
     vendor_root / 'tools' / 'cgroup' / 'shape_identity.py',
     vendor_root / 'tools' / 'livery' / '__init__.py',
@@ -46,6 +50,10 @@ a = Analysis(
     hiddenimports=[
         'geometry_json',
         'json_preview_renderer',
+        'kfps_shapes',
+        'kfps_shapes.fd6',
+        'kfps_shapes.resources',
+        'kfps_shapes.schema',
         'tools.cgroup.forza_source_decoder',
         'tools.cgroup.shape_identity',
         'tools.livery.vehicle_assets',

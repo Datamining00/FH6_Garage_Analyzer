@@ -96,6 +96,10 @@ class BareParentTransformFixTests(unittest.TestCase):
     def test_app_installs_fix_after_decoder_recovery(self):
         app_path = Path(__file__).resolve().parents[1] / "app.py"
         text = app_path.read_text(encoding="utf-8")
+        if "apply_kfps_3_1_31_clean_baseline()" in text:
+            self.assertNotIn("apply_livery_decoder_recovery_patch()", text)
+            self.assertNotIn("apply_livery_bare_parent_transform_fix()", text)
+            return
         recovery_pos = text.index("apply_livery_decoder_recovery_patch()")
         fix_pos = text.index("apply_livery_bare_parent_transform_fix()")
         baseline_pos = text.index("apply_livery_baseline_behavior_patch()")
