@@ -42,7 +42,7 @@ jobs:
           Set-Location source-v1.2
           python -m compileall -q fh6garage/fh6_clivery
 
-      - name: Run Milestone 1-2 tests without KFPS or FLS
+      - name: Run independent decoder and oracle tests
         shell: pwsh
         run: |
           Set-Location source-v1.2
