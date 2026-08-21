@@ -67,23 +67,27 @@ No nested Group-boundary state is inferred. No section-terminal state is inferre
 
 For the Car-2997 independent scene, the four currently confirmed mask source offsets are all achromatic Shapes, so this correction is a real general runtime bug fix but **does not by itself explain the known Car-2997 Left-side occlusion**.
 
-## Car 2997 runtime discrepancy still present in prior diagnostics
+## Car 2997 runtime discrepancy in the retained diagnostic corpus
 
-The prior pinned-runtime differential for `Livery_2997_20260817150058` reports:
+A retained decoder differential for `Livery_2997_20260817150058` reports the old pinned/local runtime output as:
 
 ```text
 legacy patched runtime total: 9085
-independent exact scene total: 9086
-
 legacy Left:  2988
-exact Left:   2989
 legacy Right: 2964
-exact Right:  2964
 ```
 
-The independent decoder has exact 11-section byte coverage, no unknown spans, and declared/parsed leaf equality. Therefore the old renderer input path was missing one Left leaf relative to the independently validated scene.
+The independent decoder, using the same raw Car-2997 sample, has exact 11-section byte coverage and produces:
 
-The same prior differential also contains large semantic/parser divergences around section boundaries and transformed groups. Those historical comparisons are useful diagnostics, but they compare different decoder implementations and are not themselves sufficient to identify the exact occluding polygon.
+```text
+independent exact total: 9086
+independent Left:  2989
+independent Right: 2964
+```
+
+Thus the old renderer input path is one Left leaf short relative to the independently validated scene. The retained differential itself compares that old pinned/local path with a different KFPS revision, so its other semantic differences are diagnostic evidence only; they are **not** used as an oracle for the independent decoder.
+
+The missing Left leaf is a concrete renderer-input discrepancy, but a missing layer would normally explain absent artwork rather than an extra occluding polygon. It therefore remains a candidate symptom, not a sufficient root-cause explanation.
 
 ## High-value nested transform landmarks
 
@@ -113,6 +117,8 @@ effective transform approximately:
 
 These are better candidates for renderer-path differential checks than global layer reversal or source-offset sorting because they exercise nested Group composition and reflection directly.
 
+The retained old-runtime differential does not expose a reliable one-to-one entry for these independent offsets without first reconciling the historical decoder's offset/boundary convention. Therefore this pass deliberately does not claim an exact old-vs-independent transform delta at `194176` or `194336`.
+
 ## Left/Right convention
 
 Controlled FLS pair 6 proves an FLS UI-facing side convention:
@@ -136,7 +142,7 @@ Applied and regression-tested:
 
 Still required before M4d sign-off:
 
-- directly compare the legacy renderer input and independent semantics in the affected Car-2997 nested Left region;
+- directly compare the legacy renderer input and independent semantics in the affected Car-2997 nested Left region using a reconciled offset/path identity;
 - identify the one missing legacy Left leaf and determine whether it is visually relevant;
 - validate nested Group/mask final draw order with a purpose-built oracle if the real-sample comparison remains ambiguous;
 - re-render the original problem sample and confirm whether the person-obscuring polygon is gone.
