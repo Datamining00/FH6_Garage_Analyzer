@@ -214,14 +214,20 @@ def _achromatic(shape: ShapeNode) -> bool:
     return r == g == b
 
 
-def _resolve_masks(root: GroupNode) -> dict[int, tuple[bool, tuple[str, ...]]]:
+def _resolve_masks(
+    root: GroupNode,
+    *,
+    terminal_state: int = 0,
+) -> dict[int, tuple[bool, tuple[str, ...]]]:
     """Resolve only mask semantics supported by current M4 corpus evidence.
 
     `0x60` ancestry is authoritative. Outside such ancestry, a direct Shape child
     with physical lead `01 02` carries trailing state for the immediately
-    preceding direct Shape sibling. The state is promoted only when that previous
-    shape is achromatic. Group-terminal odd-lead state is deliberately not
-    inferred here.
+    preceding direct Shape sibling. A populated section can carry the same one-bit
+    state in the first byte of its post-tree remnant (or the one-byte terminal
+    state for the last populated section); the controlled FLS export proves that
+    state `1` masks the terminal direct achromatic Shape. Group-terminal and
+    chromatic-terminal state remain unsupported and fail closed.
     """
 
     result: dict[int, tuple[bool, tuple[str, ...]]] = {}
@@ -258,14 +264,43 @@ def _resolve_masks(root: GroupNode) -> dict[int, tuple[bool, tuple[str, ...]]]:
                 result[id(previous)] = (False, ("NO_EFFECTIVE_MASK",))
 
     walk(root, False)
+
+    if terminal_state not in (0, 1):
+        raise FlattenError(f"unsupported livery section terminal state {terminal_state!r}")
+    if terminal_state == 1:
+        if not root.children:
+            raise FlattenError("nonzero livery section terminal state has no target child")
+        target = root.children[-1]
+        if not isinstance(target, ShapeNode):
+            raise FlattenError(
+                "nonzero livery section terminal state after a Group is not yet semantically mapped"
+            )
+        if not _achromatic(target):
+            raise FlattenError(
+                "nonzero livery section terminal state on a chromatic Shape is not yet semantically mapped"
+            )
+        current_mask, current_evidence = result.get(id(target), (False, ("NO_EFFECTIVE_MASK",)))
+        if current_mask:
+            result[id(target)] = (True, current_evidence + ("section_terminal_state_01",))
+        else:
+            result[id(target)] = (True, ("section_terminal_state_01",))
+
     return result
 
 
-def _flatten_section(slot: int, name: str, declared_count: int, root: GroupNode | None, complete: bool) -> FlattenedSection:
+def _flatten_section(
+    slot: int,
+    name: str,
+    declared_count: int,
+    root: GroupNode | None,
+    complete: bool,
+    *,
+    terminal_state: int = 0,
+) -> FlattenedSection:
     if root is None:
         return FlattenedSection(slot, name, declared_count, (), complete)
 
-    mask_map = _resolve_masks(root)
+    mask_map = _resolve_masks(root, terminal_state=terminal_state)
     layers: list[FlattenedLayer] = []
 
     def walk(group: GroupNode, parent_frame: _Frame) -> None:
@@ -309,6 +344,14 @@ def flatten_livery_scene(scene: CliveryScene, section_names: Iterable[str] | Non
         raise FlattenError("C_livery scene has no Milestone 3 artwork tree")
 
     requested = set(section_names) if section_names is not None else None
+    terminal_state_by_tree_end: dict[int, int] = {}
+    for record in scene.artwork.records:
+        if record.kind not in {"livery_section_remnant", "livery_section_terminal_state"}:
+            continue
+        if not record.raw:
+            raise FlattenError(f"{record.kind} at 0x{record.span.offset:x} is empty")
+        terminal_state_by_tree_end[record.span.offset] = record.raw[0]
+
     output: list[FlattenedSection] = []
     for section in scene.artwork.sections:
         if requested is not None and section.name not in requested:
@@ -320,6 +363,7 @@ def flatten_livery_scene(scene: CliveryScene, section_names: Iterable[str] | Non
                 section.declared_count,
                 section.root,
                 section.complete,
+                terminal_state=terminal_state_by_tree_end.get(section.tree_end, 0),
             )
         )
     return FlattenedLivery(scene.car_id, scene.body_start, scene.body_end, tuple(output))
