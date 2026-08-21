@@ -209,11 +209,6 @@ def _compose_shape(parent: _Frame, shape: ShapeNode) -> EffectiveTransform:
     return EffectiveTransform(frame.x, frame.y, sx, sy, rotation, skew)
 
 
-def _achromatic(shape: ShapeNode) -> bool:
-    r, g, b, _a = shape.color_rgba
-    return r == g == b
-
-
 def _resolve_masks(
     root: GroupNode,
     *,
@@ -223,14 +218,14 @@ def _resolve_masks(
 
     `0x60` ancestry is authoritative. Outside such ancestry, a direct Shape child
     with physical lead `01 02` carries trailing state for the immediately
-    preceding direct Shape sibling. A populated section can carry the same one-bit
-    state in the first byte of its post-tree remnant (or the one-byte terminal
-    state for the last populated section); controlled FLS exports prove that state
-    `1` masks the terminal direct Shape for both achromatic and chromatic colors.
-    Group-terminal state remains unsupported and fails closed.
+    preceding direct Shape sibling. Controlled pair 5 proves this direct-sibling
+    rule is independent of the preceding Shape's color.
 
-    The separate direct-sibling `01 02` rule remains conservative: current corpus
-    evidence only promotes an achromatic preceding direct Shape in that context.
+    A populated section can carry the same one-bit state in the first byte of its
+    post-tree remnant (or the one-byte terminal state for the last populated
+    section); controlled FLS exports prove that state `1` masks the terminal direct
+    Shape for both achromatic and chromatic colors. Group-terminal state remains
+    unsupported and fails closed.
     """
 
     result: dict[int, tuple[bool, tuple[str, ...]]] = {}
@@ -257,14 +252,10 @@ def _resolve_masks(
                 continue
             previous = group.children[index - 1]
             if not isinstance(previous, ShapeNode):
-                # State after a completed group belongs to a terminal child in a
-                # grammar branch that is still semantically unresolved. Preserve
-                # the structure but do not guess the target leaf.
+                # A state crossing a completed Group boundary is still unresolved.
+                # Preserve the structure but do not guess a target leaf.
                 continue
-            if _achromatic(previous):
-                result[id(previous)] = (True, ("shape_0102_trailing_state",))
-            else:
-                result[id(previous)] = (False, ("NO_EFFECTIVE_MASK",))
+            result[id(previous)] = (True, ("shape_0102_trailing_state",))
 
     walk(root, False)
 
