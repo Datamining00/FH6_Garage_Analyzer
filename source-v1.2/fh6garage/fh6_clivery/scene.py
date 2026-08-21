@@ -35,6 +35,17 @@ class ShapeNode:
     mask_evidence: str
     parent_path: tuple[int, ...]
 
+    def __post_init__(self) -> None:
+        # Controlled FLS -> C_livery pair 4 proves that the final four bytes of
+        # a livery Shape record are stored in RGBA order. Keep this correction
+        # scoped to C_livery records: standalone C_group color byte order still
+        # lacks an independent colored corpus sample and must not be guessed.
+        if self.raw_record.kind == "livery_shape_record":
+            raw = self.raw_record.raw
+            if len(raw) < 4:
+                raise ValueError("livery shape record is too short to contain RGBA color bytes")
+            self.color_rgba = tuple(raw[-4:])  # type: ignore[assignment]
+
     def to_dict(self) -> dict[str, object]:
         return {
             "kind": "shape",
