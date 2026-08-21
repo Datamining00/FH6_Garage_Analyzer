@@ -101,7 +101,7 @@ no FLS-specific runtime or implementation dependency.
 
 ## FLS `.3so` black-box oracle bridge
 
-Status: `IMPLEMENTED INSPECTION BRIDGE; REAL ORACLE ARTIFACT PENDING`.
+Status: `IMPLEMENTED INSPECTION/EVIDENCE BRIDGE; REAL ORACLE ARTIFACT PENDING`.
 
 FLS public `docs/DEV.md` documents `.3so` as the editor project JSON wrapped in a
 gzip stream, with the project document containing a recursive `root` scene tree of
@@ -114,6 +114,29 @@ observed string-valued node `kind` values, exact per-kind key signatures, and
 candidate child-bearing keys. It intentionally makes no field-to-`SemanticLayer`
 mapping until a real `.3so` produced from one of the SHA-pinned livery samples is
 observed.
+
+The bridge now also exposes a generic JSON loader and kind-node iterator. Each
+observed node is returned with its exact JSON path and untouched dictionary. This
+is structural evidence only: no undocumented key is renamed or assigned transform,
+mask, shape, section, or draw-order meaning.
+
+For reproducible handoff, the module CLI can write both the compact inventory and
+an optional raw kind-node/path dump:
+
+```text
+python -m fh6garage.fh6_clivery.fls_oracle sample.3so \
+  -o inventory.json \
+  --nodes-output nodes.json
+```
+
+The dump carries the source `.3so` raw/uncompressed SHA-256 values so later semantic
+mapping can be tied to one exact black-box artifact.
+
+An opt-in real regression hook is also present. Setting `FH6_FLS_3SO_2997` to an
+untouched `.3so` saved after importing the SHA-pinned Car 2997 `C_livery` makes the
+suite validate documented container/root framing and verify that inventory count and
+generic node traversal agree. Exact FLS key/value expectations will be pinned only
+after that real artifact is observed.
 
 This two-step policy prevents guessing FLS scene-field names or silently importing
 implementation assumptions. Once a real `.3so` is observed, only fields present in
