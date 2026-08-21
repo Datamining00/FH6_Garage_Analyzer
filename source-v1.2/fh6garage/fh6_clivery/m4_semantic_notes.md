@@ -20,8 +20,7 @@ oracle such as an FLS export:
 - leaf count.
 
 No ForzaLiveryStudio runtime or implementation source is imported by this module.
-Public FLS format documentation is reference material only.  The actual FLS
-semantic exporter remains external to this repository.
+Public FLS format/development documentation is reference material only.
 
 ## Structural flatten order
 
@@ -98,8 +97,29 @@ tolerance.  The full supplied Car 2997 scene flattens to 9086 leaves, matching a
 `semantic_diff.py` compares neutral `SemanticLayer` sequences.  It reports field
 level differences for section, structural order, raw shape identity, parent path,
 transform, mask, color, source offset, and total leaf count.  It deliberately has
-no FLS-specific adapter or dependency.
+no FLS-specific runtime or implementation dependency.
 
-A full **FLS-vs-ours** M4 sign-off requires an FLS semantic export for the same
-SHA-pinned `C_livery` sample.  That oracle artifact is not stored in this branch,
-so this commit must not be described as completing FLS differential validation.
+## FLS `.3so` black-box oracle bridge
+
+Status: `IMPLEMENTED INSPECTION BRIDGE; REAL ORACLE ARTIFACT PENDING`.
+
+FLS public `docs/DEV.md` documents `.3so` as the editor project JSON wrapped in a
+gzip stream, with the project document containing a recursive `root` scene tree of
+kind-discriminated layer nodes. `fls_oracle.py` uses only that documented container
+fact. It does not inspect or reproduce FLS implementation code.
+
+The bridge strictly decompresses gzip, requires UTF-8 JSON with the documented
+`root`, records raw/uncompressed SHA-256 values, inventories top-level keys,
+observed string-valued node `kind` values, exact per-kind key signatures, and
+candidate child-bearing keys. It intentionally makes no field-to-`SemanticLayer`
+mapping until a real `.3so` produced from one of the SHA-pinned livery samples is
+observed.
+
+This two-step policy prevents guessing FLS scene-field names or silently importing
+implementation assumptions. Once a real `.3so` is observed, only fields present in
+that black-box output will be normalized into the existing neutral comparator.
+
+A full **FLS-vs-ours** M4 sign-off still requires an untouched FLS `.3so` saved
+after importing one of the same SHA-pinned `C_livery` samples. Until that oracle
+artifact is available and compared field-by-field, Milestone 4 remains partially
+complete rather than signed off.
