@@ -1,52 +1,85 @@
 # Milestone 4d renderer trace — evidence-driven integration
 
-Status: **IN PROGRESS — TWO BOUNDED RUNTIME CORRECTIONS APPLIED; ORIGINAL CAR-2997 LEFT-SIDE OCCLUSION NOT YET SIGNED OFF**
+Status: **IN PROGRESS — INDEPENDENT VECTOR SCENE IS NOW BOUND TO THE PREVIEW RENDERER; ORIGINAL CAR-2997 LEFT-SIDE OCCLUSION STILL REQUIRES LOCAL VISUAL SIGN-OFF**
 
-This note records the first renderer-connection pass after the independent decoder and controlled FLS semantic work. It deliberately separates facts proven by controlled or real corpus evidence from hypotheses about the original visual defect.
+This note records the renderer-connection stage after the independent decoder and controlled FLS semantic work. It deliberately separates proven runtime contracts from hypotheses about the original visual defect.
 
 No global layer reversal is introduced. `source_offset` remains provenance only. No Left/Right section-name swap is introduced from the FLS UI-side convention.
 
-## Runtime chain traced
+## Runtime chain after the M4d handoff
 
-The current FH6 Assistant preview path is:
+The current FH6 Assistant preview path is now:
 
 ```text
 app.py
-  -> apply_livery_decoder_recovery_patch()
-  -> apply_livery_baseline_behavior_patch()
-  -> livery_preview.decode_livery_preview()
-  -> pinned KFPS decode_forza_source()
-  -> group by source_section
-  -> render_typecode_layers_canvas(section layers)
-  -> exact vehicle projection for that section
-  -> display-only section rotation
+  -> apply_livery_decoder_recovery_patch()       # retained legacy fallback
+  -> apply_livery_independent_render_bridge_patch()
+  -> independent decode_clivery_file()
+  -> independent flatten_livery_scene()
+  -> render_adapter exact-vector validation
+  -> existing native render_typecode_layers_canvas()
+  -> existing exact vehicle projection
+  -> existing display-only section rotation
 ```
 
-The pinned KFPS tree flattener walks Group children recursively in structural DFS order. The renderer consumes the resulting layer list in list order: an ordinary later layer paints over an earlier layer, while an encountered mask acts at that point in the sequence.
+When the independent scene cannot be bound safely, the bridge explicitly falls back to the pinned legacy preview decoder. The fallback is not silent: a stable diagnostic warning is attached.
 
-Controlled FLS pair 5 independently proves the same paint rule for flat direct siblings: stored child order is back-to-front paint order. It does **not** establish that raw byte offset is a general z-order key for nested Group scenes.
+The existing renderer, native FH6 shape resources, vehicle projection masks, and display transforms are unchanged. The new bridge changes only the source of placement dictionaries when independent semantics are proven.
+
+## Independent renderer bridge acceptance contract
+
+`fh6_clivery/render_adapter.py` accepts a `C_livery` for direct renderer use only when all of the following are true:
+
+1. the complete 11-section scene is present in the canonical serialized section order;
+2. every section is structurally complete;
+3. every flattened leaf count equals its declared section count;
+4. structural traversal indices are continuous in DFS order;
+5. every renderer-bound leaf is within the independently validated vector Shape domain.
+
+The bridge preserves the exact structural DFS sequence. It never sorts by `source_offset`.
+
+Renderer dictionaries remain the neutral M4 contract:
+
+```text
+type = 0x100000 + type_word
+data = [x, y, sx, sy, rotation, skew, mask_bit]
+color = semantic RGBA
+mask = resolved semantic mask
+source_offset = provenance only
+source_parent_path = structural ancestry
+```
+
+Successful bridge records are tagged:
+
+```text
+source_format = fh6-assistant-independent-render-bridge-v1
+```
+
+## Raster/logo fail-closed boundary
+
+Independent M4 raster/logo semantics are still an evidence gap. A high-bit Shape/type word is therefore not guessed as a vector resource by the bridge.
+
+```text
+type_word & 0x8000 != 0
+=> IndependentRenderAdapterError
+=> explicit pinned-legacy preview fallback
+```
+
+This preserves current raster preview functionality without claiming independent raster semantics that have not yet been black-box validated.
 
 ## Correction A — preserve decoder structural order
 
 Before this pass, `livery_baseline_behavior_patch.normalize_decoded_layer_order()` sorted every section by ascending `source_offset` whenever offsets were complete and unique.
 
-That policy is not supported for nested Group scenes and conflicts with the independent decoder contract, which preserves structural DFS child order and treats `source_offset` as provenance only.
+That policy is unsupported for nested Group scenes and conflicts with the independent decoder contract. The wrapper now leaves decoder layer order unchanged. Regression tests use deliberately non-monotonic source offsets and require structural order to survive into renderer input.
 
-The wrapper now leaves the decoder's layer order unchanged and records:
+Controlled FLS pair 5 independently establishes back-to-front paint order for flat direct siblings. It does not establish raw byte offset as a general nested-scene z-order key.
 
-```text
-fh6assistant_layer_order_policy = decoder_structural_dfs
-```
+## Correction B — chromatic `01 02` mask in verified-flat legacy fallback
 
-Regression tests explicitly use intentionally non-monotonic source offsets and require the original structural order to survive unchanged.
+Controlled FLS pair 5 proves that a direct `01 02` Shape lead carries trailing mask state for the immediately preceding direct Shape sibling independent of predecessor color.
 
-This is a correctness fix to the runtime contract. It is **not yet evidence that source-offset sorting caused the original Car-2997 Left-side visual occlusion**; no causal claim is made until that exact scene is re-rendered or directly compared at the affected nested region.
-
-## Correction B — chromatic `01 02` mask in verified-flat sections
-
-Controlled FLS pair 5 proves that, for direct Shape siblings, a physical `01 02` lead on the following Shape carries trailing mask state for the immediately preceding direct Shape **independent of predecessor color**.
-
-The pinned legacy flatten path suppresses non-authoritative record masks when the predecessor carries chromatic color data. The local flat-section recovery path now repairs only the bounded case for which structure has already been proven:
+The legacy fallback recovery path repairs only the structurally proven flat case:
 
 ```text
 verified flat root
@@ -55,7 +88,7 @@ verified flat root
 => immediately previous direct Shape mask = true
 ```
 
-After the pinned conversion, the recovered previous layer is normalized to:
+After legacy conversion the recovered target is normalized to:
 
 ```text
 mask = true
@@ -63,13 +96,11 @@ data[6] = 1
 fh6assistant_mask_evidence = verified_flat_0102_previous_direct_shape
 ```
 
-No nested Group-boundary state is inferred. No section-terminal state is inferred by this recovery path.
+No completed-Group boundary mask state is inferred.
 
-For the Car-2997 independent scene, the four currently confirmed mask source offsets are all achromatic Shapes, so this correction is a real general runtime bug fix but **does not by itself explain the known Car-2997 Left-side occlusion**.
+## Car 2997 renderer-input discrepancy
 
-## Car 2997 runtime discrepancy in the retained diagnostic corpus
-
-A retained decoder differential for `Livery_2997_20260817150058` reports the old pinned/local runtime output as:
+The retained historical decoder differential for `Livery_2997_20260817150058` reports the old pinned/local runtime output as:
 
 ```text
 legacy patched runtime total: 9085
@@ -77,7 +108,7 @@ legacy Left:  2988
 legacy Right: 2964
 ```
 
-The independent decoder, using the same raw Car-2997 sample, has exact 11-section byte coverage and produces:
+The independent decoder on the same raw sample established exact byte coverage and:
 
 ```text
 independent exact total: 9086
@@ -85,75 +116,78 @@ independent Left:  2989
 independent Right: 2964
 ```
 
-Thus the old renderer input path is one Left leaf short relative to the independently validated scene. The retained differential itself compares that old pinned/local path with a different KFPS revision, so its other semantic differences are diagnostic evidence only; they are **not** used as an oracle for the independent decoder.
+The historical differential itself is KFPS-revision-to-KFPS-revision diagnostic evidence, not an oracle for the independent implementation. The independently validated scene is the source now bound to the renderer when the vector-only acceptance contract succeeds.
 
-The missing Left leaf is a concrete renderer-input discrepancy, but a missing layer would normally explain absent artwork rather than an extra occluding polygon. It therefore remains a candidate symptom, not a sufficient root-cause explanation.
+This removes the old 9085/9086 parser-input discrepancy from the direct vector preview path by construction. It does **not** prove that the original person-obscuring polygon is fixed until that exact livery is rendered locally with the user's FH6 vehicle assets and visually checked.
 
-## High-value nested transform landmarks
+## High-value Car 2997 nested transform landmarks
 
-The independent Car-2997 Left scene provides corpus-validated nested/reflected landmarks near the late artwork region, including:
+The independent Left scene retains corpus-validated nested/reflected landmarks including:
 
 ```text
 source_offset 194176
 shape_id 124
 parent_path (3, 14, 0)
-effective transform approximately:
-  x  = 165.8598436178
-  y  = -19.3278817261
-  sx = 0.2054017781
-  sy = 0.2054018211
-  rotation = 112.9000778198
+x  = 165.8598436178
+y  = -19.3278817261
+sx = 0.2054017781
+sy = 0.2054018211
+rotation = 112.9000778198
 
 source_offset 194336
 shape_id 124
 parent_path (3, 14, 5)
-effective transform approximately:
-  x  = 153.2265189475
-  y  = -18.2161875276
-  sx = -0.0497239419
-  sy = 0.1314831851
-  rotation = 28.6999435425
+x  = 153.2265189475
+y  = -18.2161875276
+sx = -0.0497239419
+sy = 0.1314831851
+rotation = 28.6999435425
 ```
 
-These are better candidates for renderer-path differential checks than global layer reversal or source-offset sorting because they exercise nested Group composition and reflection directly.
-
-The retained old-runtime differential does not expose a reliable one-to-one entry for these independent offsets without first reconciling the historical decoder's offset/boundary convention. Therefore this pass deliberately does not claim an exact old-vs-independent transform delta at `194176` or `194336`.
+The bridge forwards these already-flattened independent transforms without legacy tree reconstruction or `source_offset` resorting.
 
 ## Left/Right convention
 
-Controlled FLS pair 6 proves an FLS UI-facing side convention:
+Controlled FLS pair 6 proves the FLS UI-facing convention:
 
 ```text
 FLS UI Right <-> serialized/internal Left slot 3
 FLS UI Left  <-> serialized/internal Right slot 4
 ```
 
-The serialized/internal section order remains stable and is retained by the independent decoder. The current FH6 Assistant projection path also maps internal Left/Right by their serialized names. Pair 6 therefore does **not** justify swapping application section names; it only prevents using the FLS UI label as a direct serialized-side oracle.
+This remains a UI convention only. The binary section order and FH6 Assistant serialized section names are unchanged.
 
-## Current conclusion
+## Cache boundary
 
-Applied and regression-tested:
+Because the renderer-input decoder changed, M4d bumps all preview cache namespaces used by the current pipeline. PNGs generated by the previous parser path are therefore not reused as evidence for the new bridge.
 
-1. remove unsupported `source_offset` z-order normalization;
-2. preserve decoder structural DFS order into the renderer;
-3. repair chromatic direct-sibling `01 02` masks only in structurally verified flat recovery;
-4. keep Group-boundary mask state fail-closed;
-5. keep serialized Left/Right section mapping unchanged.
+## Regression state
 
-Code-changing CI at feature head `5489cef3567b1f2597fea126bd4a93920a53aecd` passed:
+Code-changing Windows CI run `32487492718` at feature head `897966448d72391d611ffbe6d7e6dab50850689c` passed:
 
 ```text
-independent decoder/oracle: 67 tests, OK (skipped=8)
+independent decoder/oracle: 72 tests, OK (skipped=8)
 standalone C_group parser: 14 tests, OK
 real game-livery opt-ins: 2 tests, OK (skipped=2)
-full FH6 Assistant suite: 249 tests, OK (skipped=10)
+full FH6 Assistant suite: 257 tests, OK (skipped=10)
 ```
 
-The corresponding high-level Milestone-4 status and controlled-oracle summary live in `m4_semantic_notes.md`.
+New bridge regressions prove:
 
-Still required before M4d sign-off:
+- structural order survives non-monotonic `source_offset` values;
+- incomplete sections fail closed;
+- declared/flattened count mismatch fails closed;
+- high-bit raster/logo-like records do not enter the vector bridge;
+- independent exact vector output is preferred without calling the legacy decoder;
+- unsupported semantics invoke the explicit fallback;
+- app wiring applies the bridge after legacy recovery and before renderer patches.
 
-- directly compare the legacy renderer input and independent semantics in the affected Car-2997 nested Left region using a reconciled offset/path identity;
-- identify the one missing legacy Left leaf and determine whether it is visually relevant;
-- validate nested Group/mask final draw order with a purpose-built oracle if the real-sample comparison remains ambiguous;
-- re-render the original problem sample and confirm whether the person-obscuring polygon is gone.
+## Remaining M4d sign-off
+
+The architecture handoff is implemented and regression-tested. Remaining evidence work is narrower:
+
+- run the original Car-2997 problem sample through this exact feature head with the local FH6 install assets;
+- compare the new Left preview to the known defective screenshot and confirm whether the person-obscuring polygon is gone;
+- if a mismatch remains, isolate it inside the already independent renderer-layer stream rather than re-opening global order/section mapping guesses;
+- add independent raster/logo black-box evidence before removing the legacy raster fallback;
+- validate completed-Group mask-boundary and nested Group/mask final draw-order semantics when purpose-built evidence becomes available.
