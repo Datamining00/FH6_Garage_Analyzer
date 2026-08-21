@@ -33,6 +33,7 @@ from fh6garage.v1_4_native_resolution_test_patch import apply_v1_4_native_resolu
 from fh6garage.v1_4_quality_pipeline_patch import apply_v1_4_quality_pipeline_patch
 from fh6garage.v1_4_preview_final_ui_patch import apply_v1_4_preview_final_ui_patch
 from fh6garage.livery_decoder_recovery_patch import apply_livery_decoder_recovery_patch
+from fh6garage.livery_independent_render_bridge_patch import apply_livery_independent_render_bridge_patch
 from fh6garage.livery_tiled_runtime_patch import apply_livery_tiled_runtime_patch
 from fh6garage.livery_render_acceleration_patch import apply_livery_render_acceleration_patch
 from fh6garage.livery_raster_runtime_patch import apply_livery_raster_runtime_patch
@@ -58,10 +59,12 @@ def main() -> int:
     settings = QSettings()
     set_language(settings.value("language", DEFAULT_LANGUAGE, str))
 
-    # Install structural decoding safeguards before any UI action can inspect a
-    # livery. Flat sections are recovered only when their raw byte contract can
-    # be proven, and stale pre-recovery render caches are invalidated.
+    # Keep the pinned legacy recovery path available as an explicit fallback,
+    # then prefer the independent exact vector scene whenever M1-M4 can prove a
+    # complete 11-section renderer input. Raster/unresolved semantics continue
+    # through the existing fallback rather than being guessed.
     apply_livery_decoder_recovery_patch()
+    apply_livery_independent_render_bridge_patch()
 
     apply_v1_3_ui_patches(MainWindow)
     apply_v1_3_1_patches(MainWindow)

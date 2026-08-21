@@ -48,16 +48,20 @@ class BaselineBehaviorPatchTests(unittest.TestCase):
         decoded["Right"] = ({}, {}, {})
         self.assertEqual(_section_issues(expected, decoded, "Right", SECTIONS), ())
 
-    def test_source_offsets_define_stable_render_order(self) -> None:
-        first = {"source_section": "Right", "source_offset": 96, "name": "third"}
-        second = {"source_section": "Right", "source_offset": 32, "name": "first"}
-        third = {"source_section": "Right", "source_offset": 64, "name": "second"}
+    def test_source_offsets_do_not_override_decoder_structural_order(self) -> None:
+        first = {"source_section": "Right", "source_offset": 96, "name": "structural-first"}
+        second = {"source_section": "Right", "source_offset": 32, "name": "structural-second"}
+        third = {"source_section": "Right", "source_offset": 64, "name": "structural-third"}
         decoded = SimpleNamespace(layers=[first, second, third], report={})
         decoded, changed = normalize_decoded_layer_order(decoded, ("Right",))
-        self.assertEqual([item["name"] for item in decoded.layers], ["first", "second", "third"])
-        self.assertEqual(changed, ("Right",))
+        self.assertEqual(
+            [item["name"] for item in decoded.layers],
+            ["structural-first", "structural-second", "structural-third"],
+        )
+        self.assertEqual(changed, ())
+        self.assertEqual(decoded.report["fh6assistant_layer_order_policy"], "decoder_structural_dfs")
 
-    def test_missing_offset_keeps_decoder_order(self) -> None:
+    def test_missing_offset_also_keeps_decoder_order(self) -> None:
         layers = [
             {"source_section": "Right", "source_offset": 96, "name": "a"},
             {"source_section": "Right", "source_offset": None, "name": "b"},
@@ -67,6 +71,7 @@ class BaselineBehaviorPatchTests(unittest.TestCase):
         decoded, changed = normalize_decoded_layer_order(decoded, ("Right",))
         self.assertEqual([item["name"] for item in decoded.layers], ["a", "b", "c"])
         self.assertEqual(changed, ())
+        self.assertEqual(decoded.report["fh6assistant_layer_order_policy"], "decoder_structural_dfs")
 
     def test_one_x_is_a_persistable_scale(self) -> None:
         self.assertEqual(_ALLOWED_SCALES, (1, 2, 4, 8, 16))
