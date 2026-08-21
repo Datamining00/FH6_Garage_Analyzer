@@ -60,6 +60,13 @@ from .livery_sections import (
     decode_livery_sections,
 )
 from .records import RawRecord, SourceSpan, Transform
+from .render_adapter import (
+    RENDER_ADAPTER_FORMAT_ID,
+    IndependentRenderAdapterError,
+    IndependentRendererScene,
+    decode_clivery_renderer_scene,
+    renderer_scene_from_flattened,
+)
 from .scene import GroupNode, ShapeNode, UnknownNode
 from .semantic_diff import (
     SemanticDifference,
@@ -94,10 +101,13 @@ __all__ = [
     "FlattenedSection",
     "FORMAT_ID",
     "GroupNode",
+    "IndependentRenderAdapterError",
+    "IndependentRendererScene",
     "LiveryArtworkResult",
     "LiverySectionDecodeError",
     "LiverySectionResult",
     "M4_FORMAT_ID",
+    "RENDER_ADAPTER_FORMAT_ID",
     "RawRecord",
     "SECTION_NAMES",
     "SectionCount",
@@ -116,6 +126,7 @@ __all__ = [
     "decode_clivery_bytes",
     "decode_clivery_file",
     "decode_clivery_file_to_json",
+    "decode_clivery_renderer_scene",
     "decode_livery_sections",
     "flatten_livery_scene",
     "fls_kind_node_dump",
@@ -127,6 +138,7 @@ __all__ = [
     "iter_fls_kind_nodes",
     "load_fls_project_bytes",
     "load_fls_project_file",
+    "renderer_scene_from_flattened",
     "semantic_layers_from_flattened",
     "semantic_project_from_fls_artifact",
     "semantic_project_from_fls_file",
