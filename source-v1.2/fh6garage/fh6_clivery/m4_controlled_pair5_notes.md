@@ -217,7 +217,7 @@ NOT CONFIRMED:
 
 ## CI
 
-Windows run `32479905577` at head `7914915f56913ffaae54ba70068a5c74a0d8b796` completed successfully:
+Code-changing Windows run `32479905577` at head `7914915f56913ffaae54ba70068a5c74a0d8b796` completed successfully:
 
 ```text
 independent decoder/oracle: 65 tests, OK (skipped=7)
@@ -225,3 +225,5 @@ standalone C_group parser: 14 tests, OK
 real livery opt-ins: 2 tests, OK (skipped=2)
 full existing FH6 Assistant suite: 246 tests, OK (skipped=9)
 ```
+
+Subsequent commits only normalize these evidence notes; they do not change decoder behavior.
