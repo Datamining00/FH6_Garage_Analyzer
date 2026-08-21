@@ -8,15 +8,15 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from fh6garage.fh6_clivery.fls_oracle import (
+from fh6garage.fh6_clivery import (
     FLSOracleError,
     fls_kind_node_dump,
     inspect_fls_project_bytes,
     inspect_fls_project_file,
     iter_fls_kind_nodes,
     load_fls_project_bytes,
-    main,
 )
+from fh6garage.fh6_clivery.fls_oracle import main
 
 
 def make_project() -> bytes:
