@@ -140,6 +140,8 @@ Applied and regression-tested:
 4. keep Group-boundary mask state fail-closed;
 5. keep serialized Left/Right section mapping unchanged.
 
+The corresponding high-level Milestone-4 status and controlled-oracle summary live in `m4_semantic_notes.md`.
+
 Still required before M4d sign-off:
 
 - directly compare the legacy renderer input and independent semantics in the affected Car-2997 nested Left region using a reconciled offset/path identity;
