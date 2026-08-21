@@ -2,7 +2,7 @@ from __future__ import annotations
 import hashlib,os
 from pathlib import Path
 import unittest
-from fh6garage.fh6_clivery import decode_clivery_file
+from fh6garage.fh6_clivery import decode_clivery_file, flatten_livery_scene
 from fh6garage.fh6_clivery.container import inflate_clivery
 from fh6garage.fh6_clivery.scene import tree_stats
 SAMPLE_3761_SHA256="565e75445c70501dc98c00cc76c1d162d703b1921fd55735fcccb857757dac18"
@@ -33,9 +33,31 @@ class RealLiveryRegressionTests(unittest.TestCase):
         if p is None:self.skipTest("set FH6_CLIVERY_3761 to uploaded raw sample C_livery(1)")
         self.assertEqual(_sha256(p),SAMPLE_3761_SHA256);r=decode_clivery_file(p)
         self.assertEqual((r.car_id,r.gyvl_offset,r.body_start,r.body_end),(3761,51,72,275791));self.assertEqual([x.declared_count for x in r.sections],[1,21,2980,2761,2785,3,0,0,0,18,0]);_assert_artwork(self,p,EXPECTED_3761)
+        flat=flatten_livery_scene(r)
+        self.assertEqual([section.flattened_count for section in flat.sections],[1,21,2980,2761,2785,3,0,0,0,18,0])
     def test_livery_2997_when_sample_is_available(self):
         p=_sample_path("FH6_CLIVERY_2997")
         if p is None:self.skipTest("set FH6_CLIVERY_2997 to uploaded raw sample C_livery(2)")
         self.assertEqual(_sha256(p),SAMPLE_2997_SHA256);r=decode_clivery_file(p)
         self.assertEqual((r.car_id,r.gyvl_offset,r.body_start,r.body_end),(2997,51,72,293929));self.assertEqual([x.declared_count for x in r.sections],[24,156,2894,2989,2964,0,18,41,0,0,0]);_assert_artwork(self,p,EXPECTED_2997)
+        flat=flatten_livery_scene(r)
+        self.assertEqual([section.flattened_count for section in flat.sections],[24,156,2894,2989,2964,0,18,41,0,0,0])
+        by_name={section.name:section for section in flat.sections}
+        left,right=by_name["Left"],by_name["Right"]
+        self.assertEqual((left.first_source_offset,left.last_source_offset,left.mask_source_offsets),(99623,195981,(99686,99782)))
+        self.assertEqual((right.first_source_offset,right.last_source_offset,right.mask_source_offsets),(196041,291592,(196104,196200)))
+        by_offset={layer.source_offset:layer for layer in left.layers}
+        landmark=by_offset[99905]
+        self.assertEqual((landmark.type_word,landmark.source_parent_path),(532,(3,8,0)))
+        self.assertAlmostEqual(landmark.transform.x,-175.25326436990815,places=10)
+        self.assertAlmostEqual(landmark.transform.y,64.98935621042008,places=10)
+        self.assertAlmostEqual(landmark.transform.sx,0.11458421647651561,places=12)
+        self.assertAlmostEqual(landmark.transform.rotation,306.2998352050781,places=9)
+        reflected=by_offset[194336]
+        self.assertEqual((reflected.type_word,reflected.source_parent_path),(124,(3,14,5)))
+        self.assertAlmostEqual(reflected.transform.x,153.22651894752332,places=10)
+        self.assertAlmostEqual(reflected.transform.y,-18.216187527607918,places=10)
+        self.assertAlmostEqual(reflected.transform.sx,-0.049723941904440835,places=12)
+        self.assertAlmostEqual(reflected.transform.sy,0.1314831851411249,places=12)
+        self.assertAlmostEqual(reflected.transform.rotation,28.6999435424805,places=9)
 if __name__=="__main__": unittest.main()
