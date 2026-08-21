@@ -44,6 +44,15 @@ from .fls_oracle import (
     load_fls_project_bytes,
     load_fls_project_file,
 )
+from .fls_semantic import (
+    FLS_CLIVERY_FLOAT32_ABS_TOL,
+    FLS_SEMANTIC_FORMAT_ID,
+    FLSSemanticError,
+    FLSSemanticProject,
+    compare_fls_project_to_flattened,
+    semantic_project_from_fls_artifact,
+    semantic_project_from_fls_file,
+)
 from .livery_sections import (
     LiveryArtworkResult,
     LiverySectionDecodeError,
@@ -70,11 +79,15 @@ __all__ = [
     "CliveryMilestone1",
     "ContainerInfo",
     "EffectiveTransform",
+    "FLS_CLIVERY_FLOAT32_ABS_TOL",
     "FLS_PROJECT_NODE_DUMP_FORMAT_ID",
     "FLS_PROJECT_ORACLE_FORMAT_ID",
+    "FLS_SEMANTIC_FORMAT_ID",
     "FLSOracleError",
     "FLSProjectArtifact",
     "FLSProjectInventory",
+    "FLSSemanticError",
+    "FLSSemanticProject",
     "FlattenError",
     "FlattenedLayer",
     "FlattenedLivery",
@@ -95,6 +108,7 @@ __all__ = [
     "SourceSpan",
     "Transform",
     "UnknownNode",
+    "compare_fls_project_to_flattened",
     "compare_semantic_layers",
     "decode_cgroup_bytes",
     "decode_cgroup_file",
@@ -114,4 +128,6 @@ __all__ = [
     "load_fls_project_bytes",
     "load_fls_project_file",
     "semantic_layers_from_flattened",
+    "semantic_project_from_fls_artifact",
+    "semantic_project_from_fls_file",
 ]
