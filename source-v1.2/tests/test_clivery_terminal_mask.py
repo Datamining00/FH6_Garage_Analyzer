@@ -58,10 +58,10 @@ class TerminalSectionMaskTests(unittest.TestCase):
         with self.assertRaises(FlattenError):
             _resolve_masks(self._group([child_group]), terminal_state=1)
 
-    def test_nonzero_terminal_state_on_chromatic_shape_fails_closed(self) -> None:
-        shape = self._shape(287, (255, 0, 0, 255))
-        with self.assertRaises(FlattenError):
-            _resolve_masks(self._group([shape]), terminal_state=1)
+    def test_terminal_state_one_masks_terminal_direct_chromatic_shape(self) -> None:
+        shape = self._shape(287, (255, 85, 0, 255))
+        masks = _resolve_masks(self._group([shape]), terminal_state=1)
+        self.assertEqual(masks[id(shape)], (True, ("section_terminal_state_01",)))
 
     def test_unknown_terminal_state_value_fails_closed(self) -> None:
         shape = self._shape(287, (255, 255, 255, 255))
