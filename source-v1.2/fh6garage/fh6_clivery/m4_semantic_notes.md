@@ -15,7 +15,7 @@ oracle such as an FLS export:
 - structural parent path and traversal order;
 - effective transform;
 - mask state;
-- RGBA color;
+- semantic RGBA color;
 - source position; and
 - leaf count.
 
@@ -25,12 +25,21 @@ are validation inputs only.
 
 ## Structural flatten order
 
-Status: `CONFIRMED` as a representation invariant; renderer draw order remains
+Status: `CONFIRMED` as a representation invariant. Pair 5 additionally validates
+flat direct-sibling paint order, while nested Group/mask renderer order remains
 `PROVISIONAL`.
 
 Leaves are emitted by depth-first traversal of each `GroupNode.children` list in
 its stored structural order. The implementation never sorts by `source_offset`
 and never performs a global reversal. `source_offset` remains provenance.
+
+Controlled pair 5 supplies an FLS screenshot for three overlapping flat direct
+siblings. Stored/project/C_livery order is red Shape 101, green Shape 102, blue
+Shape 103. The canvas shows red at the back, then green, then blue on top.
+Therefore for this bounded flat-sibling case the stored order is paint order:
+earlier child first, later child overpaints earlier siblings. The FLS Layers UI
+shows the stack topmost-first and is therefore visually reversed relative to the
+stored child array. This does **not** establish a global reversal rule.
 
 ## Effective group transform
 
@@ -61,30 +70,39 @@ whose own scale is negative.
 If a future file contains a non-conformal group frame, M4 fails closed rather
 than silently applying this bounded decomposition outside its evidence set.
 
+## Shape skew
+
+Status: `CORPUS-VALIDATED` for a nonzero direct Shape value.
+
+Controlled pair 5 stores direct Top Shape 101 with FLS `skew=2.3`. The exported
+`C_livery` Shape record decodes as `2.299999952316284`, the expected float32
+representation. This validates the direct-Shape skew field. Group skew and more
+general affine Group composition remain outside the current evidence set.
+
 ## Record-level mask state
 
-Status: `CORPUS-VALIDATED` for direct Shape siblings in the currently observed
-achromatic context and for terminal direct Shapes of both achromatic and
-chromatic colors. Group-terminal odd state remains `UNKNOWN`.
+Status: `CORPUS-VALIDATED` for direct Shape siblings and terminal direct Shapes,
+including chromatic targets. State crossing a completed Group remains `UNKNOWN`.
 
-`0x60` ancestry is authoritative. Outside such ancestry, the current corpus
-shows that a direct Shape physically led by `01 02` carries trailing state for
-the immediately preceding **direct Shape sibling**, not for itself. Current
-black-box evidence only promotes that preceding sibling when it is achromatic
-(`R == G == B`). Chromatic `01 02` sibling behavior is still not inferred.
+`0x60` ancestry is authoritative. Outside such ancestry, a direct Shape physically
+led by `01 02` carries trailing state for the immediately preceding **direct Shape
+sibling**, not for itself.
+
+Controlled pair 5 proves the direct-sibling rule is independent of color. In the
+Front section, chromatic Shape 2104 has `mask=true` and is immediately followed
+by Shape 2110 whose physical lead is `01 02`. The decoder therefore promotes the
+preceding direct Shape regardless of its color.
 
 Controlled pair 2 proved the section-terminal variant with a white Top Shape
-`2217`: an ordinary `02` Shape record is followed by a populated-section remnant
+2217: an ordinary `02` Shape record is followed by a populated-section remnant
 whose first byte is `01`.
 
-Controlled pair 4 changes the same masked Shape to `[255,85,0,255]` and proves
-that the terminal rule is **not** restricted by color. The Shape color bytes
-change while the section-terminal state remains `01`. Therefore, in the bounded
-context of a terminal direct Shape, state `01` masks that Shape regardless of
-whether it is achromatic or chromatic.
+Controlled pair 4 changes the same masked Shape to a non-achromatic stored color
+and proves that the terminal rule is also independent of color. The Shape color
+bytes change while the section-terminal state remains `01`.
 
-State after a terminal Group and values outside `{0,1}` still fail closed rather
-than being inferred.
+State after a terminal/completed Group and values outside `{0,1}` still fail
+closed rather than being inferred.
 
 The Car ID 2997 sample provides an exact direct-sibling regression oracle:
 
@@ -93,24 +111,41 @@ Left  mask source offsets:  99686, 99782
 Right mask source offsets: 196104, 196200
 ```
 
-## C_livery vector color byte order
+## Vector color storage and semantic channel order
 
-Status: `CORPUS-VALIDATED` for controlled `C_livery` vector Shape records.
+Status: `CORPUS-VALIDATED` for controlled FLS project vectors and exported
+`C_livery` vector Shape records.
 
-Controlled pair 4 stores FLS color `[255,85,0,255]` as the final four bytes of
-the Top Shape record:
+Pair 4 proved that the FLS stored four-byte/list color tuple is preserved
+one-for-one into the corresponding `C_livery` Shape color bytes, but it did not
+have a primary-color visual oracle. The earlier interpretation of those stored
+values as RGBA was therefore over-specific.
+
+Controlled pair 5 supplies red/green/blue primary Shapes and an FLS screenshot:
 
 ```text
-ff 55 00 ff
+stored [0,0,255,255] -> visually red
+stored [0,255,0,255] -> visually green
+stored [255,0,0,255] -> visually blue
 ```
 
-The bytes therefore map directly to **RGBA** for this `C_livery` record. The
-independent decoder scopes this correction to raw records whose kind is
-`livery_shape_record`.
+Thus both the observed FLS v3 project lists and matching `C_livery` Shape color
+bytes use **BGRA storage order**. The independent decoder normalizes these stored
+values to semantic RGBA. The pre-existing shared low-level Shape parser already
+performed this conversion and is retained; the temporary livery-only raw-byte
+reinterpretation introduced after pair 4 has been removed.
 
-Standalone `C_group` color byte order is deliberately left unchanged because no
-colored standalone `C_group` corpus sample has yet independently established its
-semantics.
+Standalone colored `C_group` channel semantics have not yet been independently
+validated with a colored standalone black-box oracle, so no new standalone-only
+claim is made.
+
+## Alpha versus node opacity
+
+Controlled pair 5 contains a Shape with stored color alpha `164`, and the exported
+`C_livery` preserves that alpha. However the FLS node's separate `opacity` field
+is still exactly `1.0`. Therefore this pair validates Shape color alpha storage,
+not non-unit node opacity. The FLS semantic adapter continues to fail closed when
+`opacity != 1.0`.
 
 ## Current real-sample flatten evidence
 
@@ -195,13 +230,48 @@ C_livery: 1c48aa8e3acd6f659aae1ac4f821b7ef1a26ba9c8932aa5c73d73eb6f51f7f33
 inflated C_livery: ce42cae71b455922ba11685e8ed2972ba77096e5a069c80c92d7b5cc84c58dd9
 ```
 
-Same 10-leaf structure as pair 3. The Top Shape 2217 remains `mask=true` but its
-color becomes `[255,85,0,255]`. Compared with pair 3, exactly two inflated bytes
-change, both in the Shape color field; terminal state `01` remains unchanged.
-This confirms chromatic terminal direct-Shape mask behavior and `C_livery` RGBA
-vector color bytes. Full semantic comparison remains within the existing `2e-5`
-tolerance; maximum observed transform-component difference is approximately
-`1.4582e-5`.
+Same 10-leaf structure as pair 3. The Top Shape 2217 remains `mask=true` while
+its stored color changes to `[255,85,0,255]`. Compared with pair 3, exactly two
+inflated bytes change in the Shape color field while terminal state `01` remains
+unchanged. This confirms chromatic terminal direct-Shape mask behavior and direct
+preservation of the stored color tuple. Pair 5 later supplies the channel-semantics
+oracle and establishes those stored values as BGRA.
+
+## Controlled FLS differential pair 5
+
+```text
+.3so: be05f4ed0b53ce94b47f0dc2d0675d2b2202e579af4a77655b2ff5d8676b8175
+JSON: b7dbd2bb95bba76bea4638068b9c8baa1729673c629f36d72d527afc6bd55fdd
+C_livery: 564181e1657e7485281036e3b80492f2bce8183f88a9c24be044185c17003b9c
+inflated C_livery: e77e0cd7ea5e9528011ce034c73f00aa8c051dadc75baf0d21b55f7b8cb06167
+screenshot: 2de5818bf045f1200c0e67724f5183aad65b270ea12ba785c7e478101d3aa074
+```
+
+Car ID 2017, counts `[2,3,1,1,3,0,0,0,0,0,0]`, ten vector leaves.
+
+Confirmed:
+
+- chromatic direct-sibling `01 02` trailing-mask state;
+- nonzero direct Shape skew (`2.3 -> 2.299999952316284`);
+- Shape color alpha serialization (`164`) while node opacity remains `1`;
+- FLS/project/C_livery BGRA storage calibrated to semantic RGBA by primary-color screenshot;
+- flat direct-sibling paint order: stored earlier sibling first, later sibling on top.
+
+Not present in the saved project:
+
+- the intended completed-Group mask-boundary case (Back is three direct Shapes);
+- non-unit FLS node opacity.
+
+### Side-label discrepancy observed in pair 5
+
+The supplied screenshot shows the three primary-color Shapes under FLS UI header
+`Left (3)`, while the saved `.3so` places those exact Shape IDs in internal livery
+section slot `4`, named `Right`; internal slot `3`, named `Left`, contains the
+single alpha-164 Shape.
+
+This is recorded as a UI/internal side-label discrepancy, not yet as a format
+remapping rule. No `SECTION_NAMES` or renderer side mapping is changed without a
+dedicated two-side oracle.
 
 ## Remaining M4 evidence gaps
 
@@ -209,13 +279,13 @@ Still not signed off:
 
 - a serialized reflected Group frame;
 - non-zero Group rotation combined with a serialized reflected Group frame;
-- non-zero skew;
-- chromatic behavior of the **direct-sibling `01 02`** mask state;
+- Group skew / general affine Group transforms;
 - mask state crossing a completed Group boundary;
-- standalone colored `C_group` byte order;
+- standalone colored `C_group` channel semantics;
 - raster/logo layers;
-- non-unit opacity;
-- final renderer draw-order semantics.
+- non-unit FLS node opacity;
+- nested Group/mask final renderer draw-order semantics;
+- definitive FLS UI Left/Right to serialized section-slot mapping.
 
-Raw `.3so` and game binaries remain external opt-in fixtures; they are not
-committed to the repository.
+Raw `.3so`, screenshots, and game binaries remain external opt-in fixtures; they
+are not committed to the repository.
