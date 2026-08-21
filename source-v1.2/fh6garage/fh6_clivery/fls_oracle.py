@@ -170,15 +170,7 @@ def _inventory_kind_nodes(document: dict[str, Any]) -> tuple[
     return len(nodes), sorted_counts, sorted_signatures, tuple(sorted(child_keys))
 
 
-def inspect_fls_project_bytes(raw: bytes | bytearray | memoryview) -> FLSProjectInventory:
-    """Inspect a documented FLS `.3so` project without assuming its scene-node schema.
-
-    Public FLS documentation describes `.3so` as a gzip-wrapped editor project JSON
-    whose document contains a recursive `root` scene tree of kind-discriminated
-    layer nodes. This function intentionally stops at deterministic schema inventory;
-    semantic field mapping is deferred until a real oracle artifact is observed.
-    """
-    artifact = load_fls_project_bytes(raw)
+def _inventory_from_artifact(artifact: FLSProjectArtifact) -> FLSProjectInventory:
     document = artifact.document
     node_count, kind_counts, signatures, child_keys = _inventory_kind_nodes(document)
     return FLSProjectInventory(
@@ -195,8 +187,19 @@ def inspect_fls_project_bytes(raw: bytes | bytearray | memoryview) -> FLSProject
     )
 
 
+def inspect_fls_project_bytes(raw: bytes | bytearray | memoryview) -> FLSProjectInventory:
+    """Inspect a documented FLS `.3so` project without assuming its scene-node schema.
+
+    Public FLS documentation describes `.3so` as a gzip-wrapped editor project JSON
+    whose document contains a recursive `root` scene tree of kind-discriminated
+    layer nodes. This function intentionally stops at deterministic schema inventory;
+    semantic field mapping is deferred until a real oracle artifact is observed.
+    """
+    return _inventory_from_artifact(load_fls_project_bytes(raw))
+
+
 def inspect_fls_project_file(path: str | Path) -> FLSProjectInventory:
-    return inspect_fls_project_bytes(Path(path).read_bytes())
+    return _inventory_from_artifact(load_fls_project_file(path))
 
 
 def inspect_fls_project_file_to_json(path: str | Path, *, indent: int = 2) -> str:
@@ -236,7 +239,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     artifact = load_fls_project_file(args.source)
-    inventory = inspect_fls_project_bytes(args.source.read_bytes())
+    inventory = _inventory_from_artifact(artifact)
     text = inventory.to_json() + "\n"
     if args.output is None:
         print(text, end="")
