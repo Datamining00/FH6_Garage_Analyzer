@@ -39,7 +39,6 @@ class M4TransformTests(unittest.TestCase):
         # Final renderer canonicalization adds 180 degrees when Y scale is negative.
         self.assertAlmostEqual(_normalize_rotation(result.rotation + 180.0), 28.69994354248047, places=9)
 
-
     def _shape(self, offset: int, marker: str, color: tuple[int,int,int,int]) -> ShapeNode:
         span=SourceSpan(offset,32)
         raw=RawRecord("shape",span,b"\x00"*32,"test",marker)
@@ -57,11 +56,20 @@ class M4TransformTests(unittest.TestCase):
         self.assertEqual(masks[id(previous)],(True,("shape_0102_trailing_state",)))
         self.assertEqual(masks[id(current)],(False,("NO_EFFECTIVE_MASK",)))
 
-    def test_chromatic_previous_shape_does_not_receive_0102_mask(self) -> None:
-        previous=self._shape(10,"0002",(127,126,127,255))
-        current=self._shape(42,"0102",(211,200,0,255))
+    def test_0102_trailing_state_targets_previous_direct_chromatic_shape(self) -> None:
+        previous=self._shape(10,"0002",(255,0,0,255))
+        current=self._shape(42,"0102",(255,255,255,255))
         masks=_resolve_masks(self._group([previous,current]))
-        self.assertEqual(masks[id(previous)],(False,("NO_EFFECTIVE_MASK",)))
+        self.assertEqual(masks[id(previous)],(True,("shape_0102_trailing_state",)))
+        self.assertEqual(masks[id(current)],(False,("NO_EFFECTIVE_MASK",)))
+
+    def test_0102_after_completed_group_remains_unresolved(self) -> None:
+        nested_shape=self._shape(10,"0002",(255,255,255,255))
+        nested=self._group([nested_shape])
+        current=self._shape(42,"0102",(255,255,255,255))
+        masks=_resolve_masks(self._group([nested,current]))
+        self.assertEqual(masks[id(nested_shape)],(False,("NO_EFFECTIVE_MASK",)))
+        self.assertEqual(masks[id(current)],(False,("NO_EFFECTIVE_MASK",)))
 
     def test_confirmed_60_ancestry_is_authoritative(self) -> None:
         a=self._shape(10,"0002",(1,2,3,255))
