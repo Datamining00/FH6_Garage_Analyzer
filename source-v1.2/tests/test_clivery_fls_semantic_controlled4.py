@@ -85,7 +85,7 @@ def observed_chromatic_mask_project() -> bytes:
 
 
 class FLSControlledPair4Tests(unittest.TestCase):
-    def test_observed_fls_scene_preserves_chromatic_mask_rgba(self) -> None:
+    def test_observed_fls_scene_maps_bgra_storage_to_semantic_rgba(self) -> None:
         artifact = load_fls_project_bytes(observed_chromatic_mask_project())
         oracle = semantic_project_from_fls_artifact(artifact)
         self.assertEqual(oracle.car_id, 2017)
@@ -94,7 +94,8 @@ class FLSControlledPair4Tests(unittest.TestCase):
         self.assertEqual(layer.section, "Top")
         self.assertEqual(layer.type_word, 2217)
         self.assertTrue(layer.mask)
-        self.assertEqual(layer.color_rgba, (255, 85, 0, 255))
+        # Pair 5 screenshot later establishes FLS color lists as BGRA storage.
+        self.assertEqual(layer.color_rgba, (0, 85, 255, 255))
 
     def test_real_controlled4_fls_clivery_pair_when_available(self) -> None:
         fls_value = os.environ.get("FH6_FLS_3SO_2017_CHROMATIC_MASK")
@@ -138,7 +139,7 @@ class FLSControlledPair4Tests(unittest.TestCase):
         layer = top.layers[0]
         self.assertEqual(layer.type_word, 2217)
         self.assertEqual(layer.source_offset, 287)
-        self.assertEqual(layer.color_rgba, (255, 85, 0, 255))
+        self.assertEqual(layer.color_rgba, (0, 85, 255, 255))
         self.assertTrue(layer.mask)
         self.assertEqual(layer.mask_evidence, ("section_terminal_state_01",))
 
