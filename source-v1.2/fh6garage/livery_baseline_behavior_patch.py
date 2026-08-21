@@ -43,6 +43,7 @@ _STATUS_LABEL_TO_SECTION = {
 
 
 def _offset_value(layer: dict[str, Any]) -> int | None:
+    """Return a source offset for diagnostics only; never use it as z-order."""
     try:
         value = layer.get("source_offset")
         if value is None:
@@ -54,62 +55,34 @@ def _offset_value(layer: dict[str, Any]) -> int | None:
 
 
 def normalize_decoded_layer_order(decoded: Any, section_names) -> tuple[Any, tuple[str, ...]]:
-    """Use physical C_livery placement order as section z-order when provable.
+    """Preserve the decoder's structural traversal order.
 
-    Group transforms are already flattened into each placement's final transform
-    by the decoder. Reordering only finished placement records by their source
-    offsets preserves geometry while preventing tree-walk order from changing
-    the serialized layer stack. If offsets are incomplete or ambiguous, retain
-    the decoder's original order rather than guessing.
+    Controlled FLS pair 5 proves that flat direct siblings paint in their stored
+    child order: earlier children are painted first and later children overpaint
+    them. Both the pinned decoder and the independent decoder already emit scene
+    leaves by structural DFS child order. `source_offset` is therefore provenance,
+    not a general z-order key.
+
+    The previous implementation sorted every section by source offset. That was
+    harmless for simple flat streams whose offsets are naturally monotonic, but
+    it had no evidence for nested Group/mask scenes and could override the tree's
+    semantic order. Keep the public helper/wrapper for compatibility, but make the
+    policy explicitly order-preserving until nested draw order is independently
+    validated.
     """
-    layers = [layer for layer in list(getattr(decoded, "layers", ()) or ()) if isinstance(layer, dict)]
+    del section_names
+    layers = list(getattr(decoded, "layers", ()) or ())
     if not layers:
         return decoded, ()
 
-    names = tuple(str(name) for name in section_names)
-    by_section: dict[str, list[dict[str, Any]]] = {name: [] for name in names}
-    unknown: list[dict[str, Any]] = []
-    for layer in layers:
-        section = str(layer.get("source_section") or "")
-        if section in by_section:
-            by_section[section].append(layer)
-        else:
-            unknown.append(layer)
-
-    changed: list[str] = []
-    rebuilt: list[dict[str, Any]] = []
-    for section in names:
-        items = by_section[section]
-        offsets = [_offset_value(item) for item in items]
-        if (
-            len(items) > 1
-            and all(offset is not None for offset in offsets)
-            and len(set(offsets)) == len(offsets)
-        ):
-            ordered = [
-                item
-                for _offset, _index, item in sorted(
-                    (int(offsets[index]), index, item) for index, item in enumerate(items)
-                )
-            ]
-            if any(left is not right for left, right in zip(items, ordered)):
-                items = ordered
-                changed.append(section)
-        rebuilt.extend(items)
-    rebuilt.extend(unknown)
-
-    decoded.layers = rebuilt
-    if changed:
-        report = dict(getattr(decoded, "report", {}) or {})
-        warnings = [str(item) for item in list(report.get("warnings") or ())]
-        warnings.extend(
-            f"{section}: render layer order normalized by C_livery source offsets."
-            for section in changed
-        )
-        report["warnings"] = list(dict.fromkeys(warnings))
-        report["fh6assistant_source_order_sections"] = list(changed)
-        decoded.report = report
-    return decoded, tuple(changed)
+    # Do not reorder. Record the active evidence-driven policy without emitting a
+    # user-facing warning: source offsets remain available on each layer strictly
+    # as provenance/debug information.
+    decoded.layers = layers
+    report = dict(getattr(decoded, "report", {}) or {})
+    report["fh6assistant_layer_order_policy"] = "decoder_structural_dfs"
+    decoded.report = report
+    return decoded, ()
 
 
 def _section_issues(expected_counts, decoded_sections, section: str, section_names) -> tuple[tuple[str, int, int], ...]:
@@ -353,7 +326,7 @@ def _clear_preview_caches() -> None:
 
 
 def apply_livery_baseline_behavior_patch() -> None:
-    """Apply warning-only integrity, persistent scale and source-order stacking."""
+    """Apply warning-only integrity, persistent scale and structural layer order."""
     global _APPLIED
     if _APPLIED:
         return
