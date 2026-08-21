@@ -140,6 +140,15 @@ Applied and regression-tested:
 4. keep Group-boundary mask state fail-closed;
 5. keep serialized Left/Right section mapping unchanged.
 
+Code-changing CI at feature head `5489cef3567b1f2597fea126bd4a93920a53aecd` passed:
+
+```text
+independent decoder/oracle: 67 tests, OK (skipped=8)
+standalone C_group parser: 14 tests, OK
+real game-livery opt-ins: 2 tests, OK (skipped=2)
+full FH6 Assistant suite: 249 tests, OK (skipped=10)
+```
+
 The corresponding high-level Milestone-4 status and controlled-oracle summary live in `m4_semantic_notes.md`.
 
 Still required before M4d sign-off:
