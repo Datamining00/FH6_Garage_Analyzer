@@ -225,9 +225,12 @@ def _resolve_masks(
     with physical lead `01 02` carries trailing state for the immediately
     preceding direct Shape sibling. A populated section can carry the same one-bit
     state in the first byte of its post-tree remnant (or the one-byte terminal
-    state for the last populated section); the controlled FLS export proves that
-    state `1` masks the terminal direct achromatic Shape. Group-terminal and
-    chromatic-terminal state remain unsupported and fail closed.
+    state for the last populated section); controlled FLS exports prove that state
+    `1` masks the terminal direct Shape for both achromatic and chromatic colors.
+    Group-terminal state remains unsupported and fails closed.
+
+    The separate direct-sibling `01 02` rule remains conservative: current corpus
+    evidence only promotes an achromatic preceding direct Shape in that context.
     """
 
     result: dict[int, tuple[bool, tuple[str, ...]]] = {}
@@ -274,10 +277,6 @@ def _resolve_masks(
         if not isinstance(target, ShapeNode):
             raise FlattenError(
                 "nonzero livery section terminal state after a Group is not yet semantically mapped"
-            )
-        if not _achromatic(target):
-            raise FlattenError(
-                "nonzero livery section terminal state on a chromatic Shape is not yet semantically mapped"
             )
         current_mask, current_evidence = result.get(id(target), (False, ("NO_EFFECTIVE_MASK",)))
         if current_mask:
