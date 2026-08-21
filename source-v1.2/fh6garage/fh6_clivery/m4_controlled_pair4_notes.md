@@ -1,10 +1,10 @@
-# Milestone 4 controlled FLS pair 4 — chromatic terminal mask and C_livery RGBA
+# Milestone 4 controlled FLS pair 4 — chromatic terminal mask
 
-Status: **CORPUS-VALIDATED CHROMATIC TERMINAL DIRECT-SHAPE MASK; C_livery VECTOR COLOR BYTES RGBA**
+Status: **CORPUS-VALIDATED CHROMATIC TERMINAL DIRECT-SHAPE MASK; COLOR STORAGE SEMANTICS CORRECTED BY PAIR 5**
 
-This note records a user-produced black-box `.3so -> C_livery` pair derived from the controlled pair-3 project. The only intentional semantic change was the color of the existing Top Shape `2217`, while its `mask=true` state was retained.
+This note records a user-produced black-box `.3so -> C_livery` pair derived from the controlled pair-3 project. The only intentional semantic change was the stored color of the existing Top Shape `2217`, while its `mask=true` state was retained.
 
-No FLS implementation source is used as a format oracle. The evidence consists only of the user-produced `.3so`, its decompressed JSON, the exported `C_livery`, and byte-for-byte comparison with the preceding controlled pair.
+No FLS implementation source is used as a format oracle. The evidence consists only of user-produced `.3so`, its decompressed JSON, the exported `C_livery`, and byte-for-byte comparison with the preceding controlled pair.
 
 ## Pinned artifacts
 
@@ -23,7 +23,7 @@ The Top section contains one direct Shape:
 ```text
 Shape ID: 2217
 mask: true
-color: [255, 85, 0, 255]
+stored color list: [255, 85, 0, 255]
 transform:
   x=-36.22636
   y=-149.77848
@@ -37,13 +37,13 @@ All other controlled scene semantics remain the same as pair 3.
 
 ## Exported C_livery evidence
 
-The Top Shape record begins at inflated payload offset `287` and is 31 bytes long. Its final four bytes are:
+The Top Shape record begins at inflated payload offset `287` and is 31 bytes long. Its final four stored color bytes are:
 
 ```text
 ff 55 00 ff
 ```
 
-These bytes exactly match the FLS project color `[255,85,0,255]` in **RGBA** order.
+Pair 4 by itself proves that the FLS stored color tuple and the exported Shape color bytes are preserved one-for-one. It does **not**, by itself, establish the semantic channel labels of those four stored values.
 
 The 18-byte post-tree section remnant starts at offset `318` and still begins:
 
@@ -63,28 +63,41 @@ offset 316: ff -> 00
 
 Both offsets are inside the Shape color field. The terminal state byte at offset `318` is unchanged.
 
+## Pair-5 correction to color-channel interpretation
+
+A later controlled pair includes primary-red/green/blue overlapping Shapes plus an FLS canvas screenshot. In that evidence:
+
+```text
+stored [0,0,255,255] -> visually red
+stored [0,255,0,255] -> visually green
+stored [255,0,0,255] -> visually blue
+```
+
+The FLS project list and `C_livery` Shape bytes are therefore **BGRA storage**, normalized by the decoder to semantic RGBA. Accordingly, pair 4's stored `[255,85,0,255]` / `ff 55 00 ff` corresponds to semantic RGBA `(0,85,255,255)`, not `(255,85,0,255)`.
+
+The prior pair-4 RGBA-storage interpretation is explicitly superseded by this stronger primary-color visual oracle.
+
 ## Evidence conclusions
 
 CONFIRMED:
 
 - section-terminal state `01` masks the terminal **direct Shape** independently of whether the Shape is achromatic or chromatic;
-- the color and terminal-mask state are independently serialized in this controlled export;
-- vector Shape color bytes in the controlled `C_livery` are RGBA, matching the FLS project color list directly;
-- after the bounded decoder corrections, all ten controlled leaves match the FLS semantic oracle within the existing `2e-5` transform tolerance; maximum observed transform-component delta remains approximately `1.4582e-5`.
+- color storage bytes and terminal-mask state are independently serialized in this controlled export;
+- FLS project stored color values are preserved into the corresponding `C_livery` Shape color bytes for this pair;
+- after pair-5 channel calibration, those bytes are interpreted as BGRA storage and normalized to semantic RGBA;
+- complete semantic comparison remains within the existing `2e-5` transform tolerance after the corrected channel mapping.
 
-The RGBA correction is intentionally scoped to `C_livery` Shape records. A colored standalone `C_group` corpus sample has not yet independently established standalone color byte order.
+NOT CONFIRMED by pair 4 alone:
 
-NOT CONFIRMED by this pair:
-
-- chromatic behavior of the separate direct-sibling `01 02` trailing-state rule;
+- chromatic behavior of the separate direct-sibling `01 02` trailing-state rule (confirmed later by pair 5);
 - terminal mask state after a completed Group;
-- standalone `C_group` color byte order;
+- standalone colored `C_group` channel semantics;
 - raster/logo color semantics;
-- non-unit opacity or final renderer draw order.
+- non-unit opacity or general renderer draw order.
 
 ## Regression
 
-- `tests/test_clivery_color_order.py` locks the livery-specific RGBA interpretation while proving non-livery Shape records are not reinterpreted.
+- `tests/test_clivery_color_order.py` locks the shared BGRA-storage to semantic-RGBA behavior without a livery-only override.
 - `tests/test_clivery_terminal_mask.py` locks chromatic terminal direct-Shape mask behavior.
 - `tests/test_clivery_fls_semantic_controlled4.py` provides an always-on observed FLS semantic test plus an opt-in complete real-pair differential using:
 
