@@ -120,7 +120,7 @@ The historical differential itself is KFPS-revision-to-KFPS-revision diagnostic 
 
 This removes the old 9085/9086 parser-input discrepancy from the direct vector preview path by construction. It does **not** prove that the original person-obscuring polygon is fixed until that exact livery is rendered locally with the user's FH6 vehicle assets and visually checked.
 
-### Offset-basis reconciliation and identity of the missing Left leaf
+### Offset-basis reconciliation and Left-section boundary misassignment
 
 A later direct comparison against the raw `C_livery(2)` bytes resolved an important offset-basis mismatch in the retained historical differential:
 
@@ -132,7 +132,7 @@ Car 2997 body_start                        = 72
 independent absolute offset = historical offset + 72
 ```
 
-After normalizing the two coordinate systems, the legacy first Left record at historical offset `99582` maps to independent absolute offset `99654`, which is the **second** independent Left leaf. The independently validated first Left leaf is therefore the one missing from the 2988-layer legacy Left stream:
+After normalizing the two coordinate systems, the legacy first `Left` record at historical offset `99582` maps to independent absolute offset `99654`, which is the **second** independent `Left` leaf. The actual first independent `Left` leaf appears in the historical differential at body-relative offset `99551`, but that historical decoder labels it `Top` rather than `Left`:
 
 ```text
 independent absolute offset: 99623
@@ -146,9 +146,11 @@ color RGBA:                   (255, 244, 50, 255)
 mask:                         false
 ```
 
-This is a very large yellow Square, not a black occluding polygon. The real-sample regression now pins this first Left leaf explicitly so a future parser regression cannot silently drop it again.
+Therefore this Square is **missing from the legacy `Left` section stream, but it is not globally absent from the legacy output**. The real-sample regression now pins it as the first independently decoded `Left` leaf so a future section-boundary regression cannot silently move or drop it.
 
-The finding narrows the old 9085/9086 discrepancy: the missing leaf is a concrete parser-boundary error, but its visual identity does **not** support treating it as the direct source of the known person-obscuring black polygon. Investigation of any remaining visual defect should therefore focus on nested transform/mask/draw semantics in the independently reconstructed stream, not on this missing leaf.
+This is a very large yellow Square, not a black occluding polygon. It explains the one-element `Left` shortage as a section-boundary misassignment, but it does **not** identify the separate global `9085` versus `9086` leaf deficit: the Square still exists in the historical output under `Top`, and the historical `Top` count is itself reported as 2894. The identity of the globally absent/shifted record therefore remains unresolved.
+
+For the original visual defect, this evidence specifically argues against treating the first-Left Square as the person-obscuring black polygon. Any remaining mismatch should be investigated in nested transform/mask/draw semantics inside the independently reconstructed stream rather than attributed to this section-boundary record alone.
 
 ## High-value Car 2997 nested transform landmarks
 
