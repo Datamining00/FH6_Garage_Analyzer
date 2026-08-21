@@ -13,14 +13,20 @@ from fh6garage.livery_decoder_recovery_patch import (
 from fh6garage.livery_preview import _load_backend
 
 
-def _shape_record(shape_id: int, *, lead: bytes = b"\x00\x02", x: float = 0.0) -> bytes:
+def _shape_record(
+    shape_id: int,
+    *,
+    lead: bytes = b"\x00\x02",
+    x: float = 0.0,
+    bgra: tuple[int, int, int, int] = (128, 128, 128, 255),
+) -> bytes:
     assert lead in (b"\x00\x02", b"\x01\x02")
     # FH6 direct livery placement: lead + u16 id + rotation/x/y/sx/sy/skew + BGRA.
     return (
         lead
         + struct.pack("<H", int(shape_id))
         + struct.pack("<ffffff", 0.0, float(x), 0.0, 1.0, 1.0, 0.0)
-        + bytes((128, 128, 128, 255))
+        + bytes(bgra)
     )
 
 
@@ -77,7 +83,36 @@ class LiveryDecoderRecoveryTests(unittest.TestCase):
         self.assertEqual(len(layers), 3)
         self.assertEqual(child_end, child_start + 3 * 32)
         self.assertTrue(bool(layers[0].get("mask")))
+        self.assertEqual(layers[0]["data"][6], 1)
+        self.assertEqual(
+            layers[0].get("fh6assistant_mask_evidence"),
+            "verified_flat_0102_previous_direct_shape",
+        )
         self.assertEqual([layer.get("source_section") for layer in layers], ["Left"] * 3)
+
+    def test_chromatic_previous_direct_shape_keeps_0102_mask(self) -> None:
+        decoder, _renderer = _load_backend()
+        records = [
+            # Stored BGRA 00 00 FF FF is semantic red and therefore chromatic.
+            _shape_record(101, bgra=(0, 0, 255, 255)),
+            _shape_record(102, lead=b"\x01\x02"),
+        ]
+        body = _flat_section(records)
+        candidates = _flat_group_candidates(body, 2)
+        self.assertEqual(len(candidates), 1)
+        _group_pos, child_start, _header_size = candidates[0]
+        recovered = _decode_direct_children(decoder, body, child_start, 2, "Front")
+        self.assertIsNotNone(recovered)
+        layers, _warnings, child_end = recovered
+        self.assertEqual(child_end, child_start + 2 * 32)
+        self.assertEqual(layers[0]["color"], [255, 0, 0, 255])
+        self.assertTrue(layers[0]["mask"])
+        self.assertEqual(layers[0]["data"][6], 1)
+        self.assertEqual(
+            layers[0].get("fh6assistant_mask_evidence"),
+            "verified_flat_0102_previous_direct_shape",
+        )
+        self.assertFalse(bool(layers[1].get("mask")))
 
     def test_wide_three_thousand_section_recovers_all_direct_records(self) -> None:
         decoder, _renderer = _load_backend()
