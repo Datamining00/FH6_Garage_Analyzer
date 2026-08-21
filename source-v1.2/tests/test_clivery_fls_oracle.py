@@ -86,6 +86,12 @@ class FLSProjectOracleTests(unittest.TestCase):
         self.assertEqual(dump["nodes"][1]["path"], ["root", "children", 0])
         self.assertEqual(dump["nodes"][1]["node"], {"kind": "shape", "id": 101, "mask": False})
 
+    def test_public_api_exports_real_oracle_helpers(self) -> None:
+        # Importing through fh6garage.fh6_clivery is part of the public M4 evidence contract.
+        artifact = load_fls_project_bytes(make_project())
+        self.assertEqual(len(tuple(iter_fls_kind_nodes(artifact.document))), 4)
+        self.assertEqual(fls_kind_node_dump(artifact)["node_count"], 4)
+
     def test_cli_can_write_inventory_and_raw_node_dump(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
