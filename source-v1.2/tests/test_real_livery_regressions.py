@@ -46,6 +46,14 @@ class RealLiveryRegressionTests(unittest.TestCase):
         left,right=by_name["Left"],by_name["Right"]
         self.assertEqual((left.first_source_offset,left.last_source_offset,left.mask_source_offsets),(99623,195981,(99686,99782)))
         self.assertEqual((right.first_source_offset,right.last_source_offset,right.mask_source_offsets),(196041,291592,(196104,196200)))
+        first=left.layers[0]
+        self.assertEqual((first.type_word,first.source_parent_path,first.source_offset,first.color_rgba,first.mask),(101,(3,0),99623,(255,244,50,255),False))
+        self.assertAlmostEqual(first.transform.x,-56.0,places=10)
+        self.assertAlmostEqual(first.transform.y,5.0,places=10)
+        self.assertAlmostEqual(first.transform.sx,8.718671798706055,places=12)
+        self.assertAlmostEqual(first.transform.sy,8.448664665222168,places=12)
+        self.assertAlmostEqual(first.transform.rotation,0.0,places=10)
+        self.assertEqual(left.layers[1].source_offset,99654)
         by_offset={layer.source_offset:layer for layer in left.layers}
         landmark=by_offset[99905]
         self.assertEqual((landmark.type_word,landmark.source_parent_path),(532,(3,8,0)))
