@@ -139,11 +139,10 @@ the suite validate documented container/root framing and verify that inventory
 count and generic node traversal agree. Exact FLS key/value expectations will be
 pinned only after that real artifact is observed.
 
-The oracle bridge test module now covers ten synthetic/contract cases plus one
-opt-in real Car 2997 artifact case. These cover container inventory, deterministic
-output, loader hashes, exact JSON paths, raw node-dump preservation, public API
-exports, CLI output, invalid gzip/JSON/root rejection, and real-artifact framing
-when `FH6_FLS_3SO_2997` is supplied.
+The oracle bridge test module covers ten always-on contract cases plus one opt-in
+real Car 2997 artifact case. The always-on cases cover container inventory,
+deterministic output, loader hashes, exact JSON paths, raw node-dump preservation,
+public API exports, CLI output, and invalid gzip/JSON/root rejection.
 
 This two-step policy prevents guessing FLS scene-field names or silently importing
 implementation assumptions. Once a real `.3so` is observed, only fields present in
