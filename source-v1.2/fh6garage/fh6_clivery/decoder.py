@@ -7,6 +7,7 @@ import struct
 
 from .container import CliveryDecodeError, ContainerInfo, inflate_clivery
 from .diagnostics import Diagnostic
+from .livery_sections import LiveryArtworkResult, decode_livery_sections
 
 
 FORMAT_ID = "fh6-assistant-clivery-scene-v1"
@@ -44,7 +45,7 @@ class SectionCount:
 
 
 @dataclass(frozen=True)
-class CliveryMilestone1:
+class CliveryScene:
     car_id: int
     container: ContainerInfo
     gyvl_offset: int
@@ -52,6 +53,7 @@ class CliveryMilestone1:
     body_end: int
     sections: tuple[SectionCount, ...]
     diagnostics: tuple[Diagnostic, ...]
+    artwork: LiveryArtworkResult | None = None
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -62,11 +64,16 @@ class CliveryMilestone1:
             "body_start": self.body_start,
             "body_end": self.body_end,
             "sections": [section.to_dict() for section in self.sections],
+            "artwork": self.artwork.to_dict() if self.artwork else None,
             "diagnostics": [diagnostic.to_dict() for diagnostic in self.diagnostics],
         }
 
     def to_json(self, *, indent: int = 2) -> str:
         return json.dumps(self.to_dict(), indent=indent, ensure_ascii=False)
+
+
+# Backward-compatible name retained for Milestone 1 callers/tests.
+CliveryMilestone1 = CliveryScene
 
 
 def _read_u32(data: bytes, offset: int) -> int:
@@ -110,10 +117,12 @@ def _find_gyvl(payload: bytes) -> tuple[int, int, int]:
     return gyvl_offset, gyvl_offset + GYVL_HEADER_SIZE, body_end
 
 
-def decode_clivery_bytes(raw: bytes | bytearray | memoryview) -> CliveryMilestone1:
+def decode_clivery_bytes(raw: bytes | bytearray | memoryview) -> CliveryScene:
     payload, container = inflate_clivery(raw)
     if len(payload) < 0x1A or payload[:4] != b"vlrc":
-        raise CliveryDecodeError("C_livery payload is missing the minimum 'vlrc' root metadata")
+        raise CliveryDecodeError(
+            "C_livery payload is missing the minimum 'vlrc' root metadata"
+        )
 
     diagnostics: list[Diagnostic] = []
     car_id = _read_u32(payload, 0x10)
@@ -121,13 +130,24 @@ def decode_clivery_bytes(raw: bytes | bytearray | memoryview) -> CliveryMileston
 
     counter_start = body_end + 4
     counter_end = counter_start + SECTION_COUNTER_BYTES
-    counts = tuple(_read_u32(payload, counter_start + slot * 4) for slot in range(SECTION_COUNTER_COUNT))
+    counts = tuple(
+        _read_u32(payload, counter_start + slot * 4)
+        for slot in range(SECTION_COUNTER_COUNT)
+    )
     trailing_counter = _read_u32(payload, counter_end)
     declared_gyvl_length = _read_u32(payload, gyvl_offset - 4)
 
     sections = tuple(
         SectionCount(slot=slot, name=name, declared_count=counts[slot])
         for slot, name in enumerate(SECTION_NAMES)
+    )
+
+    artwork = decode_livery_sections(
+        payload,
+        body_start,
+        body_end,
+        SECTION_NAMES,
+        counts,
     )
 
     diagnostics.append(
@@ -160,14 +180,15 @@ def decode_clivery_bytes(raw: bytes | bytearray | memoryview) -> CliveryMileston
             code="SECTION_COUNTER_TRAILING_VALUE",
             message=(
                 "one additional little-endian u32 follows the eleven section counters; "
-                f"its position is confirmed but its higher-level semantic role is not interpreted in Milestone 1 (value={trailing_counter})"
+                f"its position is confirmed but its higher-level semantic role is not interpreted (value={trailing_counter})"
             ),
             offset=counter_end,
             evidence_state="CONFIRMED",
         )
     )
+    diagnostics.extend(artwork.diagnostics)
 
-    return CliveryMilestone1(
+    return CliveryScene(
         car_id=car_id,
         container=container,
         gyvl_offset=gyvl_offset,
@@ -175,10 +196,11 @@ def decode_clivery_bytes(raw: bytes | bytearray | memoryview) -> CliveryMileston
         body_end=body_end,
         sections=sections,
         diagnostics=tuple(diagnostics),
+        artwork=artwork,
     )
 
 
-def decode_clivery_file(path: str | Path) -> CliveryMilestone1:
+def decode_clivery_file(path: str | Path) -> CliveryScene:
     source = Path(path)
     return decode_clivery_bytes(source.read_bytes())
 

@@ -14,11 +14,18 @@ from .cgroup import (
 from .decoder import (
     FORMAT_ID,
     SECTION_NAMES,
+    CliveryScene,
     CliveryMilestone1,
     SectionCount,
     decode_clivery_bytes,
     decode_clivery_file,
     decode_clivery_file_to_json,
+)
+from .livery_sections import (
+    LiveryArtworkResult,
+    LiverySectionDecodeError,
+    LiverySectionResult,
+    decode_livery_sections,
 )
 from .records import RawRecord, SourceSpan, Transform
 from .scene import GroupNode, ShapeNode, UnknownNode
@@ -29,10 +36,14 @@ __all__ = [
     "CGroupDecodeError",
     "CGroupScene",
     "CliveryDecodeError",
+    "CliveryScene",
     "CliveryMilestone1",
     "ContainerInfo",
     "FORMAT_ID",
     "GroupNode",
+    "LiveryArtworkResult",
+    "LiverySectionDecodeError",
+    "LiverySectionResult",
     "RawRecord",
     "SECTION_NAMES",
     "SectionCount",
@@ -46,6 +57,7 @@ __all__ = [
     "decode_clivery_bytes",
     "decode_clivery_file",
     "decode_clivery_file_to_json",
+    "decode_livery_sections",
     "inflate_cgroup",
     "inflate_clivery",
 ]
