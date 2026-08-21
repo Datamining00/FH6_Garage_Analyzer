@@ -120,6 +120,36 @@ The historical differential itself is KFPS-revision-to-KFPS-revision diagnostic 
 
 This removes the old 9085/9086 parser-input discrepancy from the direct vector preview path by construction. It does **not** prove that the original person-obscuring polygon is fixed until that exact livery is rendered locally with the user's FH6 vehicle assets and visually checked.
 
+### Offset-basis reconciliation and identity of the missing Left leaf
+
+A later direct comparison against the raw `C_livery(2)` bytes resolved an important offset-basis mismatch in the retained historical differential:
+
+```text
+historical KFPS differential source_offset = artwork-body relative
+independent decoder source_offset          = inflated-payload absolute
+Car 2997 body_start                        = 72
+
+independent absolute offset = historical offset + 72
+```
+
+After normalizing the two coordinate systems, the legacy first Left record at historical offset `99582` maps to independent absolute offset `99654`, which is the **second** independent Left leaf. The independently validated first Left leaf is therefore the one missing from the 2988-layer legacy Left stream:
+
+```text
+independent absolute offset: 99623
+body-relative offset:        99551
+shape_id/type_word:           101 / 0x0065 (Square)
+parent_path:                  (3, 0)
+position:                     (-56.0, 5.0)
+scale:                        (8.718671798706055, 8.448664665222168)
+rotation:                     0.0
+color RGBA:                   (255, 244, 50, 255)
+mask:                         false
+```
+
+This is a very large yellow Square, not a black occluding polygon. The real-sample regression now pins this first Left leaf explicitly so a future parser regression cannot silently drop it again.
+
+The finding narrows the old 9085/9086 discrepancy: the missing leaf is a concrete parser-boundary error, but its visual identity does **not** support treating it as the direct source of the known person-obscuring black polygon. Investigation of any remaining visual defect should therefore focus on nested transform/mask/draw semantics in the independently reconstructed stream, not on this missing leaf.
+
 ## High-value Car 2997 nested transform landmarks
 
 The independent Left scene retains corpus-validated nested/reflected landmarks including:
