@@ -20,7 +20,8 @@ oracle such as an FLS export:
 - leaf count.
 
 No ForzaLiveryStudio runtime or implementation source is imported by this module.
-Public FLS format/development documentation is reference material only.
+Public FLS format/development documentation and user-produced black-box artifacts
+are validation inputs only.
 
 ## Structural flatten order
 
@@ -33,9 +34,9 @@ and never performs a global reversal. `source_offset` remains provenance.
 
 ## Effective group transform
 
-Status: `CORPUS-VALIDATED` for the current FH6 samples.
+Status: `CORPUS-VALIDATED`, including one controlled FLS `.3so -> C_livery` pair.
 
-All group frames observed in the two supplied `C_livery` files are conformal:
+All group frames observed in the current `C_livery` corpus are conformal:
 `abs(sx) == abs(sy)` within floating-point tolerance. For that bounded case a
 child origin `(x, y)` is transformed by the parent frame as:
 
@@ -52,15 +53,26 @@ are canonicalized to non-negative `sy`; if `sy < 0`, both scales are negated and
 180 degrees is added to rotation. Group frames themselves are not canonicalized
 before descendant composition because their reflection parity is semantic.
 
-If a future file contains a non-conformal group frame, M4 fails closed rather
-than silently applying this bounded decomposition outside its evidence set.
+The controlled FLS export pair adds an important black-box fact: raw local group
+frames are **not** stable across `.3so -> C_livery` export. In the supplied v3
+project the user-created Left group has an identity transform and its two shapes
+carry world positions directly. The exported `C_livery` recenters that group to
+approximately `(-66.92936, -129.75479)` and rewrites the two child positions to
+approximately `(+116.13744, +76.09004)` and `(-116.13744, -76.09004)`.
+After structural composition, the final leaf positions match the `.3so` values to
+within `9.3e-6`. Differential validation must therefore compare effective leaf
+semantics, never raw local group frames.
+
+If a future file contains a non-conformal group frame or non-zero group skew, M4
+fails closed rather than silently applying this bounded decomposition outside its
+evidence set.
 
 ## Record-level mask state
 
 Status: `CORPUS-VALIDATED` for direct shape siblings; group-terminal odd state
 remains `UNKNOWN`.
 
-`0x60` ancestry is authoritative. Outside such ancestry, the current corpus
+`0x60` ancestry is authoritative. Outside such ancestry, the current game corpus
 shows that a direct shape physically led by `01 02` carries trailing state for
 the immediately preceding **direct Shape sibling**, not for itself. The state is
 promoted to a mask only when that preceding shape is achromatic (`R == G == B`).
@@ -99,56 +111,89 @@ level differences for section, structural order, raw shape identity, parent path
 transform, mask, color, source offset, and total leaf count. It deliberately has
 no FLS-specific runtime or implementation dependency.
 
+For FLS comparison, source offsets are disabled because `.3so` has no C_livery
+byte provenance. The controlled export pair demonstrates float32 serialization
+round-off up to about `9.3e-6`, so `fls_semantic.py` currently uses a bounded
+`2e-5` absolute transform tolerance. This tolerance is evidence-scoped and should
+be revisited if a wider corpus requires it.
+
 ## FLS `.3so` black-box oracle bridge
 
-Status: `IMPLEMENTED INSPECTION/EVIDENCE BRIDGE; REAL ORACLE ARTIFACT PENDING`.
+Status: `CONTROLLED REAL PAIR VALIDATED FOR BASIC VECTOR/GROUP SEMANTICS`.
 
 FLS public `docs/DEV.md` documents `.3so` as the editor project JSON wrapped in a
-gzip stream, with the project document containing a recursive `root` scene tree of
-kind-discriminated layer nodes. `fls_oracle.py` uses only that documented container
-fact. It does not inspect or reproduce FLS implementation code.
+gzip stream, with the project document containing a recursive `root` scene tree.
+`fls_oracle.py` uses only that documented container fact. It does not inspect or
+reproduce FLS implementation code.
 
-The bridge strictly decompresses gzip, requires UTF-8 JSON with the documented
-`root`, records raw/uncompressed SHA-256 values, inventories top-level keys,
-observed string-valued node `kind` values, exact per-kind key signatures, and
-candidate child-bearing keys. It intentionally makes no field-to-`SemanticLayer`
-mapping until a real `.3so` produced from one of the SHA-pinned livery samples is
-observed.
+The generic bridge strictly decompresses gzip, requires UTF-8 JSON with the
+documented `root`, records raw/uncompressed SHA-256 values, inventories top-level
+keys, observed string-valued node `kind` values, exact per-kind key signatures,
+and candidate child-bearing keys. It also exposes exact JSON paths and untouched
+node dictionaries for black-box schema observation.
 
-The bridge exposes a generic JSON loader and `kind`-node iterator. Each observed
-node is returned with its exact JSON path and untouched dictionary. This is
-structural evidence only: no undocumented key is renamed or assigned transform,
-mask, shape, section, or draw-order meaning.
-
-For reproducible handoff, the module CLI can write both the compact inventory and
-an optional raw kind-node/path dump from the same single file read:
+A user-produced controlled pair has now been observed:
 
 ```text
-python -m fh6garage.fh6_clivery.fls_oracle sample.3so \
-  -o inventory.json \
-  --nodes-output nodes.json
+FLS .3so raw SHA-256:
+2b7edae070afce33360ce87087045f8fc84d9f5714d153d89c8ccb8c886fc4f4
+
+FLS uncompressed JSON SHA-256:
+2fa99cb36a5321c8449239638358891062cbe6490f8f89823bd6b58dc501c69a
+
+Exported C_livery raw SHA-256:
+bd15497668848ad2a9ecefb71105f31953208f97a308866c1519ee1bdf076476
+
+Car ID: 2017
+Section leaf counts:
+[2, 0, 0, 2, 1, 0, 0, 0, 0, 0, 0]
 ```
 
-The dump carries the source `.3so` raw/uncompressed SHA-256 values so later
-semantic mapping can be tied to one exact black-box artifact.
+Observed `.3so` v3 schema facts used by `fls_semantic.py` are limited to this
+black-box evidence:
 
-The public package API also exports the loader, inventory, iterator, and node-dump
-helpers. An opt-in real regression hook is present: setting `FH6_FLS_3SO_2997` to
-an untouched `.3so` saved after importing the SHA-pinned Car 2997 `C_livery` makes
-the suite validate documented container/root framing and verify that inventory
-count and generic node traversal agree. Exact FLS key/value expectations will be
-pinned only after that real artifact is observed.
+- top-level `format = fls_editor_project`, `version = 3`, `is_livery = true`;
+- integer `car_id`;
+- `root.children` contains eleven `group` nodes marked `is_livery_section` with
+  `livery_section_slot` 0..10;
+- groups carry `children`, `transform`, and unit `opacity`;
+- vector leaves are `kind=shape` with `visual.kind=vector`, integer `shape_id`,
+  RGBA `color`, boolean `mask`, `transform`, and unit `opacity`;
+- section and group transforms are structurally composed before comparing leaves.
 
-The oracle bridge test module covers ten always-on contract cases plus one opt-in
-real Car 2997 artifact case. The always-on cases cover container inventory,
-deterministic output, loader hashes, exact JSON paths, raw node-dump preservation,
-public API exports, CLI output, and invalid gzip/JSON/root rejection.
+The pair contains five vector leaves with shape IDs
+`[2104, 2105, 2106, 2110, 2116]`. Their section membership, DFS order, structural
+parent paths, shape IDs, masks, colors, and effective transforms all match the
+independent `C_livery` result. The nested Left paths are `(3,0,0)` and `(3,0,1)`.
 
-This two-step policy prevents guessing FLS scene-field names or silently importing
-implementation assumptions. Once a real `.3so` is observed, only fields present in
-that black-box output will be normalized into the existing neutral comparator.
+Three leaves in the `.3so` are `visible=false` yet remain present in the exported
+`C_livery` with ordinary opaque shape records. Therefore editor visibility is not
+used as a leaf-omission rule by the M4 oracle adapter. Non-unit opacity, raster
+visuals, non-conformal group scales, and non-zero group skew remain fail-closed
+until separate differential evidence exists.
 
-A full **FLS-vs-ours** M4 sign-off still requires an untouched FLS `.3so` saved
-after importing one of the same SHA-pinned `C_livery` samples. Until that oracle
-artifact is available and compared field-by-field, Milestone 4 remains partially
-complete rather than signed off.
+No raw `.3so` or game binary is committed. Regression tests pin the hashes and
+observed invariants; an opt-in pair test uses `FH6_FLS_3SO_2017` and
+`FH6_CLIVERY_2017` to execute the complete field-by-field comparison when those
+user-provided files are available locally.
+
+## Current M4 status
+
+The black-box bridge and a first real controlled FLS-to-C_livery differential are
+now complete for basic vector shapes, one nested group, section identity, color,
+mask=false, hidden editor leaves, and effective transform composition.
+
+This is **not** a universal FLS semantic sign-off. A broader oracle is still needed
+for at least:
+
+- true mask export behavior;
+- reflected group export;
+- non-zero rotation/skew combinations;
+- raster/logo layers;
+- non-unit opacity;
+- group-terminal odd-lead mask state; and
+- final renderer draw-order semantics.
+
+The original Car 2997 livery cannot currently supply that oracle because FLS blocks
+importing the locked `C_livery` by privacy policy. The controlled user-authored pair
+therefore establishes the safe M4c baseline without bypassing that policy.
