@@ -65,12 +65,21 @@ def _flat_group_candidates(body: bytes, target: int) -> list[tuple[int, int, int
 
 
 def _decode_direct_children(decoder, body: bytes, child_start: int, target: int, section: str):
-    """Decode one proven-flat section without heuristic group walking."""
+    """Decode one proven-flat section without heuristic group walking.
+
+    Controlled FLS pair 5 proves that a direct `01 02` Shape lead carries mask
+    state for the immediately preceding direct sibling independent of that
+    predecessor's color. The pinned KFPS flatten path historically suppresses
+    non-authoritative chromatic masks. Because this recovery function has already
+    proven a flat root with direct 32-byte children, it can restore that one
+    bounded mask rule without extending any unresolved Group-boundary semantics.
+    """
     end = len(body)
     pos = int(child_start)
     root = decoder.GroupNode(source="livery_section_recovered", offset=pos, section=section)
+    trailing_mask_targets: set[int] = set()
 
-    for _index in range(int(target)):
+    for index in range(int(target)):
         if pos + 32 > end:
             return None
         lead = body[pos : pos + 2]
@@ -85,6 +94,7 @@ def _decode_direct_children(decoder, body: bytes, child_start: int, target: int,
             if isinstance(previous, decoder.ShapeNode):
                 previous.mask = True
                 previous.flags |= 0x40
+                trailing_mask_targets.add(index - 1)
 
         flags = 0x01 if lead == b"\x01\x02" else 0
         if decoder.is_livery_logo_at(body, pos, end):
@@ -102,6 +112,23 @@ def _decode_direct_children(decoder, body: bytes, child_start: int, target: int,
     json_layers, identity_warnings = decoder.layers_to_kfps_json_layers(raw_layers, game="fh6")
     if len(json_layers) != int(target):
         return None
+
+    # Reapply only the mask states structurally proven above. This intentionally
+    # happens after the pinned flatten conversion because that path suppresses a
+    # chromatic non-authoritative record mask. Do not infer any mask for nested
+    # groups or section-terminal state here.
+    for target_index in sorted(trailing_mask_targets):
+        if not 0 <= target_index < len(json_layers):
+            return None
+        layer = json_layers[target_index]
+        layer["mask"] = True
+        data = list(layer.get("data") or [])
+        if len(data) < 7:
+            return None
+        data[6] = 1
+        layer["data"] = data
+        layer["fh6assistant_mask_evidence"] = "verified_flat_0102_previous_direct_shape"
+
     return json_layers, tuple(str(item) for item in identity_warnings), pos
 
 
