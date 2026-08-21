@@ -136,23 +136,27 @@ def _require_unit_opacity(node: dict[str, Any]) -> None:
 
 def _color_rgba(value: object) -> tuple[int, int, int, int]:
     if not isinstance(value, list) or len(value) != 4:
-        raise FLSSemanticError("FLS vector shape color must be a four-element RGBA list")
+        raise FLSSemanticError("FLS vector shape color must be a four-element stored color list")
     result: list[int] = []
     for item in value:
         if isinstance(item, bool) or not isinstance(item, int) or not 0 <= item <= 255:
             raise FLSSemanticError("FLS vector shape color components must be integers in [0,255]")
         result.append(item)
-    return tuple(result)  # type: ignore[return-value]
+    # Controlled pair 5 plus the FLS canvas screenshot provides channel semantics:
+    # stored [0,0,255,255] renders red and [255,0,0,255] renders blue. The v3
+    # project list is therefore BGRA storage, matching the C_livery Shape bytes.
+    b, g, r, a = result
+    return r, g, b, a
 
 
 def semantic_project_from_fls_artifact(artifact: FLSProjectArtifact) -> FLSSemanticProject:
-    """Normalize only black-box FLS v3 fields observed in a real exported test pair.
+    """Normalize only black-box FLS v3 fields observed in real exported test pairs.
 
-    The controlled oracle pair proves that FLS may recenter a group and rebake child
+    Controlled oracle pairs prove that FLS may recenter a group and rebake child
     local positions when exporting C_livery. Therefore this adapter compares effective
     leaf transforms after structural group composition, never raw local group frames.
 
-    `visible` is deliberately not used: the observed pair contains `visible=false`
+    `visible` is deliberately not used: observed pairs contain `visible=false`
     vector leaves that are nevertheless serialized into C_livery unchanged.
     """
     document = artifact.document
