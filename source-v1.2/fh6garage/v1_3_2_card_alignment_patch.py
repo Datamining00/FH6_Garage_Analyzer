@@ -8,12 +8,13 @@ from PySide6.QtWidgets import QLayout, QToolButton, QWidget
 
 
 def _eye_slash_pixmap(active: bool, size: int = 22) -> QPixmap:
-    """Draw the eye-slash at the measured effective card-icon footprint.
+    """Draw a stable eye-slash at the same apparent scale as card action icons.
 
-    Qt's existing livery-info glyph occupies a wide effective alpha footprint in
-    the 22 px icon slot.  Normalize the eye-slash to that same footprint so its
-    apparent size matches the neighbouring card controls. Checked/unchecked
-    states change color only and cannot alter geometry.
+    The reference livery-info glyph occupies an 18x20 alpha footprint when Qt
+    renders it into the card's 22x22 icon slot.  The eye itself stays naturally
+    wide; the diagonal slash extends vertically so the combined symbol has a
+    similar footprint without stretching the eye geometry. Checked/unchecked
+    states differ only in color.
     """
     raw_size = 64
     raw = QPixmap(raw_size, raw_size)
@@ -22,19 +23,22 @@ def _eye_slash_pixmap(active: bool, size: int = 22) -> QPixmap:
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
     color = QColor("#6e4bf2" if active else "#8d93a2")
-    pen = QPen(color, 5.2)
+    pen = QPen(color, 5.0)
     pen.setCapStyle(Qt.PenCapStyle.RoundCap)
     pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
     painter.setPen(pen)
     painter.setBrush(Qt.BrushStyle.NoBrush)
 
+    # Keep the eye naturally horizontal. The slash is deliberately steeper and
+    # taller so the combined mark occupies the same visual height as the native
+    # information glyph without non-uniform scaling.
     path = QPainterPath()
-    path.moveTo(8.0, raw_size / 2)
-    path.cubicTo(18.0, 16.0, raw_size - 18.0, 16.0, raw_size - 8.0, raw_size / 2)
-    path.cubicTo(raw_size - 18.0, raw_size - 16.0, 18.0, raw_size - 16.0, 8.0, raw_size / 2)
+    path.moveTo(7.0, raw_size / 2)
+    path.cubicTo(17.0, 20.0, raw_size - 17.0, 20.0, raw_size - 7.0, raw_size / 2)
+    path.cubicTo(raw_size - 17.0, 44.0, 17.0, 44.0, 7.0, raw_size / 2)
     painter.drawPath(path)
-    painter.drawEllipse(QRectF(raw_size / 2 - 8.0, raw_size / 2 - 8.0, 16.0, 16.0))
-    painter.drawLine(12, 12, raw_size - 12, raw_size - 12)
+    painter.drawEllipse(QRectF(raw_size / 2 - 7.0, raw_size / 2 - 7.0, 14.0, 14.0))
+    painter.drawLine(17, 3, raw_size - 17, raw_size - 3)
     painter.end()
 
     image = raw.toImage()
@@ -61,11 +65,13 @@ def _eye_slash_pixmap(active: bool, size: int = 22) -> QPixmap:
         max_x - min_x + 1,
         max_y - min_y + 1,
     )
-    target_width = max(1, round(size * 20 / 22))
-    target_height = max(1, round(size * 14 / 22))
+    target_box = QSize(
+        max(1, round(size * 18 / 22)),
+        max(1, round(size * 20 / 22)),
+    )
     fitted = cropped.scaled(
-        QSize(target_width, target_height),
-        Qt.AspectRatioMode.IgnoreAspectRatio,
+        target_box,
+        Qt.AspectRatioMode.KeepAspectRatio,
         Qt.TransformationMode.SmoothTransformation,
     )
 
