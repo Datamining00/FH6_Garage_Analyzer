@@ -8,12 +8,12 @@ from PySide6.QtWidgets import QLayout, QToolButton, QWidget
 
 
 def _eye_slash_pixmap(active: bool, size: int = 22) -> QPixmap:
-    """Draw a non-distorted eye-slash at the established card-icon scale.
+    """Draw the eye-slash at the same effective footprint as card action icons.
 
-    Existing card action glyphs occupy about a 20 px dominant alpha extent in
-    the 22 px icon slot.  Render the eye at high resolution, crop its vector
-    content, then fit it proportionally into the same effective footprint.
-    Checked/unchecked states change color only, never geometry.
+    The established livery-info glyph renders at about 20x17 alpha pixels inside
+    the 22 px icon slot.  The eye is naturally a wide symbol, so normalize the
+    high-resolution vector into that same 20:17 footprint. Checked/unchecked
+    states change color only and therefore cannot change apparent size.
     """
     raw_size = 64
     raw = QPixmap(raw_size, raw_size)
@@ -61,10 +61,11 @@ def _eye_slash_pixmap(active: bool, size: int = 22) -> QPixmap:
         max_x - min_x + 1,
         max_y - min_y + 1,
     )
-    target_extent = max(1, round(size * 20 / 22))
+    target_width = max(1, round(size * 20 / 22))
+    target_height = max(1, round(size * 17 / 22))
     fitted = cropped.scaled(
-        QSize(target_extent, target_extent),
-        Qt.AspectRatioMode.KeepAspectRatio,
+        QSize(target_width, target_height),
+        Qt.AspectRatioMode.IgnoreAspectRatio,
         Qt.TransformationMode.SmoothTransformation,
     )
 
@@ -141,7 +142,6 @@ class _CardActionAligner(QObject):
     def _left_center_x(self) -> int:
         if self.left_anchor is not None and self.left_anchor.isVisible():
             return _center_in_overlay(self.left_anchor, self.overlay).x()
-        # Native card layout uses an 8 px inset for the action columns.
         return 8 + (self.hide_button.width() - 1) // 2
 
     def reposition(self) -> None:
@@ -193,14 +193,10 @@ def _fix_card_actions(card: Any) -> None:
     if not isinstance(overlay, QWidget):
         return
 
-    # The native detail button is bottom-anchored by a stretch. In a taller
-    # one-card/hidden layout this makes its gap to Hide grow. Remove it from the
-    # layout and anchor both left buttons to the same Y rows as right actions 4/5.
     _remove_widget_from_layout(overlay.layout(), info_button)
     info_button.setParent(overlay)
     info_button.show()
 
-    # Use the same 22 px icon slot as the existing card controls.
     hide_button.setIconSize(QSize(22, 22))
 
     def update_hide_icon(enabled: bool) -> None:
