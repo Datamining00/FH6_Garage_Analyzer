@@ -54,6 +54,14 @@ def _center_in_overlay(widget: QWidget, overlay: QWidget) -> QPoint:
     return widget.mapTo(overlay, widget.rect().center())
 
 
+def _top_left_for_center(center: QPoint, widget: QWidget) -> QPoint:
+    """Return a top-left whose integer QRect.center() equals center exactly."""
+    return QPoint(
+        center.x() - (widget.width() - 1) // 2,
+        center.y() - (widget.height() - 1) // 2,
+    )
+
+
 class _CardActionAligner(QObject):
     """Lock the two left utility buttons to the right action-row Y coordinates."""
 
@@ -91,7 +99,7 @@ class _CardActionAligner(QObject):
         if self.left_anchor is not None and self.left_anchor.isVisible():
             return _center_in_overlay(self.left_anchor, self.overlay).x()
         # Native card layout uses an 8 px inset for the action columns.
-        return 8 + self.hide_button.width() // 2
+        return 8 + (self.hide_button.width() - 1) // 2
 
     def reposition(self) -> None:
         if not all(
@@ -107,16 +115,14 @@ class _CardActionAligner(QObject):
             return
 
         left_x = self._left_center_x()
-        fourth_y = _center_in_overlay(self.fourth_button, self.overlay).y()
-        fifth_y = _center_in_overlay(self.fifth_button, self.overlay).y()
+        fourth_center = _center_in_overlay(self.fourth_button, self.overlay)
+        fifth_center = _center_in_overlay(self.fifth_button, self.overlay)
 
         self.hide_button.move(
-            left_x - self.hide_button.width() // 2,
-            fourth_y - self.hide_button.height() // 2,
+            _top_left_for_center(QPoint(left_x, fourth_center.y()), self.hide_button)
         )
         self.info_button.move(
-            left_x - self.info_button.width() // 2,
-            fifth_y - self.info_button.height() // 2,
+            _top_left_for_center(QPoint(left_x, fifth_center.y()), self.info_button)
         )
         self.hide_button.raise_()
         self.info_button.raise_()
