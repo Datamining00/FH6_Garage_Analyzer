@@ -31,12 +31,15 @@ def apply_v1_3_2_safety_patches(MainWindow) -> None:
             and record.kind == "SoulBoundLivery"
         ):
             # v1.3.1's generic livery card creates a move button. Auction
-            # liveries are not present in FH6 My Designs, so remove the control
-            # from the widget tree before the card is ever displayed.
+            # liveries are not present in FH6 My Designs, so hide the control
+            # and schedule deletion while it is still parented to the card.
+            #
+            # Do NOT call setParent(None) here. In Qt that reparents the button
+            # into a temporary top-level native window, which can surface as a
+            # small stray window and interfere with the Windows message loop.
             move_button = getattr(card, "_fh6_game_move_button", None)
             if move_button is not None:
                 move_button.hide()
-                move_button.setParent(None)
                 move_button.deleteLater()
             card._fh6_game_move_button = None
         return card
