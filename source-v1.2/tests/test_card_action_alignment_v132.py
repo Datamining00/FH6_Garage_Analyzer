@@ -62,7 +62,6 @@ class CardActionAlignmentV132Tests(unittest.TestCase):
         self.assertEqual(hide.geometry().center().x(), move.geometry().center().x())
         self.assertEqual(info.geometry().center().x(), move.geometry().center().x())
 
-        # A taller hidden/filter layout must not pull the info button downward.
         overlay.resize(500, 330)
         info.move(8, 280)
         aligner.reposition()
@@ -89,13 +88,14 @@ class CardActionAlignmentV132Tests(unittest.TestCase):
 
         hide_w, hide_h = _alpha_bounds(hide_image)
         info_w, info_h = _alpha_bounds(info_image)
+        measured = f"hide={hide_w}x{hide_h}, info={info_w}x{info_h}"
+        print(f"CARD_ICON_BOUNDS {measured}")
 
-        # Different glyph shapes need not have identical aspect ratios, but their
-        # dominant visual extent must be the same and neither axis may differ by
-        # more than two pixels from the established card information icon.
-        self.assertLessEqual(abs(max(hide_w, hide_h) - max(info_w, info_h)), 1)
-        self.assertLessEqual(abs(hide_w - info_w), 2)
-        self.assertLessEqual(abs(hide_h - info_h), 2)
+        self.assertLessEqual(
+            abs(max(hide_w, hide_h) - max(info_w, info_h)), 1, measured
+        )
+        self.assertLessEqual(abs(hide_w - info_w), 2, measured)
+        self.assertLessEqual(abs(hide_h - info_h), 2, measured)
 
 
 if __name__ == "__main__":
