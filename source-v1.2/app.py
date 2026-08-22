@@ -30,6 +30,7 @@ from fh6garage.v1_3_2_patch import apply_v1_3_2_patches
 from fh6garage.v1_3_2_safety_patch import apply_v1_3_2_safety_patches
 from fh6garage.v1_3_2_startup_patch import apply_v1_3_2_startup_patches
 from fh6garage.v1_3_2_list_fix import apply_v1_3_2_list_fixes
+from fh6garage.v1_3_2_visibility_patch import apply_v1_3_2_visibility_patches
 from fh6garage.v1_3_2_thread_affinity_patch import apply_v1_3_2_thread_affinity_fix
 
 
@@ -60,6 +61,7 @@ def main() -> int:
     apply_v1_3_2_safety_patches(MainWindow)
     apply_v1_3_2_startup_patches()
     apply_v1_3_2_list_fixes(MainWindow)
+    apply_v1_3_2_visibility_patches(MainWindow)
 
     # This must be the final MainWindow patch. It restores the original
     # class-defined @Slot(object) scan callback so all UI rebuilding runs on the
