@@ -8,6 +8,12 @@ on:
     paths:
       - ".github/workflows/build-v1.3.2-windows.yml"
       - "source-v1.2/**"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/build-v1.3.2-windows.yml"
+      - "source-v1.2/**"
 
 permissions:
   contents: read
