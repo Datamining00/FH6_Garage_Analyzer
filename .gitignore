@@ -1,0 +1,5 @@
+**/__pycache__/
+*.py[cod]
+source-v1.2/.build-venv/
+source-v1.2/build/
+source-v1.2/dist/

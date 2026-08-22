@@ -1,0 +1,5 @@
+FH6 Assistant v1.1 reconstructed source baseline
+Base release asset: FH6_Assistant_v1.0.zip
+Base SHA-256: 048b440aacb7787354292f954d0408b9fdd57be36078cdc66beeaa7c3eab1f72
+Applied patch: .github/build-assets/v1.1/patch.part*
+Applied icon: .github/build-assets/v1.1/icon64.part*
