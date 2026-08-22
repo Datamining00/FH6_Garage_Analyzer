@@ -27,7 +27,6 @@ jobs:
         uses: actions/checkout@v6
         with:
           ref: v1.3.2-work
-          fetch-depth: 0
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v6
@@ -51,7 +50,7 @@ jobs:
           python -m compileall -q .
           python -m unittest discover -s tests -v
 
-      - name: Build v1.3.2 diagnostic EXE
+      - name: Build single Windows EXE
         shell: pwsh
         run: |
           Set-Location source-v1.2
@@ -65,31 +64,7 @@ jobs:
           if ($size -lt 10000000) {
             throw "Built EXE is unexpectedly small: $size bytes"
           }
-          Write-Host "Built v1.3.2 EXE bytes: $size"
-
-      - name: Build exact v1.3.1 control EXE
-        shell: pwsh
-        run: |
-          $controlRoot = Join-Path $env:RUNNER_TEMP "fh6-v131-control"
-          if (Test-Path $controlRoot) {
-            Remove-Item $controlRoot -Recurse -Force
-          }
-          git fetch origin v1.3.1-work
-          $controlSha = (git rev-parse origin/v1.3.1-work).Trim()
-          Write-Host "v1.3.1 control SHA: $controlSha"
-          git worktree add --detach $controlRoot origin/v1.3.1-work
-          Set-Location (Join-Path $controlRoot "source-v1.2")
-          python -m compileall -q .
-          python -m PyInstaller --clean --noconfirm .\FH6_Assistant_v1.3.1.spec
-          $controlExe = Join-Path $PWD "dist\FH6 Assistant v1.3.1.exe"
-          if (-not (Test-Path $controlExe)) {
-            throw "Exact v1.3.1 control EXE was not created."
-          }
-          $size = (Get-Item $controlExe).Length
-          if ($size -lt 10000000) {
-            throw "Control EXE is unexpectedly small: $size bytes"
-          }
-          Write-Host "Built v1.3.1 control EXE bytes: $size"
+          Write-Host "Built EXE bytes: $size"
 
       - name: Verify Windows version metadata
         shell: pwsh
@@ -109,7 +84,7 @@ jobs:
             throw "Unexpected OriginalFilename: $($version.OriginalFilename)"
           }
 
-      - name: Smoke test v1.3.2 startup responsiveness
+      - name: Smoke test bundled EXE startup responsiveness
         shell: pwsh
         run: |
           $exe = Resolve-Path "source-v1.2\dist\FH6 Assistant v1.3.2.exe"
@@ -123,35 +98,25 @@ jobs:
             Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
             throw "Bundled EXE is alive but Windows reports the GUI as Not Responding."
           }
-          Write-Host "v1.3.2 EXE is alive and Responding after 8 seconds."
+          Write-Host "Bundled EXE is alive and Responding after 8 seconds."
           Stop-Process -Id $proc.Id -Force
 
-      - name: Prepare diagnostic and control artifacts
+      - name: Prepare artifact and SHA-256
         shell: pwsh
         run: |
           $exe = Resolve-Path "source-v1.2\dist\FH6 Assistant v1.3.2.exe"
-          $controlRoot = Join-Path $env:RUNNER_TEMP "fh6-v131-control"
-          $controlExe = Resolve-Path (Join-Path $controlRoot "source-v1.2\dist\FH6 Assistant v1.3.1.exe")
           New-Item -ItemType Directory -Force -Path artifact | Out-Null
+          Copy-Item $exe "artifact\FH6 Assistant v1.3.2.exe" -Force
+          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
+          "$hash  FH6 Assistant v1.3.2.exe" | Set-Content -Path "artifact\FH6 Assistant v1.3.2.exe.sha256" -Encoding ascii
+          Write-Host "SHA-256: $hash"
 
-          Copy-Item $exe "artifact\FH6 Assistant v1.3.2 TRACE.exe" -Force
-          Copy-Item $controlExe "artifact\FH6 Assistant v1.3.1 CONTROL.exe" -Force
-
-          $hash132 = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
-          $hash131 = (Get-FileHash $controlExe -Algorithm SHA256).Hash.ToLower()
-          "$hash132  FH6 Assistant v1.3.2 TRACE.exe" | Set-Content -Path "artifact\FH6 Assistant v1.3.2 TRACE.exe.sha256" -Encoding ascii
-          "$hash131  FH6 Assistant v1.3.1 CONTROL.exe" | Set-Content -Path "artifact\FH6 Assistant v1.3.1 CONTROL.exe.sha256" -Encoding ascii
-          Write-Host "v1.3.2 TRACE SHA-256: $hash132"
-          Write-Host "v1.3.1 CONTROL SHA-256: $hash131"
-
-      - name: Upload Windows diagnostic builds
+      - name: Upload Windows test build
         uses: actions/upload-artifact@v6
         with:
-          name: FH6_Assistant_Windows_v1.3.2_diagnostic_pair
+          name: FH6_Assistant_Windows_v1.3.2_test
           path: |
-            artifact/FH6 Assistant v1.3.2 TRACE.exe
-            artifact/FH6 Assistant v1.3.2 TRACE.exe.sha256
-            artifact/FH6 Assistant v1.3.1 CONTROL.exe
-            artifact/FH6 Assistant v1.3.1 CONTROL.exe.sha256
+            artifact/FH6 Assistant v1.3.2.exe
+            artifact/FH6 Assistant v1.3.2.exe.sha256
           if-no-files-found: error
           compression-level: 0
