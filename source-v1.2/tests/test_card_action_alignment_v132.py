@@ -3,12 +3,28 @@ from __future__ import annotations
 import sys
 import unittest
 
+from PySide6.QtCore import QSize
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QToolButton, QWidget
 
+from fh6garage.ui import _classification_pixmap
 from fh6garage.v1_3_2_card_alignment_patch import (
     _CardActionAligner,
     _eye_slash_pixmap,
 )
+
+
+def _alpha_bounds(image) -> tuple[int, int]:
+    xs: list[int] = []
+    ys: list[int] = []
+    for y in range(image.height()):
+        for x in range(image.width()):
+            if image.pixelColor(x, y).alpha() > 0:
+                xs.append(x)
+                ys.append(y)
+    if not xs:
+        return (0, 0)
+    return (max(xs) - min(xs) + 1, max(ys) - min(ys) + 1)
 
 
 class CardActionAlignmentV132Tests(unittest.TestCase):
@@ -65,6 +81,21 @@ class CardActionAlignmentV132Tests(unittest.TestCase):
                 off_mask.append(off.pixelColor(x, y).alpha() > 0)
                 on_mask.append(on.pixelColor(x, y).alpha() > 0)
         self.assertEqual(off_mask, on_mask)
+
+    def test_hide_icon_matches_existing_card_icon_visual_scale(self) -> None:
+        hide_image = _eye_slash_pixmap(False, 22).toImage()
+        info_icon = QIcon(_classification_pixmap("livery_info", True, 24))
+        info_image = info_icon.pixmap(QSize(22, 22)).toImage()
+
+        hide_w, hide_h = _alpha_bounds(hide_image)
+        info_w, info_h = _alpha_bounds(info_image)
+
+        # Different glyph shapes need not have identical aspect ratios, but their
+        # dominant visual extent must be the same and neither axis may differ by
+        # more than two pixels from the established card information icon.
+        self.assertLessEqual(abs(max(hide_w, hide_h) - max(info_w, info_h)), 1)
+        self.assertLessEqual(abs(hide_w - info_w), 2)
+        self.assertLessEqual(abs(hide_h - info_h), 2)
 
 
 if __name__ == "__main__":
