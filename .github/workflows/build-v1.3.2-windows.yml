@@ -84,7 +84,7 @@ jobs:
             throw "Unexpected OriginalFilename: $($version.OriginalFilename)"
           }
 
-      - name: Smoke test bundled EXE startup
+      - name: Smoke test bundled EXE startup responsiveness
         shell: pwsh
         run: |
           $exe = Resolve-Path "source-v1.2\dist\FH6 Assistant v1.3.2.exe"
@@ -94,8 +94,12 @@ jobs:
           if ($proc.HasExited) {
             throw "Bundled EXE exited during startup smoke test with code $($proc.ExitCode)."
           }
+          if (-not $proc.Responding) {
+            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+            throw "Bundled EXE is alive but Windows reports the GUI as Not Responding."
+          }
+          Write-Host "Bundled EXE is alive and Responding after 8 seconds."
           Stop-Process -Id $proc.Id -Force
-          Write-Host "Bundled EXE remained running through the 8-second startup smoke test."
 
       - name: Prepare artifact and SHA-256
         shell: pwsh
