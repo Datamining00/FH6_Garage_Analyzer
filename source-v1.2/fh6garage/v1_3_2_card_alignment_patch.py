@@ -8,12 +8,12 @@ from PySide6.QtWidgets import QLayout, QToolButton, QWidget
 
 
 def _eye_slash_pixmap(active: bool, size: int = 22) -> QPixmap:
-    """Draw the eye-slash at the same effective footprint as card action icons.
+    """Draw the eye-slash at the measured effective card-icon footprint.
 
-    The established livery-info glyph renders at about 20x17 alpha pixels inside
-    the 22 px icon slot.  The eye is naturally a wide symbol, so normalize the
-    high-resolution vector into that same 20:17 footprint. Checked/unchecked
-    states change color only and therefore cannot change apparent size.
+    Qt's existing livery-info glyph occupies a wide effective alpha footprint in
+    the 22 px icon slot.  Normalize the eye-slash to that same footprint so its
+    apparent size matches the neighbouring card controls. Checked/unchecked
+    states change color only and cannot alter geometry.
     """
     raw_size = 64
     raw = QPixmap(raw_size, raw_size)
@@ -62,7 +62,7 @@ def _eye_slash_pixmap(active: bool, size: int = 22) -> QPixmap:
         max_y - min_y + 1,
     )
     target_width = max(1, round(size * 20 / 22))
-    target_height = max(1, round(size * 17 / 22))
+    target_height = max(1, round(size * 14 / 22))
     fitted = cropped.scaled(
         QSize(target_width, target_height),
         Qt.AspectRatioMode.IgnoreAspectRatio,
@@ -99,7 +99,6 @@ def _center_in_overlay(widget: QWidget, overlay: QWidget) -> QPoint:
 
 
 def _top_left_for_center(center: QPoint, widget: QWidget) -> QPoint:
-    """Return a top-left whose integer QRect.center() equals center exactly."""
     return QPoint(
         center.x() - (widget.width() - 1) // 2,
         center.y() - (widget.height() - 1) // 2,
@@ -107,8 +106,6 @@ def _top_left_for_center(center: QPoint, widget: QWidget) -> QPoint:
 
 
 class _CardActionAligner(QObject):
-    """Lock the two left utility buttons to the right action-row Y coordinates."""
-
     _EVENTS = {
         QEvent.Type.Show,
         QEvent.Type.Resize,
@@ -219,7 +216,6 @@ def _fix_card_actions(card: Any) -> None:
 
 
 def apply_v1_3_2_card_alignment_patch(MainWindow) -> None:
-    """Keep left card actions aligned regardless of card/image-host height."""
     if getattr(MainWindow, "_fh6_v132_card_alignment_patched", False):
         return
 
