@@ -8,29 +8,73 @@ from PySide6.QtWidgets import QLayout, QToolButton, QWidget
 
 
 def _eye_slash_pixmap(active: bool, size: int = 22) -> QPixmap:
-    """Draw one fixed eye-slash geometry for both checked and unchecked states."""
-    pixmap = QPixmap(size, size)
-    pixmap.fill(Qt.GlobalColor.transparent)
-    painter = QPainter(pixmap)
+    """Draw a non-distorted eye-slash with the same visual scale as card icons.
+
+    The existing livery-info icon is rendered from a 24 px source into a 22 px
+    icon slot and occupies about an 18 px visual footprint.  Drawing the eye
+    directly across the full 22 px canvas made its apparent size differ from the
+    neighbouring actions.  Render at high resolution, crop the vector content,
+    then fit it proportionally into an 18/22 visual footprint.
+    """
+    raw_size = 64
+    raw = QPixmap(raw_size, raw_size)
+    raw.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(raw)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
     color = QColor("#6e4bf2" if active else "#8d93a2")
-    pen = QPen(color, 1.8)
+    pen = QPen(color, 5.2)
     pen.setCapStyle(Qt.PenCapStyle.RoundCap)
     pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
     painter.setPen(pen)
     painter.setBrush(Qt.BrushStyle.NoBrush)
 
-    # Symmetric eye outline. Active/inactive changes only the color, never shape.
     path = QPainterPath()
-    path.moveTo(2.5, size / 2)
-    path.cubicTo(6.0, 5.0, size - 6.0, 5.0, size - 2.5, size / 2)
-    path.cubicTo(size - 6.0, size - 5.0, 6.0, size - 5.0, 2.5, size / 2)
+    path.moveTo(8.0, raw_size / 2)
+    path.cubicTo(18.0, 16.0, raw_size - 18.0, 16.0, raw_size - 8.0, raw_size / 2)
+    path.cubicTo(raw_size - 18.0, raw_size - 16.0, 18.0, raw_size - 16.0, 8.0, raw_size / 2)
     painter.drawPath(path)
-    painter.drawEllipse(QRectF(size / 2 - 2.6, size / 2 - 2.6, 5.2, 5.2))
-    painter.drawLine(3, 3, size - 3, size - 3)
+    painter.drawEllipse(QRectF(raw_size / 2 - 8.0, raw_size / 2 - 8.0, 16.0, 16.0))
+    painter.drawLine(12, 12, raw_size - 12, raw_size - 12)
     painter.end()
-    return pixmap
+
+    image = raw.toImage()
+    min_x = raw_size
+    min_y = raw_size
+    max_x = -1
+    max_y = -1
+    for y in range(raw_size):
+        for x in range(raw_size):
+            if image.pixelColor(x, y).alpha() > 0:
+                min_x = min(min_x, x)
+                min_y = min(min_y, y)
+                max_x = max(max_x, x)
+                max_y = max(max_y, y)
+
+    result = QPixmap(size, size)
+    result.fill(Qt.GlobalColor.transparent)
+    if max_x < min_x or max_y < min_y:
+        return result
+
+    cropped = raw.copy(
+        min_x,
+        min_y,
+        max_x - min_x + 1,
+        max_y - min_y + 1,
+    )
+    target_extent = max(1, round(size * 18 / 22))
+    fitted = cropped.scaled(
+        QSize(target_extent, target_extent),
+        Qt.AspectRatioMode.KeepAspectRatio,
+        Qt.TransformationMode.SmoothTransformation,
+    )
+
+    painter = QPainter(result)
+    x = (size - fitted.width()) // 2
+    y = (size - fitted.height()) // 2
+    painter.drawPixmap(x, y, fitted)
+    painter.end()
+    return result
 
 
 def _remove_widget_from_layout(layout: QLayout | None, target: QWidget) -> bool:
@@ -157,8 +201,8 @@ def _fix_card_actions(card: Any) -> None:
     info_button.setParent(overlay)
     info_button.show()
 
-    # Replace stateful QIcon rendering with a fixed raster geometry. Qt now only
-    # changes color on toggle, so checked state cannot appear stretched.
+    # Use a fixed 22 px slot and an 18 px proportional visual footprint, matching
+    # the apparent scale of the existing card action glyphs.
     hide_button.setIconSize(QSize(22, 22))
 
     def update_hide_icon(enabled: bool) -> None:
