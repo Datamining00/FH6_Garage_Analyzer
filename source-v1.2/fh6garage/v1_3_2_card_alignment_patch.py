@@ -8,13 +8,12 @@ from PySide6.QtWidgets import QLayout, QToolButton, QWidget
 
 
 def _eye_slash_pixmap(active: bool, size: int = 22) -> QPixmap:
-    """Draw a non-distorted eye-slash with the same visual scale as card icons.
+    """Draw a non-distorted eye-slash at the established card-icon scale.
 
-    The existing livery-info icon is rendered from a 24 px source into a 22 px
-    icon slot and occupies about an 18 px visual footprint.  Drawing the eye
-    directly across the full 22 px canvas made its apparent size differ from the
-    neighbouring actions.  Render at high resolution, crop the vector content,
-    then fit it proportionally into an 18/22 visual footprint.
+    Existing card action glyphs occupy about a 20 px dominant alpha extent in
+    the 22 px icon slot.  Render the eye at high resolution, crop its vector
+    content, then fit it proportionally into the same effective footprint.
+    Checked/unchecked states change color only, never geometry.
     """
     raw_size = 64
     raw = QPixmap(raw_size, raw_size)
@@ -62,7 +61,7 @@ def _eye_slash_pixmap(active: bool, size: int = 22) -> QPixmap:
         max_x - min_x + 1,
         max_y - min_y + 1,
     )
-    target_extent = max(1, round(size * 18 / 22))
+    target_extent = max(1, round(size * 20 / 22))
     fitted = cropped.scaled(
         QSize(target_extent, target_extent),
         Qt.AspectRatioMode.KeepAspectRatio,
@@ -201,8 +200,7 @@ def _fix_card_actions(card: Any) -> None:
     info_button.setParent(overlay)
     info_button.show()
 
-    # Use a fixed 22 px slot and an 18 px proportional visual footprint, matching
-    # the apparent scale of the existing card action glyphs.
+    # Use the same 22 px icon slot as the existing card controls.
     hide_button.setIconSize(QSize(22, 22))
 
     def update_hide_icon(enabled: bool) -> None:
