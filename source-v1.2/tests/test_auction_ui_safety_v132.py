@@ -13,11 +13,13 @@ class _DummyButton:
         self.hidden = False
         self.parent = object()
         self.deleted = False
+        self.reparented = False
 
     def hide(self) -> None:
         self.hidden = True
 
     def setParent(self, parent) -> None:
+        self.reparented = True
         self.parent = parent
 
     def deleteLater(self) -> None:
@@ -59,14 +61,15 @@ class AuctionUiSafetyTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         apply_v1_3_2_safety_patches(_DummyMainWindow)
 
-    def test_auction_card_move_control_is_removed(self) -> None:
+    def test_auction_card_move_control_is_removed_without_reparenting(self) -> None:
         auction = _record("SoulBoundLivery")
         window = _DummyMainWindow({"auction": auction})
         card = window._make_saved_content_card("livery", auction, "auction")
         button = window.last_button
         self.assertIsNotNone(button)
         self.assertTrue(button.hidden)
-        self.assertIsNone(button.parent)
+        self.assertFalse(button.reparented)
+        self.assertIsNotNone(button.parent)
         self.assertTrue(button.deleted)
         self.assertIsNone(card._fh6_game_move_button)
 
@@ -77,6 +80,7 @@ class AuctionUiSafetyTests(unittest.TestCase):
         self.assertIs(card._fh6_game_move_button, window.last_button)
         self.assertFalse(window.last_button.hidden)
         self.assertFalse(window.last_button.deleted)
+        self.assertFalse(window.last_button.reparented)
 
     def test_auction_navigation_request_is_blocked(self) -> None:
         auction = _record("SoulBoundLivery")
