@@ -28,6 +28,7 @@ from fh6garage.v1_3_ui_patch import apply_v1_3_ui_patches
 from fh6garage.v1_3_1_patch import apply_v1_3_1_patches
 from fh6garage.v1_3_2_patch import apply_v1_3_2_patches
 from fh6garage.v1_3_2_safety_patch import apply_v1_3_2_safety_patches
+from fh6garage.v1_3_2_startup_patch import apply_v1_3_2_startup_patches
 
 
 def resource_root() -> Path:
@@ -55,6 +56,7 @@ def main() -> int:
     apply_v1_3_1_patches(MainWindow)
     apply_v1_3_2_patches(MainWindow)
     apply_v1_3_2_safety_patches(MainWindow)
+    apply_v1_3_2_startup_patches()
 
     root = resource_root()
     icon_path = root / "icons" / "FH6_Assistant.ico"
