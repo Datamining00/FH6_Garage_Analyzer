@@ -20,8 +20,6 @@ class V132StartupTests(unittest.TestCase):
                 / "LocalStorage_Cache"
                 / "CacheThumbnails"
             )
-            # The directory intentionally does not exist. Returning it proves
-            # startup does not probe for .manifest or search alternate paths.
             self.assertEqual(fixed_default_thumbnail_cache(local), expected)
 
     def test_steam_and_alternate_packages_are_not_considered(self) -> None:
@@ -50,18 +48,22 @@ class V132StartupTests(unittest.TestCase):
             )
             self.assertEqual(fixed_default_thumbnail_cache(local), expected)
 
-    def test_app_installs_startup_patch(self) -> None:
+    def test_app_installs_startup_and_performance_patches(self) -> None:
         root = Path(__file__).resolve().parents[1]
         source = (root / "app.py").read_text(encoding="utf-8")
         self.assertIn("apply_v1_3_2_startup_patches()", source)
+        self.assertIn("apply_v1_3_2_performance_patches(MainWindow)", source)
 
-    def test_path_picker_row_is_replaced_by_hidden_holder(self) -> None:
+    def test_manual_picker_remains_but_auto_discovery_button_is_removed(self) -> None:
         root = Path(__file__).resolve().parents[1]
         source = (
             root / "fh6garage" / "v1_3_2_startup_patch.py"
         ).read_text(encoding="utf-8")
-        self.assertIn("v132._install_cache_row = _install_fixed_cache_holder", source)
-        self.assertIn("holder.setVisible(False)", source)
+        self.assertIn("v132._install_cache_row = _install_fixed_cache_row", source)
+        self.assertIn("choose.setObjectName(\"primary\")", source)
+        self.assertIn("refresh.setObjectName(\"secondary\")", source)
+        self.assertNotIn("Microsoft.*", source)
+        self.assertNotIn("os.scandir", source)
 
 
 if __name__ == "__main__":
