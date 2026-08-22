@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtWidgets import QLineEdit
+from PySide6.QtWidgets import QHBoxLayout, QLineEdit, QPushButton
 
 from . import v1_3_2_patch as v132
 
@@ -12,7 +12,7 @@ from . import v1_3_2_patch as v132
 def fixed_default_thumbnail_cache(
     local_appdata: Path | None = None,
 ) -> Optional[Path]:
-    """Return the one supported FH6 CacheThumbnails path without probing."""
+    """Return the default FH6 CacheThumbnails path without probing the filesystem."""
     if local_appdata is None:
         raw = os.environ.get("LOCALAPPDATA", "").strip()
         if not raw:
@@ -30,30 +30,48 @@ def fixed_default_thumbnail_cache(
     )
 
 
-def _install_fixed_cache_holder(self) -> None:
-    """Provide the cache path internally without adding cache-path UI controls."""
+def _install_fixed_cache_row(self) -> None:
+    """Install a save-path-style cache row without any automatic path search.
+
+    The default path is deterministic. Users may still explicitly choose another
+    CacheThumbnails folder; the chosen path is persisted by the existing v1.3.2
+    picker. No package/Steam/fallback discovery is performed.
+    """
     if hasattr(self, "cache_path_edit"):
         return
 
-    # Discard any path saved by earlier v1.3.2 test builds. This release always
-    # uses the single default Microsoft Store/Xbox path.
-    self.settings.remove(v132._CACHE_SETTING_KEY)
+    content = self.path_edit.parentWidget()
+    layout = content.layout() if content is not None else None
+    if layout is None or not hasattr(layout, "insertLayout"):
+        return
 
-    holder = QLineEdit(self)
-    holder.setReadOnly(True)
-    holder.setVisible(False)
-    default = fixed_default_thumbnail_cache()
-    holder.setText(str(default) if default is not None else "")
-    self.cache_path_edit = holder
+    row = QHBoxLayout()
+    self.cache_path_edit = QLineEdit()
+    self.cache_path_edit.setReadOnly(True)
+    self.cache_path_edit.setPlaceholderText(v132._t("cache_placeholder"))
+
+    choose = QPushButton(v132._t("cache_choose"))
+    choose.setObjectName("primary")
+    choose.clicked.connect(self._fh6_v132_choose_cache_folder)
+
+    refresh = QPushButton(
+        "새로고침" if (v132.get_language() or "ko").lower().startswith("ko") else "Refresh"
+    )
+    refresh.setObjectName("secondary")
+    refresh.clicked.connect(lambda _checked=False: v132._refresh_for_cache_change(self))
+
+    row.addWidget(self.cache_path_edit, 1)
+    row.addWidget(choose)
+    row.addWidget(refresh)
+    layout.insertLayout(1, row)
 
 
 def apply_v1_3_2_startup_patches() -> None:
-    """Force v1.3.2 to use only the default cache path and expose no path picker."""
-    # patched_init in v1_3_2_patch still calls this symbol, but it now performs
-    # no discovery: it simply returns the fixed path.
+    """Use one deterministic default path while preserving manual path selection."""
+    # patched_init in v1_3_2_patch calls this symbol. It returns only the fixed
+    # default path and never enumerates Packages or probes Steam/fallback paths.
     v132.auto_detect_thumbnail_cache = fixed_default_thumbnail_cache
 
-    # patched_build_ui resolves this global when the MainWindow is constructed.
-    # Replace the previous visible [path / choose / auto-detect] row with a hidden
-    # internal holder so no alternate path can be selected or scanned.
-    v132._install_cache_row = _install_fixed_cache_holder
+    # Keep a visible manual picker, styled and arranged like the save-folder row.
+    # The previous Auto-detect control is deliberately omitted.
+    v132._install_cache_row = _install_fixed_cache_row
