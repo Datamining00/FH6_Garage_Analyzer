@@ -536,14 +536,6 @@ ChatGPT는 다음 작업에 보조적으로 사용되었습니다.
 
 ---
 
-## 문서
-
-* [변경 이력](https://github.com/Datamining00/FH6_Garage_Analyzer/blob/main/CHANGELOG.md)
-* [기여 안내](https://github.com/Datamining00/FH6_Garage_Analyzer/blob/main/CONTRIBUTING.md)
-* [보안 정책](https://github.com/Datamining00/FH6_Garage_Analyzer/blob/main/SECURITY.md)
-
----
-
 ## 라이선스
 
 현재 별도의 오픈 소스 라이선스가 지정되어 있지 않습니다.
