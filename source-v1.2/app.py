@@ -48,6 +48,7 @@ from fh6garage.v1_3_2_release_layout_patch import apply_v1_3_2_release_layout_pa
 from fh6garage.v1_3_2_change_dialog_folder_patch import apply_v1_3_2_change_dialog_folder_patch
 from fh6garage.v1_3_2_change_dialog_runtime_fix import apply_v1_3_2_change_dialog_runtime_fix
 from fh6garage.v1_3_2_change_dialog_responsive_ui_fix import apply_v1_3_2_change_dialog_responsive_ui_fix
+from fh6garage.v1_3_2_auction_unapplied_recent_frame_fix import apply_v1_3_2_auction_unapplied_recent_frame_fix
 from fh6garage.v1_3_2_thread_affinity_patch import apply_v1_3_2_thread_affinity_fix
 
 
@@ -140,6 +141,11 @@ def main() -> int:
     # viewport, not from a hidden/main-grid width. Reuse the main 2/3/4-column
     # formula on every resize and force the same light application theme.
     apply_v1_3_2_change_dialog_responsive_ui_fix(MainWindow)
+
+    # Cache thumbnail matching is authoritative for auction visibility: unmatched
+    # SoulBound cards are hidden by default and appear only through the explicit
+    # unapplied-auction filter. Also make recent-change card boundaries clearer.
+    apply_v1_3_2_auction_unapplied_recent_frame_fix(MainWindow)
 
     # This must be the final MainWindow patch. It restores the original
     # class-defined @Slot(object) scan callback so all UI rebuilding runs on the
