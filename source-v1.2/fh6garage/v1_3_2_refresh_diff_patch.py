@@ -14,7 +14,11 @@ def apply_v1_3_2_refresh_diff_patch(MainWindow) -> None:
         result = getattr(self, "result", None)
         if result is not None:
             try:
-                diff = process_livery_refresh(result)
+                yield_hook = getattr(self, "_keep_busy_responsive", None)
+                diff = process_livery_refresh(
+                    result,
+                    yield_hook=yield_hook if callable(yield_hook) else None,
+                )
                 self._fh6_latest_livery_diff = diff
                 self._fh6_latest_livery_diff_summary = {
                     "baseline": diff.baseline,
@@ -24,7 +28,7 @@ def apply_v1_3_2_refresh_diff_patch(MainWindow) -> None:
                 }
                 self._fh6_latest_livery_diff_error = ""
             except Exception as exc:
-                # Refresh history is auxiliary.  A cache/disk failure must never
+                # Refresh history is auxiliary. A cache/disk failure must never
                 # prevent the FH6 save itself from loading.
                 self._fh6_latest_livery_diff = None
                 self._fh6_latest_livery_diff_summary = None
