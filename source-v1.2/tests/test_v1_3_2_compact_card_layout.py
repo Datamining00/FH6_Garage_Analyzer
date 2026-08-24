@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shiboken6 import delete as shiboken_delete
 
 from fh6garage.ui import CopyValueLabel
 from fh6garage.v1_3_2_compact_card_layout_patch import (
@@ -117,6 +118,14 @@ class V132CompactCardLayoutTests(unittest.TestCase):
         controller.apply()
         self.assertEqual(label.text(), "제작자: VeryLongCreatorName123456789")
         self.assertEqual(label.toolTip(), "")
+
+    def test_delayed_elision_is_safe_after_label_cpp_object_is_deleted(self) -> None:
+        label = CopyValueLabel("제작자", "DeletedCreator")
+        controller = _ElidedCopyValueController(label)
+        shiboken_delete(label)
+        # A queued zero-delay callback may still reach this Python method after
+        # the C++ QLabel has been destroyed. It must silently become a no-op.
+        controller.apply()
 
     def test_patch_order_keeps_icon_fix_and_thread_finalizer(self) -> None:
         source = (ROOT / "app.py").read_text(encoding="utf-8")
