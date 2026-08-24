@@ -42,6 +42,7 @@ from fh6garage.v1_3_2_compact_card_layout_patch import apply_v1_3_2_compact_card
 from fh6garage.v1_3_2_responsiveness_sort_patch import apply_v1_3_2_responsiveness_sort_patch
 from fh6garage.v1_3_2_refresh_diff_patch import apply_v1_3_2_refresh_diff_patch
 from fh6garage.v1_3_2_change_view_alias_patch import apply_v1_3_2_change_view_alias_patch
+from fh6garage.v1_3_2_change_view_alias_sync_patch import apply_v1_3_2_change_view_alias_sync_patch
 from fh6garage.v1_3_2_thread_affinity_patch import apply_v1_3_2_thread_affinity_fix
 
 
@@ -108,6 +109,11 @@ def main() -> int:
     # aliases across display/search/sort/group/statistics. This stays before the
     # final thread-affinity patch and never writes FH6 content.
     apply_v1_3_2_change_view_alias_patch(MainWindow)
+
+    # Current cards opened from the change viewer are separate widgets from the
+    # main-grid cache. Mirror their annotation/hide actions back to that cache so
+    # both views remain visually consistent immediately.
+    apply_v1_3_2_change_view_alias_sync_patch(MainWindow)
 
     # This must be the final MainWindow patch. It restores the original
     # class-defined @Slot(object) scan callback so all UI rebuilding runs on the
