@@ -46,6 +46,7 @@ from fh6garage.v1_3_2_change_view_alias_patch import apply_v1_3_2_change_view_al
 from fh6garage.v1_3_2_change_view_alias_sync_patch import apply_v1_3_2_change_view_alias_sync_patch
 from fh6garage.v1_3_2_release_layout_patch import apply_v1_3_2_release_layout_patch
 from fh6garage.v1_3_2_change_dialog_folder_patch import apply_v1_3_2_change_dialog_folder_patch
+from fh6garage.v1_3_2_change_dialog_runtime_fix import apply_v1_3_2_change_dialog_runtime_fix
 from fh6garage.v1_3_2_thread_affinity_patch import apply_v1_3_2_thread_affinity_fix
 
 
@@ -132,6 +133,11 @@ def main() -> int:
     # card action. The final left rows are move/hide/info/folder, aligned with
     # check/triangle/excluded/zoom respectively.
     apply_v1_3_2_change_dialog_folder_patch(MainWindow)
+
+    # The reserved toolbar slot was originally mouse-transparent, and an older
+    # hide aligner can race the four-row action aligner. Make the change button
+    # clickable and point every retained aligner at the same final rows.
+    apply_v1_3_2_change_dialog_runtime_fix(MainWindow)
 
     # This must be the final MainWindow patch. It restores the original
     # class-defined @Slot(object) scan callback so all UI rebuilding runs on the
