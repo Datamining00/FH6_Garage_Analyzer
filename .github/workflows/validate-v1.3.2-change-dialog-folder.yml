@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - v1.3.2-change-dialog-folder-actions
+  pull_request:
+    branches:
+      - v1.3.2-change-dialog-folder-actions
 
 permissions:
   contents: read
