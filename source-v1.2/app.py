@@ -110,9 +110,9 @@ def main() -> int:
     # final thread-affinity patch and never writes FH6 content.
     apply_v1_3_2_change_view_alias_patch(MainWindow)
 
-    # Change-view current cards are separate widgets from the main cached grid.
-    # Mirror annotation/hide actions immediately into the cached card without
-    # rebuilding either view.
+    # Current cards opened from the change viewer are separate widgets from the
+    # main-grid cache. Mirror their annotation/hide actions back to that cache so
+    # both views remain visually consistent immediately.
     apply_v1_3_2_change_view_alias_sync_patch(MainWindow)
 
     # This must be the final MainWindow patch. It restores the original
