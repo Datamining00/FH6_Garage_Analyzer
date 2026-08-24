@@ -1,42 +1,23 @@
 name: Build FH6 Assistant v1.3.2 Performance Windows EXE
 
 on:
-  workflow_dispatch:
-  push:
-    branches:
-      - v1.3.2-performance
-    paths:
-      - ".github/workflows/build-v1.3.2-performance-windows.yml"
-      - "source-v1.2/**"
   pull_request:
     branches:
-      - v1.3.2-work
+      - v1.3.2-performance-ci-base
     paths:
       - ".github/workflows/build-v1.3.2-performance-windows.yml"
       - "source-v1.2/**"
 
 permissions:
   contents: read
-  issues: write
 
 jobs:
   build-and-smoke-test:
     runs-on: windows-latest
 
     steps:
-      - name: Checkout performance branch
+      - name: Checkout performance PR
         uses: actions/checkout@v6
-
-      - name: Record workflow run on diagnostic PR
-        uses: actions/github-script@v7
-        with:
-          script: |
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: 43,
-              body: `PERF_BUILD_RUN_ID=${context.runId}\nPERF_BUILD_SHA=${context.sha}\nPERF_BUILD_EVENT=${context.eventName}`
-            })
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v6
@@ -73,15 +54,10 @@ jobs:
         run: |
           Set-Location source-v1.2
           python -m PyInstaller --clean --noconfirm .\FH6_Assistant_v1.3.2.spec
-
           $exe = Join-Path $PWD "dist\FH6 Assistant v1.3.2.exe"
-          if (-not (Test-Path $exe)) {
-            throw "FH6 Assistant v1.3.2.exe was not created."
-          }
+          if (-not (Test-Path $exe)) { throw "FH6 Assistant v1.3.2.exe was not created." }
           $size = (Get-Item $exe).Length
-          if ($size -lt 10000000) {
-            throw "Built EXE is unexpectedly small: $size bytes"
-          }
+          if ($size -lt 10000000) { throw "Built EXE is unexpectedly small: $size bytes" }
           Write-Host "Built EXE bytes: $size"
 
       - name: Verify Windows version metadata
@@ -92,15 +68,9 @@ jobs:
           Write-Host "FileVersion: $($version.FileVersion)"
           Write-Host "ProductVersion: $($version.ProductVersion)"
           Write-Host "OriginalFilename: $($version.OriginalFilename)"
-          if (-not $version.FileVersion.StartsWith("1.3.2")) {
-            throw "Unexpected FileVersion: $($version.FileVersion)"
-          }
-          if (-not $version.ProductVersion.StartsWith("1.3.2")) {
-            throw "Unexpected ProductVersion: $($version.ProductVersion)"
-          }
-          if ($version.OriginalFilename -ne "FH6 Assistant v1.3.2.exe") {
-            throw "Unexpected OriginalFilename: $($version.OriginalFilename)"
-          }
+          if (-not $version.FileVersion.StartsWith("1.3.2")) { throw "Unexpected FileVersion: $($version.FileVersion)" }
+          if (-not $version.ProductVersion.StartsWith("1.3.2")) { throw "Unexpected ProductVersion: $($version.ProductVersion)" }
+          if ($version.OriginalFilename -ne "FH6 Assistant v1.3.2.exe") { throw "Unexpected OriginalFilename: $($version.OriginalFilename)" }
 
       - name: Smoke test bundled EXE startup responsiveness
         shell: pwsh
@@ -109,9 +79,7 @@ jobs:
           $proc = Start-Process -FilePath $exe -PassThru
           Start-Sleep -Seconds 8
           $proc.Refresh()
-          if ($proc.HasExited) {
-            throw "Bundled EXE exited during startup smoke test with code $($proc.ExitCode)."
-          }
+          if ($proc.HasExited) { throw "Bundled EXE exited during startup smoke test with code $($proc.ExitCode)." }
           if (-not $proc.Responding) {
             Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
             throw "Bundled EXE is alive but Windows reports the GUI as Not Responding."
