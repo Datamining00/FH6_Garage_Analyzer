@@ -39,6 +39,7 @@ from fh6garage.v1_3_2_ui_performance_patch import apply_v1_3_2_ui_performance_pa
 from fh6garage.v1_3_2_global_ui_patch import apply_v1_3_2_global_ui_patch
 from fh6garage.v1_3_2_icon_overlay_fix import apply_v1_3_2_icon_overlay_fix
 from fh6garage.v1_3_2_compact_card_layout_patch import apply_v1_3_2_compact_card_layout_patch
+from fh6garage.v1_3_2_responsiveness_sort_patch import apply_v1_3_2_responsiveness_sort_patch
 from fh6garage.v1_3_2_thread_affinity_patch import apply_v1_3_2_thread_affinity_fix
 
 
@@ -92,6 +93,10 @@ def main() -> int:
     # Reclaim horizontal space around the saved-content grid and make the title
     # and creator metadata use equal halves with pixel-based elision.
     apply_v1_3_2_compact_card_layout_patch(MainWindow)
+
+    # Keep the indeterminate busy overlay repainting during synchronous card
+    # rebuild/layout work and make first-click download/date sorting newest-first.
+    apply_v1_3_2_responsiveness_sort_patch(MainWindow)
 
     # This must be the final MainWindow patch. It restores the original
     # class-defined @Slot(object) scan callback so all UI rebuilding runs on the
