@@ -1,9 +1,9 @@
 name: Build FH6 Assistant v1.3.2 Card Width Overlay
 
 on:
-  pull_request:
+  push:
     branches:
-      - v1.3.2-card-width-overlay-implementation
+      - v1.3.2-card-width-overlay-validation2
     paths:
       - ".github/workflows/build-v1.3.2-card-width-overlay.yml"
       - "source-v1.2/**"
