@@ -38,6 +38,7 @@ from fh6garage.v1_3_2_card_alignment_patch import apply_v1_3_2_card_alignment_pa
 from fh6garage.v1_3_2_ui_performance_patch import apply_v1_3_2_ui_performance_patches
 from fh6garage.v1_3_2_global_ui_patch import apply_v1_3_2_global_ui_patch
 from fh6garage.v1_3_2_icon_overlay_fix import apply_v1_3_2_icon_overlay_fix
+from fh6garage.v1_3_2_compact_card_layout_patch import apply_v1_3_2_compact_card_layout_patch
 from fh6garage.v1_3_2_thread_affinity_patch import apply_v1_3_2_thread_affinity_fix
 
 
@@ -87,6 +88,10 @@ def main() -> int:
     # patches have installed their controls. Also harden both thumbnail and busy
     # overlays against inherited black background/text palette combinations.
     apply_v1_3_2_icon_overlay_fix(MainWindow)
+
+    # Reclaim horizontal space around the saved-content grid and make the title
+    # and creator metadata use equal halves with pixel-based elision.
+    apply_v1_3_2_compact_card_layout_patch(MainWindow)
 
     # This must be the final MainWindow patch. It restores the original
     # class-defined @Slot(object) scan callback so all UI rebuilding runs on the
