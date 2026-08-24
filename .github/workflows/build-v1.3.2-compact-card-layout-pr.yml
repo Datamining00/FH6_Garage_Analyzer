@@ -1,0 +1,84 @@
+name: Build FH6 Assistant v1.3.2 Compact Card Layout
+
+on:
+  pull_request:
+    branches:
+      - v1.3.2-compact-card-layout
+    paths:
+      - ".github/workflows/build-v1.3.2-compact-card-layout-pr.yml"
+      - "source-v1.2/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-smoke-test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v6
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          Set-Location source-v1.2
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install --upgrade pyinstaller
+
+      - name: Compile and run full regression suite
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          Set-Location source-v1.2
+          python -m compileall -q .
+          python -m unittest discover -s tests -v
+
+      - name: Build single Windows EXE
+        shell: pwsh
+        run: |
+          Set-Location source-v1.2
+          python -m PyInstaller --clean --noconfirm .\FH6_Assistant_v1.3.2.spec
+          $exe = Join-Path $PWD "dist\FH6 Assistant v1.3.2.exe"
+          if (-not (Test-Path $exe)) { throw "EXE was not created." }
+          if ((Get-Item $exe).Length -lt 10000000) { throw "Built EXE is unexpectedly small." }
+
+      - name: Smoke test bundled EXE startup responsiveness
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path "source-v1.2\dist\FH6 Assistant v1.3.2.exe"
+          $proc = Start-Process -FilePath $exe -PassThru
+          Start-Sleep -Seconds 8
+          $proc.Refresh()
+          if ($proc.HasExited) { throw "Bundled EXE exited during startup smoke test." }
+          if (-not $proc.Responding) {
+            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+            throw "Bundled EXE is alive but Not Responding."
+          }
+          Stop-Process -Id $proc.Id -Force
+
+      - name: Prepare artifact
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path "source-v1.2\dist\FH6 Assistant v1.3.2.exe"
+          New-Item -ItemType Directory -Force -Path artifact | Out-Null
+          Copy-Item $exe "artifact\FH6 Assistant v1.3.2 Compact Card Layout.exe" -Force
+          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
+          "$hash  FH6 Assistant v1.3.2 Compact Card Layout.exe" | Set-Content -Path "artifact\FH6 Assistant v1.3.2 Compact Card Layout.exe.sha256" -Encoding ascii
+          Write-Host "SHA-256: $hash"
+
+      - name: Upload Windows build
+        uses: actions/upload-artifact@v6
+        with:
+          name: FH6_Assistant_v1.3.2_Compact_Card_Layout
+          path: artifact/*
+          if-no-files-found: error
+          compression-level: 0
