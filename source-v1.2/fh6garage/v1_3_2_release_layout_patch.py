@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6.QtCore import QSizePolicy, QTimer
-from PySide6.QtWidgets import QHBoxLayout, QToolButton, QWidget
+from PySide6.QtCore import QTimer
+from PySide6.QtWidgets import QHBoxLayout, QSizePolicy, QToolButton, QWidget
 
 
 def _move_change_banner_to_reserved_slot(window: Any) -> None:
