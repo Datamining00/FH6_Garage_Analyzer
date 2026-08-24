@@ -37,6 +37,7 @@ from fh6garage.v1_3_2_manifest_registry_patch import apply_v1_3_2_manifest_regis
 from fh6garage.v1_3_2_card_alignment_patch import apply_v1_3_2_card_alignment_patch
 from fh6garage.v1_3_2_ui_performance_patch import apply_v1_3_2_ui_performance_patches
 from fh6garage.v1_3_2_global_ui_patch import apply_v1_3_2_global_ui_patch
+from fh6garage.v1_3_2_card_parent_safety_patch import apply_v1_3_2_card_parent_safety_patch
 from fh6garage.v1_3_2_card_rail_patch import apply_v1_3_2_card_rail_patch
 from fh6garage.v1_3_2_thread_affinity_patch import apply_v1_3_2_thread_affinity_fix
 
@@ -82,6 +83,11 @@ def main() -> int:
     # cached cards retain the same aspect controller through sort/filter/source
     # changes.
     apply_v1_3_2_global_ui_patch(MainWindow)
+
+    # Before the rail patch reparents/shows action buttons, force every new card
+    # into its real grid host and keep it hidden. This preserves the v1.3.2
+    # Windows invariant that no parentless card can flash as a temporary window.
+    apply_v1_3_2_card_parent_safety_patch(MainWindow)
 
     # Move action controls out of the image after aspect handling is installed.
     # The center thumbnail remains the controller's host while side rails own all
