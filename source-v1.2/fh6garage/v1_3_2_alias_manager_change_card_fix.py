@@ -25,14 +25,31 @@ from .i18n import tr
 
 
 def _remove_deleted_heading_and_match_main_frame(widget: Any) -> Any:
-    """Deleted snapshot cards look like normal cards, but remain actionless."""
+    """Deleted snapshot cards use the normal card UI but contain no actions."""
     for frame in widget.findChildren(QFrame):
-        if bool(frame.property("fh6ArchiveCard")):
-            frame.setObjectName("panel")
-            for label in frame.findChildren(QLabel):
-                if label.text() in {"삭제 전", "Before removal"}:
-                    label.hide()
-                    label.deleteLater()
+        if not bool(frame.property("fh6ArchiveCard")):
+            continue
+
+        frame.setObjectName("panel")
+        layout = frame.layout()
+        if isinstance(layout, QVBoxLayout):
+            layout.setContentsMargins(12, 12, 12, 12)
+            layout.setSpacing(8)
+            # Archive-card layout is image, vehicle, metadata, optional description,
+            # historical badge. Match the main card's visible vehicle label.
+            if layout.count() >= 2:
+                vehicle_item = layout.itemAt(1)
+                vehicle = vehicle_item.widget() if vehicle_item is not None else None
+                if isinstance(vehicle, QLabel):
+                    prefix = _alias._txt("차량명", "Vehicle")
+                    text = vehicle.text().strip()
+                    if text and not text.startswith(f"{prefix}:"):
+                        vehicle.setText(f"{prefix}: {text}")
+
+        for label in frame.findChildren(QLabel):
+            if label.text() in {"삭제 전", "Before removal"}:
+                label.hide()
+                label.deleteLater()
     return widget
 
 
