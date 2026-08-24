@@ -11,7 +11,6 @@ from PySide6.QtWidgets import QApplication
 from fh6garage.i18n import set_language
 from fh6garage.ui import MainWindow
 from fh6garage.v1_3_ui_patch import (
-    GRID_MAX_COLUMNS,
     IMAGE_MIN_HEIGHT,
     apply_v1_3_ui_patches,
 )
@@ -60,19 +59,18 @@ class V13FollowupUiTests(unittest.TestCase):
         self.app.processEvents()
         self.assertFalse(self.window.language_restart_button.isVisible())
 
-    def test_wide_window_allows_up_to_four_columns(self) -> None:
+    def test_wide_window_allows_three_or_more_columns(self) -> None:
         self.window.pages.setCurrentIndex(1)
         self.window.resize(2200, 900)
         self.app.processEvents()
         columns = self.window._fh6_grid_column_count("livery")
         self.assertGreaterEqual(columns, 3)
-        self.assertLessEqual(columns, GRID_MAX_COLUMNS)
 
-    def test_grid_never_exceeds_four_columns(self) -> None:
+    def test_grid_has_no_four_column_ceiling(self) -> None:
         self.window.pages.setCurrentIndex(1)
         self.window.resize(4000, 900)
         self.app.processEvents()
-        self.assertEqual(self.window._fh6_grid_column_count("livery"), 4)
+        self.assertGreater(self.window._fh6_grid_column_count("livery"), 4)
 
 
 if __name__ == "__main__":
