@@ -45,6 +45,7 @@ from fh6garage.v1_3_2_refresh_diff_patch import apply_v1_3_2_refresh_diff_patch
 from fh6garage.v1_3_2_change_view_alias_patch import apply_v1_3_2_change_view_alias_patch
 from fh6garage.v1_3_2_change_view_alias_sync_patch import apply_v1_3_2_change_view_alias_sync_patch
 from fh6garage.v1_3_2_release_layout_patch import apply_v1_3_2_release_layout_patch
+from fh6garage.v1_3_2_change_dialog_folder_patch import apply_v1_3_2_change_dialog_folder_patch
 from fh6garage.v1_3_2_thread_affinity_patch import apply_v1_3_2_thread_affinity_fix
 
 
@@ -122,10 +123,15 @@ def main() -> int:
     # both views remain visually consistent immediately.
     apply_v1_3_2_change_view_alias_sync_patch(MainWindow)
 
-    # Final placement-only release patch: put the refresh-change notice in the
-    # reserved slot directly below Full Refresh and align the left hide/info
-    # controls with right-side action rows 2 and 3.
+    # Put the compact refresh-change notice below Full Refresh and keep the legacy
+    # hide/info left actions on the triangle/excluded rows.
     apply_v1_3_2_release_layout_patch(MainWindow)
+
+    # Open refresh changes in a main-sized standalone window, reuse the main card
+    # width/column contract, and add a read-only folder opener as the fourth left
+    # card action. The final left rows are move/hide/info/folder, aligned with
+    # check/triangle/excluded/zoom respectively.
+    apply_v1_3_2_change_dialog_folder_patch(MainWindow)
 
     # This must be the final MainWindow patch. It restores the original
     # class-defined @Slot(object) scan callback so all UI rebuilding runs on the
