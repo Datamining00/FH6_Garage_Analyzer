@@ -44,12 +44,13 @@ class ChangeDialogResponsiveUiFixTests(unittest.TestCase):
 
     def test_theme_explicitly_covers_dialog_scroll_viewport_and_host(self) -> None:
         source = inspect.getsource(patch._apply_dialog_theme)
+        self.assertEqual(patch._DIALOG_BACKGROUND, "#f7f8fb")
         self.assertIn("APP_STYLE", source)
         self.assertIn("QDialog#fh6ChangeDialog", source)
         self.assertIn("QScrollArea#fh6ChangeScroll", source)
         self.assertIn("scroll.viewport().setStyleSheet", source)
         self.assertIn("QWidget#fh6ChangeHost", source)
-        self.assertIn("#f7f8fb", source)
+        self.assertIn("_DIALOG_BACKGROUND", source)
 
     def test_runtime_dialog_card_width_tracks_actual_dialog_viewport(self) -> None:
         class DummyWindow(QWidget):
@@ -124,6 +125,13 @@ class ChangeDialogResponsiveUiFixTests(unittest.TestCase):
                 dialog.close()
             owner.close()
             self.app.processEvents()
+
+    def test_no_global_delayed_render_survives_dialog_close(self) -> None:
+        source = inspect.getsource(patch._open_responsive_change_dialog)
+        self.assertNotIn("QTimer.singleShot", source)
+        self.assertIn("controller.request_now()", source)
+        controller_source = inspect.getsource(patch._ViewportResizeController)
+        self.assertIn("QTimer(self)", controller_source)
 
     def test_patch_order_keeps_thread_affinity_final(self) -> None:
         app = (ROOT / "app.py").read_text(encoding="utf-8")
