@@ -37,6 +37,7 @@ from fh6garage.v1_3_2_manifest_registry_patch import apply_v1_3_2_manifest_regis
 from fh6garage.v1_3_2_card_alignment_patch import apply_v1_3_2_card_alignment_patch
 from fh6garage.v1_3_2_ui_performance_patch import apply_v1_3_2_ui_performance_patches
 from fh6garage.v1_3_2_global_ui_patch import apply_v1_3_2_global_ui_patch
+from fh6garage.v1_3_2_icon_overlay_fix import apply_v1_3_2_icon_overlay_fix
 from fh6garage.v1_3_2_thread_affinity_patch import apply_v1_3_2_thread_affinity_fix
 
 
@@ -79,8 +80,13 @@ def main() -> int:
 
     # Geometry/aspect correction is deliberately layered after card reuse so
     # cached cards retain the same aspect controller through sort/filter/source
-    # changes. The thread-affinity fix must still remain the final patch.
+    # changes.
     apply_v1_3_2_global_ui_patch(MainWindow)
+
+    # Normalize the final card action geometry only after all earlier card
+    # patches have installed their controls. Also harden both thumbnail and busy
+    # overlays against inherited black background/text palette combinations.
+    apply_v1_3_2_icon_overlay_fix(MainWindow)
 
     # This must be the final MainWindow patch. It restores the original
     # class-defined @Slot(object) scan callback so all UI rebuilding runs on the
