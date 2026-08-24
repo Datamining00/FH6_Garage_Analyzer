@@ -118,7 +118,6 @@ class ChangeViewContractTests(unittest.TestCase):
             self.assertTrue(bool(card.property("fh6ArchiveCard")))
             self.assertEqual(card.findChildren(QPushButton), [])
             self.assertEqual(card.findChildren(QToolButton), [])
-            texts = [label.text() for label in card.findChildren(type(card).mro()[1])]
             card.deleteLater()
 
     def test_app_patch_order_refresh_then_alias_then_thread_finalizer(self):
