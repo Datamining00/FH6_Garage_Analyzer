@@ -4,8 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QDialog, QFrame, QLabel, QWidget
+from PySide6.QtWidgets import QApplication, QDialog, QFrame, QLabel, QVBoxLayout, QWidget
 
 from fh6garage.creator_aliases import CreatorAliasStore
 from fh6garage import v1_3_2_alias_manager_change_card_fix as fix
@@ -24,17 +23,28 @@ class AliasManagerChangeCardFixTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.app = QApplication.instance() or QApplication([])
 
-    def test_deleted_heading_is_removed_and_archive_uses_panel_frame(self) -> None:
+    def test_deleted_heading_is_removed_and_archive_matches_main_metadata_frame(self) -> None:
         root = QWidget()
         card = QFrame(root)
         card.setObjectName("card")
         card.setProperty("fh6ArchiveCard", True)
-        label = QLabel("삭제 전", card)
-        label.show()
+        layout = QVBoxLayout(card)
+        image = QLabel()
+        vehicle = QLabel("2016 Dodge Viper ACR")
+        heading = QLabel("삭제 전")
+        layout.addWidget(image)
+        layout.addWidget(vehicle)
+        layout.addWidget(heading)
+        card.show()
+        heading.show()
 
         fix._remove_deleted_heading_and_match_main_frame(root)
         self.assertEqual(card.objectName(), "panel")
-        self.assertFalse(label.isVisible())
+        self.assertEqual(vehicle.text(), "차량명: 2016 Dodge Viper ACR")
+        margins = layout.contentsMargins()
+        self.assertEqual((margins.left(), margins.top(), margins.right(), margins.bottom()), (12, 12, 12, 12))
+        self.assertEqual(layout.spacing(), 8)
+        self.assertFalse(heading.isVisible())
 
     def test_alias_dialog_is_nonmodal_and_initial_inputs_are_blank(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
