@@ -1,0 +1,1 @@
+responsive change dialog validation
