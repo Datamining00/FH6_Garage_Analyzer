@@ -41,6 +41,7 @@ from fh6garage.v1_3_2_icon_overlay_fix import apply_v1_3_2_icon_overlay_fix
 from fh6garage.v1_3_2_compact_card_layout_patch import apply_v1_3_2_compact_card_layout_patch
 from fh6garage.v1_3_2_responsiveness_sort_patch import apply_v1_3_2_responsiveness_sort_patch
 from fh6garage.v1_3_2_refresh_diff_patch import apply_v1_3_2_refresh_diff_patch
+from fh6garage.v1_3_2_change_view_alias_patch import apply_v1_3_2_change_view_alias_patch
 from fh6garage.v1_3_2_thread_affinity_patch import apply_v1_3_2_thread_affinity_fix
 
 
@@ -102,6 +103,11 @@ def main() -> int:
     # Snapshot visible livery instances and cache only thumbnail copies under
     # LocalAppData so the latest add/remove/change diff can retain deleted images.
     apply_v1_3_2_refresh_diff_patch(MainWindow)
+
+    # Present latest refresh changes as cards and resolve user-managed creator
+    # aliases across display/search/sort/group/statistics. This stays before the
+    # final thread-affinity patch and never writes FH6 content.
+    apply_v1_3_2_change_view_alias_patch(MainWindow)
 
     # This must be the final MainWindow patch. It restores the original
     # class-defined @Slot(object) scan callback so all UI rebuilding runs on the
