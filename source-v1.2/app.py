@@ -39,6 +39,7 @@ from fh6garage.v1_3_2_ui_performance_patch import apply_v1_3_2_ui_performance_pa
 from fh6garage.v1_3_2_global_ui_patch import apply_v1_3_2_global_ui_patch
 from fh6garage.v1_3_2_card_parent_safety_patch import apply_v1_3_2_card_parent_safety_patch
 from fh6garage.v1_3_2_card_rail_patch import apply_v1_3_2_card_rail_patch
+from fh6garage.v1_3_2_unbounded_grid_patch import apply_v1_3_2_unbounded_grid_patch
 from fh6garage.v1_3_2_first_paint_patch import apply_v1_3_2_first_paint_patch
 from fh6garage.v1_3_2_thread_affinity_patch import apply_v1_3_2_thread_affinity_fix
 
@@ -94,6 +95,10 @@ def main() -> int:
     # The center thumbnail remains the controller's host while side rails own all
     # card actions.
     apply_v1_3_2_card_rail_patch(MainWindow)
+
+    # Saved-content grids always keep at least two columns, but wider windows can
+    # grow to 3, 4, 5... columns without a hard ceiling.
+    apply_v1_3_2_unbounded_grid_patch(MainWindow)
 
     # Do not expose the transient minimum-column / placeholder-thumbnail frame.
     # The first-paint barrier resolves final widths and thumbnail geometry before
