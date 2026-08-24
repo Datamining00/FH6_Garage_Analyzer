@@ -25,6 +25,8 @@ from fh6garage.v1_3_2_card_width_overlay_patch import (
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# Validation branch only: implementation assertions are unchanged.
+
 
 class V132CardWidthOverlayTests(unittest.TestCase):
     @classmethod
