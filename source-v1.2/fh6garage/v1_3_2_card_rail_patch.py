@@ -171,6 +171,7 @@ def _place_button(
 ) -> None:
     if button is None:
         return
+    button.setProperty("fh6RailIncluded", bool(visible))
     if not visible:
         button.hide()
         return
@@ -199,7 +200,11 @@ def _sync_card_rail_states(self: Any, card: QWidget) -> None:
         ("_fh6_excluded_box", "excluded", lambda b: b.isChecked()),
         ("_fh6_hide_button", "hide", lambda b: b.isChecked()),
         ("_fh6_zoom_button", "search", lambda _b: True),
-        ("_fh6_game_move_button", "move", lambda b: b.isEnabled() and b.isVisible()),
+        (
+            "_fh6_game_move_button",
+            "move",
+            lambda b: b.isEnabled() and bool(b.property("fh6RailIncluded")),
+        ),
         (
             "_fh6_memo_button",
             "memo",
