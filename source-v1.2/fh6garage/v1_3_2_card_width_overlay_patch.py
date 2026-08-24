@@ -9,25 +9,22 @@ from . import v1_3_1_patch as v131_ui
 from .v1_3_2_global_ui_patch import _AspectFitThumbnailController
 
 
-# Keep cards wide enough that overlay actions no longer crowd the vehicle image.
-# At a 1920x1080 desktop with the app snapped to one half (~960 px), the saved
-# content viewport is expected to use one column. Wider windows naturally expand
-# to 2/3/4 columns when enough room is available.
-CARD_TARGET_WIDTH = 560
-CARD_MIN_WIDTH = 520
-GRID_MIN_COLUMNS = 1
-GRID_MAX_COLUMNS = 4
+# Keep the existing dense card view: a snapped half-width 1920x1080 window must
+# still show at least two cards per row. Wider windows may grow to any number of
+# columns; there is intentionally no hard maximum.
+CARD_TARGET_WIDTH = 400
+CARD_MIN_WIDTH = 340
+GRID_MIN_COLUMNS = 2
 
-# The action controls remain inside the thumbnail overlay. Reserve a visual safe
-# zone on both sides so a full-aspect vehicle image is rendered slightly smaller
-# and centered, rather than being covered by left/right controls.
+# Action controls remain inside the thumbnail overlay. The largest left control
+# is 38 px and the right controls are 34 px, with 8 px overlay margins. Reserving
+# 48 px on each side keeps the full-aspect vehicle image away from both stacks.
 THUMBNAIL_SIDE_SAFE_PX = 48
 
 
 def _columns_for_inner_width(inner_width: int) -> int:
     inner = max(1, int(inner_width))
-    columns = inner // CARD_TARGET_WIDTH
-    return max(GRID_MIN_COLUMNS, min(GRID_MAX_COLUMNS, int(columns)))
+    return max(GRID_MIN_COLUMNS, int(inner // CARD_TARGET_WIDTH))
 
 
 def _grid_column_count(self: Any, content_type: str) -> int:
@@ -55,7 +52,7 @@ def _apply_grid_card_widths(
     *,
     force: bool = False,
 ) -> None:
-    """v1.3.1 width sync with a one-column state and a real card minimum."""
+    """Width sync with a two-column floor and no upper column limit."""
     scroll = getattr(self, f"{content_type}_grid_scroll", None)
     layout = getattr(self, f"{content_type}_grid_layout", None)
     host = getattr(self, f"{content_type}_grid_host", None)
@@ -67,7 +64,7 @@ def _apply_grid_card_widths(
     if viewport is None or viewport.width() <= 0:
         return
 
-    columns = max(GRID_MIN_COLUMNS, min(GRID_MAX_COLUMNS, int(columns)))
+    columns = max(GRID_MIN_COLUMNS, int(columns))
     margins = layout.contentsMargins()
     gap = max(0, layout.horizontalSpacing())
     available = (
@@ -88,7 +85,9 @@ def _apply_grid_card_widths(
     ):
         return
 
-    for column in range(GRID_MAX_COLUMNS):
+    active_attr = f"_fh6_{content_type}_grid_columns"
+    previous_columns = int(getattr(self, active_attr, columns) or columns)
+    for column in range(max(previous_columns, columns)):
         stretch = 1 if column < columns else 0
         if layout.columnStretch(column) != stretch:
             layout.setColumnStretch(column, stretch)
@@ -107,24 +106,22 @@ def _safe_thumbnail_render_width(raw_width: int) -> int:
 
 
 def apply_v1_3_2_card_width_overlay_patch(MainWindow) -> None:
-    """Restore overlay actions and solve crowding through card/image geometry.
+    """Keep overlay actions and solve vehicle overlap through image geometry.
 
-    This deliberately does not create side rails. Existing overlay controls stay
-    where v1.3.2 placed them. The grid gains a true one-column state, cards get a
-    larger minimum width, and the aspect-fit image is rendered inside a centered
-    left/right safe zone so controls cannot cover the vehicle.
+    Side rails are intentionally not used. Existing overlay controls stay in the
+    thumbnail. The grid keeps at least two columns, has no upper column cap, and
+    the native-aspect image is rendered slightly smaller and centered inside a
+    left/right safe zone so the controls no longer cover vehicle pixels.
     """
     if getattr(MainWindow, "_fh6_v132_card_width_overlay_patched", False):
         return
 
-    # v1.3's generalized layout function resolves this module-global helper at
-    # runtime, so replacing it makes 1-column mode available without rewriting
-    # the grouping/layout implementation.
+    # v1.3 generalized layout resolves this helper at runtime.
     v13_ui._grid_column_count = _grid_column_count
     MainWindow._fh6_grid_column_count = _grid_column_count
 
-    # v1.3.1 resize/reflow helpers also look up this module-global function at
-    # runtime. Replace only the width calculation; keep its debounce/reflow code.
+    # v1.3.1 resize/reflow helpers resolve this module-global function at
+    # runtime. Preserve their debounce/reflow path and only replace width math.
     v131_ui._apply_grid_card_widths = _apply_grid_card_widths
 
     original_make_card = MainWindow._make_saved_content_card
@@ -138,10 +135,9 @@ def apply_v1_3_2_card_width_overlay_patch(MainWindow) -> None:
 
     MainWindow._make_saved_content_card = patched_make_card
 
-    # The global aspect controller already preserves the original image ratio.
-    # Narrow only its effective render width. QLabel remains centered in the
-    # original host, so the result is a smaller full image with transparent/
-    # background space reserved under the overlay controls.
+    # The global aspect controller already uses KeepAspectRatio. Reduce only the
+    # effective render width; QLabel alignment remains centered, creating equal
+    # safe space beneath the left/right overlay controls without cropping.
     if not getattr(_AspectFitThumbnailController, "_fh6_overlay_safe_width_patched", False):
         original_host_width = _AspectFitThumbnailController._host_width
 
