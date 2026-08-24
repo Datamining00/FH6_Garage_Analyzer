@@ -44,6 +44,7 @@ from fh6garage.v1_3_2_responsive_columns_fix import apply_v1_3_2_responsive_colu
 from fh6garage.v1_3_2_refresh_diff_patch import apply_v1_3_2_refresh_diff_patch
 from fh6garage.v1_3_2_change_view_alias_patch import apply_v1_3_2_change_view_alias_patch
 from fh6garage.v1_3_2_change_view_alias_sync_patch import apply_v1_3_2_change_view_alias_sync_patch
+from fh6garage.v1_3_2_release_layout_patch import apply_v1_3_2_release_layout_patch
 from fh6garage.v1_3_2_thread_affinity_patch import apply_v1_3_2_thread_affinity_fix
 
 
@@ -120,6 +121,11 @@ def main() -> int:
     # main-grid cache. Mirror their annotation/hide actions back to that cache so
     # both views remain visually consistent immediately.
     apply_v1_3_2_change_view_alias_sync_patch(MainWindow)
+
+    # Final placement-only release patch: put the refresh-change notice in the
+    # reserved slot directly below Full Refresh and align the left hide/info
+    # controls with right-side action rows 2 and 3.
+    apply_v1_3_2_release_layout_patch(MainWindow)
 
     # This must be the final MainWindow patch. It restores the original
     # class-defined @Slot(object) scan callback so all UI rebuilding runs on the
