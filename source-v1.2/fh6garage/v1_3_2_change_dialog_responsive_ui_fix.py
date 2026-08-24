@@ -69,21 +69,23 @@ def _apply_dialog_theme(dialog: QDialog, scroll: QScrollArea, host: QWidget) -> 
 
 
 class _ViewportResizeController(QObject):
-    """Debounce native resize events before rebuilding the small change grid."""
+    """Debounce resize events with a timer owned by the dialog viewport."""
 
     def __init__(self, viewport: QWidget, callback: Callable[[], None]) -> None:
         super().__init__(viewport)
         self._callback = callback
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
-        self._timer.setInterval(_RESIZE_DEBOUNCE_MS)
         self._timer.timeout.connect(callback)
         viewport.installEventFilter(self)
 
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
         if event.type() in {QEvent.Type.Resize, QEvent.Type.Show}:
-            self._timer.start()
+            self.request(_RESIZE_DEBOUNCE_MS)
         return False
+
+    def request(self, delay_ms: int = _RESIZE_DEBOUNCE_MS) -> None:
+        self._timer.start(max(0, int(delay_ms)))
 
     def request_now(self) -> None:
         self._timer.stop()
@@ -232,10 +234,9 @@ def _open_responsive_change_dialog(window: Any) -> None:
 
         state["widgets"] = widgets
         for column in range(GRID_MAX_COLUMNS):
-            grid.setColumnStretch(column, 0)
+            grid.setColumnStretch(column, 1 if column < columns else 0)
         host.setMinimumWidth(0)
         host.updateGeometry()
-        host.adjustSize()
 
     def set_filter(filter_name: str) -> None:
         state["filter"] = filter_name
@@ -254,8 +255,11 @@ def _open_responsive_change_dialog(window: Any) -> None:
     dialog.show()
     dialog.raise_()
     dialog.activateWindow()
-    QTimer.singleShot(0, lambda: render(force=True))
-    QTimer.singleShot(80, lambda: render(force=False))
+    # show() establishes the first real viewport geometry, so render once now.
+    # Later native resize/show passes are handled only by the controller-owned
+    # QTimer; closing the dialog deletes that timer and cannot leave a callback
+    # pointing at an already-destroyed QScrollArea.
+    controller.request_now()
 
 
 def apply_v1_3_2_change_dialog_responsive_ui_fix(MainWindow) -> None:
