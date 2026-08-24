@@ -57,17 +57,27 @@ class _ElidedCopyValueController(QObject):
             return
         self._applying = True
         try:
-            full = self.full_text()
-            available = max(1, self.label.contentsRect().width())
-            metrics = QFontMetrics(self.label.font())
+            # Cached cards can be deleted while a zero-delay Qt callback is still
+            # queued. PySide keeps the Python wrapper alive briefly after the C++
+            # QLabel has gone away, so treat that late callback as a no-op.
+            try:
+                full = self.full_text()
+                available = max(1, self.label.contentsRect().width())
+                metrics = QFontMetrics(self.label.font())
+            except RuntimeError:
+                return
+
             display = metrics.elidedText(
                 full,
                 Qt.TextElideMode.ElideRight,
                 available,
             )
-            if self.label.text() != display:
-                self.label.setText(display)
-            self.label.setToolTip(full if display != full else "")
+            try:
+                if self.label.text() != display:
+                    self.label.setText(display)
+                self.label.setToolTip(full if display != full else "")
+            except RuntimeError:
+                return
         finally:
             self._applying = False
 
