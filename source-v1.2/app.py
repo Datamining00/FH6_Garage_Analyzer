@@ -39,6 +39,7 @@ from fh6garage.v1_3_2_ui_performance_patch import apply_v1_3_2_ui_performance_pa
 from fh6garage.v1_3_2_global_ui_patch import apply_v1_3_2_global_ui_patch
 from fh6garage.v1_3_2_card_parent_safety_patch import apply_v1_3_2_card_parent_safety_patch
 from fh6garage.v1_3_2_card_rail_patch import apply_v1_3_2_card_rail_patch
+from fh6garage.v1_3_2_first_paint_patch import apply_v1_3_2_first_paint_patch
 from fh6garage.v1_3_2_thread_affinity_patch import apply_v1_3_2_thread_affinity_fix
 
 
@@ -91,8 +92,13 @@ def main() -> int:
 
     # Move action controls out of the image after aspect handling is installed.
     # The center thumbnail remains the controller's host while side rails own all
-    # card actions. The thread-affinity fix must still remain the final patch.
+    # card actions.
     apply_v1_3_2_card_rail_patch(MainWindow)
+
+    # Do not expose the transient minimum-column / placeholder-thumbnail frame.
+    # The first-paint barrier resolves final widths and thumbnail geometry before
+    # enabling viewport painting. The thread-affinity fix must remain final.
+    apply_v1_3_2_first_paint_patch(MainWindow)
 
     # This must be the final MainWindow patch. It restores the original
     # class-defined @Slot(object) scan callback so all UI rebuilding runs on the
