@@ -15,6 +15,8 @@ from fh6garage.v1_3_2_card_width_overlay_patch import (
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# Validation branch only: the assertions below are identical to the source branch.
+
 
 class V132CardWidthOverlayTests(unittest.TestCase):
     def test_grid_never_drops_below_two_columns(self) -> None:
