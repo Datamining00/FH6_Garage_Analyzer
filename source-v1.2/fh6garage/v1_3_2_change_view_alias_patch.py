@@ -5,21 +5,21 @@ from typing import Any
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QButtonGroup,
     QComboBox,
     QDialog,
     QFrame,
     QGridLayout,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
-    QLineEdit,
     QMessageBox,
     QPushButton,
     QScrollArea,
     QSizePolicy,
     QTableWidget,
     QTableWidgetItem,
-    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -55,10 +55,7 @@ def _creator_canonical(window: Any, raw_name: str) -> str:
 def _find_current_livery(window: Any, entry: LiverySnapshotEntry | None) -> LiveryRecord | None:
     if entry is None or window.result is None:
         return None
-    records = [
-        record for record in window.result.liveries
-        if record.kind == entry.kind
-    ]
+    records = [record for record in window.result.liveries if record.kind == entry.kind]
     identity = entry.identity.casefold()
     for record in records:
         physical = f"{record.kind}:{record.container_name.casefold()}"
@@ -122,9 +119,8 @@ def _normalize_card_alias_properties(window: Any, content_type: str, card: QWidg
     if raw:
         group = window.creator_aliases.group_for(raw)
         display = window.creator_aliases.display_name(raw)
-        aliases = group.all_names()
         augmented = " ".join(
-            piece for piece in (base_search, display, *aliases) if piece
+            piece for piece in (base_search, display, *group.all_names()) if piece
         ).casefold()
         card.setProperty("creatorGroupKey", f"creator:{group.current.casefold()}")
         card.setProperty("creatorGroupLabel", display)
@@ -182,9 +178,7 @@ def _archive_card(window: Any, entry: LiverySnapshotEntry, heading: str) -> QFra
     creator = QLabel(f"{tr('card.creator_label')}: {_creator_display(window, entry.creator)}")
     creator.setWordWrap(True)
     if entry.creator:
-        creator.setToolTip(
-            _txt("기록 당시 제작자: ", "Recorded creator: ") + entry.creator
-        )
+        creator.setToolTip(_txt("기록 당시 제작자: ", "Recorded creator: ") + entry.creator)
     layout.addWidget(creator)
 
     if entry.description:
@@ -193,8 +187,7 @@ def _archive_card(window: Any, entry: LiverySnapshotEntry, heading: str) -> QFra
         description.setWordWrap(True)
         layout.addWidget(description)
 
-    # Deliberately no buttons: a removed/historical snapshot cannot safely
-    # execute annotation, hide, navigation, memo or metadata actions.
+    # Historical/deleted cards intentionally contain no action buttons.
     card.setProperty("fh6ArchiveCard", True)
     return card
 
@@ -242,7 +235,9 @@ def _change_wrapper(window: Any, change: LiveryRefreshChange) -> tuple[QFrame, s
     outer.setSpacing(8)
 
     badge = QLabel(_status_text(status))
-    badge.setStyleSheet(_status_style(status) + "border-radius:7px;padding:5px 9px;font-weight:700;")
+    badge.setStyleSheet(
+        _status_style(status) + "border-radius:7px;padding:5px 9px;font-weight:700;"
+    )
     badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
     outer.addWidget(badge, 0, Qt.AlignmentFlag.AlignLeft)
 
@@ -270,7 +265,6 @@ def _open_change_dialog(window: Any) -> None:
     dialog.setWindowTitle(_txt("최근 리버리 변경사항", "Recent livery changes"))
     dialog.setModal(True)
     dialog.resize(1180, 820)
-
     root = QVBoxLayout(dialog)
     root.setContentsMargins(14, 14, 14, 14)
     root.setSpacing(10)
@@ -313,9 +307,10 @@ def _open_change_dialog(window: Any) -> None:
     scroll.setWidget(host)
     root.addWidget(scroll, 1)
 
-    items: list[tuple[QWidget, str]] = []
-    for change in [*diff.added, *diff.removed, *diff.changed]:
-        items.append(_change_wrapper(window, change))
+    items: list[tuple[QWidget, str]] = [
+        _change_wrapper(window, change)
+        for change in [*diff.added, *diff.removed, *diff.changed]
+    ]
 
     def repack(filter_name: str) -> None:
         while grid.count():
@@ -354,8 +349,7 @@ def _observed_creator_names(window: Any) -> list[str]:
     names: dict[str, str] = {}
     result = getattr(window, "result", None)
     if result is not None:
-        records = [*result.liveries, *result.tunings]
-        for record in records:
+        for record in [*result.liveries, *result.tunings]:
             name = (record.header.creator or "").strip()
             if name:
                 names.setdefault(name.casefold(), name)
@@ -369,7 +363,7 @@ def _observed_creator_names(window: Any) -> list[str]:
 def _refresh_alias_views(window: Any) -> None:
     reset_cards = getattr(window, "_fh6_v132_reset_ui_card_cache", None)
     if callable(reset_cards):
-        reset_cards(window)
+        reset_cards()
     if getattr(window, "result", None) is None:
         return
     window._populate_creator_table()
@@ -421,15 +415,21 @@ def _open_alias_dialog(window: Any) -> None:
 
     table = QTableWidget(0, 3)
     table.setHorizontalHeaderLabels(
-        (_txt("현재 이름", "Current"), _txt("이전 이름", "Previous"), _txt("검색 이름 수", "Search names"))
+        (
+            _txt("현재 이름", "Current"),
+            _txt("이전 이름", "Previous"),
+            _txt("검색 이름 수", "Search names"),
+        )
     )
     table.verticalHeader().setVisible(False)
-    table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-    table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-    table.horizontalHeader().setStretchLastSection(False)
-    table.horizontalHeader().setSectionResizeMode(0, table.horizontalHeader().ResizeMode.ResizeToContents)
-    table.horizontalHeader().setSectionResizeMode(1, table.horizontalHeader().ResizeMode.Stretch)
-    table.horizontalHeader().setSectionResizeMode(2, table.horizontalHeader().ResizeMode.ResizeToContents)
+    table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+    table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+    table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+    header = table.horizontalHeader()
+    header.setStretchLastSection(False)
+    header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+    header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+    header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
     root.addWidget(table, 1)
 
     bottom = QHBoxLayout()
@@ -445,12 +445,18 @@ def _open_alias_dialog(window: Any) -> None:
 
     def rebuild() -> None:
         names = _observed_creator_names(window)
+        source_text = source.currentText().strip()
+        target_text = target.currentText().strip()
         source.blockSignals(True)
         target.blockSignals(True)
         source.clear()
         target.clear()
         source.addItems(names)
         target.addItems(names)
+        if source_text:
+            source.setCurrentText(source_text)
+        if target_text:
+            target.setCurrentText(target_text)
         source.blockSignals(False)
         target.blockSignals(False)
 
@@ -470,7 +476,11 @@ def _open_alias_dialog(window: Any) -> None:
         old = source.currentText().strip()
         new = target.currentText().strip()
         if not old or not new:
-            QMessageBox.information(dialog, _txt("입력 필요", "Names required"), _txt("두 이름을 모두 입력하세요.", "Enter both names."))
+            QMessageBox.information(
+                dialog,
+                _txt("입력 필요", "Names required"),
+                _txt("두 이름을 모두 입력하세요.", "Enter both names."),
+            )
             return
         if old.casefold() == new.casefold():
             return
@@ -505,7 +515,10 @@ def _open_alias_dialog(window: Any) -> None:
             QMessageBox.information(
                 dialog,
                 _txt("분리할 연결 없음", "Nothing to split"),
-                _txt("선택한 이름은 다른 이름과 연결되어 있지 않습니다.", "The selected name is not linked to another name."),
+                _txt(
+                    "선택한 이름은 다른 이름과 연결되어 있지 않습니다.",
+                    "The selected name is not linked to another name.",
+                ),
             )
             return
         _refresh_alias_views(window)
@@ -539,13 +552,16 @@ def _open_alias_dialog(window: Any) -> None:
     merge_button.clicked.connect(merge_names)
     split_button.clicked.connect(split_name)
     reset_button.clicked.connect(reset_aliases)
-    table.itemSelectionChanged.connect(
-        lambda: source.setCurrentText(
-            str(table.item(table.currentRow(), 0).data(Qt.ItemDataRole.UserRole))
-            if table.currentRow() >= 0 and table.item(table.currentRow(), 0) is not None
-            else source.currentText()
-        )
-    )
+
+    def use_selected_group() -> None:
+        row = table.currentRow()
+        if row < 0:
+            return
+        item = table.item(row, 0)
+        if item is not None:
+            source.setCurrentText(str(item.data(Qt.ItemDataRole.UserRole) or item.text()))
+
+    table.itemSelectionChanged.connect(use_selected_group)
     rebuild()
     dialog.exec()
 
@@ -561,7 +577,6 @@ def apply_v1_3_2_change_view_alias_patch(MainWindow) -> None:
     original_sorted_saved_content = MainWindow._sorted_saved_content
     original_filter_dashboard = MainWindow._filter_dashboard_table
     original_populate_creator_table = MainWindow._populate_creator_table
-    original_update_selected_creator = MainWindow._update_selected_creator
     original_fill_selected_liveries = MainWindow._fill_selected_liveries
     original_fill_selected_tunings = MainWindow._fill_selected_tunings
     original_relayout_livery = MainWindow._relayout_livery_grid
@@ -571,8 +586,6 @@ def apply_v1_3_2_change_view_alias_patch(MainWindow) -> None:
         original_init(self, project_root)
         self.creator_aliases = CreatorAliasStore()
 
-        # Add the manager as a compact sidebar utility without joining the main
-        # page-navigation button group.
         sidebar = self.findChild(QFrame, "sidebar")
         if sidebar is not None and sidebar.layout() is not None:
             button = QPushButton(_txt("제작자 이름 관리", "Creator aliases"), sidebar)
@@ -588,8 +601,6 @@ def apply_v1_3_2_change_view_alias_patch(MainWindow) -> None:
             sidebar.layout().insertWidget(insert_at, button)
             self.creator_alias_button = button
 
-        # Insert a transient change banner below the save-path row. It remains
-        # hidden for baseline scans and 0/0/0 refreshes.
         banner = QFrame()
         banner.setObjectName("refreshDiffBanner")
         banner.setStyleSheet(
@@ -753,7 +764,10 @@ def apply_v1_3_2_change_view_alias_patch(MainWindow) -> None:
                 return not key
             return self.creator_aliases.canonical_name(raw).casefold() == key
 
-        liveries = [record for record in self.result.liveries if record.kind == "Livery" and same_creator(record.header.creator or "")]
+        liveries = [
+            record for record in self.result.liveries
+            if record.kind == "Livery" and same_creator(record.header.creator or "")
+        ]
         tunings = [record for record in self.result.tunings if same_creator(record.header.creator or "")]
         display = tr("creator.none") if not key else self.creator_aliases.display_name(canonical)
         self.selected_title.setText(tr("dashboard.selected_creator", value=display))
