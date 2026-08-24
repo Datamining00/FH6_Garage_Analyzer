@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+# Validation branch marker: exercise the exact base implementation in Windows CI.
 import os
 import unittest
 from pathlib import Path
