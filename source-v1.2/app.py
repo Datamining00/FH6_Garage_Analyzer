@@ -47,6 +47,7 @@ from fh6garage.v1_3_2_change_view_alias_sync_patch import apply_v1_3_2_change_vi
 from fh6garage.v1_3_2_release_layout_patch import apply_v1_3_2_release_layout_patch
 from fh6garage.v1_3_2_change_dialog_folder_patch import apply_v1_3_2_change_dialog_folder_patch
 from fh6garage.v1_3_2_change_dialog_runtime_fix import apply_v1_3_2_change_dialog_runtime_fix
+from fh6garage.v1_3_2_change_dialog_responsive_ui_fix import apply_v1_3_2_change_dialog_responsive_ui_fix
 from fh6garage.v1_3_2_thread_affinity_patch import apply_v1_3_2_thread_affinity_fix
 
 
@@ -128,16 +129,17 @@ def main() -> int:
     # hide/info left actions on the triangle/excluded rows.
     apply_v1_3_2_release_layout_patch(MainWindow)
 
-    # Open refresh changes in a main-sized standalone window, reuse the main card
-    # width/column contract, and add a read-only folder opener as the fourth left
-    # card action. The final left rows are move/hide/info/folder, aligned with
-    # check/triangle/excluded/zoom respectively.
+    # Add the folder action and base standalone change-view card implementation.
     apply_v1_3_2_change_dialog_folder_patch(MainWindow)
 
-    # The reserved toolbar slot was originally mouse-transparent, and an older
-    # hide aligner can race the four-row action aligner. Make the change button
-    # clickable and point every retained aligner at the same final rows.
+    # Make the compact change button clickable and make all historical card
+    # aligners agree with move/hide/info/folder = check/triangle/excluded/zoom.
     apply_v1_3_2_change_dialog_runtime_fix(MainWindow)
+
+    # The standalone change window must calculate card geometry from its own
+    # viewport, not from a hidden/main-grid width. Reuse the main 2/3/4-column
+    # formula on every resize and force the same light application theme.
+    apply_v1_3_2_change_dialog_responsive_ui_fix(MainWindow)
 
     # This must be the final MainWindow patch. It restores the original
     # class-defined @Slot(object) scan callback so all UI rebuilding runs on the
