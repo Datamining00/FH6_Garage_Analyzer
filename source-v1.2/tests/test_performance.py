@@ -7,7 +7,7 @@ from pathlib import Path
 
 from fh6garage.performance import PerformanceRecorder
 
-# The performance build is diagnostic-only; these tests must remain filesystem-local.
+# The performance build is diagnostic-only; these tests remain filesystem-local and network-free.
 
 
 class PerformanceRecorderTests(unittest.TestCase):
