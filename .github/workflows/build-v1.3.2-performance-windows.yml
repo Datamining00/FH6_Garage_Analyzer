@@ -8,6 +8,12 @@ on:
     paths:
       - ".github/workflows/build-v1.3.2-performance-windows.yml"
       - "source-v1.2/**"
+  pull_request:
+    branches:
+      - v1.3.2-work
+    paths:
+      - ".github/workflows/build-v1.3.2-performance-windows.yml"
+      - "source-v1.2/**"
 
 permissions:
   contents: read
@@ -48,7 +54,7 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: |
           Set-Location source-v1.2
-          python -c "from PySide6.QtWidgets import QApplication; from fh6garage.ui import MainWindow; from fh6garage.v1_3_ui_patch import apply_v1_3_ui_patches; from fh6garage.v1_3_1_patch import apply_v1_3_1_patches; from fh6garage.v1_3_2_patch import apply_v1_3_2_patches; from fh6garage.v1_3_2_safety_patch import apply_v1_3_2_safety_patches; from fh6garage.v1_3_2_startup_patch import apply_v1_3_2_startup_patches; from fh6garage.v1_3_2_list_fix import apply_v1_3_2_list_fixes; from fh6garage.v1_3_2_visibility_patch import apply_v1_3_2_visibility_patches; from fh6garage.v1_3_2_ui_cleanup_patch import apply_v1_3_2_ui_cleanup_patch; from fh6garage.v1_3_2_ui_followup_patch import apply_v1_3_2_ui_followup_patch; from fh6garage.v1_3_2_manifest_registry_patch import apply_v1_3_2_manifest_registry_patch; from fh6garage.v1_3_2_card_alignment_patch import apply_v1_3_2_card_alignment_patch; from fh6garage.v1_3_2_performance_patch import apply_v1_3_2_performance_patches; from fh6garage.v1_3_2_thread_affinity_patch import apply_v1_3_2_thread_affinity_fix; apply_v1_3_ui_patches(MainWindow); apply_v1_3_1_patches(MainWindow); apply_v1_3_2_patches(MainWindow); apply_v1_3_2_safety_patches(MainWindow); apply_v1_3_2_startup_patches(); apply_v1_3_2_list_fixes(MainWindow); apply_v1_3_2_visibility_patches(MainWindow); apply_v1_3_2_ui_cleanup_patch(MainWindow); apply_v1_3_2_ui_followup_patch(MainWindow); apply_v1_3_2_manifest_registry_patch(MainWindow); apply_v1_3_2_card_alignment_patch(MainWindow); apply_v1_3_2_performance_patches(MainWindow); apply_v1_3_2_thread_affinity_fix(MainWindow); app=QApplication.instance() or QApplication([]); w=MainWindow(project_root=__import__('pathlib').Path.cwd()); assert w.findChild(__import__('PySide6.QtWidgets', fromlist=['QToolBar']).QToolBar, 'performanceDiagnosticsToolbar') is not None; w.close(); print('performance toolbar and final thread-affinity patch ok')"
+          python -c "from PySide6.QtWidgets import QApplication, QToolBar; from fh6garage.ui import MainWindow; from fh6garage.v1_3_ui_patch import apply_v1_3_ui_patches; from fh6garage.v1_3_1_patch import apply_v1_3_1_patches; from fh6garage.v1_3_2_patch import apply_v1_3_2_patches; from fh6garage.v1_3_2_safety_patch import apply_v1_3_2_safety_patches; from fh6garage.v1_3_2_startup_patch import apply_v1_3_2_startup_patches; from fh6garage.v1_3_2_list_fix import apply_v1_3_2_list_fixes; from fh6garage.v1_3_2_visibility_patch import apply_v1_3_2_visibility_patches; from fh6garage.v1_3_2_ui_cleanup_patch import apply_v1_3_2_ui_cleanup_patch; from fh6garage.v1_3_2_ui_followup_patch import apply_v1_3_2_ui_followup_patch; from fh6garage.v1_3_2_manifest_registry_patch import apply_v1_3_2_manifest_registry_patch; from fh6garage.v1_3_2_card_alignment_patch import apply_v1_3_2_card_alignment_patch; from fh6garage.v1_3_2_performance_patch import apply_v1_3_2_performance_patches; from fh6garage.v1_3_2_thread_affinity_patch import apply_v1_3_2_thread_affinity_fix; apply_v1_3_ui_patches(MainWindow); apply_v1_3_1_patches(MainWindow); apply_v1_3_2_patches(MainWindow); apply_v1_3_2_safety_patches(MainWindow); apply_v1_3_2_startup_patches(); apply_v1_3_2_list_fixes(MainWindow); apply_v1_3_2_visibility_patches(MainWindow); apply_v1_3_2_ui_cleanup_patch(MainWindow); apply_v1_3_2_ui_followup_patch(MainWindow); apply_v1_3_2_manifest_registry_patch(MainWindow); apply_v1_3_2_card_alignment_patch(MainWindow); apply_v1_3_2_performance_patches(MainWindow); apply_v1_3_2_thread_affinity_fix(MainWindow); app=QApplication.instance() or QApplication([]); w=MainWindow(project_root=__import__('pathlib').Path.cwd()); assert w.findChild(QToolBar, 'performanceDiagnosticsToolbar') is not None; w.close(); print('performance toolbar and final thread-affinity patch ok')"
 
       - name: Build single Windows EXE
         shell: pwsh
