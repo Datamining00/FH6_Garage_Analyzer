@@ -1,143 +1,56 @@
-name: Build FH6 Assistant v1.1
+name: Validate FH6 Assistant v1.2 work source
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - main
-      - icon-node24-fix
+      - v1.2-work
     paths:
+      - "source-v1.2/**"
       - ".github/workflows/build-windows-exe.yml"
-      - ".github/build-assets/v1.1/**"
 
 permissions:
   contents: read
 
 jobs:
-  build:
+  validate:
     runs-on: windows-latest
 
     steps:
-      - name: Checkout build assets
+      - name: Checkout work branch
         uses: actions/checkout@v6
+        with:
+          ref: v1.2-work
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
-      - name: Download exact v1.0 source package
+      - name: Compile all Python source
         shell: pwsh
         run: |
-          $url = "https://github.com/Datamining00/FH6_Garage_Analyzer/releases/download/FH6_Assistant/FH6_Assistant_v1.0.zip"
-          Invoke-WebRequest -Uri $url -OutFile source.zip
-
-          $expected = "048b440aacb7787354292f954d0408b9fdd57be36078cdc66beeaa7c3eab1f72"
-          $actual = (Get-FileHash source.zip -Algorithm SHA256).Hash.ToLower()
-          if ($actual -ne $expected) {
-            throw "v1.0 source digest mismatch. Expected $expected, got $actual"
-          }
-
-          Expand-Archive -Path source.zip -DestinationPath source -Force
-          $app = Get-ChildItem -Path source -Filter app.py -Recurse | Select-Object -First 1
-          if (-not $app) { throw "app.py was not found in the v1.0 release archive." }
-          $appDir = $app.Directory.FullName
-          "APP_DIR=$appDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
-      - name: Reconstruct v1.1 patch and transparent icon
-        shell: pwsh
-        run: |
-          @'
-          import base64
-          import gzip
-          import os
-          from pathlib import Path
-
-          workspace = Path(os.environ["GITHUB_WORKSPACE"])
-          app_dir = Path(os.environ["APP_DIR"])
-          asset_dir = workspace / ".github" / "build-assets" / "v1.1"
-
-          def decode_parts(prefix: str) -> bytes:
-              parts = sorted(asset_dir.glob(prefix + ".part*"))
-              if not parts:
-                  raise RuntimeError(f"No build asset parts found for {prefix}")
-              encoded = "".join(part.read_text(encoding="ascii").strip() for part in parts)
-              return gzip.decompress(base64.b64decode(encoded))
-
-          patch = decode_parts("patch")
-          icon = decode_parts("icon64")
-
-          (workspace / "v1.1.patch").write_bytes(patch)
-          icon_path = app_dir / "icons" / "FH6_Assistant.ico"
-          icon_path.write_bytes(icon)
-
-          if len(patch) < 60000:
-              raise RuntimeError(f"Reconstructed patch is unexpectedly small: {len(patch)}")
-          if len(icon) < 6000 or icon[:4] != b"\x00\x00\x01\x00":
-              raise RuntimeError("Reconstructed FH6_Assistant.ico is invalid")
-
-          print(f"Patch bytes: {len(patch)}")
-          print(f"Transparent icon bytes: {len(icon)}")
-          '@ | Set-Content -Path reconstruct_assets.py -Encoding UTF8
-
-          python reconstruct_assets.py
-
-      - name: Apply final v1.1 source changes
-        shell: pwsh
-        run: |
-          Set-Location $env:APP_DIR
-          git apply (Join-Path $env:GITHUB_WORKSPACE "v1.1.patch")
-
-          if (Test-Path "fh6garage\thumbnail_labeler.py") {
-            throw "Obsolete thumbnail write module still exists after applying the v1.1 patch."
-          }
-
+          Set-Location source-v1.2
           python -m compileall -q .
-          python -c "import json,pathlib; d=json.loads(pathlib.Path('data/car_names.json').read_text(encoding='utf-8')); cars=d.get('cars',{}); assert d.get('count')==660; assert len(cars)==660; print('Embedded car database:', len(cars), 'entries')"
 
-          if (-not (Select-String -Path "fh6garage\ui.py" -Pattern "FH6 Assistant v1.1" -Quiet)) {
-            throw "v1.1 window title was not found in ui.py."
-          }
-          if (-not (Test-Path "FH6_Assistant_v1.1.spec")) {
-            throw "FH6_Assistant_v1.1.spec was not created."
-          }
-          if (-not (Test-Path "version_info.txt")) {
-            throw "version_info.txt was not created."
-          }
-
-      - name: Install build dependencies
+      - name: Validate bundled car database
         shell: pwsh
         run: |
-          Set-Location $env:APP_DIR
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
-          python -m pip install --upgrade pyinstaller
+          Set-Location source-v1.2
+          python -c "import json,pathlib; d=json.loads(pathlib.Path('data/car_names.json').read_text(encoding='utf-8')); cars=d.get('cars',{}); assert d.get('count')==660; assert len(cars)==660; assert '1229' in cars; print('Embedded car database:', len(cars), 'entries'); print('CarOrdinal 1229:', cars['1229'])"
 
-      - name: Build single Windows EXE
+      - name: Run v1.2 regression tests
         shell: pwsh
         run: |
-          Set-Location $env:APP_DIR
-          pyinstaller --clean --noconfirm .\FH6_Assistant_v1.1.spec
+          Set-Location source-v1.2
+          python -m unittest discover -s tests -v
 
-          $exe = Join-Path $env:APP_DIR "dist\FH6 Assistant v1.1.exe"
-          if (-not (Test-Path $exe)) {
-            throw "FH6 Assistant v1.1.exe was not created."
+      - name: Verify v1.1 source baseline remains untouched
+        shell: pwsh
+        run: |
+          $expected = "757cf0349b9b2240273c99f892497e3f89438333"
+          $actual = (git rev-parse "HEAD:source-v1.1").Trim()
+          if ($actual -ne $expected) {
+            throw "v1.1 baseline tree changed. Expected $expected, got $actual"
           }
-
-          $artifactDir = Join-Path $env:GITHUB_WORKSPACE "artifact"
-          New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
-          Copy-Item $exe (Join-Path $artifactDir "FH6 Assistant v1.1.exe") -Force
-
-          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
-          "$hash  FH6 Assistant v1.1.exe" | Set-Content -Path (Join-Path $artifactDir "FH6 Assistant v1.1.exe.sha256") -Encoding ascii
-          Write-Host "EXE SHA-256: $hash"
-
-      - name: Upload Windows build artifact
-        uses: actions/upload-artifact@v6
-        with:
-          name: FH6_Assistant_Windows_v1.1
-          path: |
-            artifact/FH6 Assistant v1.1.exe
-            artifact/FH6 Assistant v1.1.exe.sha256
-          if-no-files-found: error
-          compression-level: 0
+          Write-Host "v1.1 baseline tree preserved: $actual"
