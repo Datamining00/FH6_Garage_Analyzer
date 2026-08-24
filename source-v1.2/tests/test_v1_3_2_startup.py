@@ -48,13 +48,17 @@ class V132StartupTests(unittest.TestCase):
             )
             self.assertEqual(fixed_default_thumbnail_cache(local), expected)
 
-    def test_app_uses_startup_patch_and_original_livery_construction(self) -> None:
+    def test_app_uses_startup_patch_with_diagnostic_instrumentation(self) -> None:
         root = Path(__file__).resolve().parents[1]
         source = (root / "app.py").read_text(encoding="utf-8")
         self.assertIn("apply_v1_3_2_startup_patches()", source)
-        self.assertNotIn("apply_v1_3_2_performance_patches", source)
-        self.assertFalse(
+        self.assertIn("apply_v1_3_2_performance_patches(MainWindow)", source)
+        self.assertTrue(
             (root / "fh6garage" / "v1_3_2_performance_patch.py").exists()
+        )
+        self.assertLess(
+            source.index("apply_v1_3_2_performance_patches(MainWindow)"),
+            source.index("apply_v1_3_2_thread_affinity_fix(MainWindow)"),
         )
 
     def test_manual_picker_remains_but_auto_discovery_button_is_removed(self) -> None:
