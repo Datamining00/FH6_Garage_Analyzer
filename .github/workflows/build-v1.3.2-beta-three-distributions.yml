@@ -1,0 +1,219 @@
+name: Build FH6 Assistant v1.3.2 Beta Three Distributions
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - v1.3.2-beta-vbs-portable-build
+    paths:
+      - "source-v1.2/**"
+      - ".github/workflows/build-v1.3.2-beta-three-distributions.yml"
+  pull_request:
+    branches:
+      - v1.3.2-change-dialog-folder-actions
+    paths:
+      - "source-v1.2/**"
+      - ".github/workflows/build-v1.3.2-beta-three-distributions.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-test-package:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout current source
+        uses: actions/checkout@v6
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          Set-Location source-v1.2
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install --upgrade pyinstaller
+
+      - name: Compile and run regression suite
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          Set-Location source-v1.2
+          python -m compileall -q .
+          python -m unittest discover -s tests -v
+
+      - name: Verify legacy VBS launcher files
+        shell: pwsh
+        run: |
+          $required = @(
+            "source-v1.2\FH6 Assistant.vbs",
+            "source-v1.2\run.bat",
+            "source-v1.2\app.py",
+            "source-v1.2\requirements.txt"
+          )
+          foreach ($path in $required) {
+            if (-not (Test-Path $path)) { throw "Required VBS launcher file is missing: $path" }
+          }
+
+      - name: Build OneFile EXE
+        shell: pwsh
+        run: |
+          Set-Location source-v1.2
+          python -m PyInstaller --clean --noconfirm .\FH6_Assistant_v1.3.2.spec
+          $exe = Join-Path $PWD "dist\FH6 Assistant v1.3.2.exe"
+          if (-not (Test-Path $exe)) { throw "OneFile EXE was not created." }
+          if ((Get-Item $exe).Length -lt 10000000) { throw "OneFile EXE is unexpectedly small." }
+
+      - name: Smoke test OneFile EXE
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path "source-v1.2\dist\FH6 Assistant v1.3.2.exe"
+          $proc = Start-Process -FilePath $exe -PassThru
+          Start-Sleep -Seconds 8
+          $proc.Refresh()
+          if ($proc.HasExited) { throw "OneFile EXE exited during startup smoke test with code $($proc.ExitCode)." }
+          if (-not $proc.Responding) {
+            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+            throw "OneFile EXE is alive but Windows reports Not Responding."
+          }
+          Stop-Process -Id $proc.Id -Force
+
+      - name: Package OneFile
+        shell: pwsh
+        run: |
+          $dst = "package_onefile\FH6 Assistant v1.3.2 Beta OneFile"
+          New-Item -ItemType Directory -Force -Path $dst | Out-Null
+          $exe = Resolve-Path "source-v1.2\dist\FH6 Assistant v1.3.2.exe"
+          Copy-Item $exe "$dst\FH6 Assistant v1.3.2 Beta.exe" -Force
+          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
+          "$hash  FH6 Assistant v1.3.2 Beta.exe" | Set-Content "$dst\SHA256.txt" -Encoding ascii
+          @"
+          FH6 Assistant v1.3.2 Beta - OneFile
+
+          Single-file PyInstaller build.
+          Python installation is not required.
+          If this build does not start on a PC, test the OneDir or VBS Portable package from the same source revision.
+          "@ | Set-Content "$dst\README.txt" -Encoding utf8
+
+      - name: Build OneDir EXE
+        shell: pwsh
+        run: |
+          Set-Location source-v1.2
+          python -m PyInstaller --clean --noconfirm .\FH6_Assistant_v1.3.2_portable.spec
+          $exe = Join-Path $PWD "dist\FH6 Assistant v1.3.2 Portable\FH6 Assistant v1.3.2.exe"
+          if (-not (Test-Path $exe)) { throw "OneDir EXE was not created." }
+
+      - name: Smoke test OneDir EXE
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path "source-v1.2\dist\FH6 Assistant v1.3.2 Portable\FH6 Assistant v1.3.2.exe"
+          $proc = Start-Process -FilePath $exe -PassThru
+          Start-Sleep -Seconds 8
+          $proc.Refresh()
+          if ($proc.HasExited) { throw "OneDir EXE exited during startup smoke test with code $($proc.ExitCode)." }
+          if (-not $proc.Responding) {
+            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+            throw "OneDir EXE is alive but Windows reports Not Responding."
+          }
+          Stop-Process -Id $proc.Id -Force
+
+      - name: Package OneDir
+        shell: pwsh
+        run: |
+          $dst = "package_onedir\FH6 Assistant v1.3.2 Beta OneDir"
+          New-Item -ItemType Directory -Force -Path $dst | Out-Null
+          Copy-Item "source-v1.2\dist\FH6 Assistant v1.3.2 Portable\*" $dst -Recurse -Force
+          $exe = Resolve-Path "$dst\FH6 Assistant v1.3.2.exe"
+          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
+          "$hash  FH6 Assistant v1.3.2.exe" | Set-Content "$dst\EXE_SHA256.txt" -Encoding ascii
+          @"
+          FH6 Assistant v1.3.2 Beta - OneDir
+
+          Folder-based PyInstaller build.
+          Python installation is not required.
+          Keep all files and the _internal folder together.
+          Use this package to bypass PyInstaller OneFile self-extraction problems.
+          "@ | Set-Content "$dst\README.txt" -Encoding utf8
+
+      - name: Package legacy VBS Portable
+        shell: pwsh
+        run: |
+          $dst = "package_vbs\FH6 Assistant v1.3.2 Beta VBS Portable"
+          New-Item -ItemType Directory -Force -Path $dst | Out-Null
+          Copy-Item "source-v1.2\app.py" $dst
+          Copy-Item "source-v1.2\run.bat" $dst
+          Copy-Item "source-v1.2\FH6 Assistant.vbs" $dst
+          Copy-Item "source-v1.2\requirements.txt" $dst
+          Copy-Item "source-v1.2\README.txt" $dst
+          Copy-Item "source-v1.2\data" $dst -Recurse
+          Copy-Item "source-v1.2\icons" $dst -Recurse
+          Copy-Item "source-v1.2\fh6garage" $dst -Recurse
+          @"
+          FH6 Assistant v1.3.2 Beta - VBS Portable
+
+          This is the legacy launcher style used by early FH6 Assistant builds.
+
+          Requirements:
+          - Python 3.12 or newer installed on Windows.
+          - Internet access is required the first time if dependencies are not already available.
+
+          Normal launch:
+          - Double-click "FH6 Assistant.vbs".
+
+          Diagnostic launch:
+          - Run "run.bat" to keep error messages visible.
+
+          Runtime behavior:
+          - run.bat creates/reuses a virtual environment under %LOCALAPPDATA%\FH6GarageAnalyzer\venv.
+          - PySide6 and the packages in requirements.txt are installed into that environment when needed.
+          - This package does not use the PyInstaller OneFile bootloader or _MEI temporary extraction path.
+          "@ | Set-Content "$dst\README_VBS_PORTABLE.txt" -Encoding utf8
+
+          $files = Get-ChildItem $dst -File -Recurse | Sort-Object FullName
+          $lines = foreach ($file in $files) {
+            $hash = (Get-FileHash $file.FullName -Algorithm SHA256).Hash.ToLower()
+            $rel = $file.FullName.Substring((Resolve-Path $dst).Path.Length + 1)
+            "$hash  $rel"
+          }
+          $lines | Set-Content "$dst\FILES_SHA256.txt" -Encoding ascii
+
+      - name: Smoke test VBS Portable source
+        shell: pwsh
+        run: |
+          $env:QT_QPA_PLATFORM = "offscreen"
+          $work = Resolve-Path "package_vbs\FH6 Assistant v1.3.2 Beta VBS Portable"
+          $proc = Start-Process -FilePath python -ArgumentList '-B','app.py' -WorkingDirectory $work -PassThru
+          Start-Sleep -Seconds 6
+          $proc.Refresh()
+          if ($proc.HasExited) { throw "VBS Portable app.py exited during startup smoke test with code $($proc.ExitCode)." }
+          Stop-Process -Id $proc.Id -Force
+
+      - name: Upload OneFile package
+        uses: actions/upload-artifact@v6
+        with:
+          name: FH6_Assistant_v1.3.2_Beta_OneFile
+          path: package_onefile/*
+          if-no-files-found: error
+          compression-level: 0
+
+      - name: Upload OneDir package
+        uses: actions/upload-artifact@v6
+        with:
+          name: FH6_Assistant_v1.3.2_Beta_OneDir
+          path: package_onedir/*
+          if-no-files-found: error
+          compression-level: 6
+
+      - name: Upload VBS Portable package
+        uses: actions/upload-artifact@v6
+        with:
+          name: FH6_Assistant_v1.3.2_Beta_VBS_Portable
+          path: package_vbs/*
+          if-no-files-found: error
+          compression-level: 6
