@@ -6,7 +6,7 @@ import json
 import os
 from pathlib import Path
 import shutil
-from typing import Any
+from typing import Any, Callable
 
 from .models import LiveryRecord, ScanResult
 
@@ -162,7 +162,10 @@ def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
 
 
 def _save_snapshot(path: Path, scope: str, entries: list[LiverySnapshotEntry]) -> None:
-    _atomic_write_json(path, {"schema": _SCHEMA, "scope": scope, "entries": [asdict(entry) for entry in entries]})
+    _atomic_write_json(
+        path,
+        {"schema": _SCHEMA, "scope": scope, "entries": [asdict(entry) for entry in entries]},
+    )
 
 
 def _unique_key_map(entries: list[LiverySnapshotEntry], field_name: str) -> dict[tuple[str, str], LiverySnapshotEntry]:
@@ -236,14 +239,17 @@ def _serialize_change(change: LiveryRefreshChange) -> dict[str, Any]:
 
 
 def _save_latest_diff(path: Path, diff: LiveryRefreshDiff) -> None:
-    _atomic_write_json(path, {
-        "schema": _SCHEMA,
-        "baseline": diff.baseline,
-        "scope": diff.scope,
-        "added": [_serialize_change(item) for item in diff.added],
-        "removed": [_serialize_change(item) for item in diff.removed],
-        "changed": [_serialize_change(item) for item in diff.changed],
-    })
+    _atomic_write_json(
+        path,
+        {
+            "schema": _SCHEMA,
+            "baseline": diff.baseline,
+            "scope": diff.scope,
+            "added": [_serialize_change(item) for item in diff.added],
+            "removed": [_serialize_change(item) for item in diff.removed],
+            "changed": [_serialize_change(item) for item in diff.changed],
+        },
+    )
 
 
 def _referenced_thumbnail_names(current_entries: list[LiverySnapshotEntry], diff: LiveryRefreshDiff) -> set[str]:
@@ -267,19 +273,32 @@ def _prune_thumbnail_cache(cache_dir: Path, keep: set[str]) -> None:
             pass
 
 
-def process_livery_refresh(result: ScanResult, history_dir: Path | None = None) -> LiveryRefreshDiff:
-    """Compare current liveries with the last snapshot without modifying FH6 files."""
+def process_livery_refresh(
+    result: ScanResult,
+    history_dir: Path | None = None,
+    yield_hook: Callable[[int], None] | None = None,
+) -> LiveryRefreshDiff:
+    """Compare current liveries with the last snapshot without modifying FH6 files.
+
+    Current thumbnails are copied into a content-addressed LocalAppData cache so
+    a livery that disappears on the next scan still has an image for the latest
+    refresh diff.  ``yield_hook`` lets the GUI service paint/timer events while
+    a large cache is being hashed and updated.
+    """
     root = Path(history_dir) if history_dir is not None else default_refresh_history_dir()
     snapshot_path = root / "snapshot.json"
     diff_path = root / "latest_diff.json"
     thumbnails_dir = root / "thumbnails"
     scope = _scope_for_result(result)
 
-    current_entries = [
-        _snapshot_entry(record, thumbnails_dir)
-        for record in result.liveries
-        if record.kind in _TRACKED_KINDS
-    ]
+    current_entries: list[LiverySnapshotEntry] = []
+    for index, record in enumerate(result.liveries):
+        if record.kind not in _TRACKED_KINDS:
+            continue
+        if yield_hook is not None:
+            yield_hook(index)
+        current_entries.append(_snapshot_entry(record, thumbnails_dir))
+
     old_scope, old_entries = _load_snapshot(snapshot_path)
     if not old_entries or old_scope != scope:
         diff = LiveryRefreshDiff(True, scope, [], [], [])
