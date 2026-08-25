@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from . import v1_3_2_change_view_alias_patch as _alias
+from . import creator_change_views as _alias
 from .i18n import tr
 
 

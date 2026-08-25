@@ -9,7 +9,7 @@ from PySide6.QtWidgets import QApplication, QPushButton, QToolButton
 
 from fh6garage.creator_aliases import CreatorAliasStore
 from fh6garage.refresh_history import LiverySnapshotEntry
-from fh6garage.v1_3_2_change_view_alias_patch import _archive_card
+from fh6garage.creator_change_views import _archive_card
 
 
 _APP = QApplication.instance() or QApplication([])
@@ -126,9 +126,9 @@ class ChangeViewContractTests(unittest.TestCase):
         self.assertNotIn("apply_v1_3_2_refresh_diff_patch", source)
         self.assertNotIn("apply_v1_3_2_change_view_alias_patch", source)
 
-    def test_change_patch_contains_zero_change_banner_suppression(self):
-        patch_path = Path(__file__).resolve().parents[1] / "fh6garage" / "v1_3_2_change_view_alias_patch.py"
-        source = patch_path.read_text(encoding="utf-8")
+    def test_change_view_contains_zero_change_banner_suppression(self):
+        view_path = Path(__file__).resolve().parents[1] / "fh6garage" / "creator_change_views.py"
+        source = view_path.read_text(encoding="utf-8")
         self.assertIn("diff.total <= 0", source)
         self.assertIn("banner.hide()", source)
         ui_path = Path(__file__).resolve().parents[1] / "fh6garage" / "ui.py"
@@ -136,8 +136,8 @@ class ChangeViewContractTests(unittest.TestCase):
         self.assertIn("def _fh6_open_refresh_diff_view", ui_source)
 
     def test_alias_search_and_group_properties_include_all_names(self):
-        patch_path = Path(__file__).resolve().parents[1] / "fh6garage" / "v1_3_2_change_view_alias_patch.py"
-        source = patch_path.read_text(encoding="utf-8")
+        view_path = Path(__file__).resolve().parents[1] / "fh6garage" / "creator_change_views.py"
+        source = view_path.read_text(encoding="utf-8")
         self.assertIn("*group.all_names()", source)
         self.assertIn("creatorGroupKey", source)
         self.assertIn("creatorGroupLabel", source)

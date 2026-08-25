@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from . import v1_3_2_change_view_alias_patch as _change_view
+from . import creator_change_views as _change_view
 from .i18n import tr
 from .refresh_history import (
     LiveryRefreshChange,

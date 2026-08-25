@@ -141,7 +141,7 @@ from .window_responsiveness import (
     _save_window_geometry,
     _schedule_resize_settle,
 )
-from .v1_3_2_change_view_alias_patch import (
+from .creator_change_views import (
     _creator_display,
     _decorate_creator_copy_label,
     _normalize_card_alias_properties,
