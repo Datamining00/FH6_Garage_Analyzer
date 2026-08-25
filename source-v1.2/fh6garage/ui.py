@@ -92,6 +92,7 @@ from .saved_content_cards import (
     _populate_tuning_grid_reusing_cards,
     initialize_ui_performance_state,
 )
+from .saved_content_card_metadata import append_card_metadata
 from .saved_content_presenter import (
     FilterState,
     build_search_text,
@@ -3073,47 +3074,7 @@ class MainWindow(QMainWindow):
         image_stack.setCurrentWidget(overlay)
         outer.addWidget(image_host)
 
-        # Borderless hierarchy: vehicle first, then title and creator metadata.
-        content_name = record.header.name or "(unnamed)"
-        creator_name = record.header.creator or "—"
-        vehicle_name = self._car_label(record.header.car_id)
-        vehicle = CopyValueLabel(tr("card.vehicle_label"), vehicle_name)
-        vehicle.setStyleSheet(
-            "QLabel { background:transparent; color:#171924; border:0; padding:4px 2px 1px 2px; "
-            "font-size:11.5pt; font-weight:700; }"
-        )
-        vehicle.setFixedHeight(31)
-        vehicle.setToolTip(tr("common.copy_value_detail", label=tr("card.vehicle_label"), value=vehicle_name))
-        vehicle.setMinimumWidth(0)
-        vehicle.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
-        outer.addWidget(vehicle)
-
-        meta_row = QHBoxLayout()
-        meta_row.setContentsMargins(0, 0, 0, 0)
-        meta_row.setSpacing(7)
-
-        title_box = CopyValueLabel(tr("card.title_label"), content_name)
-        title_box.setStyleSheet(
-            "QLabel { background:transparent; color:#343744; border:0; padding:2px; "
-            "font-size:10pt; font-weight:600; }"
-        )
-        title_box.setFixedHeight(28)
-        title_box.setToolTip(tr("common.copy_value_detail", label=tr("card.title_label"), value=content_name))
-        title_box.setMinimumWidth(0)
-        title_box.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
-        meta_row.addWidget(title_box, 3)
-
-        creator_box = CopyValueLabel(tr("card.creator_label"), creator_name)
-        creator_box.setStyleSheet(
-            "QLabel { background:transparent; color:#6d7282; border:0; padding:2px; "
-            "font-size:9.5pt; font-weight:500; }"
-        )
-        creator_box.setFixedHeight(28)
-        creator_box.setToolTip(tr("common.copy_value_detail", label=tr("card.creator_label"), value=creator_name))
-        creator_box.setMinimumWidth(0)
-        creator_box.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
-        meta_row.addWidget(creator_box, 2)
-        outer.addLayout(meta_row)
+        append_card_metadata(self, outer, record, CopyValueLabel)
 
         card._fh6_image_label = image_label
         card._fh6_thumbnail_path = record.thumbnail_path
