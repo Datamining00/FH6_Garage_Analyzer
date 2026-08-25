@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
-from PySide6.QtCore import QSize, Qt
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
@@ -14,14 +14,12 @@ from PySide6.QtWidgets import (
 )
 
 from .auction_thumbnails import (
-    assign_auction_thumbnails,
     auto_detect_thumbnail_cache,
     is_thumbnail_cache_dir,
 )
 from .i18n import get_language
-from .models import LiveryRecord, TuningRecord
+from .models import LiveryRecord
 from .ui import SummaryCard
-
 
 _CACHE_SETTING_KEY = "auction_thumbnail_cache_path_v1_3_2"
 _SHOW_MY_DESIGNS_KEY = "livery_show_my_designs_v1_3_2"
@@ -81,7 +79,7 @@ def _set_cache_path(self: Any, path: Path, *, persist: bool = True) -> None:
         self.settings.sync()
 
 
-def _current_cache_path(self: Any) -> Optional[Path]:
+def _current_cache_path(self: Any) -> Path | None:
     if not hasattr(self, "cache_path_edit"):
         return None
     raw = self.cache_path_edit.text().strip()
@@ -323,7 +321,6 @@ def apply_v1_3_2_patches(MainWindow) -> None:
     original_livery_page = MainWindow._livery_page
     original_build_controls = MainWindow._build_saved_content_controls
     original_populate_all = MainWindow._populate_all
-    original_scan_finished = MainWindow._scan_finished
     original_sorted_saved_content = MainWindow._sorted_saved_content
     original_record_for_content_key = MainWindow._record_for_content_key
     original_make_card = MainWindow._make_saved_content_card
@@ -383,19 +380,6 @@ def apply_v1_3_2_patches(MainWindow) -> None:
                 rescan=False,
             )
 
-    def patched_scan_finished(self, result) -> None:
-        try:
-            stats = assign_auction_thumbnails(
-                result.liveries,
-                _current_cache_path(self),
-            )
-        except Exception:
-            # Cache integration is optional.  A malformed/missing local cache
-            # must never make the save scan fail.
-            stats = None
-        self._fh6_v132_match_stats = stats
-        original_scan_finished(self, result)
-
     def patched_populate_all(self) -> None:
         original_populate_all(self)
         if self.result is None:
@@ -450,7 +434,6 @@ def apply_v1_3_2_patches(MainWindow) -> None:
     MainWindow._dashboard_page = patched_dashboard_page
     MainWindow._livery_page = patched_livery_page
     MainWindow._build_saved_content_controls = patched_build_controls
-    MainWindow._scan_finished = patched_scan_finished
     MainWindow._populate_all = patched_populate_all
     MainWindow._sorted_saved_content = patched_sorted_saved_content
     MainWindow._record_for_content_key = patched_record_for_content_key

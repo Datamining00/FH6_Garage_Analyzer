@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from collections import Counter
-
 from PySide6.QtCore import QTimer
 
 from .models import LiveryRecord
@@ -24,29 +22,10 @@ def apply_v1_3_2_list_fixes(MainWindow) -> None:
     if getattr(MainWindow, "_fh6_v132_list_fix_patched", False):
         return
 
-    original_scan_finished = MainWindow._scan_finished
     combined_sorted_saved_content = MainWindow._sorted_saved_content
     original_populate_livery_table = MainWindow._populate_livery_table
     original_record_for_content_key = MainWindow._record_for_content_key
     original_duplicate_livery_hashes = MainWindow._duplicate_livery_hashes
-
-    def rebuild_indexes(self, result) -> None:
-        by_key: dict[str, LiveryRecord] = {}
-        for record in result.liveries:
-            if record.kind not in {"Livery", "SoulBoundLivery"}:
-                continue
-            key = self._content_annotation_key("livery", record)
-            by_key[key] = record
-        self._fh6_v132_livery_record_by_key = by_key
-
-        counts = Counter(
-            record.content_sha256
-            for record in result.liveries
-            if record.kind == "Livery" and record.content_sha256
-        )
-        self._fh6_v132_duplicate_hashes = {
-            digest for digest, count in counts.items() if count > 1
-        }
 
     def patched_sorted_saved_content(self, content_type: str):
         records = combined_sorted_saved_content(self, content_type)
@@ -191,7 +170,7 @@ def apply_v1_3_2_list_fixes(MainWindow) -> None:
                     card.setProperty("excluded", annotation.excluded)
                     self._livery_grid_cards.append(card)
                     self._livery_card_by_key[key] = card
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - isolate one malformed card
                 if card is not None:
                     card.hide()
                     card.deleteLater()
@@ -215,24 +194,6 @@ def apply_v1_3_2_list_fixes(MainWindow) -> None:
         )
         original_populate_livery_table(self)
 
-    def patched_scan_finished(self, result) -> None:
-        rebuild_indexes(self, result)
-        self._fh6_v132_initial_scan_build = True
-        try:
-            original_scan_finished(self, result)
-        finally:
-            self._fh6_v132_initial_scan_build = False
-
-        # This timer is posted only after the complete original _scan_finished
-        # chain has returned: cars, My Designs, tunings and busy-overlay cleanup
-        # are all finished.  Nested processEvents() during rebuild can no longer
-        # enter auction construction.
-        QTimer.singleShot(
-            0,
-            lambda owner=self: schedule_auction_cards(owner),
-        )
-
-    MainWindow._scan_finished = patched_scan_finished
     MainWindow._sorted_saved_content = patched_sorted_saved_content
     MainWindow._record_for_content_key = patched_record_for_content_key
     MainWindow._duplicate_livery_hashes = patched_duplicate_livery_hashes

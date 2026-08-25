@@ -22,19 +22,16 @@ class V132ListFixContractTests(unittest.TestCase):
         self.assertIn('record.kind == "Livery"', source)
         self.assertIn("combined_sorted_saved_content", source)
 
-    def test_auction_schedule_occurs_after_scan_finished_returns(self) -> None:
+    def test_scan_finished_slot_is_not_runtime_replaced(self) -> None:
         source = self._source()
-        start = source.index("def patched_scan_finished")
-        original_call = source.index("original_scan_finished(self, result)", start)
-        schedule_call = source.index("schedule_auction_cards(owner)", original_call)
-        self.assertLess(original_call, schedule_call)
-        self.assertIn("QTimer.singleShot(", source[schedule_call - 120:schedule_call + 120])
+        self.assertNotIn("def patched_scan_finished", source)
+        self.assertNotIn("MainWindow._scan_finished =", source)
+        self.assertIn("_fh6_v132_schedule_auction_cards", source)
 
     def test_populate_livery_table_does_not_schedule_auction_reentrantly(self) -> None:
         source = self._source()
         start = source.index("def patched_populate_livery_table")
-        end = source.index("def patched_scan_finished", start)
-        block = source[start:end]
+        block = source[start:source.index("MainWindow._sorted_saved_content", start)]
         self.assertIn("original_populate_livery_table(self)", block)
         self.assertNotIn("schedule_auction_cards", block)
         self.assertNotIn("QTimer.singleShot", block)
