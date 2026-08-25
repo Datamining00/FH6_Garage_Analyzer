@@ -54,7 +54,6 @@ from .auction_ui_safety import is_auction_livery
 from .card_metadata_layout import _compact_window_chrome, _configure_card_metadata
 from .card_action_alignment import configure_livery_card_actions
 from .card_state_sync import (
-    _refresh_dialog_memo_button,
     _sync_cached_annotation_card,
     _sync_cached_hidden_card,
 )
@@ -93,6 +92,7 @@ from .saved_content_cards import (
     initialize_ui_performance_state,
 )
 from .saved_content_card_metadata import append_card_metadata
+from .saved_content_card_actions import build_card_actions
 from .saved_content_presenter import (
     FilterState,
     build_search_text,
@@ -2889,187 +2889,17 @@ class MainWindow(QMainWindow):
         overlay_layout = QVBoxLayout(overlay)
         overlay_layout.setContentsMargins(8, 8, 8, 8)
         annotation = self.annotations.get(key)
-        # Icon-only check control.  The check mark always stays visible:
-        # gray = unchecked, green = checked.  There is deliberately no "체크" label.
-        check_box = QToolButton()
-        check_box.setCheckable(True)
-        check_box.setIcon(_classification_toggle_icon("check"))
-        check_box.setIconSize(QSize(22, 22))
-        check_box.setChecked(annotation.checked)
-        check_box.setToolTip(tr("status.toggle_check"))
-        item_label = tr("content.noun_livery") if content_type == "livery" else tr("content.noun_tuning")
-        check_box.setAccessibleName(tr("status.accessible_check", noun=item_label))
-        check_box.setFixedSize(34, 34)
-        check_box.setStyleSheet(
-            "QToolButton { background:rgba(255,255,255,238); color:#9aa0aa; "
-            "border:1px solid #dfe1e8; border-radius:17px; font-size:16px; font-weight:800; padding:0; }"
-            "QToolButton:hover { border-color:#a9adb7; background:rgba(255,255,255,250); }"
-            "QToolButton:checked { color:#2e9b50; border-color:#7ac58f; background:#eef9f1; }"
-            "QToolButton:checked:hover { color:#238442; border-color:#58ad72; background:#e7f6eb; }"
+        actions = build_card_actions(
+            self,
+            card,
+            overlay_layout,
+            content_type,
+            record,
+            key,
+            annotation,
+            _classification_toggle_icon,
+            _classification_pixmap,
         )
-        check_box.toggled.connect(
-            lambda checked, k=key, c=card, t=content_type:
-            self._set_grid_checked(t, k, c, checked)
-        )
-
-        triangle_box = QToolButton()
-        triangle_box.setCheckable(True)
-        triangle_box.setIcon(_classification_toggle_icon("triangle"))
-        triangle_box.setIconSize(QSize(22, 22))
-        triangle_box.setChecked(annotation.triangle)
-        triangle_box.setToolTip(tr("status.toggle_triangle"))
-        triangle_box.setAccessibleName(tr("status.accessible_triangle", noun=item_label))
-        triangle_box.setFixedSize(34, 34)
-        triangle_box.setStyleSheet(
-            "QToolButton { background:rgba(255,255,255,238); color:#9aa0aa; "
-            "border:1px solid #dfe1e8; border-radius:8px; font-size:17px; font-weight:800; padding:0; }"
-            "QToolButton:hover { border-color:#d4a14c; background:rgba(255,250,240,250); }"
-            "QToolButton:checked { color:#d98216; border-color:#e2a64f; background:#fff5e6; }"
-            "QToolButton:checked:hover { color:#c36f09; border-color:#d58d2c; background:#ffeed5; }"
-        )
-        triangle_box.toggled.connect(
-            lambda enabled, k=key, c=card, t=content_type:
-            self._set_grid_triangle(t, k, c, enabled)
-        )
-
-        excluded_box = QToolButton()
-        excluded_box.setCheckable(True)
-        excluded_box.setIcon(_classification_toggle_icon("excluded"))
-        excluded_box.setIconSize(QSize(22, 22))
-        excluded_box.setChecked(annotation.excluded)
-        excluded_box.setToolTip(tr("status.toggle_excluded"))
-        excluded_box.setAccessibleName(tr("status.accessible_excluded", noun=item_label))
-        excluded_box.setFixedSize(34, 34)
-        excluded_box.setStyleSheet(
-            "QToolButton { background:rgba(255,255,255,238); color:#9aa0aa; "
-            "border:1px solid #dfe1e8; border-radius:8px; font-size:18px; font-weight:800; padding:0; }"
-            "QToolButton:hover { border-color:#df7d86; background:rgba(255,247,248,250); }"
-            "QToolButton:checked { color:#c93c49; border-color:#df7d86; background:#fff0f2; }"
-            "QToolButton:checked:hover { color:#ad2936; border-color:#cf5b66; background:#ffe7ea; }"
-        )
-        excluded_box.toggled.connect(
-            lambda enabled, k=key, c=card, t=content_type:
-            self._set_grid_excluded(t, k, c, enabled)
-        )
-
-        zoom_button = QToolButton()
-        zoom_button.setIcon(QIcon(_classification_pixmap("search", True, 24)))
-        zoom_button.setIconSize(QSize(21, 21))
-        zoom_button.setToolTip(tr("preview.enlarge"))
-        zoom_button.setAccessibleName(tr("preview.enlarge"))
-        zoom_button.setFixedSize(34, 34)
-        zoom_button.setStyleSheet(
-            "QToolButton { background:rgba(255,255,255,238); color:#555a68; "
-            "border:1px solid #dfe1e8; border-radius:8px; padding:0; }"
-            "QToolButton:hover { border-color:#8c74ee; background:rgba(247,245,255,250); }"
-        )
-        zoom_button.clicked.connect(
-            lambda _checked=False, r=record: self._show_livery_image(r)
-        )
-
-        memo_button = QToolButton()
-        memo_button.setIcon(self._detail_memo_icon(bool(annotation.note.strip())))
-        memo_button.setIconSize(QSize(18, 18))
-        memo_button.setToolTip(
-            (annotation.note.strip() + tr("memo.edit_suffix"))
-            if annotation.note.strip()
-            else tr("memo.none_add")
-        )
-        memo_button.setAccessibleName(tr("memo.accessible", noun=item_label))
-        memo_button.setFixedSize(34, 34)
-        memo_button.setStyleSheet(
-            "QToolButton { background:rgba(255,255,255,238); color:#555a68; "
-            "border:1px solid #dfe1e8; border-radius:8px; padding:0; }"
-            "QToolButton:hover { border-color:#8c74ee; background:rgba(247,245,255,250); }"
-        )
-        memo_button.clicked.connect(
-            lambda _checked=False, t=content_type, k=key:
-            self._handle_saved_content_memo_clicked(t, k)
-        )
-        memo_button.clicked.connect(
-            lambda _checked=False, c=card, k=key:
-            QTimer.singleShot(0, lambda: _refresh_dialog_memo_button(self, c, k))
-        )
-
-        game_move_button = None
-        if not (content_type == "livery" and is_auction_livery(record)):
-            game_move_button = QToolButton()
-            game_move_button.setIcon(QIcon(_classification_pixmap("move", True, 24)))
-            game_move_button.setIconSize(QSize(23, 23))
-            game_move_button.setToolTip(tr("content.game_move_tip"))
-            game_move_button.setAccessibleName(tr("content.game_move_accessible", noun=item_label))
-            game_move_button.setFixedSize(38, 38)
-            game_move_button.setStyleSheet(
-                "QToolButton { background:rgba(255,255,255,242); color:#5f39d8; "
-                "border:2px solid #8c74ee; border-radius:19px; padding:0; }"
-                "QToolButton:hover { color:white; border-color:#6e4bf2; background:#6e4bf2; }"
-            )
-            game_move_button.clicked.connect(
-                lambda _checked=False, t=content_type, k=key:
-                self._request_game_navigation(t, k)
-            )
-
-        if content_type == "livery":
-            info_active = bool((record.header.description or "").strip())
-            info_tooltip = tr("content.livery_info_tip")
-        else:
-            info_active = bool(
-                isinstance(record, TuningRecord)
-                and record.data_path is not None
-                and record.data_size == 598
-            )
-            info_tooltip = tr("content.tuning_info_tip")
-        info_button = QToolButton()
-        info_kind = "livery_info" if content_type == "livery" else "tuning_info"
-        info_button.setIcon(QIcon(_classification_pixmap(info_kind, info_active, 24)))
-        info_button.setIconSize(QSize(22, 22))
-        info_button.setToolTip(info_tooltip)
-        info_button.setAccessibleName(info_tooltip)
-        info_button.setFixedSize(38, 38)
-        info_button.setStyleSheet(
-            "QToolButton { background:"
-            + ("#f2edff" if info_active else "rgba(255,255,255,242)")
-            + "; border:1px solid "
-            + ("#9c86f2" if info_active else "#dfe1e8")
-            + "; border-radius:9px; padding:0; }"
-            "QToolButton:hover { border-color:#8c74ee; background:#f2edff; }"
-        )
-        if content_type == "livery":
-            info_button.clicked.connect(
-                lambda _checked=False, r=record:
-                self._show_livery_metadata(r)
-            )
-        else:
-            info_button.clicked.connect(
-                lambda _checked=False, r=record:
-                self._show_tuning_details(r)
-            )
-
-        overlay_actions = QVBoxLayout()
-        overlay_actions.setContentsMargins(0, 0, 0, 0)
-        overlay_actions.setSpacing(6)
-        overlay_actions.addWidget(check_box)
-        overlay_actions.addWidget(triangle_box)
-        overlay_actions.addWidget(excluded_box)
-        overlay_actions.addWidget(zoom_button)
-        overlay_actions.addWidget(memo_button)
-        overlay_actions.addStretch(1)
-
-        left_actions = QVBoxLayout()
-        left_actions.setContentsMargins(0, 0, 0, 0)
-        left_actions.setSpacing(6)
-        if content_type == "livery" and game_move_button is not None:
-            left_actions.addWidget(game_move_button, 0, Qt.AlignmentFlag.AlignTop)
-        left_actions.addStretch(1)
-        left_actions.addWidget(info_button, 0, Qt.AlignmentFlag.AlignBottom)
-
-        action_columns = QHBoxLayout()
-        action_columns.setContentsMargins(0, 0, 0, 0)
-        action_columns.setSpacing(0)
-        action_columns.addLayout(left_actions)
-        action_columns.addStretch(1)
-        action_columns.addLayout(overlay_actions)
-        overlay_layout.addLayout(action_columns)
         image_stack.addWidget(overlay)
         image_stack.setCurrentWidget(overlay)
         outer.addWidget(image_host)
@@ -3079,13 +2909,13 @@ class MainWindow(QMainWindow):
         card._fh6_image_label = image_label
         card._fh6_thumbnail_path = record.thumbnail_path
         card._fh6_thumbnail_loaded = False
-        card._fh6_check_box = check_box
-        card._fh6_triangle_box = triangle_box
-        card._fh6_excluded_box = excluded_box
-        card._fh6_memo_button = memo_button
-        card._fh6_zoom_button = zoom_button
-        card._fh6_game_move_button = game_move_button
-        card._fh6_info_button = info_button
+        card._fh6_check_box = actions.check
+        card._fh6_triangle_box = actions.triangle
+        card._fh6_excluded_box = actions.excluded
+        card._fh6_memo_button = actions.memo
+        card._fh6_zoom_button = actions.zoom
+        card._fh6_game_move_button = actions.game_move
+        card._fh6_info_button = actions.info
         card._fh6_content_type = content_type
         self._apply_pointing_cursors(card)
         _configure_card_metadata(card)
