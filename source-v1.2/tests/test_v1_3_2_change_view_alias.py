@@ -124,13 +124,16 @@ class ChangeViewContractTests(unittest.TestCase):
         app_path = Path(__file__).resolve().parents[1] / "app.py"
         source = app_path.read_text(encoding="utf-8")
         self.assertNotIn("apply_v1_3_2_refresh_diff_patch", source)
+        self.assertNotIn("apply_v1_3_2_change_view_alias_patch", source)
 
     def test_change_patch_contains_zero_change_banner_suppression(self):
         patch_path = Path(__file__).resolve().parents[1] / "fh6garage" / "v1_3_2_change_view_alias_patch.py"
         source = patch_path.read_text(encoding="utf-8")
         self.assertIn("diff.total <= 0", source)
         self.assertIn("banner.hide()", source)
-        self.assertIn("_fh6_open_refresh_diff_view", source)
+        ui_path = Path(__file__).resolve().parents[1] / "fh6garage" / "ui.py"
+        ui_source = ui_path.read_text(encoding="utf-8")
+        self.assertIn("def _fh6_open_refresh_diff_view", ui_source)
 
     def test_alias_search_and_group_properties_include_all_names(self):
         patch_path = Path(__file__).resolve().parents[1] / "fh6garage" / "v1_3_2_change_view_alias_patch.py"

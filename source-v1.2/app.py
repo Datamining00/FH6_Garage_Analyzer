@@ -25,7 +25,6 @@ except ModuleNotFoundError as exc:
 
 from fh6garage.i18n import DEFAULT_LANGUAGE, set_language
 from fh6garage.ui import MainWindow
-from fh6garage.v1_3_2_change_view_alias_patch import apply_v1_3_2_change_view_alias_patch
 
 
 def resource_root() -> Path:
@@ -46,27 +45,6 @@ def main() -> int:
     # Resolve the persisted UI language before constructing any translated widgets.
     settings = QSettings()
     set_language(settings.value("language", DEFAULT_LANGUAGE, str))
-
-    # Apply patches in release order so every maintenance release layers only its
-    # own behavior on top of the already-verified previous version.
-
-    # Present latest refresh changes as cards and resolve user-managed creator
-    # aliases across display/search/sort/group/statistics. This never writes FH6
-    # content; scan completion remains the class-defined Qt slot in ui.py.
-    apply_v1_3_2_change_view_alias_patch(MainWindow)
-
-    # Add the folder action and base standalone change-view card implementation.
-
-    # Make the compact change button clickable and make all historical card
-    # aligners agree with move/hide/info/folder = check/triangle/excluded/zoom.
-
-    # The standalone change window must calculate card geometry from its own
-    # viewport, not from a hidden/main-grid width. Reuse the main 2/3/4-column
-    # formula on every resize and force the same light application theme.
-
-    # Cache thumbnail matching is authoritative for auction visibility: unmatched
-    # SoulBound cards are hidden by default and appear only through the explicit
-    # unapplied-auction filter. Also make recent-change card boundaries clearer.
 
     root = resource_root()
     icon_path = root / "icons" / "FH6_Assistant.ico"

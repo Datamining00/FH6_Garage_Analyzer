@@ -142,7 +142,12 @@ from .window_responsiveness import (
     _schedule_resize_settle,
 )
 from .v1_3_2_change_view_alias_patch import (
+    _creator_display,
     _decorate_creator_copy_label,
+    _normalize_card_alias_properties,
+    _open_alias_dialog,
+    _open_change_dialog,
+    _refresh_alias_views,
     initialize_creator_alias_ui,
     update_change_banner,
 )
@@ -2016,6 +2021,16 @@ class MainWindow(QMainWindow):
             if selected_creator and creator.casefold() == selected_creator.casefold():
                 selected_row = row
 
+        for row in range(table.rowCount()):
+            item = table.item(row, 1)
+            if item is None:
+                continue
+            canonical = str(item.data(Qt.ItemDataRole.UserRole) or item.text() or "").strip()
+            if not canonical or canonical == tr("creator.none"):
+                continue
+            item.setText(self.creator_aliases.display_name(canonical))
+            item.setToolTip(" / ".join(self.creator_aliases.search_names(canonical)))
+
         if selected_row >= 0:
             table.selectRow(selected_row)
         elif table.rowCount():
@@ -2743,6 +2758,8 @@ class MainWindow(QMainWindow):
 
     def _relayout_livery_grid(self, text: str = "") -> None:
         """Pack matching cards contiguously into two columns."""
+        for card in self._livery_grid_cards:
+            _normalize_card_alias_properties(self, "livery", card)
         self.livery_grid_host.setUpdatesEnabled(False)
         self._clear_livery_grid_layout()
 
@@ -2785,6 +2802,8 @@ class MainWindow(QMainWindow):
         _schedule_grid_followup(self, "livery")
 
     def _relayout_tuning_grid(self, text: str = "") -> None:
+        for card in self._tuning_grid_cards:
+            _normalize_card_alias_properties(self, "tuning", card)
         self.tuning_grid_host.setUpdatesEnabled(False)
         self._clear_tuning_grid_layout()
         visible_cards: list[QFrame] = []
@@ -4271,11 +4290,13 @@ class MainWindow(QMainWindow):
         if not item:
             return
         creator = str(item.data(Qt.ItemDataRole.UserRole) or item.text())
-        creator_key = creator.casefold()
+        creator_key = "" if creator == tr("creator.none") else creator.casefold()
 
         def same_creator(raw_name: str) -> bool:
-            display = (raw_name or "").strip() or tr("creator.none")
-            return display.casefold() == creator_key
+            raw = (raw_name or "").strip()
+            if not raw:
+                return not creator_key
+            return self.creator_aliases.canonical_name(raw).casefold() == creator_key
 
         liveries = [
             record for record in self.result.liveries
@@ -4285,7 +4306,12 @@ class MainWindow(QMainWindow):
             record for record in self.result.tunings
             if same_creator(record.header.creator or "")
         ]
-        self.selected_title.setText(tr("dashboard.selected_creator", value=creator))
+        display = (
+            tr("creator.none")
+            if not creator_key
+            else self.creator_aliases.display_name(creator)
+        )
+        self.selected_title.setText(tr("dashboard.selected_creator", value=display))
         self.selected_hint.clear()
         self.selected_hint.hide()
         self._fill_selected_liveries(liveries)
@@ -4296,14 +4322,14 @@ class MainWindow(QMainWindow):
         for r in records:
             row=t.rowCount(); t.insertRow(row); t.setRowHeight(row,54)
             it=QTableWidgetItem(); it.setIcon(self._icon_for(r.thumbnail_path)); t.setItem(row,0,it)
-            for c,v in enumerate((r.header.name or "(unnamed)",r.header.creator),1): t.setItem(row,c,QTableWidgetItem(str(v)))
+            for c,v in enumerate((r.header.name or "(unnamed)",_creator_display(self, r.header.creator or "")),1): t.setItem(row,c,QTableWidgetItem(str(v)))
 
     def _fill_selected_tunings(self, records: list[TuningRecord]) -> None:
         t=self.selected_tunings; t.setRowCount(0)
         for r in records:
             row=t.rowCount(); t.insertRow(row); t.setRowHeight(row,54)
             it=QTableWidgetItem(); it.setIcon(self._icon_for(r.thumbnail_path)); t.setItem(row,0,it)
-            for c,v in enumerate((r.header.name or "(unnamed)",r.header.creator,self._fmt_bytes(r.data_size)),1): t.setItem(row,c,QTableWidgetItem(str(v)))
+            for c,v in enumerate((r.header.name or "(unnamed)",_creator_display(self, r.header.creator or ""),self._fmt_bytes(r.data_size)),1): t.setItem(row,c,QTableWidgetItem(str(v)))
 
     def _apply_pointing_cursors(self, root: QWidget) -> None:
         """Use the hand cursor for controls that are intended to be clicked."""
@@ -5226,8 +5252,36 @@ class MainWindow(QMainWindow):
     def _filter_dashboard_table(self, text: str) -> None:
         if self.dashboard_content_stack.currentIndex() == 0:
             self._filter_table(self.car_table, text, (0, 1))
-        else:
-            self._filter_table(self.creator_table, text, (1,))
+            return
+        needle = text.strip().casefold()
+        for row in range(self.creator_table.rowCount()):
+            item = self.creator_table.item(row, 1)
+            if item is None:
+                self.creator_table.setRowHidden(row, bool(needle))
+                continue
+            canonical = str(item.data(Qt.ItemDataRole.UserRole) or item.text() or "").strip()
+            if not canonical or canonical == tr("creator.none"):
+                haystack = item.text().casefold()
+            else:
+                haystack = " ".join(
+                    [
+                        self.creator_aliases.display_name(canonical),
+                        *self.creator_aliases.search_names(canonical),
+                    ]
+                ).casefold()
+            self.creator_table.setRowHidden(row, bool(needle) and needle not in haystack)
+
+    def _fh6_open_creator_alias_manager(self) -> None:
+        _open_alias_dialog(self)
+
+    def _fh6_open_refresh_diff_view(self) -> None:
+        _open_change_dialog(self)
+
+    def _fh6_refresh_alias_views(self) -> None:
+        _refresh_alias_views(self)
+
+    def _fh6_update_refresh_diff_banner(self) -> None:
+        update_change_banner(self)
 
     def _filter_car_table(self, text: str) -> None:
         # Compatibility alias for older internal call sites.
