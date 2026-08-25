@@ -80,6 +80,7 @@ from .livery_visibility import (
     visibility_labels,
 )
 from .preferences import LocalPreferences
+from .refresh_diff_service import update_livery_refresh_diff
 from .scanner import SaveLayoutError, scan_save
 from .scan_result_processing import populate_scan_result_ui
 from .saved_content_cards import (
@@ -1718,6 +1719,7 @@ class MainWindow(QMainWindow):
         QMessageBox.critical(self, tr("scan.failed_title"), message)
 
     def _populate_all(self) -> None:
+        update_livery_refresh_diff(self)
         populate_scan_result_ui(self, self._populate_all_content)
         from .release_layout import _compact_change_banner
 

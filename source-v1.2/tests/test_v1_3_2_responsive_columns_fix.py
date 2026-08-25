@@ -165,13 +165,11 @@ class V132ResponsiveColumnsFixTests(unittest.TestCase):
         source = (ROOT / "app.py").read_text(encoding="utf-8")
         responsive = "apply_v1_3_2_responsiveness_sort_patch(MainWindow)"
         columns_fix = "apply_v1_3_2_responsive_columns_fix(MainWindow)"
-        refresh = "apply_v1_3_2_refresh_diff_patch(MainWindow)"
         thread_fix = "window = MainWindow(project_root=root)"
         self.assertNotIn(responsive, source)
         self.assertNotIn(columns_fix, source)
-        self.assertIn(refresh, source)
+        self.assertNotIn("apply_v1_3_2_refresh_diff_patch", source)
         self.assertIn(thread_fix, source)
-        self.assertLess(source.index(refresh), source.index(thread_fix))
 
 
 if __name__ == "__main__":

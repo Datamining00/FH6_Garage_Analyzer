@@ -225,11 +225,11 @@ class V132RefreshDiffTests(unittest.TestCase):
             self.assertTrue(diff.baseline)
             self.assertEqual(diff.total, 0)
 
-    def test_app_applies_refresh_diff_before_window_creation(self):
+    def test_refresh_diff_is_integrated_into_population(self):
         app_text = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
-        refresh_pos = app_text.index("apply_v1_3_2_refresh_diff_patch(MainWindow)")
-        thread_pos = app_text.index("window = MainWindow(project_root=root)")
-        self.assertLess(refresh_pos, thread_pos)
+        self.assertNotIn("apply_v1_3_2_refresh_diff_patch", app_text)
+        ui_text = (Path(__file__).resolve().parents[1] / "fh6garage" / "ui.py").read_text(encoding="utf-8")
+        self.assertIn("update_livery_refresh_diff(self)", ui_text)
 
 
 if __name__ == "__main__":
