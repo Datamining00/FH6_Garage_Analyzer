@@ -388,12 +388,56 @@ def _open_alias_dialog(window: Any) -> None:
     open_creator_alias_dialog(window)
 
 
+def initialize_creator_alias_ui(window: Any) -> None:
+    sidebar = window.findChild(QFrame, "sidebar")
+    if sidebar is not None and sidebar.layout() is not None:
+        button = QPushButton(_txt("제작자 이름 관리", "Creator aliases"), sidebar)
+        button.setObjectName("creatorAliasManagerButton")
+        button.setCursor(Qt.CursorShape.PointingHandCursor)
+        button.setStyleSheet(
+            "QPushButton { color:#c7c9d4;background:transparent;border:0;"
+            "padding:8px 10px;text-align:left;border-radius:8px; }"
+            "QPushButton:hover { background:#242632;color:white; }"
+        )
+        button.clicked.connect(lambda: _open_alias_dialog(window))
+        sidebar.layout().insertWidget(1 + len(getattr(window, "nav_buttons", [])), button)
+        window.creator_alias_button = button
+
+    banner = QFrame()
+    banner.setObjectName("refreshDiffBanner")
+    banner.setStyleSheet(
+        "QFrame#refreshDiffBanner { background:#eee9ff;border:1px solid #d8ceff;"
+        "border-radius:9px; }"
+    )
+    row = QHBoxLayout(banner)
+    row.setContentsMargins(11, 7, 8, 7)
+    label = QLabel()
+    label.setStyleSheet("color:#4f35aa;font-weight:700;")
+    view = QPushButton(_txt("보기", "View"))
+    view.setObjectName("secondary")
+    view.clicked.connect(lambda: _open_integrated_change_dialog(window))
+    row.addWidget(label)
+    row.addStretch(1)
+    row.addWidget(view)
+    banner.hide()
+    window.refresh_diff_banner = banner
+    window.refresh_diff_banner_label = label
+    window.refresh_diff_view_button = view
+
+    central = window.centralWidget()
+    root_layout = central.layout() if central is not None else None
+    if root_layout is not None and root_layout.count() >= 2:
+        content = root_layout.itemAt(1).widget()
+        content_layout = content.layout() if content is not None else None
+        if content_layout is not None:
+            content_layout.insertWidget(1, banner)
+
+
 def apply_v1_3_2_change_view_alias_patch(MainWindow) -> None:
     """Add creator aliases and a card-based latest-refresh change viewer."""
     if getattr(MainWindow, "_fh6_v132_change_view_alias_patched", False):
         return
 
-    original_init = MainWindow.__init__
     original_populate_all = MainWindow._populate_all
     original_make_card = MainWindow._make_saved_content_card
     original_sorted_saved_content = MainWindow._sorted_saved_content
@@ -403,54 +447,6 @@ def apply_v1_3_2_change_view_alias_patch(MainWindow) -> None:
     original_fill_selected_tunings = MainWindow._fill_selected_tunings
     original_relayout_livery = MainWindow._relayout_livery_grid
     original_relayout_tuning = MainWindow._relayout_tuning_grid
-
-    def patched_init(self, project_root) -> None:
-        original_init(self, project_root)
-        self.creator_aliases = CreatorAliasStore()
-
-        sidebar = self.findChild(QFrame, "sidebar")
-        if sidebar is not None and sidebar.layout() is not None:
-            button = QPushButton(_txt("제작자 이름 관리", "Creator aliases"), sidebar)
-            button.setObjectName("creatorAliasManagerButton")
-            button.setCursor(Qt.CursorShape.PointingHandCursor)
-            button.setStyleSheet(
-                "QPushButton { color:#c7c9d4;background:transparent;border:0;"
-                "padding:8px 10px;text-align:left;border-radius:8px; }"
-                "QPushButton:hover { background:#242632;color:white; }"
-            )
-            button.clicked.connect(lambda: _open_alias_dialog(self))
-            insert_at = 1 + len(getattr(self, "nav_buttons", []))
-            sidebar.layout().insertWidget(insert_at, button)
-            self.creator_alias_button = button
-
-        banner = QFrame()
-        banner.setObjectName("refreshDiffBanner")
-        banner.setStyleSheet(
-            "QFrame#refreshDiffBanner { background:#eee9ff;border:1px solid #d8ceff;"
-            "border-radius:9px; }"
-        )
-        row = QHBoxLayout(banner)
-        row.setContentsMargins(11, 7, 8, 7)
-        label = QLabel()
-        label.setStyleSheet("color:#4f35aa;font-weight:700;")
-        view = QPushButton(_txt("보기", "View"))
-        view.setObjectName("secondary")
-        view.clicked.connect(lambda: _open_integrated_change_dialog(self))
-        row.addWidget(label)
-        row.addStretch(1)
-        row.addWidget(view)
-        banner.hide()
-        self.refresh_diff_banner = banner
-        self.refresh_diff_banner_label = label
-        self.refresh_diff_view_button = view
-
-        central = self.centralWidget()
-        root_layout = central.layout() if central is not None else None
-        if root_layout is not None and root_layout.count() >= 2:
-            content = root_layout.itemAt(1).widget()
-            content_layout = content.layout() if content is not None else None
-            if content_layout is not None:
-                content_layout.insertWidget(1, banner)
 
     def update_change_banner(self) -> None:
         banner = getattr(self, "refresh_diff_banner", None)
@@ -622,7 +618,6 @@ def apply_v1_3_2_change_view_alias_patch(MainWindow) -> None:
             _normalize_card_alias_properties(self, "tuning", card)
         original_relayout_tuning(self, text)
 
-    MainWindow.__init__ = patched_init
     MainWindow._populate_all = patched_populate_all
     MainWindow._make_saved_content_card = patched_make_card
     MainWindow._sorted_saved_content = patched_sorted_saved_content

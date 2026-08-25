@@ -61,6 +61,7 @@ from .card_state_sync import (
 from .card_visuals import _fix_busy_overlay, _normalize_card_actions
 from .change_dialog_cards import _repair_card_actions
 from .car_db import CarDatabase, CarDatabaseError, REMOTE_SOURCE_PAGE
+from .creator_aliases import CreatorAliasStore
 from .game_navigation import (
     GameGridSession,
     GameNavigationError,
@@ -139,6 +140,7 @@ from .window_responsiveness import (
     _save_window_geometry,
     _schedule_resize_settle,
 )
+from .v1_3_2_change_view_alias_patch import initialize_creator_alias_ui
 
 
 APP_STYLE = """
@@ -711,6 +713,7 @@ class MainWindow(QMainWindow):
         self.car_db = CarDatabase(project_root / "data" / "car_names.json")
         self.settings = QSettings()
         self.annotations = AnnotationStore()
+        self.creator_aliases = CreatorAliasStore()
         self.local_preferences = LocalPreferences()
         # Save-related persistence is path-only. Remove the old UI-mode key from
         # v0.1.2 so no scan result, thumbnail or view state is persisted.
@@ -761,6 +764,7 @@ class MainWindow(QMainWindow):
         configure_language_controls(self)
         _install_cache_row(self)
         _restore_cache_path(self)
+        initialize_creator_alias_ui(self)
         _normalize_path_rows(self)
         _align_path_rows(self)
         _configure_livery_source_switch(self)
