@@ -68,6 +68,7 @@ from .livery_visibility import (
     HIDDEN_MODE,
     eye_slash_pixmap,
     install_visibility_filter_rows,
+    is_unapplied_auction_livery,
     is_livery_hidden,
     set_livery_hidden,
     visibility_labels,
@@ -3308,6 +3309,13 @@ class MainWindow(QMainWindow):
                         AUCTION_UNAPPLIED_MODE in modes and applied
                     ):
                         table.setRowHidden(row, True)
+                if (
+                    not table.isRowHidden(row)
+                    and AUCTION_APPLIED_MODE not in modes
+                    and AUCTION_UNAPPLIED_MODE not in modes
+                    and is_unapplied_auction_livery(self, record)
+                ):
+                    table.setRowHidden(row, True)
 
     def _request_saved_content_filter(
         self,

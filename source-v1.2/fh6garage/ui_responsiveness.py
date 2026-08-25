@@ -7,6 +7,7 @@ from PySide6.QtCore import QEventLoop, QTimer
 from PySide6.QtWidgets import QApplication, QFrame, QLabel
 
 from .i18n import tr
+from .livery_visibility import default_auction_card_allowed
 from .models import LiveryRecord
 
 _BUSY_YIELD_INTERVAL_SECONDS = 1.0 / 60.0
@@ -96,7 +97,7 @@ def _livery_visibility_allowed(self: Any, card: Any) -> bool:
         if unapplied_filter and applied:
             return False
 
-    return True
+    return default_auction_card_allowed(self, card, True)
 
 
 def _responsive_layout_visible_grid_cards(self: Any, content_type: str, cards: list[QFrame]) -> None:
@@ -294,4 +295,3 @@ def _install_download_sort_default(MainWindow: Any) -> None:
         original(self, content_type, mode)
 
     MainWindow._set_saved_content_sort_mode = patched
-

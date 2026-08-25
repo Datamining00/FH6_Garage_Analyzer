@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 import os
+import unittest
 from pathlib import Path
 from types import SimpleNamespace
-import unittest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication, QFrame, QVBoxLayout, QWidget
 
-from fh6garage import v1_3_2_auction_unapplied_recent_frame_fix as patch
-
+from fh6garage import livery_visibility as patch
+from fh6garage.v1_3_2_change_dialog_folder_patch import (
+    _strengthen_recent_card_frames,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -44,7 +46,7 @@ class AuctionUnappliedRecentFrameFixTests(unittest.TestCase):
         record = SimpleNamespace(kind="SoulBoundLivery")
         owner = self._window(record, applied=False, modes=())
         self.assertFalse(
-            patch._default_auction_visibility_allowed(owner, self._card(), True)
+            patch.default_auction_card_allowed(owner, self._card(), True)
         )
 
     def test_unmatched_soulbound_is_visible_with_unapplied_filter(self) -> None:
@@ -52,24 +54,24 @@ class AuctionUnappliedRecentFrameFixTests(unittest.TestCase):
         owner = self._window(
             record,
             applied=False,
-            modes={patch._AUCTION_UNAPPLIED_MODE},
+            modes={patch.AUCTION_UNAPPLIED_MODE},
         )
         self.assertTrue(
-            patch._default_auction_visibility_allowed(owner, self._card(), True)
+            patch.default_auction_card_allowed(owner, self._card(), True)
         )
 
     def test_matched_soulbound_remains_visible_by_default(self) -> None:
         record = SimpleNamespace(kind="SoulBoundLivery")
         owner = self._window(record, applied=True, modes=())
         self.assertTrue(
-            patch._default_auction_visibility_allowed(owner, self._card(), True)
+            patch.default_auction_card_allowed(owner, self._card(), True)
         )
 
     def test_non_auction_livery_is_not_affected(self) -> None:
         record = SimpleNamespace(kind="Livery")
         owner = self._window(record, applied=False, modes=())
         self.assertTrue(
-            patch._default_auction_visibility_allowed(owner, self._card(), True)
+            patch.default_auction_card_allowed(owner, self._card(), True)
         )
 
     def test_existing_filter_rejection_is_never_overridden(self) -> None:
@@ -77,10 +79,10 @@ class AuctionUnappliedRecentFrameFixTests(unittest.TestCase):
         owner = self._window(
             record,
             applied=False,
-            modes={patch._AUCTION_UNAPPLIED_MODE},
+            modes={patch.AUCTION_UNAPPLIED_MODE},
         )
         self.assertFalse(
-            patch._default_auction_visibility_allowed(owner, self._card(), False)
+            patch.default_auction_card_allowed(owner, self._card(), False)
         )
 
     def test_recent_current_and_archive_cards_receive_visible_frame(self) -> None:
@@ -96,7 +98,7 @@ class AuctionUnappliedRecentFrameFixTests(unittest.TestCase):
         layout.addWidget(archive)
         layout.addWidget(unrelated)
 
-        patch._strengthen_recent_card_frames(root)
+        _strengthen_recent_card_frames(root)
 
         for frame in (current, archive):
             self.assertTrue(bool(frame.property("fh6RecentStrongFrame")))
@@ -104,13 +106,15 @@ class AuctionUnappliedRecentFrameFixTests(unittest.TestCase):
             self.assertIn("border:1px solid", frame.styleSheet())
         self.assertFalse(bool(unrelated.property("fh6RecentStrongFrame")))
 
-    def test_patch_is_applied_before_window_creation(self) -> None:
+    def test_runtime_patch_is_removed(self) -> None:
         app_source = (ROOT / "app.py").read_text(encoding="utf-8")
-        fix_pos = app_source.index(
-            "apply_v1_3_2_auction_unapplied_recent_frame_fix(MainWindow)"
+        self.assertNotIn(
+            "apply_v1_3_2_auction_unapplied_recent_frame_fix(MainWindow)",
+            app_source,
         )
-        thread_pos = app_source.index("window = MainWindow(project_root=root)")
-        self.assertLess(fix_pos, thread_pos)
+        self.assertFalse(
+            (ROOT / "fh6garage" / "v1_3_2_auction_unapplied_recent_frame_fix.py").exists()
+        )
 
 
 if __name__ == "__main__":

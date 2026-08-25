@@ -34,6 +34,50 @@ def set_livery_hidden(
     preferences.set_bool(hidden_preference_key(content_key), bool(hidden))
 
 
+def selected_livery_filter_modes(owner: object) -> set[int]:
+    button = getattr(owner, "livery_check_filter", None)
+    selected = getattr(button, "selected_modes", None)
+    if not callable(selected):
+        return set()
+    try:
+        return {int(mode) for mode in selected()}
+    except (TypeError, ValueError, RuntimeError):
+        return set()
+
+
+def is_unapplied_auction_livery(owner: object, record: object) -> bool:
+    if getattr(record, "kind", None) != "SoulBoundLivery":
+        return False
+    applied = getattr(owner, "_fh6_v132_is_auction_applied", None)
+    if not callable(applied):
+        return True
+    try:
+        return not bool(applied(record))
+    except (OSError, RuntimeError, TypeError, ValueError):
+        return True
+
+
+def default_auction_card_allowed(
+    owner: object,
+    card: object,
+    base_allowed: bool,
+) -> bool:
+    if not base_allowed:
+        return False
+    modes = selected_livery_filter_modes(owner)
+    if AUCTION_APPLIED_MODE in modes or AUCTION_UNAPPLIED_MODE in modes:
+        return True
+    key = str(card.property("annotationKey") or "")  # type: ignore[attr-defined]
+    resolver = getattr(owner, "_record_for_content_key", None)
+    if not key or not callable(resolver):
+        return True
+    try:
+        record = resolver("livery", key)
+    except (RuntimeError, TypeError, ValueError):
+        record = None
+    return not is_unapplied_auction_livery(owner, record)
+
+
 def eye_slash_pixmap(active: bool, size: int = 22) -> QPixmap:
     pixmap = QPixmap(size, size)
     pixmap.fill(Qt.GlobalColor.transparent)

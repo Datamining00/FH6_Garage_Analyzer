@@ -23,9 +23,31 @@ from PySide6.QtWidgets import (
 
 from . import v1_3_2_change_view_alias_patch as _change_view
 from .i18n import tr
-from .refresh_history import LiveryRefreshChange, LiverySnapshotEntry, cached_thumbnail_path
+from .refresh_history import (
+    LiveryRefreshChange,
+    LiverySnapshotEntry,
+    cached_thumbnail_path,
+)
 from .v1_3_ui_patch import GRID_MAX_COLUMNS, GRID_MIN_COLUMNS
 
+_RECENT_CARD_FRAME_RULE = (
+    "QFrame#panel, QFrame#card { "
+    "background:#ffffff; border:1px solid #cfd3dd; border-radius:12px; "
+    "}"
+)
+
+
+def _strengthen_recent_card_frames(root: QWidget) -> QWidget:
+    frames = ([root] if isinstance(root, QFrame) else []) + root.findChildren(QFrame)
+    for frame in frames:
+        if frame.objectName() not in {"panel", "card"}:
+            continue
+        if bool(frame.property("fh6RecentStrongFrame")):
+            continue
+        existing = frame.styleSheet().rstrip()
+        frame.setStyleSheet((existing + "\n" if existing else "") + _RECENT_CARD_FRAME_RULE)
+        frame.setProperty("fh6RecentStrongFrame", True)
+    return root
 
 CARD_ACTION_BUTTON_SIZE = 30
 CARD_ACTION_ICON_SIZE = 20
@@ -288,6 +310,7 @@ def _single_change_item(window: Any, change: LiveryRefreshChange, card_width: in
         outer.addWidget(_current_card_same_size(window, change.after, card_width))
     elif status == "removed" and change.before is not None:
         outer.addWidget(_archive_card_like_main(window, change.before, _txt("삭제 전", "Before removal"), card_width))
+    _strengthen_recent_card_frames(wrapper)
     return wrapper, status, 1
 
 
@@ -308,6 +331,7 @@ def _changed_pair_item(window: Any, change: LiveryRefreshChange, card_width: int
         pair.addWidget(_current_card_same_size(window, change.after, card_width))
     pair.addStretch(1)
     outer.addLayout(pair)
+    _strengthen_recent_card_frames(wrapper)
     return wrapper, "changed", 2
 
 
