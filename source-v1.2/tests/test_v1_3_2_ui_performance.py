@@ -10,7 +10,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtWidgets import QApplication, QFrame, QLineEdit, QWidget
 
 from fh6garage.models import HeaderInfo, LiveryRecord
-from fh6garage.v1_3_2_ui_performance_patch import (
+from fh6garage.saved_content_cards import (
     _populate_livery_grid_reusing_cards,
 )
 

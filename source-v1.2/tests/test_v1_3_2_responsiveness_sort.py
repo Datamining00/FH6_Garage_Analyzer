@@ -10,7 +10,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
 
-from fh6garage.v1_3_2_responsiveness_sort_patch import (
+from fh6garage.ui_responsiveness import (
     _AUCTION_APPLIED_MODE,
     _HIDDEN_MODE,
     _BUSY_YIELD_INTERVAL_SECONDS,
