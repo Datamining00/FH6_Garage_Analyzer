@@ -59,9 +59,15 @@ from .i18n import SUPPORTED_LANGUAGES, get_language, normalize_language, tr
 from .models import LiveryRecord, ScanResult, TuningRecord
 from .preferences import LocalPreferences
 from .scanner import SaveLayoutError, scan_save
+from .saved_content_presenter import (
+    FilterState,
+    build_grid_sections,
+    build_search_text,
+    filter_matches,
+    search_matches,
+)
 from .saved_content_view import (
     SortSpec,
-    group_items,
     sort_records,
     vehicle_brand_sort_key,
 )
@@ -2597,19 +2603,17 @@ class MainWindow(QMainWindow):
             else self.tuning_check_filter
         )
         modes = filter_box.selected_modes()
-        checks = {
-            1: checked,
-            2: not checked,
-            3: bool((note or "").strip()),
-            4: not bool((note or "").strip()),
-            5: triangle,
-            6: not triangle,
-            7: excluded,
-            8: not excluded,
-            9: duplicate if content_type == "livery" else True,
-            10: not checked and not triangle and not excluded,
-        }
-        return all(checks.get(mode, True) for mode in modes)
+        return filter_matches(
+            content_type,
+            modes,
+            FilterState(
+                checked=checked,
+                note=note,
+                triangle=triangle,
+                excluded=excluded,
+                duplicate=duplicate,
+            ),
+        )
 
     def _duplicate_livery_hashes(self) -> set[str]:
         counts = Counter(
@@ -2662,26 +2666,35 @@ class MainWindow(QMainWindow):
         group_by_vehicle = vehicle_group_button.isChecked()
         group_by_creator = creator_group_button.isChecked()
 
-        if not group_by_vehicle and not group_by_creator:
-            for index, card in enumerate(cards):
+        if group_by_creator:
+            group_mode = "creator"
+        elif group_by_vehicle:
+            group_mode = "vehicle"
+        else:
+            group_mode = "none"
+
+        sections = build_grid_sections(
+            cards,
+            group_mode=group_mode,
+            vehicle_key=lambda card: str(
+                card.property("vehicleGroupKey") or "unknown"
+            ),
+            vehicle_label=lambda card: str(
+                card.property("vehicleGroupLabel") or "Unknown vehicle"
+            ),
+            creator_key=lambda card: str(
+                card.property("creatorGroupKey") or "unknown"
+            ),
+            creator_label=lambda card: str(
+                card.property("creatorGroupLabel") or tr("creator.none")
+            ),
+        )
+
+        if group_mode == "none":
+            for index, card in enumerate(sections[0].items):
                 layout.addWidget(card, index // 2, index % 2)
                 card.setVisible(True)
             return
-
-        if group_by_creator:
-            key_property = "creatorGroupKey"
-            label_property = "creatorGroupLabel"
-            fallback_label = tr("creator.none")
-        else:
-            key_property = "vehicleGroupKey"
-            label_property = "vehicleGroupLabel"
-            fallback_label = "Unknown vehicle"
-
-        grouped = group_items(
-            cards,
-            lambda card: str(card.property(key_property) or "unknown"),
-            lambda card: str(card.property(label_property) or fallback_label),
-        )
 
         headers: dict[str, QLabel] = (
             self._livery_group_headers
@@ -2690,7 +2703,10 @@ class MainWindow(QMainWindow):
         )
         noun = tr("content.noun_livery") if content_type == "livery" else tr("content.noun_tuning")
         row = 0
-        for group_key, group_label, group_cards in grouped:
+        for section in sections:
+            group_key = section.key
+            group_label = section.label
+            group_cards = section.items
             header = headers.get(group_key)
             if header is None:
                 header = QLabel()
@@ -2725,11 +2741,11 @@ class MainWindow(QMainWindow):
 
     def _relayout_livery_grid(self, text: str = "") -> None:
         """Pack matching cards contiguously into two columns."""
-        needle = text.strip().lower()
         self.livery_grid_host.setUpdatesEnabled(False)
         self._clear_livery_grid_layout()
 
         visible_cards: list[QFrame] = []
+        duplicate_hashes = self._duplicate_livery_hashes()
         for card in self._livery_grid_cards:
             haystack = str(card.property("searchText") or "")
             checked = bool(card.property("checked"))
@@ -2738,8 +2754,18 @@ class MainWindow(QMainWindow):
             key = str(card.property("annotationKey") or "")
             note = self.annotations.get(key).note if key else ""
             record = self._record_for_content_key("livery", key) if key else None
-            duplicate = self._is_duplicate_livery(record if isinstance(record, LiveryRecord) else None)
-            matched = (not needle or needle in haystack) and self._livery_filter_matches(checked, note, triangle, excluded, duplicate)
+            duplicate = bool(
+                isinstance(record, LiveryRecord)
+                and record.content_sha256
+                and record.content_sha256 in duplicate_hashes
+            )
+            matched = search_matches(haystack, text) and self._livery_filter_matches(
+                checked,
+                note,
+                triangle,
+                excluded,
+                duplicate,
+            )
             if not matched:
                 self._unload_livery_card_thumbnail(card)
                 continue
@@ -2755,7 +2781,6 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(0, self._refresh_visible_livery_thumbnails)
 
     def _relayout_tuning_grid(self, text: str = "") -> None:
-        needle = text.strip().lower()
         self.tuning_grid_host.setUpdatesEnabled(False)
         self._clear_tuning_grid_layout()
         visible_cards: list[QFrame] = []
@@ -2767,7 +2792,7 @@ class MainWindow(QMainWindow):
             key = str(card.property("annotationKey") or "")
             note = self.annotations.get(key).note if key else ""
             matched = (
-                (not needle or needle in haystack)
+                search_matches(haystack, text)
                 and self._saved_content_filter_matches(
                     "tuning", checked, note, triangle, excluded
                 )
@@ -3133,16 +3158,7 @@ class MainWindow(QMainWindow):
         record: LiveryRecord | TuningRecord,
         note: str = "",
     ) -> str:
-        return " ".join(
-            (
-                record.header.name or "",
-                record.header.creator or "",
-                str(record.header.car_id or ""),
-                self._car_label(record.header.car_id),
-                record.header.description or "",
-                note or "",
-            )
-        ).lower()
+        return build_search_text(record, self._car_label, note)
 
     def _refresh_card_search_text(self, card: QFrame, key: str) -> None:
         content_type = str(
