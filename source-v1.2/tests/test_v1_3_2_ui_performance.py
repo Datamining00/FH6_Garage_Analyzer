@@ -229,22 +229,22 @@ class V132UiPerformanceTests(unittest.TestCase):
 
         self.assertIsNot(window._livery_card_by_key["Livery_A"], old_card)
 
-    def test_patch_order_keeps_thread_affinity_fix_last(self) -> None:
+    def test_performance_patch_is_integrated_before_thread_finalizer(self) -> None:
         source = (ROOT / "app.py").read_text(encoding="utf-8")
         perf = "apply_v1_3_2_ui_performance_patches(MainWindow)"
         thread_fix = "apply_v1_3_2_thread_affinity_fix(MainWindow)"
-        self.assertIn(perf, source)
+        ui_source = (ROOT / "fh6garage" / "ui.py").read_text(encoding="utf-8")
+        self.assertNotIn(perf, source)
+        self.assertIn("initialize_ui_performance_state(self)", ui_source)
         self.assertIn(thread_fix, source)
-        self.assertLess(source.index(perf), source.index(thread_fix))
 
     def test_visible_grid_path_does_not_build_hidden_legacy_tables(self) -> None:
-        source = (
-            ROOT / "fh6garage" / "v1_3_2_ui_performance_patch.py"
-        ).read_text(encoding="utf-8")
-        start = source.index("def patched_populate_livery_table")
-        end = source.index("def patched_populate_tuning_table")
+        source = (ROOT / "fh6garage" / "ui.py").read_text(encoding="utf-8")
+        start = source.index("def _populate_livery_table")
+        end = source.index("def _livery_table_item_changed")
         livery_block = source[start:end]
         self.assertNotIn("_populate_saved_content_table", livery_block)
+        self.assertIn("self._populate_livery_grid()", livery_block)
 
 
 if __name__ == "__main__":

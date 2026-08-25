@@ -59,6 +59,13 @@ from .i18n import SUPPORTED_LANGUAGES, get_language, normalize_language, tr
 from .models import LiveryRecord, ScanResult, TuningRecord
 from .preferences import LocalPreferences
 from .scanner import SaveLayoutError, scan_save
+from .saved_content_cards import (
+    _delete_cached_cards,
+    _ensure_scan_generation,
+    _populate_livery_grid_reusing_cards,
+    _populate_tuning_grid_reusing_cards,
+    initialize_ui_performance_state,
+)
 from .saved_content_presenter import (
     FilterState,
     build_grid_sections,
@@ -682,6 +689,7 @@ class MainWindow(QMainWindow):
         self._busy_overlay = BusyOverlay(self)
         self._busy_overlay.setGeometry(self.rect())
         self._view_operations = ViewOperationCoordinator(self)
+        initialize_ui_performance_state(self)
         self._apply_pointing_cursors(self)
         self._refresh_db_status()
         self._set_always_on_top(
@@ -1665,6 +1673,7 @@ class MainWindow(QMainWindow):
         QMessageBox.critical(self, tr("scan.failed_title"), message)
 
     def _populate_all(self) -> None:
+        _ensure_scan_generation(self)
         assert self.result is not None
         r = self.result
         meta = r.metadata
@@ -2100,6 +2109,8 @@ class MainWindow(QMainWindow):
         content_type: str,
         key: str,
     ) -> Optional[LiveryRecord | TuningRecord]:
+        if self._fh6_record_index_ready:
+            return self._fh6_record_by_key.get(content_type, {}).get(key)
         for record in self._saved_content_records(content_type):
             if self._content_annotation_key(
                 content_type,
@@ -2472,11 +2483,10 @@ class MainWindow(QMainWindow):
             table.setItem(row, 7, downloaded_item)
 
     def _populate_livery_table(self) -> None:
-        self._populate_saved_content_table("livery")
-        self._populate_livery_grid()
-        self._filter_livery_views(
-            self.livery_search.text()
+        self._fh6_v132_auction_build_generation = (
+            getattr(self, "_fh6_v132_auction_build_generation", 0) + 1
         )
+        self._populate_livery_grid()
 
     @Slot(QTableWidgetItem)
     def _livery_table_item_changed(
@@ -2495,78 +2505,10 @@ class MainWindow(QMainWindow):
 
 
     def _populate_livery_grid(self) -> None:
-        for card in self._livery_grid_cards:
-            card.deleteLater()
-        self._livery_grid_cards.clear()
-        self._livery_card_by_key.clear()
-        self._clear_livery_grid_layout()
-
-        for index, record in enumerate(self._sorted_liveries()):
-            self._keep_busy_responsive(index)
-            key = self._annotation_key(record)
-            card = self._make_livery_card(record, key)
-            card.setProperty("searchText", self._livery_search_text(record, self.annotations.get(key).note))
-            card.setProperty("annotationKey", key)
-            card.setProperty(
-                "vehicleGroupKey",
-                f"id:{record.car_id}"
-                if record.car_id is not None
-                else "unknown",
-            )
-            card.setProperty("vehicleGroupLabel", self._car_label(record.car_id))
-            creator_label = (record.header.creator or "").strip() or tr("creator.none")
-            card.setProperty(
-                "creatorGroupKey",
-                f"creator:{creator_label.casefold()}",
-            )
-            card.setProperty("creatorGroupLabel", creator_label)
-            card.setProperty("checked", self.annotations.get(key).checked)
-            card.setProperty("triangle", self.annotations.get(key).triangle)
-            card.setProperty("excluded", self.annotations.get(key).excluded)
-            self._livery_grid_cards.append(card)
-            self._livery_card_by_key[key] = card
-
-        self._relayout_livery_grid(self.livery_search.text())
-        self._apply_pointing_cursors(self.livery_grid_host)
+        _populate_livery_grid_reusing_cards(self)
 
     def _populate_tuning_grid(self) -> None:
-        for card in self._tuning_grid_cards:
-            card.deleteLater()
-        self._tuning_grid_cards.clear()
-        self._tuning_card_by_key.clear()
-        self._clear_tuning_grid_layout()
-
-        for index, record in enumerate(self._sorted_tunings()):
-            self._keep_busy_responsive(index)
-            key = self._content_annotation_key("tuning", record)
-            annotation = self.annotations.get(key)
-            card = self._make_tuning_card(record, key)
-            card.setProperty(
-                "searchText",
-                self._saved_content_search_text(record, annotation.note),
-            )
-            card.setProperty("annotationKey", key)
-            card.setProperty(
-                "vehicleGroupKey",
-                f"id:{record.car_id}"
-                if record.car_id is not None
-                else "unknown",
-            )
-            card.setProperty("vehicleGroupLabel", self._car_label(record.car_id))
-            creator_label = (record.header.creator or "").strip() or tr("creator.none")
-            card.setProperty(
-                "creatorGroupKey",
-                f"creator:{creator_label.casefold()}",
-            )
-            card.setProperty("creatorGroupLabel", creator_label)
-            card.setProperty("checked", annotation.checked)
-            card.setProperty("triangle", annotation.triangle)
-            card.setProperty("excluded", annotation.excluded)
-            self._tuning_grid_cards.append(card)
-            self._tuning_card_by_key[key] = card
-
-        self._relayout_tuning_grid(self.tuning_search.text())
-        self._apply_pointing_cursors(self.tuning_grid_host)
+        _populate_tuning_grid_reusing_cards(self)
 
     def _clear_livery_grid_layout(self) -> None:
         while self.livery_grid_layout.count():
@@ -3852,12 +3794,17 @@ class MainWindow(QMainWindow):
             self._refresh_visible_tuning_thumbnails()
 
     def _populate_tuning_table(self) -> None:
-        self._populate_saved_content_table("tuning")
         self._populate_tuning_grid()
-        self._filter_saved_content_views(
-            "tuning",
-            self.tuning_search.text(),
-        )
+
+    def _fh6_v132_reset_ui_card_cache(
+        self,
+        *,
+        clear_pixmaps: bool = False,
+    ) -> None:
+        _delete_cached_cards(self, clear_pixmaps=clear_pixmaps)
+
+    def _fh6_v132_ensure_ui_scan_generation(self) -> None:
+        _ensure_scan_generation(self)
 
     def _current_unknown_car_ids(self) -> list[int]:
         if not self.result:

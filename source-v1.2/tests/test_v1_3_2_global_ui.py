@@ -105,7 +105,7 @@ class V132GlobalUiTests(unittest.TestCase):
         perf = "apply_v1_3_2_ui_performance_patches(MainWindow)"
         global_ui = "apply_v1_3_2_global_ui_patch(MainWindow)"
         thread_fix = "apply_v1_3_2_thread_affinity_fix(MainWindow)"
-        self.assertLess(source.index(perf), source.index(global_ui))
+        self.assertNotIn(perf, source)
         self.assertLess(source.index(global_ui), source.index(thread_fix))
 
 

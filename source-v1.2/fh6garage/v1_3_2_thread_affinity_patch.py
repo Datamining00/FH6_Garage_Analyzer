@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections import Counter
 from collections.abc import Iterable
 from pathlib import Path
 from time import perf_counter
@@ -18,6 +17,7 @@ from .auction_thumbnails import (
 )
 from .models import LiveryRecord, TuningRecord
 from .performance_metrics import write_latest_performance
+from .saved_content_cards import rebuild_record_indexes
 from .ui import MainWindow as _UiMainWindow
 
 # Capture the original Qt-decorated slot before any runtime monkey patches are
@@ -127,42 +127,6 @@ def apply_v1_3_2_thread_affinity_fix(MainWindow) -> None:
 
     current_populate_all = MainWindow._populate_all
 
-    def _rebuild_v132_indexes(self) -> None:
-        result = self.result
-        if result is None:
-            self._fh6_v132_livery_record_by_key = {}
-            self._fh6_v132_duplicate_hashes = set()
-            self._fh6_record_by_key = {"livery": {}, "tuning": {}}
-            self._fh6_record_index_ready = False
-            return
-
-        by_key: dict[str, LiveryRecord] = {}
-        for record in result.liveries:
-            if record.kind not in {"Livery", "SoulBoundLivery"}:
-                continue
-            key = self._content_annotation_key("livery", record)
-            by_key[key] = record
-        self._fh6_v132_livery_record_by_key = by_key
-
-        tuning_by_key: dict[str, TuningRecord] = {}
-        for record in result.tunings:
-            key = self._content_annotation_key("tuning", record)
-            tuning_by_key[key] = record
-        self._fh6_record_by_key = {
-            "livery": by_key,
-            "tuning": tuning_by_key,
-        }
-        self._fh6_record_index_ready = True
-
-        counts = Counter(
-            record.content_sha256
-            for record in result.liveries
-            if record.kind == "Livery" and record.content_sha256
-        )
-        self._fh6_v132_duplicate_hashes = {
-            digest for digest, count in counts.items() if count > 1
-        }
-
     def patched_populate_all(self) -> None:
         ui_started = perf_counter()
         result = self.result
@@ -178,7 +142,7 @@ def apply_v1_3_2_thread_affinity_fix(MainWindow) -> None:
                 # Cache integration is optional and must never block save loading.
                 self._fh6_v132_match_stats = None
 
-        _rebuild_v132_indexes(self)
+        rebuild_record_indexes(self)
 
         # The synchronous initial build must remain identical in scope to 1.3.1:
         # only normal My Designs records are exposed to the existing table/grid.

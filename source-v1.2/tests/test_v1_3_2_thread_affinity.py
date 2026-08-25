@@ -33,9 +33,9 @@ class V132ThreadAffinityContractTests(unittest.TestCase):
 
     def test_both_content_types_receive_constant_time_indexes(self) -> None:
         root = Path(__file__).resolve().parents[1]
-        source = (root / "fh6garage" / "v1_3_2_thread_affinity_patch.py").read_text(encoding="utf-8")
+        source = (root / "fh6garage" / "saved_content_cards.py").read_text(encoding="utf-8")
         self.assertIn("tuning_by_key", source)
-        self.assertIn('"livery": by_key', source)
+        self.assertIn('"livery": livery_by_key', source)
         self.assertIn('"tuning": tuning_by_key', source)
         self.assertIn("_fh6_record_index_ready = True", source)
 

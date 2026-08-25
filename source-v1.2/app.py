@@ -36,7 +36,6 @@ from fh6garage.v1_3_2_ui_cleanup_patch import apply_v1_3_2_ui_cleanup_patch
 from fh6garage.v1_3_2_ui_followup_patch import apply_v1_3_2_ui_followup_patch
 from fh6garage.v1_3_2_manifest_registry_patch import apply_v1_3_2_manifest_registry_patch
 from fh6garage.v1_3_2_card_alignment_patch import apply_v1_3_2_card_alignment_patch
-from fh6garage.v1_3_2_ui_performance_patch import apply_v1_3_2_ui_performance_patches
 from fh6garage.v1_3_2_global_ui_patch import apply_v1_3_2_global_ui_patch
 from fh6garage.v1_3_2_icon_overlay_fix import apply_v1_3_2_icon_overlay_fix
 from fh6garage.v1_3_2_compact_card_layout_patch import apply_v1_3_2_compact_card_layout_patch
@@ -86,10 +85,6 @@ def main() -> int:
     apply_v1_3_2_ui_followup_patch(MainWindow)
     apply_v1_3_2_manifest_registry_patch(MainWindow)
     apply_v1_3_2_card_alignment_patch(MainWindow)
-
-    # Performance/card-lifetime optimization stays below all feature patches so
-    # it reuses the final v1.3.2 card behavior.
-    apply_v1_3_2_ui_performance_patches(MainWindow)
 
     # Geometry/aspect correction is deliberately layered after card reuse so
     # cached cards retain the same aspect controller through sort/filter/source
