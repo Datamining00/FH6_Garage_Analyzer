@@ -60,6 +60,7 @@ from .models import LiveryRecord, ScanResult, TuningRecord
 from .preferences import LocalPreferences
 from .scanner import SaveLayoutError, scan_save
 from .tune_data import TuneDataError, read_tune_data
+from .view_operations import ViewOperationCoordinator
 
 
 APP_STYLE = """
@@ -668,6 +669,7 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self._busy_overlay = BusyOverlay(self)
         self._busy_overlay.setGeometry(self.rect())
+        self._view_operations = ViewOperationCoordinator(self)
         self._apply_pointing_cursors(self)
         self._refresh_db_status()
         self._set_always_on_top(
@@ -1387,14 +1389,14 @@ class MainWindow(QMainWindow):
         self._connect_debounced_search(
             search,
             lambda text, kind=content_type:
-            self._filter_saved_content_views(kind, text),
+            self._request_saved_content_filter(kind, text),
         )
         search_row.addWidget(search, 1)
 
         status_filter = MultiStatusFilterButton(content_type == "livery", self)
         status_filter.selectionChanged.connect(
             lambda kind=content_type, field=search:
-            self._filter_saved_content_views(kind, field.text())
+            self._request_saved_content_filter(kind, field.text())
         )
         search_row.addWidget(status_filter)
         controls.addLayout(search_row)
@@ -1522,7 +1524,27 @@ class MainWindow(QMainWindow):
             if content_type == "livery"
             else self.tuning_search
         )
-        self._filter_saved_content_views(content_type, search.text())
+        if self.result is None:
+            return
+        noun = (
+            tr("content.noun_livery")
+            if content_type == "livery"
+            else tr("content.noun_tuning")
+        )
+        message = tr(
+            "content.grouping_vehicle" if enabled else "content.relayout",
+            noun=noun,
+        )
+        text = search.text()
+        self._view_operations.request(
+            content_type,
+            message,
+            lambda: self._filter_saved_content_views(
+                content_type,
+                text,
+                preserve_scroll=True,
+            ),
+        )
 
     @Slot(str, bool)
     def _set_creator_grouping(
@@ -1549,7 +1571,27 @@ class MainWindow(QMainWindow):
             if content_type == "livery"
             else self.tuning_search
         )
-        self._filter_saved_content_views(content_type, search.text())
+        if self.result is None:
+            return
+        noun = (
+            tr("content.noun_livery")
+            if content_type == "livery"
+            else tr("content.noun_tuning")
+        )
+        message = tr(
+            "content.grouping_creator" if enabled else "content.relayout",
+            noun=noun,
+        )
+        text = search.text()
+        self._view_operations.request(
+            content_type,
+            message,
+            lambda: self._filter_saved_content_views(
+                content_type,
+                text,
+                preserve_scroll=True,
+            ),
+        )
 
     @Slot()
     def choose_save_folder(self) -> None:
@@ -1570,6 +1612,7 @@ class MainWindow(QMainWindow):
     def start_scan(self, path: Path) -> None:
         if self._scan_thread and self._scan_thread.isRunning():
             return
+        self._view_operations.cancel_pending()
         self._begin_busy(tr("scan.loading"))
         self._show_status(tr("scan.scanning"))
         thread = QThread(self)
@@ -1987,53 +2030,60 @@ class MainWindow(QMainWindow):
         content_type: str,
         mode: str,
     ) -> None:
-        if mode not in {"default", "brand", "creator", "download"}:
+        if (
+            content_type not in {"livery", "tuning"}
+            or mode not in {"default", "brand", "creator", "download"}
+        ):
             return
 
         noun = tr("content.noun_livery") if content_type == "livery" else tr("content.noun_tuning")
-        self._begin_busy(tr("content.sorting", noun=noun))
-        try:
-            # Download order is a flat chronology. Disable grouping when the
-            # mode is selected, but do not lock it: the user may re-enable the
-            # grouping button immediately afterwards.
-            if mode == "download":
-                for button_name, pref_name in (
-                    (f"{content_type}_group_button", f"{content_type}_group_by_vehicle"),
-                    (f"{content_type}_creator_group_button", f"{content_type}_group_by_creator"),
-                ):
-                    group_button = getattr(self, button_name)
-                    if group_button.isChecked():
-                        group_button.blockSignals(True)
-                        group_button.setChecked(False)
-                        group_button.blockSignals(False)
-                        self.local_preferences.set_bool(pref_name, False)
-            if content_type == "livery":
-                self._livery_sort_descending = (
-                    not self._livery_sort_descending
-                    if self._livery_sort_mode == mode
-                    else False
-                )
-                self._livery_sort_mode = mode
-                self._update_sort_button_labels("livery")
-                if self.result is not None:
-                    self._populate_livery_table()
-                self.livery_grid_scroll.verticalScrollBar().setValue(0)
-                return
+        # Download order is a flat chronology. Disable grouping when the mode
+        # is selected, but keep the buttons available for a later user choice.
+        if mode == "download":
+            for button_name, pref_name in (
+                (f"{content_type}_group_button", f"{content_type}_group_by_vehicle"),
+                (f"{content_type}_creator_group_button", f"{content_type}_group_by_creator"),
+            ):
+                group_button = getattr(self, button_name)
+                if group_button.isChecked():
+                    group_button.blockSignals(True)
+                    group_button.setChecked(False)
+                    group_button.blockSignals(False)
+                    self.local_preferences.set_bool(pref_name, False)
 
-            if content_type == "tuning":
-                self._tuning_sort_descending = (
-                    not self._tuning_sort_descending
-                    if self._tuning_sort_mode == mode
-                    else False
-                )
-                self._tuning_sort_mode = mode
-                self._update_sort_button_labels("tuning")
-                if self.result is not None:
-                    self._populate_tuning_table()
-                self.tuning_table.scrollToTop()
-                self.tuning_grid_scroll.verticalScrollBar().setValue(0)
-        finally:
-            self._end_busy()
+        mode_attr = (
+            "_livery_sort_mode"
+            if content_type == "livery"
+            else "_tuning_sort_mode"
+        )
+        descending_attr = (
+            "_livery_sort_descending"
+            if content_type == "livery"
+            else "_tuning_sort_descending"
+        )
+        previous_mode = getattr(self, mode_attr)
+        previous_descending = bool(getattr(self, descending_attr))
+        setattr(
+            self,
+            descending_attr,
+            not previous_descending if previous_mode == mode else False,
+        )
+        setattr(self, mode_attr, mode)
+        self._update_sort_button_labels(content_type)
+
+        if self.result is None:
+            return
+
+        populate = (
+            self._populate_livery_table
+            if content_type == "livery"
+            else self._populate_tuning_table
+        )
+        self._view_operations.request(
+            content_type,
+            tr("content.sorting", noun=noun),
+            populate,
+        )
 
     def _update_sort_button_labels(self, content_type: str) -> None:
         buttons = (
@@ -3247,6 +3297,35 @@ class MainWindow(QMainWindow):
                     )
                 ),
             )
+
+    def _request_saved_content_filter(
+        self,
+        content_type: str,
+        text: str,
+    ) -> None:
+        """Queue user-initiated filtering so its progress overlay can paint."""
+
+        if self.result is None:
+            self._filter_saved_content_views(
+                content_type,
+                text,
+                preserve_scroll=True,
+            )
+            return
+        noun = (
+            tr("content.noun_livery")
+            if content_type == "livery"
+            else tr("content.noun_tuning")
+        )
+        self._view_operations.request(
+            content_type,
+            tr("content.filtering", noun=noun),
+            lambda: self._filter_saved_content_views(
+                content_type,
+                text,
+                preserve_scroll=True,
+            ),
+        )
 
     def _filter_saved_content_views(
         self,

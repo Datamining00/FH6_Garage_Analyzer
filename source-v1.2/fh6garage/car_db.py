@@ -69,6 +69,7 @@ class CarDatabase:
         self._cache_updated_at = ""
         self._cache_source_last_modified = ""
         self._load_warnings: list[str] = []
+        self._revision = 0
         self.reload()
 
     @staticmethod
@@ -109,6 +110,13 @@ class CarDatabase:
         if overrides:
             self._items.update(overrides)
         self._override_count = len(overrides)
+        self._revision += 1
+
+    @property
+    def revision(self) -> int:
+        """Monotonic token for invalidating derived UI sort/group indexes."""
+
+        return self._revision
 
     @property
     def status(self) -> CarDatabaseStatus:

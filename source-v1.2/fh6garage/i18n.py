@@ -111,6 +111,22 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
     "content.noun_livery": {"ko": "리버리", "en": "liveries"},
     "content.noun_tuning": {"ko": "튜닝", "en": "tunings"},
     "content.sorting": {"ko": "{noun} 목록을 정렬하는 중…", "en": "Sorting {noun} list…"},
+    "content.grouping_vehicle": {
+        "ko": "{noun} 목록을 차량별로 그룹화하는 중…",
+        "en": "Grouping {noun} by vehicle…",
+    },
+    "content.grouping_creator": {
+        "ko": "{noun} 목록을 제작자별로 그룹화하는 중…",
+        "en": "Grouping {noun} by creator…",
+    },
+    "content.relayout": {
+        "ko": "{noun} 목록을 다시 배치하는 중…",
+        "en": "Rearranging {noun} list…",
+    },
+    "content.filtering": {
+        "ko": "{noun} 목록을 필터링하는 중…",
+        "en": "Filtering {noun} list…",
+    },
     "content.rebuilding_livery": {"ko": "리버리 목록을 다시 구성하는 중…", "en": "Rebuilding livery list…"},
     "status.check": {"ko": "원 표시", "en": "Circle mark"},
     "status.triangle": {"ko": "삼각형 표시", "en": "Triangle mark"},

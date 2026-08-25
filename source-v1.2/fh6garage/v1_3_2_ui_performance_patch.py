@@ -92,6 +92,65 @@ def _records_for_result(
     return {"livery": liveries, "tuning": tunings}
 
 
+def _creator_alias_token(self: Any) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    aliases = getattr(self, "creator_aliases", None)
+    groups = getattr(aliases, "groups", ())
+    result: list[tuple[str, tuple[str, ...]]] = []
+    for group in groups:
+        result.append(
+            (
+                str(getattr(group, "current", "")),
+                tuple(str(name) for name in getattr(group, "previous", ())),
+            )
+        )
+    return tuple(result)
+
+
+def _cached_sorted_records(self: Any, content_type: str) -> list[Any]:
+    factory = self._sorted_liveries if content_type == "livery" else self._sorted_tunings
+    coordinator = getattr(self, "_view_operations", None)
+    if coordinator is None or not hasattr(coordinator, "cached_order"):
+        return list(factory())
+
+    mode = getattr(self, f"_{content_type}_sort_mode", "default")
+    descending = bool(getattr(self, f"_{content_type}_sort_descending", False))
+    try:
+        raw_records = self._saved_content_records(content_type)
+    except (AttributeError, RuntimeError, TypeError, ValueError):
+        raw_records = ()
+    cache_key = (
+        content_type,
+        id(getattr(self, "result", None)),
+        tuple(id(record) for record in raw_records),
+        mode,
+        descending,
+        bool(getattr(self, "_fh6_v132_initial_scan_build", False)),
+        int(getattr(getattr(self, "car_db", None), "revision", 0)),
+        _creator_alias_token(self),
+    )
+    return coordinator.cached_order(cache_key, factory)
+
+
+def initialize_ui_performance_state(self: Any) -> None:
+    """Initialize card/index caches without replacing ``MainWindow`` methods."""
+
+    policy = detect_runtime_policy()
+    self._fh6_runtime_policy = policy
+    self._fh6_thumbnail_pixmap_cache = ThumbnailPixmapCache(
+        policy.pixmap_cache_bytes
+    )
+    self._fh6_ui_cache_result_token = None
+    self._fh6_ui_cache_scope = ""
+    self._fh6_ui_record_signatures = {"livery": {}, "tuning": {}}
+    self._fh6_ui_livery_cards_created = 0
+    self._fh6_ui_livery_cards_reused = 0
+    self._fh6_ui_tuning_cards_created = 0
+    self._fh6_ui_tuning_cards_reused = 0
+    self._fh6_ui_cards_discarded = 0
+    self._fh6_record_by_key = {"livery": {}, "tuning": {}}
+    self._fh6_record_index_ready = False
+
+
 def _delete_group_headers(self: Any) -> None:
     for name in ("_livery_group_headers", "_tuning_group_headers"):
         headers = getattr(self, name, None)
@@ -234,6 +293,10 @@ def _ensure_scan_generation(self: Any) -> None:
     if token == getattr(self, "_fh6_ui_cache_result_token", None):
         return
 
+    view_operations = getattr(self, "_view_operations", None)
+    if view_operations is not None and hasattr(view_operations, "clear_order_cache"):
+        view_operations.clear_order_cache()
+
     old_token = getattr(self, "_fh6_ui_cache_result_token", None)
     old_scope = getattr(self, "_fh6_ui_cache_scope", "")
     new_scope = _result_scope(result)
@@ -268,7 +331,7 @@ def _populate_livery_grid_reusing_cards(self: Any) -> None:
     active_keys: set[str] = set()
     cache = self._livery_card_by_key
 
-    for index, record in enumerate(self._sorted_liveries()):
+    for index, record in enumerate(_cached_sorted_records(self, "livery")):
         self._keep_busy_responsive(index)
         key = self._annotation_key(record)
         active_keys.add(key)
@@ -313,7 +376,7 @@ def _populate_tuning_grid_reusing_cards(self: Any) -> None:
     active_keys: set[str] = set()
     cache = self._tuning_card_by_key
 
-    for index, record in enumerate(self._sorted_tunings()):
+    for index, record in enumerate(_cached_sorted_records(self, "tuning")):
         self._keep_busy_responsive(index)
         key = self._content_annotation_key("tuning", record)
         active_keys.add(key)
@@ -362,21 +425,7 @@ def apply_v1_3_2_ui_performance_patches(MainWindow) -> None:
 
     def patched_init(self, project_root) -> None:
         original_init(self, project_root)
-        policy = detect_runtime_policy()
-        self._fh6_runtime_policy = policy
-        self._fh6_thumbnail_pixmap_cache = ThumbnailPixmapCache(
-            policy.pixmap_cache_bytes
-        )
-        self._fh6_ui_cache_result_token = None
-        self._fh6_ui_cache_scope = ""
-        self._fh6_ui_record_signatures = {"livery": {}, "tuning": {}}
-        self._fh6_ui_livery_cards_created = 0
-        self._fh6_ui_livery_cards_reused = 0
-        self._fh6_ui_tuning_cards_created = 0
-        self._fh6_ui_tuning_cards_reused = 0
-        self._fh6_ui_cards_discarded = 0
-        self._fh6_record_by_key = {"livery": {}, "tuning": {}}
-        self._fh6_record_index_ready = False
+        initialize_ui_performance_state(self)
 
     def patched_populate_all(self) -> None:
         # A new ScanResult invalidates cached widgets.  Sorting, filtering,

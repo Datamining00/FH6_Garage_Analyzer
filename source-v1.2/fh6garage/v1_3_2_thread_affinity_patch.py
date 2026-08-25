@@ -223,6 +223,9 @@ def apply_v1_3_2_thread_affinity_fix(MainWindow) -> None:
         pixmaps = getattr(self, "_fh6_thumbnail_pixmap_cache", None)
         if pixmaps is not None and hasattr(pixmaps, "stats"):
             counters.update(pixmaps.stats())
+        view_operations = getattr(self, "_view_operations", None)
+        if view_operations is not None and hasattr(view_operations, "stats"):
+            counters.update(view_operations.stats())
         refresh_diff = getattr(self, "_fh6_latest_livery_diff", None)
         if refresh_diff is not None:
             counters.update(
