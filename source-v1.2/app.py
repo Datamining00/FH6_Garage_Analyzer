@@ -34,7 +34,6 @@ from fh6garage.v1_3_2_refresh_diff_patch import apply_v1_3_2_refresh_diff_patch
 from fh6garage.v1_3_2_change_view_alias_patch import apply_v1_3_2_change_view_alias_patch
 from fh6garage.v1_3_2_change_view_alias_sync_patch import apply_v1_3_2_change_view_alias_sync_patch
 from fh6garage.v1_3_2_release_layout_patch import apply_v1_3_2_release_layout_patch
-from fh6garage.v1_3_2_alias_manager_change_card_fix import apply_v1_3_2_alias_manager_change_card_fix
 
 
 def resource_root() -> Path:
@@ -94,11 +93,6 @@ def main() -> int:
     # Cache thumbnail matching is authoritative for auction visibility: unmatched
     # SoulBound cards are hidden by default and appear only through the explicit
     # unapplied-auction filter. Also make recent-change card boundaries clearer.
-
-    # Finalize deleted recent cards and creator-name manager interaction. Deleted
-    # cards keep the normal card UI but no actions, and the alias manager remains
-    # non-modal so the main window can still be used while it is open.
-    apply_v1_3_2_alias_manager_change_card_fix(MainWindow)
 
     root = resource_root()
     icon_path = root / "icons" / "FH6_Assistant.ico"

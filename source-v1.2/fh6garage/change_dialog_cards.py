@@ -245,14 +245,15 @@ def _main_livery_columns(window: Any) -> int:
 
 def _archive_card_like_main(window: Any, entry: LiverySnapshotEntry, heading: str, card_width: int) -> QFrame:
     card = QFrame()
-    card.setObjectName("card")
+    card.setObjectName("panel" if not heading else "card")
     card.setProperty("fh6ArchiveCard", True)
     card.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
     card.setFixedWidth(card_width)
 
     layout = QVBoxLayout(card)
-    layout.setContentsMargins(10, 10, 10, 10)
-    layout.setSpacing(7)
+    margin = 12 if not heading else 10
+    layout.setContentsMargins(margin, margin, margin, margin)
+    layout.setSpacing(8 if not heading else 7)
 
     image = QLabel()
     image.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -281,7 +282,10 @@ def _archive_card_like_main(window: Any, entry: LiverySnapshotEntry, heading: st
         image.setText(_txt("썸네일 없음", "No thumbnail"))
     layout.addWidget(image)
 
-    vehicle = QLabel(window._car_label(entry.car_id))
+    vehicle_text = window._car_label(entry.car_id)
+    if not heading:
+        vehicle_text = f"{_txt('차량명', 'Vehicle')}: {vehicle_text}"
+    vehicle = QLabel(vehicle_text)
     vehicle.setStyleSheet("font-weight:700;font-size:11pt;")
     vehicle.setWordWrap(True)
     layout.addWidget(vehicle)
@@ -308,13 +312,14 @@ def _archive_card_like_main(window: Any, entry: LiverySnapshotEntry, heading: st
         description.setWordWrap(True)
         layout.addWidget(description)
 
-    record_badge = QLabel(heading)
-    record_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    record_badge.setStyleSheet(
-        "background:#f0ecff;color:#5f39d8;border-radius:7px;"
-        "padding:4px 8px;font-weight:700;"
-    )
-    layout.addWidget(record_badge)
+    if heading:
+        record_badge = QLabel(heading)
+        record_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        record_badge.setStyleSheet(
+            "background:#f0ecff;color:#5f39d8;border-radius:7px;"
+            "padding:4px 8px;font-weight:700;"
+        )
+        layout.addWidget(record_badge)
     return card
 
 
@@ -348,7 +353,7 @@ def _single_change_item(window: Any, change: LiveryRefreshChange, card_width: in
     if status == "added" and change.after is not None:
         outer.addWidget(_current_card_same_size(window, change.after, card_width))
     elif status == "removed" and change.before is not None:
-        outer.addWidget(_archive_card_like_main(window, change.before, _txt("삭제 전", "Before removal"), card_width))
+        outer.addWidget(_archive_card_like_main(window, change.before, "", card_width))
     _strengthen_recent_card_frames(wrapper)
     return wrapper, status, 1
 
@@ -477,4 +482,3 @@ def _open_change_dialog_same_as_main(window: Any) -> None:
     dialog.show()
     dialog.raise_()
     dialog.activateWindow()
-
