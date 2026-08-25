@@ -383,9 +383,9 @@ def _refresh_alias_views(window: Any) -> None:
 def _open_alias_dialog(window: Any) -> None:
     # Kept as the stable call site while the dialog implementation is separated
     # from the release patch layer.
-    from .v1_3_2_alias_manager_change_card_fix import _open_alias_dialog_nonmodal
+    from .creator_alias_dialog import open_creator_alias_dialog
 
-    _open_alias_dialog_nonmodal(window)
+    open_creator_alias_dialog(window)
 
 
 def apply_v1_3_2_change_view_alias_patch(MainWindow) -> None:

@@ -7,7 +7,6 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
     QDialog,
-    QFrame,
     QGridLayout,
     QHBoxLayout,
     QHeaderView,
@@ -19,41 +18,11 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from . import change_dialog_cards as _change_dialog
 from . import v1_3_2_change_view_alias_patch as _alias
 from .i18n import tr
 
 
-def _remove_deleted_heading_and_match_main_frame(widget: Any) -> Any:
-    """Deleted snapshot cards use the normal card UI but contain no actions."""
-    for frame in widget.findChildren(QFrame):
-        if not bool(frame.property("fh6ArchiveCard")):
-            continue
-
-        frame.setObjectName("panel")
-        layout = frame.layout()
-        if isinstance(layout, QVBoxLayout):
-            layout.setContentsMargins(12, 12, 12, 12)
-            layout.setSpacing(8)
-            # Archive-card layout is image, vehicle, metadata, optional description,
-            # historical badge. Match the main card's visible vehicle label.
-            if layout.count() >= 2:
-                vehicle_item = layout.itemAt(1)
-                vehicle = vehicle_item.widget() if vehicle_item is not None else None
-                if isinstance(vehicle, QLabel):
-                    prefix = _alias._txt("차량명", "Vehicle")
-                    text = vehicle.text().strip()
-                    if text and not text.startswith(f"{prefix}:"):
-                        vehicle.setText(f"{prefix}: {text}")
-
-        for label in frame.findChildren(QLabel):
-            if label.text() in {"삭제 전", "Before removal"}:
-                label.hide()
-                label.deleteLater()
-    return widget
-
-
-def _open_alias_dialog_nonmodal(window: Any) -> None:
+def open_creator_alias_dialog(window: Any) -> None:
     previous = getattr(window, "_fh6_alias_dialog", None)
     if isinstance(previous, QDialog) and previous.isVisible():
         previous.raise_()
@@ -291,21 +260,3 @@ def _open_alias_dialog_nonmodal(window: Any) -> None:
     dialog.show()
     dialog.raise_()
     dialog.activateWindow()
-
-
-def apply_v1_3_2_alias_manager_change_card_fix(MainWindow: Any) -> None:
-    """Finalize alias-manager interaction and deleted change-card presentation."""
-    if getattr(MainWindow, "_fh6_v132_alias_manager_change_card_fixed", False):
-        return
-
-    original_single_change = _change_dialog._single_change_item
-
-    def single_change_item(*args: Any, **kwargs: Any):
-        widget, status, span = original_single_change(*args, **kwargs)
-        if status == "removed":
-            _remove_deleted_heading_and_match_main_frame(widget)
-        return widget, status, span
-
-    _change_dialog._single_change_item = single_change_item
-    _alias._open_alias_dialog = _open_alias_dialog_nonmodal
-    MainWindow._fh6_v132_alias_manager_change_card_fixed = True

@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import inspect
 import tempfile
 import unittest
 from pathlib import Path
 
-from PySide6.QtWidgets import QApplication, QDialog, QFrame, QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QApplication, QDialog, QWidget
 
 from fh6garage.creator_aliases import CreatorAliasStore
-from fh6garage import v1_3_2_alias_manager_change_card_fix as fix
+from fh6garage import change_dialog_cards
+from fh6garage import creator_alias_dialog
 
 
 class _DummyWindow(QWidget):
@@ -18,43 +20,28 @@ class _DummyWindow(QWidget):
         self._fh6_alias_dialog = None
 
 
-class AliasManagerChangeCardFixTests(unittest.TestCase):
+class CreatorAliasDialogTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.app = QApplication.instance() or QApplication([])
 
-    def test_deleted_heading_is_removed_and_archive_matches_main_metadata_frame(self) -> None:
-        root = QWidget()
-        card = QFrame(root)
-        card.setObjectName("card")
-        card.setProperty("fh6ArchiveCard", True)
-        layout = QVBoxLayout(card)
-        image = QLabel()
-        vehicle = QLabel("2016 Dodge Viper ACR")
-        heading = QLabel("삭제 전")
-        layout.addWidget(image)
-        layout.addWidget(vehicle)
-        layout.addWidget(heading)
-        card.show()
-        heading.show()
+    def test_deleted_card_presentation_is_integrated_at_creation(self) -> None:
+        source = inspect.getsource(change_dialog_cards._single_change_item)
+        self.assertIn('_archive_card_like_main(window, change.before, "", card_width)', source)
 
-        fix._remove_deleted_heading_and_match_main_frame(root)
-        self.assertEqual(card.objectName(), "panel")
-        self.assertEqual(vehicle.text(), "차량명: 2016 Dodge Viper ACR")
-        margins = layout.contentsMargins()
-        self.assertEqual((margins.left(), margins.top(), margins.right(), margins.bottom()), (12, 12, 12, 12))
-        self.assertEqual(layout.spacing(), 8)
-        self.assertFalse(heading.isVisible())
+        archive_source = inspect.getsource(change_dialog_cards._archive_card_like_main)
+        self.assertIn('card.setObjectName("panel" if not heading else "card")', archive_source)
+        self.assertIn("if heading:", archive_source)
 
     def test_alias_dialog_is_nonmodal_and_initial_inputs_are_blank(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             window = _DummyWindow(Path(temp) / "creator_aliases.json")
-            old_observed = fix._alias._observed_creator_names
-            old_refresh = fix._alias._refresh_alias_views
+            old_observed = creator_alias_dialog._alias._observed_creator_names
+            old_refresh = creator_alias_dialog._alias._refresh_alias_views
             try:
-                fix._alias._observed_creator_names = lambda _window: ["OldName", "NewName"]
-                fix._alias._refresh_alias_views = lambda _window: None
-                fix._open_alias_dialog_nonmodal(window)
+                creator_alias_dialog._alias._observed_creator_names = lambda _window: ["OldName", "NewName"]
+                creator_alias_dialog._alias._refresh_alias_views = lambda _window: None
+                creator_alias_dialog.open_creator_alias_dialog(window)
                 dialog = window._fh6_alias_dialog
                 self.assertIsInstance(dialog, QDialog)
                 self.assertFalse(dialog.isModal())
@@ -66,8 +53,8 @@ class AliasManagerChangeCardFixTests(unittest.TestCase):
                 dialog.close()
                 self.app.processEvents()
             finally:
-                fix._alias._observed_creator_names = old_observed
-                fix._alias._refresh_alias_views = old_refresh
+                creator_alias_dialog._alias._observed_creator_names = old_observed
+                creator_alias_dialog._alias._refresh_alias_views = old_refresh
 
     def test_selected_group_unlink_dissolves_only_that_group(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
