@@ -12,17 +12,15 @@ from PySide6.QtWidgets import QApplication, QLabel
 from fh6garage.i18n import set_language
 from fh6garage.ui import MainWindow
 from fh6garage.v1_3_ui_patch import apply_v1_3_ui_patches
-from fh6garage.v1_3_1_patch import (
+from fh6garage.window_responsiveness import (
     RESIZE_DEBOUNCE_MS,
     WINDOW_GEOMETRY_KEY,
     WINDOW_MAXIMIZED_KEY,
-    apply_v1_3_1_patches,
 )
 
 
 ROOT = Path(__file__).resolve().parents[1]
 apply_v1_3_ui_patches(MainWindow)
-apply_v1_3_1_patches(MainWindow)
 
 
 class V131PatchTests(unittest.TestCase):
@@ -123,14 +121,10 @@ class V131BuildMetadataTests(unittest.TestCase):
         source = (ROOT / "app.py").read_text(encoding="utf-8")
         self.assertIn('app.setApplicationVersion("1.3.2")', source)
         self.assertIn("apply_v1_3_ui_patches(MainWindow)", source)
-        self.assertIn("apply_v1_3_1_patches(MainWindow)", source)
+        self.assertNotIn("apply_v1_3_1_patches", source)
         self.assertIn("apply_v1_3_2_patches(MainWindow)", source)
         self.assertLess(
             source.index("apply_v1_3_ui_patches(MainWindow)"),
-            source.index("apply_v1_3_1_patches(MainWindow)"),
-        )
-        self.assertLess(
-            source.index("apply_v1_3_1_patches(MainWindow)"),
             source.index("apply_v1_3_2_patches(MainWindow)"),
         )
 

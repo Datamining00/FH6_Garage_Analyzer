@@ -26,7 +26,6 @@ except ModuleNotFoundError as exc:
 from fh6garage.i18n import DEFAULT_LANGUAGE, set_language
 from fh6garage.ui import MainWindow
 from fh6garage.v1_3_ui_patch import apply_v1_3_ui_patches
-from fh6garage.v1_3_1_patch import apply_v1_3_1_patches
 from fh6garage.v1_3_2_patch import apply_v1_3_2_patches
 from fh6garage.v1_3_2_change_view_alias_patch import apply_v1_3_2_change_view_alias_patch
 
@@ -53,7 +52,6 @@ def main() -> int:
     # Apply patches in release order so every maintenance release layers only its
     # own behavior on top of the already-verified previous version.
     apply_v1_3_ui_patches(MainWindow)
-    apply_v1_3_1_patches(MainWindow)
     apply_v1_3_2_patches(MainWindow)
 
     # Present latest refresh changes as cards and resolve user-managed creator

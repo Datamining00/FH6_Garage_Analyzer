@@ -329,65 +329,11 @@ def apply_v1_3_ui_patches(MainWindow) -> None:
                 card.setVisible(True)
             row += (len(group_cards) + columns - 1) // columns
 
-    def sync_grid_card_widths(self, content_type: str) -> None:
-        scroll = getattr(self, f"{content_type}_grid_scroll", None)
-        layout = getattr(self, f"{content_type}_grid_layout", None)
-        cards = getattr(self, f"_{content_type}_grid_cards", None)
-        host = getattr(self, f"{content_type}_grid_host", None)
-        if scroll is None or layout is None or cards is None or host is None:
-            return
-
-        viewport = scroll.viewport()
-        if viewport is None or viewport.width() <= 0:
-            return
-
-        columns = _grid_column_count(self, content_type)
-        attr_name = f"_fh6_{content_type}_grid_columns"
-        previous_columns = getattr(self, attr_name, None)
-        setattr(self, attr_name, columns)
-
-        for column in range(GRID_MAX_COLUMNS):
-            layout.setColumnStretch(column, 1 if column < columns else 0)
-
-        if previous_columns is not None and previous_columns != columns:
-            search = getattr(self, f"{content_type}_search", None)
-            search_text = search.text() if search is not None else ""
-            if content_type == "livery":
-                self._relayout_livery_grid(search_text)
-            else:
-                self._relayout_tuning_grid(search_text)
-            return
-
-        margins = layout.contentsMargins()
-        gap = max(0, layout.horizontalSpacing())
-        available = (
-            viewport.width()
-            - margins.left()
-            - margins.right()
-            - gap * (columns - 1)
-            - 4
-        )
-        card_width = max(1, available // columns)
-        for card in cards:
-            card.setMinimumWidth(0)
-            card.setMaximumWidth(card_width)
-            card.setFixedWidth(card_width)
-        host.setMinimumWidth(0)
-        host.updateGeometry()
-
-    def sync_livery_grid_card_widths(self) -> None:
-        sync_grid_card_widths(self, "livery")
-
-    def sync_tuning_grid_card_widths(self) -> None:
-        sync_grid_card_widths(self, "tuning")
-
     MainWindow._build_ui = patched_build_ui
     MainWindow._on_language_preference_changed = patched_language_changed
     MainWindow._restart_for_language_change = restart_for_language_change
     MainWindow._set_always_on_top = patched_set_always_on_top
     MainWindow._make_saved_content_card = patched_make_saved_content_card
     MainWindow._layout_visible_grid_cards = patched_layout_visible_grid_cards
-    MainWindow._sync_livery_grid_card_widths = sync_livery_grid_card_widths
-    MainWindow._sync_tuning_grid_card_widths = sync_tuning_grid_card_widths
     MainWindow._fh6_grid_column_count = _grid_column_count
     MainWindow._fh6_v13_followup_patched = True

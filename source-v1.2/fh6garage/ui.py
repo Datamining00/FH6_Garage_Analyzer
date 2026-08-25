@@ -113,6 +113,15 @@ from .ui_responsiveness import (
 )
 from .ui_cleanup import _install_card_hide_button
 from .view_operations import ViewOperationCoordinator
+from .window_responsiveness import (
+    _ensure_resize_timer,
+    _finalize_resize,
+    _lightweight_reflow,
+    _optimized_sync_grid_widths,
+    _restore_window_geometry,
+    _save_window_geometry,
+    _schedule_resize_settle,
+)
 
 
 APP_STYLE = """
@@ -725,14 +734,34 @@ class MainWindow(QMainWindow):
         self._dashboard_creator_sort_section = 1
         self._dashboard_creator_sort_order = Qt.SortOrder.AscendingOrder
 
-        self.setWindowTitle("FH6 Assistant v1.3")
+        self.setWindowTitle("FH6 Assistant v1.3.1")
         self.resize(1460, 900)
         # Allow a narrower compact layout while preventing the two-row toolbar
         # and card metadata from being vertically clipped.
         self.setMinimumSize(960, 680)
         QApplication.instance().setStyleSheet(APP_STYLE)
         self._build_ui()
+        _ensure_resize_timer(self)
+        _restore_window_geometry(self)
+        app = QApplication.instance()
+        if app is not None:
+            app.aboutToQuit.connect(self._fh6_v131_save_window_geometry)
         _compact_window_chrome(self)
+
+    def _fh6_v131_save_window_geometry(self) -> None:
+        _save_window_geometry(self)
+
+    def _fh6_v131_restore_window_geometry(self) -> bool:
+        return _restore_window_geometry(self)
+
+    def _fh6_v131_lightweight_reflow(self, content_type: str) -> bool:
+        return _lightweight_reflow(self, content_type)
+
+    def _fh6_v131_schedule_resize_settle(self) -> None:
+        _schedule_resize_settle(self)
+
+    def _fh6_v131_finalize_resize(self) -> None:
+        _finalize_resize(self)
         self._busy_overlay = BusyOverlay(self)
         self._busy_overlay.setGeometry(self.rect())
         _fix_busy_overlay(self)
@@ -945,7 +974,7 @@ class MainWindow(QMainWindow):
         )
         self.always_on_top_box.toggled.connect(self._set_always_on_top)
         side.addWidget(self.always_on_top_box)
-        version = QLabel("v1.3\nLIVERY & TUNING")
+        version = QLabel("v1.3.1\nLIVERY & TUNING")
         version.setStyleSheet("color:#777b8b; padding:8px;")
         side.addWidget(version)
         outer.addWidget(sidebar)
@@ -2849,63 +2878,10 @@ class MainWindow(QMainWindow):
         _schedule_grid_followup(self, "tuning")
 
     def _sync_livery_grid_card_widths(self) -> None:
-        """Fit exactly two cards inside the visible QScrollArea viewport.
-
-        Use viewport.width(), not the outer QScrollArea width, so the vertical
-        scrollbar, frame, layout margins, and card gap are all accounted for.
-        """
-        if not hasattr(self, "livery_grid_scroll"):
-            return
-
-        viewport = self.livery_grid_scroll.viewport()
-        if viewport is None or viewport.width() <= 0:
-            return
-
-        margins = self.livery_grid_layout.contentsMargins()
-        gap = max(0, self.livery_grid_layout.horizontalSpacing())
-
-        available = (
-            viewport.width()
-            - margins.left()
-            - margins.right()
-            - gap
-            - 4  # small safety margin for style/border rounding
-        )
-        card_width = max(1, available // 2)
-
-        for card in self._livery_grid_cards:
-            # Child labels/text editors may have large size hints.  The card
-            # width is authoritative so those hints cannot create horizontal
-            # overflow and clip the second column.
-            card.setMinimumWidth(0)
-            card.setMaximumWidth(card_width)
-            card.setFixedWidth(card_width)
-
-        self.livery_grid_host.setMinimumWidth(0)
-        self.livery_grid_host.updateGeometry()
+        _optimized_sync_grid_widths(self, "livery")
 
     def _sync_tuning_grid_card_widths(self) -> None:
-        if not hasattr(self, "tuning_grid_scroll"):
-            return
-        viewport = self.tuning_grid_scroll.viewport()
-        if viewport is None or viewport.width() <= 0:
-            return
-        margins = self.tuning_grid_layout.contentsMargins()
-        gap = max(0, self.tuning_grid_layout.horizontalSpacing())
-        available = (
-            viewport.width()
-            - margins.left()
-            - margins.right()
-            - gap
-            - 4
-        )
-        card_width = max(1, available // 2)
-        for card in self._tuning_grid_cards:
-            card.setMinimumWidth(0)
-            card.setMaximumWidth(card_width)
-            card.setFixedWidth(card_width)
-        self.tuning_grid_host.setMinimumWidth(0)
-        self.tuning_grid_host.updateGeometry()
+        _optimized_sync_grid_widths(self, "tuning")
 
     def _make_livery_card(self, record: LiveryRecord, key: str) -> QFrame:
         return self._make_saved_content_card("livery", record, key)
@@ -3913,41 +3889,37 @@ class MainWindow(QMainWindow):
         card._fh6_thumbnail_loaded = False
 
     def eventFilter(self, watched, event) -> bool:
-        if (
-            hasattr(self, "livery_grid_scroll")
-            and watched is self.livery_grid_scroll.viewport()
-            and event.type() in (QEvent.Type.Resize, QEvent.Type.Show)
-        ):
-            # Show is as important as Resize here: cards may have been populated
-            # while this stacked page was hidden, in which case the initial lazy
-            # load skipped them because card.isVisible() was false.
-            self._sync_livery_grid_card_widths()
-            self._refresh_visible_livery_thumbnails()
-            if event.type() == QEvent.Type.Show:
-                QTimer.singleShot(0, self._prime_livery_grid_thumbnails)
-        if (
-            hasattr(self, "tuning_grid_scroll")
-            and watched is self.tuning_grid_scroll.viewport()
-            and event.type() in (QEvent.Type.Resize, QEvent.Type.Show)
-        ):
-            self._sync_tuning_grid_card_widths()
-            self._refresh_visible_tuning_thumbnails()
-            if event.type() == QEvent.Type.Show:
-                QTimer.singleShot(0, self._prime_tuning_grid_thumbnails)
+        event_type = event.type()
+        for content_type in ("livery", "tuning"):
+            scroll = getattr(self, f"{content_type}_grid_scroll", None)
+            if scroll is None or watched is not scroll.viewport():
+                continue
+            if event_type == QEvent.Type.Resize:
+                _schedule_resize_settle(self)
+                _optimized_sync_grid_widths(self, content_type)
+                break
+            if event_type == QEvent.Type.Show:
+                _optimized_sync_grid_widths(self, content_type)
+                prime = getattr(self, f"_prime_{content_type}_grid_thumbnails")
+                QTimer.singleShot(0, prime)
+                break
         return super().eventFilter(watched, event)
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
         if hasattr(self, "_busy_overlay"):
             self._busy_overlay.setGeometry(self.rect())
-        if hasattr(self, "livery_grid_scroll"):
-            # Immediate update for the window resize itself.  The viewport
-            # eventFilter performs the authoritative update with its final width.
-            self._sync_livery_grid_card_widths()
-            self._refresh_visible_livery_thumbnails()
-        if hasattr(self, "tuning_grid_scroll"):
-            self._sync_tuning_grid_card_widths()
-            self._refresh_visible_tuning_thumbnails()
+        page_index = self.pages.currentIndex() if hasattr(self, "pages") else -1
+        if page_index == 1 and hasattr(self, "livery_grid_scroll"):
+            _schedule_resize_settle(self)
+            _optimized_sync_grid_widths(self, "livery")
+        elif page_index == 2 and hasattr(self, "tuning_grid_scroll"):
+            _schedule_resize_settle(self)
+            _optimized_sync_grid_widths(self, "tuning")
+
+    def closeEvent(self, event) -> None:
+        _save_window_geometry(self)
+        super().closeEvent(event)
 
     def _populate_tuning_table(self) -> None:
         self._populate_tuning_grid()

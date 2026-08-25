@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6.QtCore import QEvent, QRect, QTimer, Qt
-from PySide6.QtWidgets import QApplication, QLabel, QMainWindow
+from PySide6.QtCore import QRect, QTimer, Qt
+from PySide6.QtWidgets import QApplication
 
 
 WINDOW_GEOMETRY_KEY = "window_geometry_v1_3_1"
@@ -281,93 +281,3 @@ def _restore_window_geometry(self: Any) -> bool:
         )
     return True
 
-
-def apply_v1_3_1_patches(MainWindow) -> None:
-    """Apply v1.3.1 window-state persistence and resize optimizations."""
-    if getattr(MainWindow, "_fh6_v131_patched", False):
-        return
-
-    original_init = MainWindow.__init__
-    original_build_ui = MainWindow._build_ui
-    original_close_event = MainWindow.closeEvent
-    original_event_filter = MainWindow.eventFilter
-
-    def patched_build_ui(self) -> None:
-        original_build_ui(self)
-        _ensure_resize_timer(self)
-
-    def patched_init(self, project_root) -> None:
-        original_init(self, project_root)
-        self.setWindowTitle("FH6 Assistant v1.3.1")
-        for label in self.findChildren(QLabel):
-            if label.text() == "v1.3\nLIVERY & TUNING":
-                label.setText("v1.3.1\nLIVERY & TUNING")
-                break
-        _restore_window_geometry(self)
-
-        app = QApplication.instance()
-        if app is not None:
-            app.aboutToQuit.connect(self._fh6_v131_save_window_geometry)
-
-    def patched_close_event(self, event) -> None:
-        _save_window_geometry(self)
-        original_close_event(self, event)
-
-    def patched_event_filter(self, watched, event) -> bool:
-        event_type = event.type()
-        for content_type in ("livery", "tuning"):
-            scroll = getattr(self, f"{content_type}_grid_scroll", None)
-            if scroll is None or watched is not scroll.viewport():
-                continue
-
-            if event_type == QEvent.Type.Resize:
-                _schedule_resize_settle(self)
-                _optimized_sync_grid_widths(self, content_type)
-                return QMainWindow.eventFilter(self, watched, event)
-
-            if event_type == QEvent.Type.Show:
-                _optimized_sync_grid_widths(self, content_type)
-                if content_type == "livery":
-                    QTimer.singleShot(0, self._prime_livery_grid_thumbnails)
-                else:
-                    QTimer.singleShot(0, self._prime_tuning_grid_thumbnails)
-                return QMainWindow.eventFilter(self, watched, event)
-
-        return original_event_filter(self, watched, event)
-
-    def patched_resize_event(self, event) -> None:
-        # The previous resizeEvent performed a full thumbnail visibility scan
-        # on every mouse-move event. Keep only the overlay geometry immediate;
-        # grid reflow/thumbnail work is coalesced by the settle timer.
-        QMainWindow.resizeEvent(self, event)
-        if hasattr(self, "_busy_overlay"):
-            self._busy_overlay.setGeometry(self.rect())
-
-        page_index = self.pages.currentIndex() if hasattr(self, "pages") else -1
-        if page_index == 1 and hasattr(self, "livery_grid_scroll"):
-            _schedule_resize_settle(self)
-            _optimized_sync_grid_widths(self, "livery")
-        elif page_index == 2 and hasattr(self, "tuning_grid_scroll"):
-            _schedule_resize_settle(self)
-            _optimized_sync_grid_widths(self, "tuning")
-
-    def sync_livery_grid_card_widths(self) -> None:
-        _optimized_sync_grid_widths(self, "livery")
-
-    def sync_tuning_grid_card_widths(self) -> None:
-        _optimized_sync_grid_widths(self, "tuning")
-
-    MainWindow._build_ui = patched_build_ui
-    MainWindow.__init__ = patched_init
-    MainWindow.closeEvent = patched_close_event
-    MainWindow.eventFilter = patched_event_filter
-    MainWindow.resizeEvent = patched_resize_event
-    MainWindow._sync_livery_grid_card_widths = sync_livery_grid_card_widths
-    MainWindow._sync_tuning_grid_card_widths = sync_tuning_grid_card_widths
-
-    MainWindow._fh6_v131_save_window_geometry = _save_window_geometry
-    MainWindow._fh6_v131_restore_window_geometry = _restore_window_geometry
-    MainWindow._fh6_v131_lightweight_reflow = _lightweight_reflow
-    MainWindow._fh6_v131_schedule_resize_settle = _schedule_resize_settle
-    MainWindow._fh6_v131_finalize_resize = _finalize_resize
-    MainWindow._fh6_v131_patched = True
