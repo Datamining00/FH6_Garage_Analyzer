@@ -59,6 +59,12 @@ from .i18n import SUPPORTED_LANGUAGES, get_language, normalize_language, tr
 from .models import LiveryRecord, ScanResult, TuningRecord
 from .preferences import LocalPreferences
 from .scanner import SaveLayoutError, scan_save
+from .saved_content_view import (
+    SortSpec,
+    group_items,
+    sort_records,
+    vehicle_brand_sort_key,
+)
 from .tune_data import TuneDataError, read_tune_data
 from .view_operations import ViewOperationCoordinator
 
@@ -1922,22 +1928,7 @@ class MainWindow(QMainWindow):
         record: LiveryRecord | TuningRecord,
     ) -> tuple:
         """Sort saved content by manufacturer-first vehicle display text."""
-        label = self._car_label(record.header.car_id).strip()
-        unknown = (
-            label.startswith("Car ID ")
-            or label == "Unknown vehicle"
-        )
-        brand_first = re.sub(
-            r"^\d{4}\s+",
-            "",
-            label,
-        ).casefold()
-        return (
-            1 if unknown else 0,
-            brand_first,
-            label.casefold(),
-            (record.header.name or "").casefold(),
-        )
+        return vehicle_brand_sort_key(record, self._car_label)
 
     def _saved_content_records(
         self,
@@ -1967,48 +1958,11 @@ class MainWindow(QMainWindow):
             else self._tuning_sort_descending
         )
 
-        if mode == "brand":
-            ordered = sorted(
-                records,
-                key=self._vehicle_brand_sort_key,
-            )
-            return list(reversed(ordered)) if descending else ordered
-
-        if mode == "creator":
-            def creator_key(
-                record: LiveryRecord | TuningRecord,
-            ) -> tuple:
-                creator = (
-                    record.header.creator or ""
-                ).strip()
-                return (
-                    1 if not creator else 0,
-                    creator.casefold(),
-                    self._vehicle_brand_sort_key(record),
-                    (record.header.name or "").casefold(),
-                )
-
-            ordered = sorted(records, key=creator_key)
-            if not descending:
-                return ordered
-            available = [record for record in ordered if (record.header.creator or "").strip()]
-            unavailable = [record for record in ordered if not (record.header.creator or "").strip()]
-            return list(reversed(available)) + unavailable
-
-        if mode == "download":
-            available = [record for record in records if record.downloaded_at is not None]
-            unavailable = [record for record in records if record.downloaded_at is None]
-            return sorted(
-                available,
-                key=lambda record: record.downloaded_at or 0.0,
-                reverse=descending,
-            ) + unavailable
-
-        if mode == "default" and descending:
-            return list(reversed(records))
-
-        # Default preserves scanner/container order.
-        return records
+        return sort_records(
+            records,
+            SortSpec(mode=mode, descending=descending),
+            self._car_label,
+        )
 
     def _sorted_liveries(self) -> list[LiveryRecord]:
         return [
@@ -2723,15 +2677,11 @@ class MainWindow(QMainWindow):
             label_property = "vehicleGroupLabel"
             fallback_label = "Unknown vehicle"
 
-        grouped: dict[str, list[QFrame]] = {}
-        labels: dict[str, str] = {}
-        for card in cards:
-            group_key = str(card.property(key_property) or "unknown")
-            grouped.setdefault(group_key, []).append(card)
-            labels.setdefault(
-                group_key,
-                str(card.property(label_property) or fallback_label),
-            )
+        grouped = group_items(
+            cards,
+            lambda card: str(card.property(key_property) or "unknown"),
+            lambda card: str(card.property(label_property) or fallback_label),
+        )
 
         headers: dict[str, QLabel] = (
             self._livery_group_headers
@@ -2740,7 +2690,7 @@ class MainWindow(QMainWindow):
         )
         noun = tr("content.noun_livery") if content_type == "livery" else tr("content.noun_tuning")
         row = 0
-        for group_key, group_cards in grouped.items():
+        for group_key, group_label, group_cards in grouped:
             header = headers.get(group_key)
             if header is None:
                 header = QLabel()
@@ -2756,14 +2706,14 @@ class MainWindow(QMainWindow):
                 header.setText(
                     tr(
                         "content.creator_group_header",
-                        creator=labels[group_key],
+                        creator=group_label,
                         noun=noun,
                         count=len(group_cards),
                     )
                 )
             else:
                 header.setText(
-                    tr("content.group_header", vehicle=labels[group_key], noun=noun, count=len(group_cards))
+                    tr("content.group_header", vehicle=group_label, noun=noun, count=len(group_cards))
                 )
             layout.addWidget(header, row, 0, 1, 2)
             header.setVisible(True)

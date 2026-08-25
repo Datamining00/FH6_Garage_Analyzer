@@ -6,6 +6,7 @@ from typing import Any
 from .i18n import tr
 from .models import LiveryRecord, TuningRecord
 from .runtime_policy import detect_runtime_policy
+from .saved_content_view import SortSpec, sort_cache_key
 from .thumbnail_cache import ThumbnailPixmapCache
 
 
@@ -92,20 +93,6 @@ def _records_for_result(
     return {"livery": liveries, "tuning": tunings}
 
 
-def _creator_alias_token(self: Any) -> tuple[tuple[str, tuple[str, ...]], ...]:
-    aliases = getattr(self, "creator_aliases", None)
-    groups = getattr(aliases, "groups", ())
-    result: list[tuple[str, tuple[str, ...]]] = []
-    for group in groups:
-        result.append(
-            (
-                str(getattr(group, "current", "")),
-                tuple(str(name) for name in getattr(group, "previous", ())),
-            )
-        )
-    return tuple(result)
-
-
 def _cached_sorted_records(self: Any, content_type: str) -> list[Any]:
     factory = self._sorted_liveries if content_type == "livery" else self._sorted_tunings
     coordinator = getattr(self, "_view_operations", None)
@@ -118,15 +105,14 @@ def _cached_sorted_records(self: Any, content_type: str) -> list[Any]:
         raw_records = self._saved_content_records(content_type)
     except (AttributeError, RuntimeError, TypeError, ValueError):
         raw_records = ()
-    cache_key = (
-        content_type,
-        id(getattr(self, "result", None)),
-        tuple(id(record) for record in raw_records),
-        mode,
-        descending,
-        bool(getattr(self, "_fh6_v132_initial_scan_build", False)),
-        int(getattr(getattr(self, "car_db", None), "revision", 0)),
-        _creator_alias_token(self),
+    cache_key = sort_cache_key(
+        content_type=content_type,
+        result=getattr(self, "result", None),
+        records=raw_records,
+        spec=SortSpec(mode=mode, descending=descending),
+        initial_scan=bool(getattr(self, "_fh6_v132_initial_scan_build", False)),
+        car_db_revision=int(getattr(getattr(self, "car_db", None), "revision", 0)),
+        aliases=getattr(self, "creator_aliases", None),
     )
     return coordinator.cached_order(cache_key, factory)
 
