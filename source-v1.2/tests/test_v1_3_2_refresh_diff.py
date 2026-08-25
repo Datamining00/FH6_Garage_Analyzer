@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import tempfile
+import time
 import unittest
 
 from fh6garage.models import HeaderInfo, LiveryRecord, SaveMetadata, ScanResult
@@ -69,6 +71,37 @@ class V132RefreshDiffTests(unittest.TestCase):
             self.assertEqual(len(snapshot["entries"]), 1)
             cached_name = snapshot["entries"][0]["thumbnail_cache"]
             self.assertTrue((history / "thumbnails" / cached_name).is_file())
+            self.assertEqual(diff.cache_files, 1)
+            self.assertEqual(diff.cache_bytes, len(b"thumb-a"))
+
+    def test_stale_temp_file_is_cleaned_automatically(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            save_root = root / "save"
+            history = root / "history"
+            thumbnails = history / "thumbnails"
+            thumbnails.mkdir(parents=True)
+            stale = thumbnails / "interrupted.tmp"
+            stale.write_bytes(b"stale")
+            stamp = time.time() - 2 * 24 * 60 * 60
+            os.utime(stale, (stamp, stamp))
+            record = self._record(
+                save_root,
+                "Livery_100_A",
+                name="Alpha",
+                guid="guid-a",
+                digest="hash-a",
+                thumb_bytes=b"thumb-a",
+            )
+
+            diff = process_livery_refresh(
+                self._result(save_root, [record]),
+                history,
+            )
+
+            self.assertFalse(stale.exists())
+            self.assertEqual(diff.cleanup_removed_files, 1)
+            self.assertEqual(diff.cleanup_removed_bytes, len(b"stale"))
 
     def test_added_removed_changed_keep_required_thumbnails(self):
         with tempfile.TemporaryDirectory() as td:

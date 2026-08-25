@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from PySide6.QtCore import QEvent, QObject, QSize, Qt, QTimer
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QLabel, QSizePolicy, QWidget
-
 
 DEFAULT_THUMBNAIL_ASPECT = 16.0 / 9.0
 _QT_MAX_WIDGET_SIZE = 16777215
@@ -22,7 +21,7 @@ class _AspectFitThumbnailController(QObject):
     decoded thumbnail aspect ratio and always uses KeepAspectRatio rendering.
     """
 
-    _WATCHED_EVENTS = {
+    _WATCHED_EVENTS: ClassVar[set[QEvent.Type]] = {
         QEvent.Type.Resize,
         QEvent.Type.Show,
         QEvent.Type.LayoutRequest,
@@ -101,7 +100,7 @@ class _AspectFitThumbnailController(QObject):
 
     def target_height(self, width: int | None = None) -> int:
         use_width = max(1, int(width if width is not None else self._host_width()))
-        return max(1, int(round(use_width / max(self._aspect, 0.05))))
+        return max(1, round(use_width / max(self._aspect, 0.05)))
 
     def apply(self) -> None:
         self._pending = False
@@ -206,7 +205,11 @@ def apply_v1_3_2_global_ui_patch(MainWindow) -> None:
             return
 
         path = getattr(card, "_fh6_thumbnail_path", None)
-        pixmap = _load_original_pixmap(path)
+        cache = getattr(self, "_fh6_thumbnail_pixmap_cache", None)
+        if cache is not None and hasattr(cache, "get_or_load"):
+            pixmap = cache.get_or_load(path)
+        else:
+            pixmap = _load_original_pixmap(path)
         if pixmap.isNull():
             # Preserve support for any thumbnail format/path handled by the
             # older loader. If it succeeds, aspect-fit its rendered result.

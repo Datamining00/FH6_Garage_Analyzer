@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -8,7 +9,7 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 
 try:
-    from PySide6.QtCore import QSettings
+    from PySide6.QtCore import QSettings, QTimer
     from PySide6.QtWidgets import QApplication
     from PySide6.QtGui import QFont, QIcon
 except ModuleNotFoundError as exc:
@@ -170,6 +171,18 @@ def main() -> int:
     if not app_icon.isNull():
         window.setWindowIcon(app_icon)
     window.show()
+
+    # CI/distribution smoke tests use the real application entry point and then
+    # request an ordinary window close.  Avoiding force-termination also lets a
+    # PyInstaller OneFile process remove its temporary extraction directory.
+    smoke_delay = os.environ.get("FH6_ASSISTANT_SMOKE_TEST_MS", "").strip()
+    if smoke_delay:
+        try:
+            delay_ms = max(250, min(60_000, int(smoke_delay)))
+        except ValueError:
+            delay_ms = 0
+        if delay_ms:
+            QTimer.singleShot(delay_ms, window.close)
     return app.exec()
 
 

@@ -1,20 +1,27 @@
 from __future__ import annotations
 
-import re
 import hashlib
+import re
 from collections import Counter, defaultdict
+from dataclasses import dataclass
 from pathlib import Path
+from time import perf_counter
+from typing import Literal
 
 from .car_db import CarDatabase
 from .i18n import tr
 from .models import (
     CarContentSummary,
+    HeaderInfo,
     LiveryRecord,
     ScanResult,
     TuningRecord,
 )
 from .parsers import ParseError, parse_save_metadata, read_header_file
-
+from .performance_metrics import PerformanceMetrics
+from .runtime_policy import RuntimePolicy, detect_runtime_policy
+from .scan_backend import ScanJob, SequentialScanBackend, ThreadedScanBackend
+from .scan_cache import FileAnalysisCache
 
 _CONTAINER_RE = re.compile(r"^(?P<kind>BaseLivery|SoulBoundLivery|Livery|Tuning)_", re.IGNORECASE)
 _CONTAINER_CAR_ID_RE = re.compile(
@@ -25,6 +32,19 @@ _CONTAINER_CAR_ID_RE = re.compile(
 
 class SaveLayoutError(ValueError):
     pass
+
+
+@dataclass(slots=True)
+class _ContainerAnalysis:
+    job: ScanJob
+    header: HeaderInfo | None = None
+    thumbnail_path: Path | None = None
+    content_path: Path | None = None
+    content_size: int = 0
+    downloaded_at: float | None = None
+    content_sha256: str = ""
+    failure: str = ""
+    failure_detail: str = ""
 
 
 def _file_created_timestamp(path: Path) -> float | None:
@@ -49,6 +69,13 @@ def _file_sha256(path: Path) -> str:
     except OSError:
         return ""
     return digest.hexdigest()
+
+
+def _safe_file_size(path: Path) -> int:
+    try:
+        return int(path.stat().st_size) if path.is_file() else 0
+    except OSError:
+        return 0
 
 
 def _numeric_version_dirs(path: Path) -> list[Path]:
@@ -89,9 +116,12 @@ def _resolve_car_id(container_name: str, kind: str, header_car_id: int | None, c
     if container_car_id is None:
         return header_car_id
 
-    if car_db.is_known(container_car_id):
-        if header_car_id is None or not car_db.is_known(header_car_id) or header_car_id != container_car_id:
-            return container_car_id
+    if car_db.is_known(container_car_id) and (
+        header_car_id is None
+        or not car_db.is_known(header_car_id)
+        or header_car_id != container_car_id
+    ):
+        return container_car_id
 
     return header_car_id
 
@@ -140,85 +170,292 @@ def _detect_thumbnail(container: Path, tuning: bool) -> Path | None:
     return None
 
 
-def scan_save(selected_path: Path, car_db: CarDatabase) -> ScanResult:
-    save_root, containers_root, active_version = resolve_layout(selected_path)
-    metadata = parse_save_metadata(selected_path.resolve(), save_root, containers_root, active_version)
+def _canonical_kind(raw_kind: str) -> str:
+    return {
+        "baselivery": "BaseLivery",
+        "soulboundlivery": "SoulBoundLivery",
+        "livery": "Livery",
+        "tuning": "Tuning",
+    }[raw_kind.casefold()]
+
+
+def _job_estimated_bytes(container: Path, kind: str) -> int:
+    content_name = "Data" if kind == "Tuning" else "C_livery"
+    return _safe_file_size(container / "header") + _safe_file_size(
+        container / content_name
+    )
+
+
+def _analyze_container(
+    job: ScanJob,
+    cache: FileAnalysisCache,
+) -> _ContainerAnalysis:
+    """Read one container without touching Qt or mutating FH6 content."""
+
+    container = job.container
+    header_path = container / "header"
+    if not header_path.is_file():
+        return _ContainerAnalysis(job=job, failure="header_missing")
+
+    header = cache.get_header(header_path, job.kind)
+    if header is None:
+        try:
+            header = read_header_file(header_path, job.kind)
+        except (OSError, ParseError) as exc:
+            return _ContainerAnalysis(
+                job=job,
+                failure="header_parse_failed",
+                failure_detail=str(exc),
+            )
+        cache.put_header(header_path, job.kind, header)
+
+    tuning = job.kind == "Tuning"
+    content_path = container / ("Data" if tuning else "C_livery")
+    if not content_path.is_file():
+        content_path = None
+
+    digest = ""
+    if not tuning and content_path is not None:
+        digest = cache.get_sha256(content_path) or ""
+        if not digest:
+            digest = _file_sha256(content_path)
+            if digest:
+                cache.put_sha256(content_path, digest)
+
+    return _ContainerAnalysis(
+        job=job,
+        header=header,
+        thumbnail_path=_detect_thumbnail(container, tuning=tuning),
+        content_path=content_path,
+        content_size=_safe_file_size(content_path) if content_path is not None else 0,
+        downloaded_at=(
+            _file_created_timestamp(content_path)
+            if content_path is not None
+            else None
+        ),
+        content_sha256=digest,
+    )
+
+
+def _analyze_container_legacy(job: ScanJob) -> _ContainerAnalysis:
+    """Original no-cache file path retained as the final compatibility fallback."""
+
+    container = job.container
+    header_path = container / "header"
+    if not header_path.is_file():
+        return _ContainerAnalysis(job=job, failure="header_missing")
+    try:
+        header = read_header_file(header_path, job.kind)
+    except (OSError, ParseError) as exc:
+        return _ContainerAnalysis(
+            job=job,
+            failure="header_parse_failed",
+            failure_detail=str(exc),
+        )
+
+    tuning = job.kind == "Tuning"
+    content_path = container / ("Data" if tuning else "C_livery")
+    if not content_path.is_file():
+        content_path = None
+    return _ContainerAnalysis(
+        job=job,
+        header=header,
+        thumbnail_path=_detect_thumbnail(container, tuning=tuning),
+        content_path=content_path,
+        content_size=_safe_file_size(content_path) if content_path is not None else 0,
+        downloaded_at=(
+            _file_created_timestamp(content_path)
+            if content_path is not None
+            else None
+        ),
+        content_sha256=(
+            _file_sha256(content_path)
+            if not tuning and content_path is not None
+            else ""
+        ),
+    )
+
+
+def _select_scan_backend(
+    policy: RuntimePolicy,
+    jobs: list[ScanJob],
+    requested: Literal["auto", "sequential", "threaded"],
+):
+    if requested == "sequential":
+        return SequentialScanBackend[_ContainerAnalysis]()
+    if requested == "threaded":
+        return ThreadedScanBackend[_ContainerAnalysis](policy.scan_workers)
+
+    total_bytes = sum(max(0, job.estimated_bytes) for job in jobs)
+    if (
+        policy.scan_workers <= 1
+        or len(jobs) < policy.parallel_scan_min_items
+        or total_bytes < policy.parallel_scan_min_bytes
+    ):
+        return SequentialScanBackend[_ContainerAnalysis]()
+    return ThreadedScanBackend[_ContainerAnalysis](policy.scan_workers)
+
+
+def scan_save(
+    selected_path: Path,
+    car_db: CarDatabase,
+    *,
+    runtime_policy: RuntimePolicy | None = None,
+    cache_base_dir: Path | None = None,
+    backend: Literal["auto", "sequential", "threaded"] = "auto",
+) -> ScanResult:
+    """Scan one FH6 save with a compatibility-first adaptive I/O backend.
+
+    ``backend`` and ``cache_base_dir`` are primarily diagnostic/test controls.
+    Normal callers use automatic policy selection.  Any unexpected threaded
+    backend failure is retried through the original sequential semantics.
+    """
+
+    if backend not in {"auto", "sequential", "threaded"}:
+        raise ValueError(f"unsupported scan backend: {backend}")
+
+    started = perf_counter()
+    metrics = PerformanceMetrics()
+    policy = runtime_policy or detect_runtime_policy()
+
+    with metrics.measure("scan.resolve_layout"):
+        save_root, containers_root, active_version = resolve_layout(selected_path)
+    with metrics.measure("scan.metadata"):
+        metadata = parse_save_metadata(
+            selected_path.resolve(),
+            save_root,
+            containers_root,
+            active_version,
+        )
+
     warnings: list[str] = []
     liveries: list[LiveryRecord] = []
     tunings: list[TuningRecord] = []
     counts: Counter[str] = Counter()
 
-    for container in sorted((p for p in containers_root.iterdir() if p.is_dir()), key=lambda p: p.name.lower()):
+    cache = FileAnalysisCache(save_root, base_dir=cache_base_dir)
+    jobs: list[ScanJob] = []
+    active_cache_paths: set[Path] = set()
+    with metrics.measure("scan.enumerate"):
+        containers = sorted(
+            (path for path in containers_root.iterdir() if path.is_dir()),
+            key=lambda path: path.name.casefold(),
+        )
+    for container in containers:
         prefix = container.name.split("_", 1)[0]
         counts[prefix] += 1
         match = _CONTAINER_RE.match(container.name)
-        if match:
-            raw_kind = match.group("kind")
-            kind_map = {
-                "baselivery": "BaseLivery",
-                "soulboundlivery": "SoulBoundLivery",
-                "livery": "Livery",
-                "tuning": "Tuning",
-            }
-            kind = kind_map[raw_kind.lower()]
-            header_path = container / "header"
-            if not header_path.is_file():
-                warnings.append(tr("scanner.header_missing", container=container.name))
+        if not match:
+            continue
+        kind = _canonical_kind(match.group("kind"))
+        jobs.append(
+            ScanJob(
+                container=container,
+                kind=kind,
+                estimated_bytes=_job_estimated_bytes(container, kind),
+            )
+        )
+        header_path = container / "header"
+        if header_path.is_file():
+            active_cache_paths.add(header_path)
+        if kind != "Tuning":
+            livery_path = container / "C_livery"
+            if livery_path.is_file():
+                active_cache_paths.add(livery_path)
+
+    selected_backend = _select_scan_backend(policy, jobs, backend)
+    metrics.set("scan_backend", selected_backend.name)
+    metrics.set("scan_workers", selected_backend.workers)
+    metrics.set("scan_jobs", len(jobs))
+    metrics.set(
+        "scan_estimated_bytes",
+        sum(max(0, job.estimated_bytes) for job in jobs),
+    )
+
+    analyze = lambda job: _analyze_container(job, cache)
+    try:
+        with metrics.measure("scan.analyze"):
+            analyses = selected_backend.run(jobs, analyze)
+    except Exception as exc:  # noqa: BLE001 - backend failures require fallback
+        # A backend implementation or executor failure must not make FH6 saves
+        # unreadable on an otherwise supported machine.
+        metrics.set("scan_fallback_used", True)
+        metrics.set("scan_fallback_error", type(exc).__name__)
+        selected_backend = SequentialScanBackend[_ContainerAnalysis]()
+        metrics.set("scan_backend", selected_backend.name)
+        metrics.set("scan_workers", 1)
+        with metrics.measure("scan.fallback_analyze"):
+            analyses = selected_backend.run(jobs, _analyze_container_legacy)
+
+    with metrics.measure("scan.aggregate"):
+        for analysis in analyses:
+            container = analysis.job.container
+            kind = analysis.job.kind
+            if analysis.failure == "header_missing":
+                warnings.append(
+                    tr("scanner.header_missing", container=container.name)
+                )
                 continue
-            try:
-                header = read_header_file(header_path, kind)
-            except (OSError, ParseError) as exc:
-                warnings.append(tr("scanner.header_parse_failed", container=container.name, error=exc))
+            if analysis.failure == "header_parse_failed":
+                warnings.append(
+                    tr(
+                        "scanner.header_parse_failed",
+                        container=container.name,
+                        error=analysis.failure_detail,
+                    )
+                )
+                continue
+            header = analysis.header
+            if header is None:
                 continue
 
             parsed_car_id = header.car_id
-            resolved_car_id = _resolve_car_id(container.name, kind, parsed_car_id, car_db)
+            resolved_car_id = _resolve_car_id(
+                container.name,
+                kind,
+                parsed_car_id,
+                car_db,
+            )
             if resolved_car_id != parsed_car_id:
                 header.car_id = resolved_car_id
                 warnings.append(
-                    tr("scanner.car_id_fallback", container=container.name, header_id=parsed_car_id, car_id=resolved_car_id)
+                    tr(
+                        "scanner.car_id_fallback",
+                        container=container.name,
+                        header_id=parsed_car_id,
+                        car_id=resolved_car_id,
+                    )
                 )
 
             if kind == "Tuning":
-                data_path = container / "Data"
                 tunings.append(
                     TuningRecord(
                         container_name=container.name,
                         container_path=container,
                         header=header,
-                        thumbnail_path=_detect_thumbnail(container, tuning=True),
-                        data_path=data_path if data_path.is_file() else None,
-                        data_size=data_path.stat().st_size if data_path.is_file() else 0,
-                        downloaded_at=(
-                            _file_created_timestamp(data_path)
-                            if data_path.is_file()
-                            else None
-                        ),
+                        thumbnail_path=analysis.thumbnail_path,
+                        data_path=analysis.content_path,
+                        data_size=analysis.content_size,
+                        downloaded_at=analysis.downloaded_at,
                     )
                 )
             else:
-                livery_path = container / "C_livery"
                 liveries.append(
                     LiveryRecord(
                         container_name=container.name,
                         container_path=container,
                         kind=kind,
                         header=header,
-                        thumbnail_path=_detect_thumbnail(container, tuning=False),
-                        livery_path=livery_path if livery_path.is_file() else None,
-                        downloaded_at=(
-                            _file_created_timestamp(livery_path)
-                            if livery_path.is_file()
-                            else None
-                        ),
-                        content_sha256=(
-                            _file_sha256(livery_path)
-                            if livery_path.is_file()
-                            else ""
-                        ),
+                        thumbnail_path=analysis.thumbnail_path,
+                        livery_path=analysis.content_path,
+                        downloaded_at=analysis.downloaded_at,
+                        content_sha256=analysis.content_sha256,
                     )
                 )
-            continue
+
+    with metrics.measure("scan.cache_save"):
+        cache.prune_to_paths(active_cache_paths)
+        cache.save()
 
     by_car: dict[int, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     for record in liveries:
@@ -253,6 +490,14 @@ def scan_save(selected_path: Path, car_db: CarDatabase) -> ScanResult:
             )
         )
 
+    metrics.timings_ms["scan.total"] = round(
+        (perf_counter() - started) * 1000.0,
+        3,
+    )
+    cache_stats = cache.stats()
+    for key, value in cache_stats.items():
+        metrics.set(key, value)
+
     return ScanResult(
         metadata=metadata,
         liveries=liveries,
@@ -260,4 +505,8 @@ def scan_save(selected_path: Path, car_db: CarDatabase) -> ScanResult:
         car_summaries=summaries,
         container_counts=dict(counts),
         warnings=warnings,
+        diagnostics={
+            "runtime_policy": policy.as_dict(),
+            "scan": metrics.snapshot(),
+        },
     )

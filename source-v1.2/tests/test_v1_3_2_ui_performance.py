@@ -30,7 +30,6 @@ class _Annotations:
 
 class _FakeWindow:
     def __init__(self) -> None:
-        self.result = object()
         self.annotations = _Annotations()
         self.livery_search = QLineEdit()
         self.livery_grid_host = QWidget()
@@ -42,12 +41,20 @@ class _FakeWindow:
         self._livery_group_headers = {}
         self._tuning_group_headers = {}
         self._fh6_ui_cache_result_token = None
+        self._fh6_ui_cache_scope = ""
+        self._fh6_ui_record_signatures = {"livery": {}, "tuning": {}}
         self._fh6_ui_livery_cards_created = 0
         self._fh6_ui_livery_cards_reused = 0
         self._fh6_ui_tuning_cards_created = 0
         self._fh6_ui_tuning_cards_reused = 0
+        self._fh6_ui_cards_discarded = 0
         self._fh6_v132_auction_build_generation = 0
         self.records: list[LiveryRecord] = []
+        self.result = SimpleNamespace(
+            metadata=SimpleNamespace(save_root=Path("save")),
+            liveries=[],
+            tunings=[],
+        )
         self.relayout_orders: list[list[str]] = []
         self.unloaded: list[str] = []
 
@@ -62,6 +69,22 @@ class _FakeWindow:
 
     def _annotation_key(self, record: LiveryRecord) -> str:
         return record.container_name
+
+    def _content_annotation_key(self, _content_type: str, record) -> str:
+        return record.container_name
+
+    def install_scan(
+        self,
+        records: list[LiveryRecord],
+        *,
+        root: str = "save",
+    ) -> None:
+        self.records = list(records)
+        self.result = SimpleNamespace(
+            metadata=SimpleNamespace(save_root=Path(root)),
+            liveries=list(records),
+            tunings=[],
+        )
 
     def _make_livery_card(self, _record: LiveryRecord, key: str) -> QFrame:
         card = QFrame()
@@ -112,7 +135,7 @@ class V132UiPerformanceTests(unittest.TestCase):
         window = _FakeWindow()
         first = _record("Livery_A", 1)
         second = _record("Livery_B", 2)
-        window.records = [first, second]
+        window.install_scan([first, second])
 
         _populate_livery_grid_reusing_cards(window)
         first_ids = {
@@ -137,7 +160,7 @@ class V132UiPerformanceTests(unittest.TestCase):
         saved = _record("MyDesign", 1)
         auction = _record("Auction", 2)
         auction.kind = "SoulBoundLivery"
-        window.records = [saved, auction]
+        window.install_scan([saved, auction])
         _populate_livery_grid_reusing_cards(window)
 
         auction_card_id = id(window._livery_card_by_key["Auction"])
@@ -153,19 +176,58 @@ class V132UiPerformanceTests(unittest.TestCase):
         _populate_livery_grid_reusing_cards(window)
         self.assertEqual(id(window._livery_card_by_key["Auction"]), auction_card_id)
 
-    def test_new_scan_result_invalidates_card_cache(self) -> None:
+    def test_same_save_refresh_reuses_unchanged_card(self) -> None:
         window = _FakeWindow()
         record = _record("Livery_A", 1)
-        window.records = [record]
+        window.install_scan([record])
         _populate_livery_grid_reusing_cards(window)
-        old_id = id(window._livery_card_by_key["Livery_A"])
+        old_card = window._livery_card_by_key["Livery_A"]
 
-        window.result = object()
+        window.install_scan([_record("Livery_A", 1)])
         _populate_livery_grid_reusing_cards(window)
-        new_id = id(window._livery_card_by_key["Livery_A"])
 
-        self.assertNotEqual(old_id, new_id)
-        self.assertEqual(window._fh6_ui_livery_cards_created, 2)
+        self.assertIs(window._livery_card_by_key["Livery_A"], old_card)
+        self.assertEqual(window._fh6_ui_livery_cards_created, 1)
+
+    def test_changed_record_recreates_only_its_card(self) -> None:
+        window = _FakeWindow()
+        first = _record("Livery_A", 1)
+        second = _record("Livery_B", 2)
+        window.install_scan([first, second])
+        _populate_livery_grid_reusing_cards(window)
+        first_card = window._livery_card_by_key["Livery_A"]
+        second_card = window._livery_card_by_key["Livery_B"]
+
+        changed = _record("Livery_A", 1)
+        changed.header.name = "Changed title"
+        window.install_scan([changed, _record("Livery_B", 2)])
+        _populate_livery_grid_reusing_cards(window)
+
+        self.assertIsNot(window._livery_card_by_key["Livery_A"], first_card)
+        self.assertIs(window._livery_card_by_key["Livery_B"], second_card)
+        self.assertEqual(window._fh6_ui_cards_discarded, 1)
+
+    def test_removed_record_is_not_retained_in_card_cache(self) -> None:
+        window = _FakeWindow()
+        window.install_scan([_record("Livery_A", 1), _record("Livery_B", 2)])
+        _populate_livery_grid_reusing_cards(window)
+
+        window.install_scan([_record("Livery_A", 1)])
+        _populate_livery_grid_reusing_cards(window)
+
+        self.assertEqual(set(window._livery_card_by_key), {"Livery_A"})
+        self.assertEqual(window._fh6_ui_cards_discarded, 1)
+
+    def test_different_save_root_resets_card_cache(self) -> None:
+        window = _FakeWindow()
+        window.install_scan([_record("Livery_A", 1)], root="save-a")
+        _populate_livery_grid_reusing_cards(window)
+        old_card = window._livery_card_by_key["Livery_A"]
+
+        window.install_scan([_record("Livery_A", 1)], root="save-b")
+        _populate_livery_grid_reusing_cards(window)
+
+        self.assertIsNot(window._livery_card_by_key["Livery_A"], old_card)
 
     def test_patch_order_keeps_thread_affinity_fix_last(self) -> None:
         source = (ROOT / "app.py").read_text(encoding="utf-8")

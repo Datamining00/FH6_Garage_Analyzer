@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
 import os
 import sys
+from dataclasses import asdict, dataclass
 
 _GIB = 1024 ** 3
 _MIB = 1024 ** 2
@@ -50,7 +50,7 @@ def _physical_memory_bytes() -> int | None:
             status.dwLength = ctypes.sizeof(status)
             if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
                 return int(status.ullTotalPhys)
-        except Exception:
+        except Exception:  # noqa: BLE001 - hardware probing must be best-effort
             return None
 
     try:

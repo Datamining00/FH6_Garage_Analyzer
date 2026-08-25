@@ -3,10 +3,16 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from pathlib import Path
+import tempfile
 import threading
+from pathlib import Path
 from typing import Any
 
+from .cache_housekeeping import (
+    CacheCleanupStats,
+    cleanup_stale_temp_files,
+    prune_scan_cache_namespaces,
+)
 from .models import HeaderInfo
 from .performance_metrics import app_data_dir
 
@@ -80,6 +86,7 @@ class FileAnalysisCache:
         self.header_misses = 0
         self.hash_hits = 0
         self.hash_misses = 0
+        self.cleanup_stats = CacheCleanupStats()
         self._load()
 
     @staticmethod
@@ -182,6 +189,7 @@ class FileAnalysisCache:
                 self._entries.pop(key, None)
 
     def save(self) -> None:
+        temporary: Path | None = None
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             payload = {
@@ -189,17 +197,43 @@ class FileAnalysisCache:
                 "header_parser_revision": _HEADER_PARSER_REVISION,
                 "entries": self._entries,
             }
-            tmp = self.path.with_suffix(".json.tmp")
-            tmp.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-            os.replace(tmp, self.path)
+            fd, temporary_name = tempfile.mkstemp(
+                prefix=f"{self.path.stem}.",
+                suffix=".tmp",
+                dir=str(self.path.parent),
+            )
+            os.close(fd)
+            temporary = Path(temporary_name)
+            temporary.write_text(
+                json.dumps(payload, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            os.replace(temporary, self.path)
         except (OSError, TypeError, ValueError):
             return
+        finally:
+            if temporary is not None and temporary.exists():
+                try:
+                    temporary.unlink()
+                except OSError:
+                    pass
+        self.cleanup_stats += cleanup_stale_temp_files(self.path.parent)
+        self.cleanup_stats += prune_scan_cache_namespaces(
+            self.path.parent,
+            active_path=self.path,
+        )
 
     def stats(self) -> dict[str, int]:
-        return {
+        result = {
             "header_cache_hits": self.header_hits,
             "header_cache_misses": self.header_misses,
             "hash_cache_hits": self.hash_hits,
             "hash_cache_misses": self.hash_misses,
             "scan_cache_entries": len(self._entries),
         }
+        result.update(self.cleanup_stats.as_dict())
+        try:
+            result["scan_cache_bytes"] = int(self.path.stat().st_size)
+        except OSError:
+            result["scan_cache_bytes"] = 0
+        return result

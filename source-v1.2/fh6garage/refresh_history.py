@@ -1,13 +1,16 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
 import hashlib
 import json
 import os
-from pathlib import Path
 import shutil
-from typing import Any, Callable
+import tempfile
+from collections.abc import Callable
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Any
 
+from .cache_housekeeping import cleanup_stale_temp_files
 from .models import LiveryRecord, ScanResult
 
 _SCHEMA = 1
@@ -59,6 +62,10 @@ class LiveryRefreshDiff:
     added: list[LiveryRefreshChange]
     removed: list[LiveryRefreshChange]
     changed: list[LiveryRefreshChange]
+    cache_files: int = 0
+    cache_bytes: int = 0
+    cleanup_removed_files: int = 0
+    cleanup_removed_bytes: int = 0
 
     @property
     def total(self) -> int:
@@ -78,6 +85,13 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _safe_cache_file_size(path: Path) -> int:
+    try:
+        return max(0, int(path.stat().st_size))
+    except OSError:
+        return 0
+
+
 def _cache_thumbnail(source: Path | None, cache_dir: Path) -> str:
     if source is None:
         return ""
@@ -92,9 +106,22 @@ def _cache_thumbnail(source: Path | None, cache_dir: Path) -> str:
         cache_dir.mkdir(parents=True, exist_ok=True)
         target = cache_dir / f"{digest}{suffix}"
         if not target.is_file():
-            temporary = target.with_suffix(target.suffix + ".tmp")
-            shutil.copyfile(source, temporary)
-            os.replace(temporary, target)
+            fd, temporary_name = tempfile.mkstemp(
+                prefix="refresh_thumb_",
+                suffix=".tmp",
+                dir=str(cache_dir),
+            )
+            os.close(fd)
+            temporary = Path(temporary_name)
+            try:
+                shutil.copyfile(source, temporary)
+                os.replace(temporary, target)
+            finally:
+                if temporary.exists():
+                    try:
+                        temporary.unlink()
+                    except OSError:
+                        pass
         return target.name
     except OSError:
         return ""
@@ -156,9 +183,25 @@ def _load_snapshot(path: Path) -> tuple[str, list[LiverySnapshotEntry]]:
 
 def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    os.replace(temporary, path)
+    fd, temporary_name = tempfile.mkstemp(
+        prefix=f"{path.stem}.",
+        suffix=".tmp",
+        dir=str(path.parent),
+    )
+    os.close(fd)
+    temporary = Path(temporary_name)
+    try:
+        temporary.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        os.replace(temporary, path)
+    finally:
+        if temporary.exists():
+            try:
+                temporary.unlink()
+            except OSError:
+                pass
 
 
 def _save_snapshot(path: Path, scope: str, entries: list[LiverySnapshotEntry]) -> None:
@@ -265,7 +308,11 @@ def _prune_thumbnail_cache(cache_dir: Path, keep: set[str]) -> None:
     if not cache_dir.is_dir():
         return
     for path in cache_dir.iterdir():
-        if not path.is_file() or path.name in keep:
+        if (
+            not path.is_file()
+            or path.name in keep
+            or path.suffix.casefold() == ".tmp"
+        ):
             continue
         try:
             path.unlink()
@@ -290,6 +337,7 @@ def process_livery_refresh(
     diff_path = root / "latest_diff.json"
     thumbnails_dir = root / "thumbnails"
     scope = _scope_for_result(result)
+    cleanup = cleanup_stale_temp_files(root, recursive=True)
 
     current_entries: list[LiverySnapshotEntry] = []
     for index, record in enumerate(result.liveries):
@@ -309,6 +357,14 @@ def process_livery_refresh(
     _save_snapshot(snapshot_path, scope, current_entries)
     _save_latest_diff(diff_path, diff)
     _prune_thumbnail_cache(thumbnails_dir, _referenced_thumbnail_names(current_entries, diff))
+    try:
+        cached_files = [path for path in thumbnails_dir.iterdir() if path.is_file()]
+    except OSError:
+        cached_files = []
+    diff.cache_files = len(cached_files)
+    diff.cache_bytes = sum(_safe_cache_file_size(path) for path in cached_files)
+    diff.cleanup_removed_files = cleanup.removed_files
+    diff.cleanup_removed_bytes = cleanup.removed_bytes
     return diff
 
 

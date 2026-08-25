@@ -5,6 +5,8 @@ import os
 from pathlib import Path
 from typing import Any
 
+from .local_storage import write_json_atomic
+
 
 class LocalPreferences:
     """Small JSON-backed UI preference store under LocalAppData."""
@@ -43,12 +45,6 @@ class LocalPreferences:
         self._values[key] = bool(value)
         self.save()
 
-    def save(self) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+    def save(self) -> bool:
         payload = {"schema": self.SCHEMA, "values": self._values}
-        temporary = self.path.with_suffix(self.path.suffix + ".tmp")
-        temporary.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-        os.replace(temporary, self.path)
+        return write_json_atomic(self.path, payload)

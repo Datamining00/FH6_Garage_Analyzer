@@ -31,6 +31,14 @@ class V132ThreadAffinityContractTests(unittest.TestCase):
         self.assertIn("_fh6_v132_initial_scan_build = True", source)
         self.assertIn("QTimer.singleShot(0, scheduler)", source)
 
+    def test_both_content_types_receive_constant_time_indexes(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        source = (root / "fh6garage" / "v1_3_2_thread_affinity_patch.py").read_text(encoding="utf-8")
+        self.assertIn("tuning_by_key", source)
+        self.assertIn('"livery": by_key', source)
+        self.assertIn('"tuning": tuning_by_key', source)
+        self.assertIn("_fh6_record_index_ready = True", source)
+
     def test_base_scan_callback_is_qt_slot(self) -> None:
         root = Path(__file__).resolve().parents[1]
         source = (root / "fh6garage" / "ui.py").read_text(encoding="utf-8")

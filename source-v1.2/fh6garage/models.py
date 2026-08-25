@@ -95,3 +95,6 @@ class ScanResult:
     car_summaries: list[CarContentSummary] = field(default_factory=list)
     container_counts: dict[str, int] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
+    # Local-only timing/cache data.  It is never read from or written into the
+    # FH6 save tree and has no effect on user-facing scan semantics.
+    diagnostics: dict[str, object] = field(default_factory=dict)

@@ -8,6 +8,8 @@ from pathlib import Path
 import shutil
 from typing import Iterable
 
+from .local_storage import write_json_atomic
+
 
 _SCHEMA = 1
 
@@ -87,8 +89,7 @@ class CreatorAliasStore:
             claimed.add(self._key(current))
             self.groups.append(CreatorAliasGroup(current=current, previous=filtered))
 
-    def _write(self) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+    def _write(self) -> bool:
         payload = {
             "schema": _SCHEMA,
             "groups": [
@@ -97,9 +98,7 @@ class CreatorAliasStore:
                 if group.current
             ],
         }
-        temporary = self.path.with_suffix(self.path.suffix + ".tmp")
-        temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-        os.replace(temporary, self.path)
+        return write_json_atomic(self.path, payload)
 
     def find_group(self, name: str) -> CreatorAliasGroup | None:
         key = self._key(name)
@@ -218,9 +217,12 @@ class CreatorAliasStore:
         if self.path.is_file():
             stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
             backup_dir = self.path.parent / "creator_alias_backups"
-            backup_dir.mkdir(parents=True, exist_ok=True)
-            backup_path = backup_dir / f"creator_aliases_{stamp}.json"
-            shutil.copy2(self.path, backup_path)
+            try:
+                backup_dir.mkdir(parents=True, exist_ok=True)
+                backup_path = backup_dir / f"creator_aliases_{stamp}.json"
+                shutil.copy2(self.path, backup_path)
+            except OSError:
+                backup_path = None
         self.groups = []
         self._write()
         return backup_path

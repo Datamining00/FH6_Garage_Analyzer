@@ -7,6 +7,8 @@ import os
 from pathlib import Path
 from typing import Any
 
+from .local_storage import write_json_atomic
+
 
 @dataclass(slots=True)
 class LiveryAnnotation:
@@ -169,8 +171,7 @@ class AnnotationStore:
         if save:
             self.save()
 
-    def save(self) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+    def save(self) -> bool:
         # Keep the legacy alias too so rolling back to an older analyzer
         # does not make existing livery annotations disappear.
         data = {
@@ -178,9 +179,7 @@ class AnnotationStore:
             "contents": self._entries,
             "liveries": self._entries,
         }
-        temp = self.path.with_suffix(self.path.suffix + ".tmp")
-        temp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-        os.replace(temp, self.path)
+        return write_json_atomic(self.path, data)
 
     def _cleanup_empty(self, key: str) -> None:
         entry = self._entries.get(key)

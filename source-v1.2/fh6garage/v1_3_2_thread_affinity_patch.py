@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
+from time import perf_counter
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QThread, QTimer
 
 from .auction_thumbnails import (
     AuctionThumbnailManifestError,
@@ -15,9 +16,9 @@ from .auction_thumbnails import (
     is_thumbnail_cache_dir,
     read_thumbnail_manifest,
 )
-from .models import LiveryRecord
+from .models import LiveryRecord, TuningRecord
+from .performance_metrics import write_latest_performance
 from .ui import MainWindow as _UiMainWindow
-
 
 # Capture the original Qt-decorated slot before any runtime monkey patches are
 # applied. v1.3.2 previously replaced this method with plain Python functions,
@@ -131,6 +132,8 @@ def apply_v1_3_2_thread_affinity_fix(MainWindow) -> None:
         if result is None:
             self._fh6_v132_livery_record_by_key = {}
             self._fh6_v132_duplicate_hashes = set()
+            self._fh6_record_by_key = {"livery": {}, "tuning": {}}
+            self._fh6_record_index_ready = False
             return
 
         by_key: dict[str, LiveryRecord] = {}
@@ -140,6 +143,16 @@ def apply_v1_3_2_thread_affinity_fix(MainWindow) -> None:
             key = self._content_annotation_key("livery", record)
             by_key[key] = record
         self._fh6_v132_livery_record_by_key = by_key
+
+        tuning_by_key: dict[str, TuningRecord] = {}
+        for record in result.tunings:
+            key = self._content_annotation_key("tuning", record)
+            tuning_by_key[key] = record
+        self._fh6_record_by_key = {
+            "livery": by_key,
+            "tuning": tuning_by_key,
+        }
+        self._fh6_record_index_ready = True
 
         counts = Counter(
             record.content_sha256
@@ -151,6 +164,7 @@ def apply_v1_3_2_thread_affinity_fix(MainWindow) -> None:
         }
 
     def patched_populate_all(self) -> None:
+        ui_started = perf_counter()
         result = self.result
         if result is not None:
             try:
@@ -160,7 +174,7 @@ def apply_v1_3_2_thread_affinity_fix(MainWindow) -> None:
                     result.liveries,
                     cache_path,
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001 - optional cache integration
                 # Cache integration is optional and must never block save loading.
                 self._fh6_v132_match_stats = None
 
@@ -180,6 +194,63 @@ def apply_v1_3_2_thread_affinity_fix(MainWindow) -> None:
         scheduler = getattr(self, "_fh6_v132_schedule_auction_cards", None)
         if callable(scheduler):
             QTimer.singleShot(0, scheduler)
+
+        ui_timings = {
+            "ui.scan_result_to_initial_paint": round(
+                (perf_counter() - ui_started) * 1000.0,
+                3,
+            )
+        }
+        indexes = getattr(self, "_fh6_record_by_key", {})
+        counters = {
+            "gui_thread_confirmed": QThread.currentThread() is self.thread(),
+            "livery_index_entries": len(indexes.get("livery", {})),
+            "tuning_index_entries": len(indexes.get("tuning", {})),
+            "livery_cards_created": getattr(
+                self, "_fh6_ui_livery_cards_created", 0
+            ),
+            "livery_cards_reused": getattr(
+                self, "_fh6_ui_livery_cards_reused", 0
+            ),
+            "tuning_cards_created": getattr(
+                self, "_fh6_ui_tuning_cards_created", 0
+            ),
+            "tuning_cards_reused": getattr(
+                self, "_fh6_ui_tuning_cards_reused", 0
+            ),
+            "cards_discarded": getattr(self, "_fh6_ui_cards_discarded", 0),
+        }
+        pixmaps = getattr(self, "_fh6_thumbnail_pixmap_cache", None)
+        if pixmaps is not None and hasattr(pixmaps, "stats"):
+            counters.update(pixmaps.stats())
+        refresh_diff = getattr(self, "_fh6_latest_livery_diff", None)
+        if refresh_diff is not None:
+            counters.update(
+                {
+                    "refresh_thumbnail_cache_files": getattr(
+                        refresh_diff, "cache_files", 0
+                    ),
+                    "refresh_thumbnail_cache_bytes": getattr(
+                        refresh_diff, "cache_bytes", 0
+                    ),
+                    "refresh_cache_cleanup_removed_files": getattr(
+                        refresh_diff, "cleanup_removed_files", 0
+                    ),
+                    "refresh_cache_cleanup_removed_bytes": getattr(
+                        refresh_diff, "cleanup_removed_bytes", 0
+                    ),
+                }
+            )
+        write_latest_performance(
+            {
+                "app_version": "1.3.2",
+                "scan": getattr(result, "diagnostics", {}),
+                "ui": {
+                    "timings_ms": ui_timings,
+                    "counters": counters,
+                },
+            }
+        )
 
     MainWindow._populate_all = patched_populate_all
 

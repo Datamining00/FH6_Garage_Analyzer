@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from contextlib import contextmanager
-from datetime import datetime, timezone
 import json
 import os
+import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from time import perf_counter
-from typing import Iterator
 
 
 class PerformanceMetrics:
@@ -24,7 +25,7 @@ class PerformanceMetrics:
         finally:
             self.timings_ms[name] = round((perf_counter() - started) * 1000.0, 3)
 
-    def set(self, name: str, value: int | float | str | bool | None) -> None:
+    def set(self, name: str, value: float | str | bool | None) -> None:
         self.counters[name] = value
 
     def increment(self, name: str, amount: int = 1) -> None:
@@ -50,15 +51,31 @@ def write_latest_performance(payload: dict[str, object]) -> Path | None:
     save scanning or UI availability.
     """
 
+    temporary: Path | None = None
     try:
         directory = app_data_dir() / "performance"
         directory.mkdir(parents=True, exist_ok=True)
         path = directory / "latest.json"
-        tmp = path.with_suffix(".json.tmp")
         data = dict(payload)
         data["written_at_utc"] = datetime.now(timezone.utc).isoformat()
-        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-        os.replace(tmp, path)
+        fd, temporary_name = tempfile.mkstemp(
+            prefix="latest.",
+            suffix=".tmp",
+            dir=str(directory),
+        )
+        os.close(fd)
+        temporary = Path(temporary_name)
+        temporary.write_text(
+            json.dumps(data, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        os.replace(temporary, path)
         return path
     except (OSError, TypeError, ValueError):
         return None
+    finally:
+        if temporary is not None and temporary.exists():
+            try:
+                temporary.unlink()
+            except OSError:
+                pass
