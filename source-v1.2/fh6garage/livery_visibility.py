@@ -90,7 +90,6 @@ def install_visibility_filter_rows(button: object, labels: dict[str, str]) -> No
     menu.addSeparator()
     entries = (
         (HIDDEN_MODE, "hidden", "hidden_tip", QIcon(eye_slash_pixmap(True))),
-        (AUCTION_APPLIED_MODE, "auction_applied", "auction_applied_tip", QIcon(_cache_state_pixmap(True))),
         (AUCTION_UNAPPLIED_MODE, "auction_unapplied", "auction_unapplied_tip", QIcon(_cache_state_pixmap(False))),
     )
     for mode, label_key, tip_key, icon in entries:

@@ -101,6 +101,7 @@ from .ui_responsiveness import (
     _schedule_grid_followup,
     _yield_busy_events,
 )
+from .ui_cleanup import _install_card_hide_button
 from .view_operations import ViewOperationCoordinator
 
 
@@ -3170,6 +3171,8 @@ class MainWindow(QMainWindow):
         _configure_card_metadata(card)
         _configure_aspect_card(card)
         _normalize_card_actions(card)
+        if content_type == "livery":
+            _install_card_hide_button(self, card, key)
         return card
 
     def _livery_search_text(self, record: LiveryRecord, note: str = "") -> str:

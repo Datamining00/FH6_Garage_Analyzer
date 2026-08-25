@@ -4,16 +4,10 @@ from typing import Any
 
 from PySide6.QtCore import QEvent, QObject, Qt, QTimer
 from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QLabel, QPushButton, QToolButton, QWidget, QWidgetAction
+from PySide6.QtWidgets import QLabel, QPushButton, QToolButton, QWidget
 
 from .i18n import get_language
 from .livery_visibility import eye_slash_pixmap
-from .models import LiveryRecord
-from .ui import MultiStatusFilterButton
-
-_HIDDEN_MODE = 11
-_AUCTION_APPLIED_MODE = 12
-_AUCTION_UNAPPLIED_MODE = 13
 
 
 def _t(key: str) -> str:
@@ -72,20 +66,6 @@ def _remove_direct_labels(layout: Any) -> None:
             layout.removeWidget(widget)
             widget.hide()
             widget.deleteLater()
-
-
-def _remove_filter_mode(button: MultiStatusFilterButton, mode: int) -> None:
-    row = button._actions.pop(mode, None)
-    menu = button.menu()
-    if row is None or menu is None:
-        return
-    for action in tuple(menu.actions()):
-        if isinstance(action, QWidgetAction) and action.defaultWidget() is row:
-            menu.removeAction(action)
-            action.deleteLater()
-            break
-    row.hide()
-    row.deleteLater()
 
 
 class _HideButtonAligner(QObject):
@@ -268,97 +248,3 @@ def _normalize_path_rows(self: Any) -> None:
     self.full_refresh_button = refresh_button
     self._fh6_v132_reserved_backup_slot_width = action_width
 
-
-def apply_v1_3_2_ui_cleanup_patch(MainWindow) -> None:
-    """Apply the final v1.3.2 visibility and top-toolbar UX cleanup."""
-    if getattr(MainWindow, "_fh6_v132_ui_cleanup_patched", False):
-        return
-
-    original_filter_init = MultiStatusFilterButton.__init__
-    original_build_ui = MainWindow._build_ui
-    original_make_card = MainWindow._make_saved_content_card
-    original_layout_visible_grid_cards = MainWindow._layout_visible_grid_cards
-    original_filter_saved_content_table = MainWindow._filter_saved_content_table
-
-    def filter_init(self, include_duplicate: bool, parent=None) -> None:
-        original_filter_init(self, include_duplicate, parent)
-        if include_duplicate:
-            _remove_filter_mode(self, _AUCTION_APPLIED_MODE)
-
-    MultiStatusFilterButton.__init__ = filter_init
-
-    def refresh_all(self) -> None:
-        # refresh_scan reloads the vehicle DB and re-scans the live save. The
-        # existing v1.3.2 scan-finished patch then re-resolves CacheThumbnails,
-        # rebuilds livery/tuning views and refreshes summary counts.
-        self.refresh_scan()
-
-    def patched_build_ui(self) -> None:
-        original_build_ui(self)
-        _normalize_path_rows(self)
-
-    def patched_make_card(self, content_type: str, record: Any, key: str):
-        card = original_make_card(self, content_type, record, key)
-        if content_type == "livery":
-            _install_card_hide_button(self, card, key)
-        return card
-
-    def normal_view_allows(self, card: Any) -> bool:
-        modes = self.livery_check_filter.selected_modes()
-        if _AUCTION_UNAPPLIED_MODE in modes:
-            return True
-        key = str(card.property("annotationKey") or "")
-        record = self._record_for_content_key("livery", key) if key else None
-        if not isinstance(record, LiveryRecord) or record.kind != "SoulBoundLivery":
-            return True
-        return bool(self._fh6_v132_is_auction_applied(record))
-
-    def patched_layout_visible_grid_cards(
-        self,
-        content_type: str,
-        cards,
-    ) -> None:
-        if content_type == "livery":
-            cards = [card for card in cards if normal_view_allows(self, card)]
-        original_layout_visible_grid_cards(self, content_type, cards)
-
-    def patched_filter_saved_content_table(
-        self,
-        content_type: str,
-        text: str,
-    ) -> None:
-        original_filter_saved_content_table(self, content_type, text)
-        if content_type != "livery":
-            return
-        modes = self.livery_check_filter.selected_modes()
-        if _AUCTION_UNAPPLIED_MODE in modes:
-            return
-
-        table = self.livery_table
-        for row in range(table.rowCount()):
-            if table.isRowHidden(row):
-                continue
-            key_item = table.item(row, 0)
-            key = (
-                str(key_item.data(Qt.ItemDataRole.UserRole) or "")
-                if key_item is not None
-                else ""
-            )
-            record = (
-                self._record_for_content_key("livery", key)
-                if key
-                else None
-            )
-            if (
-                isinstance(record, LiveryRecord)
-                and record.kind == "SoulBoundLivery"
-                and not self._fh6_v132_is_auction_applied(record)
-            ):
-                table.setRowHidden(row, True)
-
-    MainWindow._fh6_v132_refresh_all = refresh_all
-    MainWindow._build_ui = patched_build_ui
-    MainWindow._make_saved_content_card = patched_make_card
-    MainWindow._layout_visible_grid_cards = patched_layout_visible_grid_cards
-    MainWindow._filter_saved_content_table = patched_filter_saved_content_table
-    MainWindow._fh6_v132_ui_cleanup_patched = True

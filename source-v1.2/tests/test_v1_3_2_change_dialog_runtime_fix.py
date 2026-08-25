@@ -1,16 +1,21 @@
 from __future__ import annotations
 
-from pathlib import Path
 import unittest
+from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QPushButton, QToolButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QPushButton,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from fh6garage import v1_3_2_change_dialog_folder_patch as feature
 from fh6garage import v1_3_2_change_dialog_runtime_fix as runtime_fix
+from fh6garage.ui_cleanup import _HideButtonAligner
 from fh6garage.v1_3_2_card_alignment_patch import _CardActionAligner
-from fh6garage.v1_3_2_ui_cleanup_patch import _HideButtonAligner
-
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -19,6 +24,14 @@ class ChangeDialogRuntimeFixTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.app = QApplication.instance() or QApplication([])
+
+    def test_ui_cleanup_runtime_patch_is_removed(self) -> None:
+        app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+        self.assertNotIn("apply_v1_3_2_ui_cleanup_patch(MainWindow)", app_source)
+        self.assertFalse(
+            (ROOT / "fh6garage" / "v1_3_2_ui_cleanup_patch.py").exists()
+        )
+        self.assertTrue((ROOT / "fh6garage" / "ui_cleanup.py").is_file())
 
     def test_runtime_fix_stays_before_window_creation(self) -> None:
         app = (ROOT / "app.py").read_text(encoding="utf-8")

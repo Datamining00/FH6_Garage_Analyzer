@@ -20,6 +20,7 @@ from .auction_thumbnails import (
 from .i18n import get_language
 from .models import LiveryRecord
 from .ui import SummaryCard
+from .ui_cleanup import _normalize_path_rows
 
 _CACHE_SETTING_KEY = "auction_thumbnail_cache_path_v1_3_2"
 _SHOW_MY_DESIGNS_KEY = "livery_show_my_designs_v1_3_2"
@@ -329,6 +330,7 @@ def apply_v1_3_2_patches(MainWindow) -> None:
     def patched_build_ui(self) -> None:
         original_build_ui(self)
         _install_cache_row(self)
+        _normalize_path_rows(self)
 
     def patched_dashboard_page(self):
         page = original_dashboard_page(self)
