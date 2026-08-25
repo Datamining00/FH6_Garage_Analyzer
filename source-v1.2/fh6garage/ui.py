@@ -60,6 +60,7 @@ from .car_db_override_dialog import open_car_db_override_dialog
 from .creator_aliases import CreatorAliasStore
 from .creator_alias_view import aggregate_creator_alias_stats, sort_by_creator_alias
 from .content_note_dialog import edit_content_note_dialog
+from .content_detail_dialogs import show_livery_metadata, show_tuning_details
 from .dashboard_page_builder import build_dashboard_page
 from .game_navigation import (
     GameGridSession,
@@ -76,7 +77,6 @@ from .livery_visibility import (
     AUCTION_APPLIED_MODE,
     AUCTION_UNAPPLIED_MODE,
     HIDDEN_MODE,
-    eye_slash_pixmap,
     install_visibility_filter_rows,
     is_unapplied_auction_livery,
     is_livery_hidden,
@@ -96,6 +96,7 @@ from .saved_content_cards import (
 )
 from .saved_content_card_metadata import append_card_metadata
 from .saved_content_card_actions import build_card_actions
+from .saved_content_controls import build_saved_content_controls
 from .saved_content_presenter import (
     FilterState,
     build_search_text,
@@ -108,7 +109,6 @@ from .saved_content_view import (
     sort_records,
     vehicle_brand_sort_key,
 )
-from .tune_data import TuneDataError, read_tune_data
 from .thumbnail_display import _configure_aspect_card, _load_original_pixmap
 from .ui_responsiveness import (
     _livery_visibility_allowed,
@@ -1200,128 +1200,11 @@ class MainWindow(QMainWindow):
         QButtonGroup,
         dict[str, QPushButton],
     ]:
-        """Create two toolbar rows: search/filter, then sort/view/actions."""
-        controls = QVBoxLayout()
-        controls.setSpacing(7)
-        search_row = QHBoxLayout()
-        action_row = QHBoxLayout()
-        action_row.setSpacing(7)
-        self._saved_content_action_rows[content_type] = action_row
-
-        search = QLineEdit()
-        search.setPlaceholderText(
-            tr("content.search_placeholder")
-        )
-        self._connect_debounced_search(
-            search,
-            lambda text, kind=content_type:
-            self._request_saved_content_filter(kind, text),
-        )
-        search_row.addWidget(search, 1)
-
-        status_filter = MultiStatusFilterButton(content_type == "livery", self)
-        status_filter.selectionChanged.connect(
-            lambda kind=content_type, field=search:
-            self._request_saved_content_filter(kind, field.text())
-        )
-        search_row.addWidget(status_filter)
-        controls.addLayout(search_row)
-
-        sort_label = QLabel(tr("content.sort_label"))
-        sort_label.setObjectName("muted")
-        action_row.addWidget(sort_label)
-
-        sort_group = QButtonGroup(self)
-        sort_group.setExclusive(True)
-        sort_buttons: dict[str, QPushButton] = {}
-
-        for mode, label_text in (
-            ("default", tr("content.sort_default")),
-            ("brand", tr("content.sort_brand")),
-            ("creator", tr("content.sort_creator")),
-            ("download", tr("content.sort_download")),
-        ):
-            button = QPushButton(label_text)
-            button.setObjectName("secondary")
-            button.setCheckable(True)
-            if mode == "default":
-                button.setChecked(True)
-            button.clicked.connect(
-                lambda _checked=False, kind=content_type, m=mode:
-                self._set_saved_content_sort_mode(kind, m)
-            )
-            sort_group.addButton(button)
-            sort_buttons[mode] = button
-            action_row.addWidget(button)
-
-        separator = QLabel("││")
-        separator.setObjectName("sortGroupSeparator")
-        separator.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        separator.setStyleSheet(
-            "color:#b1a8c9; font-weight:700; padding:0 2px;"
-        )
-        action_row.addWidget(separator)
-
-        group_button = QPushButton(tr("content.group_vehicle"))
-        group_button.setObjectName("secondary")
-        group_button.setCheckable(True)
-        group_button.setChecked(
-            self.local_preferences.get_bool(
-                f"{content_type}_group_by_vehicle",
-                False,
-            )
-        )
-        group_button.setToolTip(
-            tr("content.group_vehicle_tip")
-        )
-        group_button.toggled.connect(
-            lambda checked, kind=content_type:
-            self._set_vehicle_grouping(kind, checked)
-        )
-        setattr(self, f"{content_type}_group_button", group_button)
-        action_row.addWidget(group_button)
-
-        creator_group_button = QPushButton(tr("content.group_creator"))
-        creator_group_button.setObjectName("secondary")
-        creator_group_button.setCheckable(True)
-        creator_group_button.setChecked(
-            self.local_preferences.get_bool(
-                f"{content_type}_group_by_creator",
-                False,
-            )
-        )
-        if group_button.isChecked() and creator_group_button.isChecked():
-            creator_group_button.setChecked(False)
-            self.local_preferences.set_bool(
-                f"{content_type}_group_by_creator",
-                False,
-            )
-        creator_group_button.setToolTip(
-            tr("content.group_creator_tip")
-        )
-        creator_group_button.toggled.connect(
-            lambda checked, kind=content_type:
-            self._set_creator_grouping(kind, checked)
-        )
-        setattr(
+        return build_saved_content_controls(
             self,
-            f"{content_type}_creator_group_button",
-            creator_group_button,
-        )
-        action_row.addWidget(creator_group_button)
-
-        action_row.addStretch(1)
-        controls.addLayout(action_row)
-
-        if content_type == "livery":
-            _install_source_controls(self, controls)
-
-        return (
-            controls,
-            search,
-            status_filter,
-            sort_group,
-            sort_buttons,
+            content_type,
+            filter_button_factory=MultiStatusFilterButton,
+            install_source_controls=_install_source_controls,
         )
 
     @Slot(str, bool)
@@ -3113,141 +2996,10 @@ class MainWindow(QMainWindow):
         return QIcon(pixmap)
 
     def _show_livery_metadata(self, record: LiveryRecord) -> None:
-        key = self._content_annotation_key("livery", record)
-        labels = visibility_labels((get_language() or "ko").startswith("ko"))
-        dialog = QDialog(self)
-        dialog.setWindowTitle(tr("detail.livery_info_title"))
-        dialog.setModal(True)
-        dialog.resize(560, 360)
-        dialog.setStyleSheet(APP_STYLE)
-        layout = QVBoxLayout(dialog)
-        layout.setContentsMargins(18, 18, 18, 18)
-        layout.setSpacing(10)
-
-        vehicle = QLabel(self._car_label(record.header.car_id))
-        vehicle.setStyleSheet("font-size:13pt;font-weight:700;")
-        layout.addWidget(vehicle)
-        title = QLabel(tr("detail.livery_prefix", name=record.header.name or tr("detail.no_title")))
-        title.setObjectName("muted")
-        layout.addWidget(title)
-
-        hide_row = QHBoxLayout()
-        hide_row.addStretch(1)
-        hide_button = QToolButton()
-        hide_button.setCheckable(True)
-        icon = QIcon()
-        icon.addPixmap(eye_slash_pixmap(False), QIcon.Mode.Normal, QIcon.State.Off)
-        icon.addPixmap(eye_slash_pixmap(True), QIcon.Mode.Normal, QIcon.State.On)
-        hide_button.setIcon(icon)
-        hide_button.setIconSize(QSize(22, 22))
-        hide_button.setChecked(self._fh6_v132_is_livery_hidden(key))
-        hide_button.setToolTip(labels["hide_toggle"])
-        hide_button.setAccessibleName(labels["hide_toggle"])
-        hide_button.setFixedSize(38, 38)
-        hide_button.setStyleSheet(
-            "QToolButton { background:white; border:1px solid #dfe1e8; "
-            "border-radius:9px; padding:0; }"
-            "QToolButton:hover { border-color:#8c74ee; background:#f5f2ff; }"
-            "QToolButton:checked { border-color:#8c74ee; background:#eee9ff; }"
-        )
-        hide_button.toggled.connect(
-            lambda enabled, content_key=key: self._fh6_v132_set_livery_hidden(
-                content_key, enabled
-            )
-        )
-        hide_row.addWidget(hide_button)
-        layout.addLayout(hide_row)
-
-        layout.addWidget(QLabel(tr("detail.description")))
-        description = QPlainTextEdit()
-        description.setReadOnly(True)
-        description.setPlainText(
-            (record.header.description or "").strip() or tr("detail.no_description")
-        )
-        layout.addWidget(description, 1)
-        uploaded = record.header.created or tr("common.unavailable")
-        layout.addWidget(QLabel(tr("detail.uploaded", date=uploaded)))
-        close_button = QPushButton(tr("common.close"))
-        close_button.setObjectName("primary")
-        close_button.clicked.connect(dialog.accept)
-        row = QHBoxLayout()
-        row.addStretch(1)
-        row.addWidget(close_button)
-        layout.addLayout(row)
-        self._apply_pointing_cursors(dialog)
-        dialog.exec()
+        show_livery_metadata(self, record, app_style=APP_STYLE)
 
     def _show_tuning_details(self, record: TuningRecord) -> None:
-        dialog = QDialog(self)
-        dialog.setWindowTitle(tr("detail.tuning_title"))
-        dialog.setModal(True)
-        dialog.resize(720, 720)
-        dialog.setStyleSheet(APP_STYLE)
-        layout = QVBoxLayout(dialog)
-        layout.setContentsMargins(18, 18, 18, 18)
-        layout.setSpacing(10)
-
-        heading = QLabel(self._car_label(record.header.car_id))
-        heading.setStyleSheet("font-size:13pt;font-weight:700;")
-        layout.addWidget(heading)
-        details = QPlainTextEdit()
-        details.setReadOnly(True)
-        details.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
-
-        lines = [
-            tr("detail.basic_info"),
-            tr("detail.title_line", value=record.header.name or tr("detail.no_title")),
-            tr("detail.creator_line", value=record.header.creator or "—"),
-            tr("detail.description_line", value=(record.header.description or "").strip() or tr("detail.no_description")),
-            tr("detail.uploaded", date=record.header.created or tr("common.unavailable")),
-            "",
-        ]
-        if record.data_path is None:
-            lines.extend((tr("detail.data_file"), tr("detail.data_missing")))
-        else:
-            try:
-                parsed = read_tune_data(record.data_path)
-            except TuneDataError as exc:
-                lines.extend((tr("detail.data_file"), tr("detail.read_failed", error=exc)))
-            else:
-                lines.extend(
-                    (
-                        tr("detail.data_file"),
-                        tr("detail.format_version", value=parsed.format_version),
-                        tr("detail.lock_state", value=tr("detail.locked") if parsed.locked else tr("detail.unlocked")),
-                        tr("detail.car_ordinal", value=parsed.car_ordinal_id),
-                        "",
-                        tr("detail.installed_parts"),
-                    )
-                )
-                lines.extend(
-                    f"0x{offset:04X}  {label}: 0x{value:08X}"
-                    for offset, label, value in parsed.parts
-                )
-                lines.extend(("", tr("detail.tuning_values")))
-                lines.extend(
-                    f"0x{offset:04X}  {label}: {value:.6g}"
-                    for offset, label, value in parsed.values
-                )
-                if record.header.car_id is not None:
-                    lines.extend(
-                        (
-                            "",
-                            tr("detail.validation"),
-                            tr("detail.header_car_id", value=record.header.car_id),
-                            tr("detail.data_ordinal", value=parsed.car_ordinal_id),
-                        )
-                    )
-        details.setPlainText("\n".join(lines))
-        layout.addWidget(details, 1)
-        close_button = QPushButton(tr("common.close"))
-        close_button.setObjectName("primary")
-        close_button.clicked.connect(dialog.accept)
-        row = QHBoxLayout()
-        row.addStretch(1)
-        row.addWidget(close_button)
-        layout.addLayout(row)
-        dialog.exec()
+        show_tuning_details(self, record, app_style=APP_STYLE)
 
     @staticmethod
     def _magnifier_icon() -> QIcon:
@@ -3353,6 +3105,7 @@ class MainWindow(QMainWindow):
             key,
             app_style=APP_STYLE,
         )
+
     def _edit_livery_note_dialog(
         self,
         current_note: str,

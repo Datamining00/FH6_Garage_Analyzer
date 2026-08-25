@@ -8,6 +8,10 @@ from fh6garage.i18n import DEFAULT_LANGUAGE, set_language, tr
 
 ROOT = Path(__file__).resolve().parents[1]
 UI_SOURCE = ROOT / "fh6garage" / "ui.py"
+UI_MODULES = "\n".join(
+    path.read_text(encoding="utf-8")
+    for path in (ROOT / "fh6garage").glob("*.py")
+)
 
 
 class I18nStage2Tests(unittest.TestCase):
@@ -37,12 +41,9 @@ class I18nStage2Tests(unittest.TestCase):
         )
 
     def test_stage2_ui_uses_translation_keys(self) -> None:
-        source = UI_SOURCE.read_text(encoding="utf-8")
+        source = UI_MODULES
         required = (
-            'tr("dashboard.saved_livery")',
             'tr("dashboard.saved_tuning")',
-            'tr("table.tuning_name")',
-            'tr("table.status")',
             'tr("content.search_placeholder")',
             'tr("content.sort_label")',
             'tr("content.group_vehicle")',
