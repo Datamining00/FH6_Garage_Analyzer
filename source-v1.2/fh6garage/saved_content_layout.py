@@ -6,8 +6,28 @@ from PySide6.QtWidgets import QFrame, QLabel
 
 from .i18n import tr
 from .models import LiveryRecord
-from .v1_3_ui_patch import GRID_MAX_COLUMNS, GRID_MIN_COLUMNS
 from . import ui_responsiveness as _responsive
+
+GRID_TARGET_CARD_WIDTH = 420
+GRID_MIN_COLUMNS = 2
+GRID_MAX_COLUMNS = 4
+
+
+def grid_column_count(self: Any, content_type: str) -> int:
+    scroll = getattr(self, f"{content_type}_grid_scroll", None)
+    layout = getattr(self, f"{content_type}_grid_layout", None)
+    if scroll is None or layout is None:
+        return GRID_MIN_COLUMNS
+    viewport = scroll.viewport()
+    if viewport is None or viewport.width() <= 0:
+        return GRID_MIN_COLUMNS
+    margins = layout.contentsMargins()
+    inner_width = max(
+        1,
+        viewport.width() - margins.left() - margins.right() - 4,
+    )
+    columns = inner_width // GRID_TARGET_CARD_WIDTH
+    return max(GRID_MIN_COLUMNS, min(GRID_MAX_COLUMNS, int(columns)))
 
 
 def _current_grid_columns(self: Any, content_type: str) -> int:

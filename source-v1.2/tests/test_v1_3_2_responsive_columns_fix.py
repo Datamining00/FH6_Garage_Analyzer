@@ -9,11 +9,11 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication, QFrame, QGridLayout, QWidget
 
-from fh6garage.v1_3_ui_patch import _grid_column_count
 from fh6garage.saved_content_layout import (
     _current_grid_columns,
     _dynamic_layout_visible_grid_cards,
     _dynamic_sync_grid_card_widths,
+    grid_column_count,
 )
 
 
@@ -57,7 +57,7 @@ class V132ResponsiveColumnsFixTests(unittest.TestCase):
             tuning_grid_scroll=_Scroll(2300),
             tuning_grid_layout=layout,
         )
-        self.assertEqual(_grid_column_count(owner, "tuning"), 4)
+        self.assertEqual(grid_column_count(owner, "tuning"), 4)
 
     def test_dynamic_layout_places_cards_across_four_columns(self) -> None:
         host = QWidget()

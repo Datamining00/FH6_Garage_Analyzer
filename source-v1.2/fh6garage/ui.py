@@ -98,6 +98,7 @@ from .saved_content_presenter import (
     filter_matches,
     search_matches,
 )
+from .saved_content_layout import _dynamic_layout_visible_grid_cards, grid_column_count
 from .saved_content_view import (
     SortSpec,
     sort_records,
@@ -2717,6 +2718,8 @@ class MainWindow(QMainWindow):
         content_type: str,
         cards: list[QFrame],
     ) -> None:
+        _dynamic_layout_visible_grid_cards(self, content_type, cards)
+        return
         layout = (
             self.livery_grid_layout
             if content_type == "livery"
@@ -2802,6 +2805,9 @@ class MainWindow(QMainWindow):
                 layout.addWidget(card, row + index // 2, index % 2)
                 card.setVisible(True)
             row += (len(group_cards) + 1) // 2
+
+    def _fh6_grid_column_count(self, content_type: str) -> int:
+        return grid_column_count(self, content_type)
 
     def _relayout_livery_grid(self, text: str = "") -> None:
         """Pack matching cards contiguously into two columns."""

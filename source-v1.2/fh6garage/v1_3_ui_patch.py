@@ -79,7 +79,6 @@ def apply_v1_3_ui_patches(MainWindow) -> None:
         return
 
     original_build_ui = MainWindow._build_ui
-    original_layout_cards = MainWindow._layout_visible_grid_cards
     original_make_saved_content_card = MainWindow._make_saved_content_card
     original_set_always_on_top = MainWindow._set_always_on_top
 
@@ -334,6 +333,4 @@ def apply_v1_3_ui_patches(MainWindow) -> None:
     MainWindow._restart_for_language_change = restart_for_language_change
     MainWindow._set_always_on_top = patched_set_always_on_top
     MainWindow._make_saved_content_card = patched_make_saved_content_card
-    MainWindow._layout_visible_grid_cards = patched_layout_visible_grid_cards
-    MainWindow._fh6_grid_column_count = _grid_column_count
     MainWindow._fh6_v13_followup_patched = True
