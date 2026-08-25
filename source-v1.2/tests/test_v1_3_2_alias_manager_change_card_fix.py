@@ -86,10 +86,10 @@ class AliasManagerChangeCardFixTests(unittest.TestCase):
             self.assertEqual(store.group_for("C").all_names(), ["C"])
             self.assertEqual(store.group_for("Y").all_names(), ["Y", "X"])
 
-    def test_patch_order_keeps_thread_affinity_final(self) -> None:
+    def test_patch_is_applied_before_window_creation(self) -> None:
         source = (Path(__file__).parents[1] / "app.py").read_text(encoding="utf-8")
         alias_pos = source.find("apply_v1_3_2_alias_manager_change_card_fix(MainWindow)")
-        final_pos = source.find("apply_v1_3_2_thread_affinity_fix(MainWindow)")
+        final_pos = source.find("window = MainWindow(project_root=root)")
         self.assertGreaterEqual(alias_pos, 0)
         self.assertGreater(final_pos, alias_pos)
 

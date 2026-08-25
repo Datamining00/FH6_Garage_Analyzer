@@ -9,7 +9,7 @@ class V132CardParentContractTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         source = (root / "app.py").read_text(encoding="utf-8")
         self.assertNotIn("apply_v1_3_2_card_parent_patches(MainWindow)", source)
-        self.assertIn("apply_v1_3_2_thread_affinity_fix(MainWindow)", source)
+        self.assertNotIn("apply_v1_3_2_thread_affinity_fix(MainWindow)", source)
 
     def test_legacy_patch_file_remains_inert(self) -> None:
         root = Path(__file__).resolve().parents[1]

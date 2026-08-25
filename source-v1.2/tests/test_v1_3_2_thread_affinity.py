@@ -5,34 +5,32 @@ from pathlib import Path
 
 
 class V132ThreadAffinityContractTests(unittest.TestCase):
-    def test_app_applies_thread_fix_last(self) -> None:
+    def test_app_no_longer_applies_thread_runtime_fix(self) -> None:
         root = Path(__file__).resolve().parents[1]
         source = (root / "app.py").read_text(encoding="utf-8")
-        self.assertIn("apply_v1_3_2_thread_affinity_fix(MainWindow)", source)
+        self.assertNotIn("apply_v1_3_2_thread_affinity_fix(MainWindow)", source)
         self.assertNotIn("apply_v1_3_2_diagnostic_patches(MainWindow)", source)
         self.assertNotIn("apply_v1_3_2_card_parent_patches(MainWindow)", source)
-        self.assertLess(
-            source.index("apply_v1_3_2_list_fixes(MainWindow)"),
-            source.index("apply_v1_3_2_thread_affinity_fix(MainWindow)"),
-        )
+        self.assertIn("window = MainWindow(project_root=root)", source)
 
-    def test_original_qt_slot_is_restored(self) -> None:
+    def test_original_qt_slot_is_never_replaced(self) -> None:
         root = Path(__file__).resolve().parents[1]
-        source = (root / "fh6garage" / "v1_3_2_thread_affinity_patch.py").read_text(encoding="utf-8")
-        self.assertIn("_ORIGINAL_SCAN_FINISHED = _UiMainWindow._scan_finished", source)
-        self.assertIn("MainWindow._scan_finished = _ORIGINAL_SCAN_FINISHED", source)
-        self.assertNotIn("def patched_scan_finished", source)
+        package = root / "fh6garage"
+        self.assertFalse((package / "v1_3_2_thread_affinity_patch.py").exists())
+        for name in ("v1_3_2_patch.py", "v1_3_2_list_fix.py"):
+            source = (package / name).read_text(encoding="utf-8")
+            self.assertNotIn("MainWindow._scan_finished =", source)
 
-    def test_postprocessing_moved_to_populate_all(self) -> None:
+    def test_postprocessing_is_integrated_into_populate_all(self) -> None:
         root = Path(__file__).resolve().parents[1]
-        patch_source = (
-            root / "fh6garage" / "v1_3_2_thread_affinity_patch.py"
-        ).read_text(encoding="utf-8")
+        ui_source = (root / "fh6garage" / "ui.py").read_text(encoding="utf-8")
         processing_source = (
             root / "fh6garage" / "scan_result_processing.py"
         ).read_text(encoding="utf-8")
-        self.assertIn("def patched_populate_all", patch_source)
-        self.assertIn("populate_scan_result_ui", patch_source)
+        self.assertIn(
+            "populate_scan_result_ui(self, self._populate_all_content)",
+            ui_source,
+        )
         self.assertIn("def assign_auction_thumbnails", processing_source)
         self.assertIn("_fh6_v132_initial_scan_build = True", processing_source)
         self.assertIn("QTimer.singleShot(0, scheduler)", processing_source)

@@ -45,7 +45,6 @@ from fh6garage.v1_3_2_change_dialog_runtime_fix import apply_v1_3_2_change_dialo
 from fh6garage.v1_3_2_change_dialog_responsive_ui_fix import apply_v1_3_2_change_dialog_responsive_ui_fix
 from fh6garage.v1_3_2_auction_unapplied_recent_frame_fix import apply_v1_3_2_auction_unapplied_recent_frame_fix
 from fh6garage.v1_3_2_alias_manager_change_card_fix import apply_v1_3_2_alias_manager_change_card_fix
-from fh6garage.v1_3_2_thread_affinity_patch import apply_v1_3_2_thread_affinity_fix
 
 
 def resource_root() -> Path:
@@ -86,8 +85,8 @@ def main() -> int:
     apply_v1_3_2_refresh_diff_patch(MainWindow)
 
     # Present latest refresh changes as cards and resolve user-managed creator
-    # aliases across display/search/sort/group/statistics. This stays before the
-    # final thread-affinity patch and never writes FH6 content.
+    # aliases across display/search/sort/group/statistics. This never writes FH6
+    # content; scan completion remains the class-defined Qt slot in ui.py.
     apply_v1_3_2_change_view_alias_patch(MainWindow)
 
     # Current cards opened from the change viewer are separate widgets from the
@@ -120,11 +119,6 @@ def main() -> int:
     # cards keep the normal card UI but no actions, and the alias manager remains
     # non-modal so the main window can still be used while it is open.
     apply_v1_3_2_alias_manager_change_card_fix(MainWindow)
-
-    # This must be the final MainWindow patch. It restores the original
-    # class-defined @Slot(object) scan callback so all UI rebuilding runs on the
-    # GUI thread, then moves v1.3.2 post-processing into _populate_all().
-    apply_v1_3_2_thread_affinity_fix(MainWindow)
 
     root = resource_root()
     icon_path = root / "icons" / "FH6_Assistant.ico"

@@ -225,10 +225,10 @@ class V132RefreshDiffTests(unittest.TestCase):
             self.assertTrue(diff.baseline)
             self.assertEqual(diff.total, 0)
 
-    def test_app_applies_refresh_diff_before_thread_finalizer(self):
+    def test_app_applies_refresh_diff_before_window_creation(self):
         app_text = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
         refresh_pos = app_text.index("apply_v1_3_2_refresh_diff_patch(MainWindow)")
-        thread_pos = app_text.index("apply_v1_3_2_thread_affinity_fix(MainWindow)")
+        thread_pos = app_text.index("window = MainWindow(project_root=root)")
         self.assertLess(refresh_pos, thread_pos)
 
 

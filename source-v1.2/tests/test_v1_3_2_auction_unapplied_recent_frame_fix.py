@@ -104,12 +104,12 @@ class AuctionUnappliedRecentFrameFixTests(unittest.TestCase):
             self.assertIn("border:1px solid", frame.styleSheet())
         self.assertFalse(bool(unrelated.property("fh6RecentStrongFrame")))
 
-    def test_patch_order_keeps_thread_affinity_final(self) -> None:
+    def test_patch_is_applied_before_window_creation(self) -> None:
         app_source = (ROOT / "app.py").read_text(encoding="utf-8")
         fix_pos = app_source.index(
             "apply_v1_3_2_auction_unapplied_recent_frame_fix(MainWindow)"
         )
-        thread_pos = app_source.index("apply_v1_3_2_thread_affinity_fix(MainWindow)")
+        thread_pos = app_source.index("window = MainWindow(project_root=root)")
         self.assertLess(fix_pos, thread_pos)
 
 

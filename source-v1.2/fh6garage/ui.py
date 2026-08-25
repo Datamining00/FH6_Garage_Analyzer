@@ -61,6 +61,7 @@ from .i18n import SUPPORTED_LANGUAGES, get_language, normalize_language, tr
 from .models import LiveryRecord, ScanResult, TuningRecord
 from .preferences import LocalPreferences
 from .scanner import SaveLayoutError, scan_save
+from .scan_result_processing import populate_scan_result_ui
 from .saved_content_cards import (
     _delete_cached_cards,
     _ensure_scan_generation,
@@ -1687,6 +1688,9 @@ class MainWindow(QMainWindow):
         QMessageBox.critical(self, tr("scan.failed_title"), message)
 
     def _populate_all(self) -> None:
+        populate_scan_result_ui(self, self._populate_all_content)
+
+    def _populate_all_content(self) -> None:
         _ensure_scan_generation(self)
         assert self.result is not None
         r = self.result

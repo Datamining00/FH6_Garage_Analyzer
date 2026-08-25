@@ -120,12 +120,12 @@ class ChangeViewContractTests(unittest.TestCase):
             self.assertEqual(card.findChildren(QToolButton), [])
             card.deleteLater()
 
-    def test_app_patch_order_refresh_then_alias_then_thread_finalizer(self):
+    def test_app_patch_order_refresh_then_alias_then_window(self):
         app_path = Path(__file__).resolve().parents[1] / "app.py"
         source = app_path.read_text(encoding="utf-8")
         refresh_call = source.index("apply_v1_3_2_refresh_diff_patch(MainWindow)")
         alias_call = source.index("apply_v1_3_2_change_view_alias_patch(MainWindow)")
-        thread_call = source.index("apply_v1_3_2_thread_affinity_fix(MainWindow)")
+        thread_call = source.index("window = MainWindow(project_root=root)")
         self.assertLess(refresh_call, alias_call)
         self.assertLess(alias_call, thread_call)
 

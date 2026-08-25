@@ -7,7 +7,7 @@ import uuid
 from pathlib import Path
 
 from fh6garage.models import HeaderInfo, LiveryRecord
-from fh6garage.v1_3_2_thread_affinity_patch import assign_auction_thumbnails
+from fh6garage.scan_result_processing import assign_auction_thumbnails
 
 
 def _write_manifest(cache: Path, rows: list[tuple[str, str]]) -> None:

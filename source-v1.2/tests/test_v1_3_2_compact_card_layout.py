@@ -127,16 +127,16 @@ class V132CompactCardLayoutTests(unittest.TestCase):
         # the C++ QLabel has been destroyed. It must silently become a no-op.
         controller.apply()
 
-    def test_compact_layout_is_integrated_and_thread_finalizer_remains(self) -> None:
+    def test_compact_layout_and_scan_processing_are_integrated(self) -> None:
         source = (ROOT / "app.py").read_text(encoding="utf-8")
         icon_fix = "apply_v1_3_2_icon_overlay_fix(MainWindow)"
         compact = "apply_v1_3_2_compact_card_layout_patch(MainWindow)"
         thread_fix = "apply_v1_3_2_thread_affinity_fix(MainWindow)"
         self.assertNotIn(icon_fix, source)
         self.assertNotIn(compact, source)
-        self.assertIn(thread_fix, source)
-        self.assertIn(thread_fix, source)
+        self.assertNotIn(thread_fix, source)
         ui_source = (ROOT / "fh6garage" / "ui.py").read_text(encoding="utf-8")
+        self.assertIn("populate_scan_result_ui(self, self._populate_all_content)", ui_source)
         self.assertIn("_compact_window_chrome(self)", ui_source)
         self.assertIn("_configure_card_metadata(card)", ui_source)
 

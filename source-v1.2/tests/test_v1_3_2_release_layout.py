@@ -106,10 +106,10 @@ class ReleaseLayoutTests(unittest.TestCase):
         self.assertIs(aligner.fifth_button, excluded)
         self.assertGreaterEqual(aligner.calls, 1)
 
-    def test_release_patch_stays_before_thread_affinity_finalizer(self) -> None:
+    def test_release_patch_stays_before_window_creation(self) -> None:
         source = (ROOT / "app.py").read_text(encoding="utf-8")
         release_layout = "apply_v1_3_2_release_layout_patch(MainWindow)"
-        thread_fix = "apply_v1_3_2_thread_affinity_fix(MainWindow)"
+        thread_fix = "window = MainWindow(project_root=root)"
         self.assertIn(release_layout, source)
         self.assertIn(thread_fix, source)
         self.assertLess(source.index(release_layout), source.index(thread_fix))

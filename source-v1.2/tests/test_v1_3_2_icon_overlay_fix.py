@@ -93,15 +93,16 @@ class V132IconOverlayFixTests(unittest.TestCase):
         self.assertIn("color: #20232d", busy.styleSheet())
         self.assertNotIn("background:rgba(23,24,33,145);", busy.styleSheet())
 
-    def test_patch_order_is_global_ui_then_icon_overlay_then_thread_fix(self) -> None:
+    def test_global_ui_icon_overlay_and_scan_processing_are_integrated(self) -> None:
         source = (ROOT / "app.py").read_text(encoding="utf-8")
         global_ui = "apply_v1_3_2_global_ui_patch(MainWindow)"
         icon_overlay = "apply_v1_3_2_icon_overlay_fix(MainWindow)"
         thread_fix = "apply_v1_3_2_thread_affinity_fix(MainWindow)"
         self.assertNotIn(global_ui, source)
         self.assertNotIn(icon_overlay, source)
-        self.assertIn(thread_fix, source)
+        self.assertNotIn(thread_fix, source)
         ui_source = (ROOT / "fh6garage" / "ui.py").read_text(encoding="utf-8")
+        self.assertIn("populate_scan_result_ui(self, self._populate_all_content)", ui_source)
         self.assertIn("_fix_busy_overlay(self)", ui_source)
         self.assertIn("_normalize_card_actions(card)", ui_source)
         self.assertNotIn("apply_v1_3_2_card_width_overlay_patch(MainWindow)", source)

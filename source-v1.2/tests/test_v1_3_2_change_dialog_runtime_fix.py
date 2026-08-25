@@ -20,11 +20,11 @@ class ChangeDialogRuntimeFixTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.app = QApplication.instance() or QApplication([])
 
-    def test_runtime_fix_stays_before_thread_affinity_finalizer(self) -> None:
+    def test_runtime_fix_stays_before_window_creation(self) -> None:
         app = (ROOT / "app.py").read_text(encoding="utf-8")
         feature_pos = app.index("apply_v1_3_2_change_dialog_folder_patch(MainWindow)")
         runtime_pos = app.index("apply_v1_3_2_change_dialog_runtime_fix(MainWindow)")
-        thread_pos = app.index("apply_v1_3_2_thread_affinity_fix(MainWindow)")
+        thread_pos = app.index("window = MainWindow(project_root=root)")
         self.assertLess(feature_pos, runtime_pos)
         self.assertLess(runtime_pos, thread_pos)
 

@@ -133,11 +133,11 @@ class ChangeDialogResponsiveUiFixTests(unittest.TestCase):
         controller_source = inspect.getsource(patch._ViewportResizeController)
         self.assertIn("QTimer(self)", controller_source)
 
-    def test_patch_order_keeps_thread_affinity_final(self) -> None:
+    def test_patch_order_precedes_window_creation(self) -> None:
         app = (ROOT / "app.py").read_text(encoding="utf-8")
         runtime_pos = app.index("apply_v1_3_2_change_dialog_runtime_fix(MainWindow)")
         responsive_pos = app.index("apply_v1_3_2_change_dialog_responsive_ui_fix(MainWindow)")
-        thread_pos = app.index("apply_v1_3_2_thread_affinity_fix(MainWindow)")
+        thread_pos = app.index("window = MainWindow(project_root=root)")
         self.assertLess(runtime_pos, responsive_pos)
         self.assertLess(responsive_pos, thread_pos)
 

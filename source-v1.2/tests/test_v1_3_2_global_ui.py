@@ -100,15 +100,16 @@ class V132GlobalUiTests(unittest.TestCase):
             self.assertFalse(loaded.isNull())
             self.assertEqual((loaded.width(), loaded.height()), (640, 360))
 
-    def test_patch_order_preserves_thread_affinity_finalizer(self) -> None:
+    def test_global_ui_and_scan_processing_are_integrated(self) -> None:
         source = (ROOT / "app.py").read_text(encoding="utf-8")
         perf = "apply_v1_3_2_ui_performance_patches(MainWindow)"
         global_ui = "apply_v1_3_2_global_ui_patch(MainWindow)"
         thread_fix = "apply_v1_3_2_thread_affinity_fix(MainWindow)"
         self.assertNotIn(perf, source)
         self.assertNotIn(global_ui, source)
-        self.assertIn(thread_fix, source)
+        self.assertNotIn(thread_fix, source)
         ui_source = (ROOT / "fh6garage" / "ui.py").read_text(encoding="utf-8")
+        self.assertIn("populate_scan_result_ui(self, self._populate_all_content)", ui_source)
         self.assertIn("_configure_aspect_card(card)", ui_source)
 
 

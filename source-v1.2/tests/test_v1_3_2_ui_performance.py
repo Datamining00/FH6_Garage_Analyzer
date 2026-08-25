@@ -229,14 +229,15 @@ class V132UiPerformanceTests(unittest.TestCase):
 
         self.assertIsNot(window._livery_card_by_key["Livery_A"], old_card)
 
-    def test_performance_patch_is_integrated_before_thread_finalizer(self) -> None:
+    def test_performance_and_scan_processing_are_integrated(self) -> None:
         source = (ROOT / "app.py").read_text(encoding="utf-8")
         perf = "apply_v1_3_2_ui_performance_patches(MainWindow)"
         thread_fix = "apply_v1_3_2_thread_affinity_fix(MainWindow)"
         ui_source = (ROOT / "fh6garage" / "ui.py").read_text(encoding="utf-8")
         self.assertNotIn(perf, source)
         self.assertIn("initialize_ui_performance_state(self)", ui_source)
-        self.assertIn(thread_fix, source)
+        self.assertNotIn(thread_fix, source)
+        self.assertIn("populate_scan_result_ui(self, self._populate_all_content)", ui_source)
 
     def test_visible_grid_path_does_not_build_hidden_legacy_tables(self) -> None:
         source = (ROOT / "fh6garage" / "ui.py").read_text(encoding="utf-8")

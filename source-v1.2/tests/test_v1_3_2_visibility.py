@@ -11,11 +11,11 @@ class V132VisibilityContractTests(unittest.TestCase):
             root / "fh6garage" / "v1_3_2_visibility_patch.py"
         ).read_text(encoding="utf-8")
 
-    def test_patch_is_installed_before_thread_affinity_fix(self) -> None:
+    def test_patch_is_installed_before_window_creation(self) -> None:
         root = Path(__file__).resolve().parents[1]
         source = (root / "app.py").read_text(encoding="utf-8")
         visibility = source.index("apply_v1_3_2_visibility_patches(MainWindow)")
-        thread_fix = source.index("apply_v1_3_2_thread_affinity_fix(MainWindow)")
+        thread_fix = source.index("window = MainWindow(project_root=root)")
         self.assertLess(visibility, thread_fix)
 
     def test_applied_auction_rule_requires_real_current_webp(self) -> None:
