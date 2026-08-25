@@ -92,8 +92,8 @@ def refresh_alias_views(window: Any) -> None:
     if getattr(window, "result", None) is None:
         return
     window._populate_creator_table()
-    window._populate_livery_table()
-    window._populate_tuning_table()
+    window._populate_livery_view()
+    window._populate_tuning_view()
     window._filter_dashboard_table(window.car_search.text())
     if window.dashboard_content_stack.currentIndex() == 1:
         window._update_selected_creator()

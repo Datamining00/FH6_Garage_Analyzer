@@ -156,7 +156,7 @@ def _set_source_enabled(self: Any, source: str, enabled: bool) -> None:
         return
     self._begin_busy()
     try:
-        self._populate_livery_table()
+        self._populate_livery_view()
         self.livery_grid_scroll.verticalScrollBar().setValue(0)
     finally:
         self._end_busy()

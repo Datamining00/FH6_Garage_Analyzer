@@ -143,7 +143,7 @@ class MainWindowViewOperationTests(unittest.TestCase):
 
     def test_sort_state_updates_immediately_and_rebuild_is_deferred(self) -> None:
         calls: list[str] = []
-        self.window._populate_livery_table = lambda: calls.append(
+        self.window._populate_livery_view = lambda: calls.append(
             self.window._livery_sort_mode
         )
 

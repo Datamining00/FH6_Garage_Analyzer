@@ -241,8 +241,8 @@ class V132UiPerformanceTests(unittest.TestCase):
 
     def test_visible_grid_path_does_not_build_hidden_legacy_tables(self) -> None:
         source = (ROOT / "fh6garage" / "ui.py").read_text(encoding="utf-8")
-        start = source.index("def _populate_livery_table")
-        end = source.index("def _livery_table_item_changed")
+        start = source.index("def _populate_livery_view")
+        end = source.index("def _populate_livery_grid")
         livery_block = source[start:end]
         self.assertNotIn("_populate_saved_content_table", livery_block)
         self.assertIn("self._populate_livery_grid()", livery_block)

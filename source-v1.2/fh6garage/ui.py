@@ -1315,10 +1315,6 @@ class MainWindow(QMainWindow):
         ) = self._build_saved_content_controls("livery")
         layout.addLayout(controls)
 
-        self.livery_table = self._saved_content_table(tr("table.livery_name"))
-        self.livery_table.setParent(page)
-        self.livery_table.hide()
-
         self.livery_grid_scroll = QScrollArea()
         self.livery_grid_scroll.setObjectName("liveryGridScroll")
         self.livery_grid_scroll.setWidgetResizable(True)
@@ -1389,10 +1385,6 @@ class MainWindow(QMainWindow):
             self.tuning_sort_buttons,
         ) = self._build_saved_content_controls("tuning")
         layout.addLayout(controls)
-        self.tuning_table = self._saved_content_table(tr("table.tuning_name"))
-        self.tuning_table.setParent(page)
-        self.tuning_table.hide()
-
         self.tuning_grid_scroll = QScrollArea()
         self.tuning_grid_scroll.setObjectName("tuningGridScroll")
         self.tuning_grid_scroll.setWidgetResizable(True)
@@ -1453,56 +1445,6 @@ class MainWindow(QMainWindow):
             table.horizontalHeader().setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
         if len(headers) > 1:
             table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        return table
-
-    def _saved_content_table(self, name_header: str) -> QTableWidget:
-        """Create the common list component used by Livery and Tuning.
-
-        Visible columns intentionally stay identical:
-        Status | Vehicle | Creator | Name | Description | Memo | Created | Downloaded
-
-        The future detail column is deliberately omitted until the supporting
-        database/schema mapping is available.
-        """
-        table = self._table(
-            (
-                tr("table.status"),
-                tr("table.vehicle_name"),
-                tr("table.creator_short"),
-                name_header,
-                tr("table.description"),
-                tr("table.memo"),
-                tr("table.created"),
-                tr("table.downloaded"),
-            )
-        )
-        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        table.setStyleSheet(
-            "QTableWidget::item:selected { background:#f2edff; color:#171924; border:0; }"
-            "QTableWidget::item:selected:active { background:#f2edff; color:#171924; border:0; }"
-            "QTableWidget::item:hover { background:#fbf9ff; }"
-        )
-
-        header = table.horizontalHeader()
-        header.setStretchLastSection(False)
-        header.setDefaultAlignment(
-            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
-        )
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(7, QHeaderView.ResizeMode.Fixed)
-
-        table.setColumnWidth(0, 126)
-        table.setColumnWidth(2, 150)
-        table.setColumnWidth(5, 48)
-        table.setColumnWidth(6, 104)
-        table.setColumnWidth(7, 150)
         return table
 
     def _build_saved_content_controls(
@@ -1820,10 +1762,10 @@ class MainWindow(QMainWindow):
         self._populate_creator_table()
         self._begin_busy(tr("content.rebuilding_livery"))
         try:
-            self._populate_livery_table()
+            self._populate_livery_view()
         finally:
             self._end_busy()
-        self._populate_tuning_table()
+        self._populate_tuning_view()
         self._refresh_db_status(self._current_unknown_car_ids())
 
     def _configure_dashboard_table(self, table: QTableWidget) -> None:
@@ -2186,9 +2128,9 @@ class MainWindow(QMainWindow):
             return
 
         populate = (
-            self._populate_livery_table
+            self._populate_livery_view
             if content_type == "livery"
-            else self._populate_tuning_table
+            else self._populate_tuning_view
         )
         self._view_operations.request(
             content_type,
@@ -2505,28 +2447,13 @@ class MainWindow(QMainWindow):
         self._show_status(message, 8000)
 
 
-    def _populate_livery_table(self) -> None:
+    def _populate_livery_view(self) -> None:
         self._fh6_v132_auction_build_generation = (
             getattr(self, "_fh6_v132_auction_build_generation", 0) + 1
         )
         self._populate_livery_grid()
 
     @Slot(QTableWidgetItem)
-    def _livery_table_item_changed(
-        self,
-        item: QTableWidgetItem,
-    ) -> None:
-        return
-
-    @Slot(int, int)
-    def _livery_table_cell_double_clicked(
-        self,
-        row: int,
-        column: int,
-    ) -> None:
-        return
-
-
     def _populate_livery_grid(self) -> None:
         _populate_livery_grid_reusing_cards(self)
 
@@ -2863,7 +2790,6 @@ class MainWindow(QMainWindow):
             old_scroll = scrollbar.value()
             self._relayout_tuning_grid(text)
             if not preserve_scroll:
-                self.tuning_table.scrollToTop()
                 scrollbar.setValue(0)
             else:
                 self._restore_grid_scroll(scrollbar, old_scroll)
@@ -2990,64 +2916,6 @@ class MainWindow(QMainWindow):
         content_type: str,
         key: str,
     ) -> None:
-        annotation = self.annotations.get(key)
-        table = (
-            self.livery_table
-            if content_type == "livery"
-            else self.tuning_table
-        )
-
-        for row in range(table.rowCount()):
-            item = table.item(row, 0)
-            if (
-                item is None
-                or str(
-                    item.data(Qt.ItemDataRole.UserRole)
-                    or ""
-                ) != key
-            ):
-                continue
-
-            status_widget = table.cellWidget(row, 0)
-            if status_widget is not None:
-                for object_name, enabled in (
-                    ("detailCheckButton", annotation.checked),
-                    ("detailTriangleButton", annotation.triangle),
-                    ("detailExcludedButton", annotation.excluded),
-                ):
-                    button = status_widget.findChild(QToolButton, object_name)
-                    if button is not None:
-                        button.blockSignals(True)
-                        button.setChecked(enabled)
-                        button.blockSignals(False)
-
-            memo_item = table.item(row, 5)
-            if memo_item is not None:
-                self._set_detail_memo_item(
-                    memo_item,
-                    annotation.note,
-                )
-            memo_widget = table.cellWidget(row, 5)
-            if memo_widget is not None:
-                button = memo_widget.findChild(QToolButton)
-                if button is not None:
-                    note = (
-                        annotation.note or ""
-                    ).strip()
-                    button.setIcon(
-                        self._detail_memo_icon(
-                            bool(note)
-                        )
-                    )
-                    button.setToolTip(
-                        (
-                            note
-                            + tr("memo.edit_suffix")
-                        )
-                        if note
-                        else tr("memo.none_add")
-                    )
-            break
         _sync_cached_annotation_card(self, content_type, key)
 
     def _sync_table_annotation(
@@ -3172,43 +3040,6 @@ class MainWindow(QMainWindow):
 
 
     def _refresh_annotation_widgets(self) -> None:
-        self.livery_table.blockSignals(True)
-        try:
-            for row in range(self.livery_table.rowCount()):
-                item = self.livery_table.item(row, 0)
-                if not item:
-                    continue
-                key = str(item.data(Qt.ItemDataRole.UserRole) or "")
-                annotation = self.annotations.get(key)
-
-                status_widget = self.livery_table.cellWidget(row, 0)
-                if status_widget is not None:
-                    for object_name, enabled in (
-                        ("detailCheckButton", annotation.checked),
-                        ("detailTriangleButton", annotation.triangle),
-                        ("detailExcludedButton", annotation.excluded),
-                    ):
-                        button = status_widget.findChild(QToolButton, object_name)
-                        if button is not None:
-                            button.blockSignals(True)
-                            button.setChecked(enabled)
-                            button.blockSignals(False)
-
-                memo = self.livery_table.item(row, 5)
-                if memo is not None:
-                    self._set_detail_memo_item(memo, annotation.note)
-                memo_widget = self.livery_table.cellWidget(row, 5)
-                if memo_widget is not None:
-                    button = memo_widget.findChild(QToolButton)
-                    if button is not None:
-                        note = (annotation.note or "").strip()
-                        button.setIcon(self._detail_memo_icon(bool(note)))
-                        button.setToolTip(
-                            (note + tr("memo.edit_suffix")) if note else tr("memo.none_add")
-                        )
-        finally:
-            self.livery_table.blockSignals(False)
-
         for key, card in self._livery_card_by_key.items():
             annotation = self.annotations.get(key)
             checkbox = getattr(card, "_fh6_check_box", None)
@@ -3237,23 +3068,6 @@ class MainWindow(QMainWindow):
 
 
     @Slot()
-    def _apply_selected_table_note_to_creator(self) -> None:
-        rows = self.livery_table.selectionModel().selectedRows()
-        if not rows:
-            QMessageBox.information(self, tr("memo.select_livery_title"), tr("memo.select_livery_message"))
-            return
-        row = rows[0].row()
-        key_item = self.livery_table.item(row, 0)
-        memo_item = self.livery_table.item(row, 5)
-        if not key_item or not memo_item:
-            return
-        key = str(
-            key_item.data(Qt.ItemDataRole.UserRole) or ""
-        )
-        note = self.annotations.get(key).note
-        self._apply_note_to_same_creator(key, note)
-
-    @Slot(int)
     def _on_main_page_changed(self, index: int) -> None:
         """Prime lazy thumbnails when a hidden stacked page becomes visible.
 
@@ -3410,7 +3224,7 @@ class MainWindow(QMainWindow):
         _save_window_geometry(self)
         super().closeEvent(event)
 
-    def _populate_tuning_table(self) -> None:
+    def _populate_tuning_view(self) -> None:
         self._populate_tuning_grid()
 
     def _fh6_v132_reset_ui_card_cache(
@@ -3857,21 +3671,6 @@ class MainWindow(QMainWindow):
             button.setCursor(Qt.CursorShape.PointingHandCursor)
 
     @Slot(int, int)
-    def _update_livery_table_cursor(
-        self,
-        row: int,
-        column: int,
-    ) -> None:
-        if column in (0, 6):
-            self.livery_table.viewport().setCursor(
-                Qt.CursorShape.PointingHandCursor
-            )
-        else:
-            self.livery_table.viewport().setCursor(
-                Qt.CursorShape.ArrowCursor
-            )
-
-    @staticmethod
     def _detail_view_icon() -> QIcon:
         pixmap = QPixmap(24, 24)
         pixmap.fill(Qt.GlobalColor.transparent)
@@ -4409,160 +4208,6 @@ class MainWindow(QMainWindow):
         )
 
 
-    def _detail_table_button_container(self, button: QWidget) -> QWidget:
-        container = QWidget()
-        container.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        container.setStyleSheet("background: transparent;")
-        layout = QHBoxLayout(container)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(button)
-        return container
-
-    def _detail_status_button_container(
-        self,
-        check_button: QToolButton,
-        triangle_button: QToolButton,
-        excluded_button: QToolButton,
-    ) -> QWidget:
-        container = QWidget()
-        container.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        container.setStyleSheet("background:transparent;")
-        layout = QHBoxLayout(container)
-        layout.setContentsMargins(4, 0, 4, 0)
-        layout.setSpacing(5)
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(check_button)
-        layout.addWidget(triangle_button)
-        layout.addWidget(excluded_button)
-        return container
-
-    def _make_detail_check_button(
-        self,
-        key: str,
-        checked: bool,
-        content_type: str = "livery",
-    ) -> QToolButton:
-        button = QToolButton()
-        button.setObjectName("detailCheckButton")
-        button.setCheckable(True)
-        button.setIcon(_classification_toggle_icon("check"))
-        button.setIconSize(QSize(22, 22))
-        button.setChecked(bool(checked))
-        button.setToolTip(tr("status.toggle_check"))
-        noun = tr("content.noun_livery") if content_type == "livery" else tr("content.noun_tuning")
-        button.setAccessibleName(tr("status.accessible_check", noun=noun))
-        button.setFixedSize(34, 34)
-        button.setStyleSheet(
-            "QToolButton { background:rgba(255,255,255,238); color:#9aa0aa; "
-            "border:1px solid #dfe1e8; border-radius:17px; font-size:16px; font-weight:800; padding:0; }"
-            "QToolButton:hover { border-color:#a9adb7; background:rgba(255,255,255,250); }"
-            "QToolButton:checked { color:#2e9b50; border-color:#7ac58f; background:#eef9f1; }"
-            "QToolButton:checked:hover { color:#238442; border-color:#58ad72; background:#e7f6eb; }"
-        )
-        button.clicked.connect(
-            lambda _=False, kind=content_type, k=key, b=button:
-            self._handle_saved_content_check_clicked(
-                kind,
-                k,
-                b.isChecked(),
-            )
-        )
-        return button
-
-    def _make_detail_triangle_button(
-        self,
-        key: str,
-        enabled: bool,
-        content_type: str = "livery",
-    ) -> QToolButton:
-        button = QToolButton()
-        button.setObjectName("detailTriangleButton")
-        button.setCheckable(True)
-        button.setIcon(_classification_toggle_icon("triangle"))
-        button.setIconSize(QSize(22, 22))
-        button.setChecked(bool(enabled))
-        button.setToolTip(tr("status.toggle_triangle"))
-        noun = tr("content.noun_livery") if content_type == "livery" else tr("content.noun_tuning")
-        button.setAccessibleName(tr("status.accessible_triangle", noun=noun))
-        button.setFixedSize(34, 34)
-        button.setStyleSheet(
-            "QToolButton { background:rgba(255,255,255,238); color:#9aa0aa; "
-            "border:1px solid #dfe1e8; border-radius:8px; font-size:17px; font-weight:800; padding:0; }"
-            "QToolButton:hover { border-color:#d4a14c; background:rgba(255,250,240,250); }"
-            "QToolButton:checked { color:#d98216; border-color:#e2a64f; background:#fff5e6; }"
-            "QToolButton:checked:hover { color:#c36f09; border-color:#d58d2c; background:#ffeed5; }"
-        )
-        button.clicked.connect(
-            lambda _=False, kind=content_type, k=key, b=button:
-            self._handle_saved_content_triangle_clicked(
-                kind,
-                k,
-                b.isChecked(),
-            )
-        )
-        return button
-
-    def _make_detail_memo_button(
-        self,
-        key: str,
-        note: str,
-        content_type: str = "livery",
-    ) -> QToolButton:
-        note = (note or "").strip()
-        button = QToolButton()
-        button.setIcon(self._detail_memo_icon(bool(note)))
-        button.setIconSize(QSize(18, 18))
-        button.setToolTip(
-            (note + tr("memo.edit_suffix")) if note else tr("memo.none_add")
-        )
-        noun = tr("content.noun_livery") if content_type == "livery" else tr("content.noun_tuning")
-        button.setAccessibleName(tr("memo.accessible", noun=noun))
-        button.setFixedSize(34, 34)
-        button.setStyleSheet(
-            "QToolButton { background:rgba(255,255,255,238); color:#555a68; "
-            "border:1px solid #dfe1e8; border-radius:8px; padding:0; }"
-            "QToolButton:hover { border-color:#8c74ee; background:rgba(247,245,255,250); }"
-        )
-        button.clicked.connect(
-            lambda _=False, kind=content_type, k=key:
-            self._handle_saved_content_memo_clicked(
-                kind,
-                k,
-            )
-        )
-        return button
-
-    def _make_detail_excluded_button(
-        self,
-        key: str,
-        enabled: bool,
-        content_type: str = "livery",
-    ) -> QToolButton:
-        button = QToolButton()
-        button.setObjectName("detailExcludedButton")
-        button.setCheckable(True)
-        button.setIcon(_classification_toggle_icon("excluded"))
-        button.setIconSize(QSize(22, 22))
-        button.setChecked(bool(enabled))
-        button.setToolTip(tr("status.toggle_excluded"))
-        noun = tr("content.noun_livery") if content_type == "livery" else tr("content.noun_tuning")
-        button.setAccessibleName(tr("status.accessible_excluded", noun=noun))
-        button.setFixedSize(34, 34)
-        button.setStyleSheet(
-            "QToolButton { background:rgba(255,255,255,238); color:#9aa0aa; "
-            "border:1px solid #dfe1e8; border-radius:8px; font-size:18px; font-weight:800; padding:0; }"
-            "QToolButton:hover { border-color:#df7d86; background:rgba(255,247,248,250); }"
-            "QToolButton:checked { color:#c93c49; border-color:#df7d86; background:#fff0f2; }"
-            "QToolButton:checked:hover { color:#ad2936; border-color:#cf5b66; background:#ffe7ea; }"
-        )
-        button.clicked.connect(
-            lambda _=False, kind=content_type, k=key, b=button:
-            self._handle_saved_content_excluded_clicked(kind, k, b.isChecked())
-        )
-        return button
-
     def _handle_saved_content_check_clicked(
         self,
         content_type: str,
@@ -4688,55 +4333,6 @@ class MainWindow(QMainWindow):
             filter_modes={3, 4},
             search_sensitive=True,
         )
-
-    def _handle_detail_check_clicked(
-        self,
-        key: str,
-        checked: bool,
-    ) -> None:
-        self._handle_saved_content_check_clicked(
-            "livery",
-            key,
-            checked,
-        )
-
-    def _handle_detail_memo_clicked(
-        self,
-        key: str,
-    ) -> None:
-        self._handle_saved_content_memo_clicked(
-            "livery",
-            key,
-        )
-
-    def _set_detail_check_item(
-        self,
-        item: QTableWidgetItem,
-        checked: bool,
-    ) -> None:
-        item.setText("")
-        item.setData(Qt.ItemDataRole.UserRole + 1, bool(checked))
-        item.setTextAlignment(
-            Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter
-        )
-        item.setToolTip(tr("status.checked") if checked else tr("status.unchecked"))
-
-    def _set_detail_memo_item(
-        self,
-        item: QTableWidgetItem,
-        note: str,
-    ) -> None:
-        note = (note or "").strip()
-        item.setText("")
-        item.setTextAlignment(
-            Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter
-        )
-        item.setData(Qt.ItemDataRole.UserRole + 1, note)
-        if note:
-            item.setToolTip(note + tr("memo.edit_suffix"))
-        else:
-            item.setToolTip(tr("memo.none_add"))
-
 
     def _icon_for(self, path: Optional[Path]) -> QIcon:
         # Small table icons are owned by their table items. Do not keep a second

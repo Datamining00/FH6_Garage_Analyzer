@@ -30,11 +30,11 @@ class V132ListFixContractTests(unittest.TestCase):
         self.assertNotIn("def patched_scan_finished", source)
         self.assertIn("def _fh6_v132_schedule_auction_cards", source)
 
-    def test_populate_livery_table_does_not_schedule_auction_reentrantly(self) -> None:
+    def test_populate_livery_view_does_not_schedule_auction_reentrantly(self) -> None:
         root = Path(__file__).resolve().parents[1]
         ui_source = (root / "fh6garage" / "ui.py").read_text(encoding="utf-8")
-        start = ui_source.index("def _populate_livery_table")
-        block = ui_source[start:ui_source.index("def _livery_table_item_changed", start)]
+        start = ui_source.index("def _populate_livery_view")
+        block = ui_source[start:ui_source.index("def _populate_livery_grid", start)]
         self.assertIn("self._populate_livery_grid()", block)
         self.assertNotIn("schedule_auction_cards", block)
         self.assertNotIn("QTimer.singleShot", block)
