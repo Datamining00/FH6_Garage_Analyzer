@@ -67,7 +67,7 @@ from .game_navigation import (
     NavigationItem,
     send_arrow_keys_to_fh6,
 )
-from .i18n import SUPPORTED_LANGUAGES, get_language, normalize_language, tr
+from .i18n import SUPPORTED_LANGUAGES, get_language, tr
 from .models import LiveryRecord, ScanResult, TuningRecord
 from .livery_visibility import (
     AUCTION_APPLIED_MODE,
@@ -112,6 +112,7 @@ from .ui_responsiveness import (
     _yield_busy_events,
 )
 from .ui_cleanup import _install_card_hide_button
+from .ui_followup import IMAGE_MIN_HEIGHT, configure_language_controls, persist_language_preference, restart_application, set_always_on_top
 from .view_operations import ViewOperationCoordinator
 from .window_responsiveness import (
     _ensure_resize_timer,
@@ -741,6 +742,7 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(960, 680)
         QApplication.instance().setStyleSheet(APP_STYLE)
         self._build_ui()
+        configure_language_controls(self)
         _ensure_resize_timer(self)
         _restore_window_geometry(self)
         app = QApplication.instance()
@@ -828,27 +830,15 @@ class MainWindow(QMainWindow):
     @Slot(int)
     def _on_language_preference_changed(self, index: int) -> None:
         """Persist a language choice and apply it cleanly on the next launch."""
-        if index < 0:
-            return
-        raw_language = self.language_combo.itemData(index)
-        if not isinstance(raw_language, str):
-            return
-        normalized = normalize_language(raw_language)
-        self.settings.setValue("language", normalized)
-        if normalized != get_language():
-            self._show_status(tr("language.restart_required"), 6000)
+        persist_language_preference(self, index)
+
+    def _restart_for_language_change(self) -> None:
+        restart_application(self)
 
     @Slot(bool)
     def _set_always_on_top(self, enabled: bool, *, persist: bool = True) -> None:
-        """Apply the topmost flag without changing the current window size."""
-        was_visible = self.isVisible()
-        was_maximized = self.isMaximized()
-        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, enabled)
-        if persist:
-            self.settings.setValue("window_always_on_top", enabled)
-        # Changing a native window flag hides an already visible window.
-        if was_visible:
-            self.showMaximized() if was_maximized else self.show()
+        """Apply the topmost state with a non-flashing Windows fast path."""
+        set_always_on_top(self, enabled, persist=persist)
 
     def _show_status(self, message: str, timeout: int = 0) -> None:
         """Show the status bar only while a message is active.
@@ -2831,7 +2821,7 @@ class MainWindow(QMainWindow):
 
         image_label = QLabel()
         image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        image_label.setMinimumHeight(210)
+        image_label.setMinimumHeight(IMAGE_MIN_HEIGHT)
         image_label.setStyleSheet("background:#f1f2f6;border-radius:9px;")
         image_label.setText("Thumbnail")
         image_label.setObjectName("muted")

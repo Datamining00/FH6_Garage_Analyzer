@@ -28,7 +28,7 @@ from .refresh_history import (
     LiverySnapshotEntry,
     cached_thumbnail_path,
 )
-from .v1_3_ui_patch import GRID_MAX_COLUMNS, GRID_MIN_COLUMNS
+from .saved_content_layout import GRID_MAX_COLUMNS, GRID_MIN_COLUMNS
 
 _RECENT_CARD_FRAME_RULE = (
     "QFrame#panel, QFrame#card { "

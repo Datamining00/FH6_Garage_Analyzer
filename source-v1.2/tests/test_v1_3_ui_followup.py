@@ -11,11 +11,10 @@ from PySide6.QtWidgets import QApplication
 from fh6garage.i18n import set_language
 from fh6garage.ui import MainWindow
 from fh6garage.saved_content_layout import GRID_MAX_COLUMNS
-from fh6garage.v1_3_ui_patch import IMAGE_MIN_HEIGHT, apply_v1_3_ui_patches
+from fh6garage.ui_followup import IMAGE_MIN_HEIGHT
 
 
 ROOT = Path(__file__).resolve().parents[1]
-apply_v1_3_ui_patches(MainWindow)
 
 
 class V13FollowupUiTests(unittest.TestCase):

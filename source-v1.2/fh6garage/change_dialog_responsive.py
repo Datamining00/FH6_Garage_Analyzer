@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 from . import change_dialog_cards as _feature
 from .i18n import tr
 from .ui import APP_STYLE
-from .v1_3_ui_patch import (
+from .saved_content_layout import (
     GRID_MAX_COLUMNS,
     GRID_MIN_COLUMNS,
     GRID_TARGET_CARD_WIDTH,
