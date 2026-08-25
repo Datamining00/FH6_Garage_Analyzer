@@ -7,26 +7,15 @@ from types import SimpleNamespace
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication, QFrame, QHBoxLayout, QLabel, QPushButton, QToolButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QApplication, QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from fh6garage.release_layout import (
-    _align_left_actions_to_right_second_third,
     _compact_change_banner,
     _move_change_banner_to_reserved_slot,
 )
 
 
 ROOT = Path(__file__).resolve().parents[1]
-
-
-class _Aligner:
-    def __init__(self) -> None:
-        self.fourth_button = None
-        self.fifth_button = None
-        self.calls = 0
-
-    def reposition(self) -> None:
-        self.calls += 1
 
 
 class ReleaseLayoutTests(unittest.TestCase):
@@ -90,21 +79,6 @@ class ReleaseLayoutTests(unittest.TestCase):
         )
         _compact_change_banner(owner)
         self.assertTrue(banner.isHidden())
-
-    def test_hide_and_info_retarget_right_second_and_third_rows(self) -> None:
-        triangle = QToolButton()
-        excluded = QToolButton()
-        aligner = _Aligner()
-        card = SimpleNamespace(
-            _fh6_card_action_aligner=aligner,
-            _fh6_triangle_box=triangle,
-            _fh6_excluded_box=excluded,
-        )
-        _align_left_actions_to_right_second_third(card)
-        QApplication.processEvents()
-        self.assertIs(aligner.fourth_button, triangle)
-        self.assertIs(aligner.fifth_button, excluded)
-        self.assertGreaterEqual(aligner.calls, 1)
 
     def test_release_runtime_patch_is_removed(self) -> None:
         source = (ROOT / "app.py").read_text(encoding="utf-8")

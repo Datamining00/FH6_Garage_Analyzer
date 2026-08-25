@@ -9,7 +9,7 @@ from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QToolButton, QWidget
 
 from fh6garage.card_action_alignment import (
-    _CardActionAligner,
+    LiveryCardActionAligner,
     _eye_slash_pixmap,
 )
 from fh6garage.ui import _classification_pixmap
@@ -56,14 +56,18 @@ class CardActionAlignmentV132Tests(unittest.TestCase):
         fifth = QToolButton(overlay)
         fifth.setGeometry(454, 174, 38, 38)
 
-        aligner = _CardActionAligner(
-            overlay,
-            hide,
-            info,
-            move,
-            fourth,
-            fifth,
-        )
+        card = QWidget()
+        card._fh6_game_move_button = move
+        card._fh6_hide_button = hide
+        card._fh6_info_button = info
+        card._fh6_check_box = QToolButton(overlay)
+        card._fh6_check_box.setGeometry(454, 86, 38, 38)
+        card._fh6_triangle_box = fourth
+        card._fh6_excluded_box = fifth
+        card._fh6_folder_button = QToolButton(overlay)
+        card._fh6_zoom_button = QToolButton(overlay)
+        card._fh6_zoom_button.setGeometry(454, 218, 38, 38)
+        aligner = LiveryCardActionAligner(card, overlay)
         aligner.reposition()
 
         self.assertEqual(hide.geometry().center().y(), fourth.geometry().center().y())

@@ -122,69 +122,6 @@ def _top_left_for_center(center: QPoint, widget: QWidget) -> QPoint:
     )
 
 
-class _CardActionAligner(QObject):
-    _EVENTS = {
-        QEvent.Type.Show,
-        QEvent.Type.Resize,
-        QEvent.Type.LayoutRequest,
-        QEvent.Type.PolishRequest,
-    }
-
-    def __init__(
-        self,
-        overlay: QWidget,
-        hide_button: QToolButton,
-        info_button: QToolButton,
-        left_anchor: QToolButton | None,
-        fourth_button: QToolButton,
-        fifth_button: QToolButton,
-    ) -> None:
-        super().__init__(overlay)
-        self.overlay = overlay
-        self.hide_button = hide_button
-        self.info_button = info_button
-        self.left_anchor = left_anchor
-        self.fourth_button = fourth_button
-        self.fifth_button = fifth_button
-        overlay.installEventFilter(self)
-
-    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
-        if event.type() in self._EVENTS:
-            QTimer.singleShot(0, self.reposition)
-        return False
-
-    def _left_center_x(self) -> int:
-        if self.left_anchor is not None and self.left_anchor.isVisible():
-            return _center_in_overlay(self.left_anchor, self.overlay).x()
-        return 8 + (self.hide_button.width() - 1) // 2
-
-    def reposition(self) -> None:
-        if not all(
-            widget is not None
-            for widget in (
-                self.overlay,
-                self.hide_button,
-                self.info_button,
-                self.fourth_button,
-                self.fifth_button,
-            )
-        ):
-            return
-
-        left_x = self._left_center_x()
-        fourth_center = _center_in_overlay(self.fourth_button, self.overlay)
-        fifth_center = _center_in_overlay(self.fifth_button, self.overlay)
-
-        self.hide_button.move(
-            _top_left_for_center(QPoint(left_x, fourth_center.y()), self.hide_button)
-        )
-        self.info_button.move(
-            _top_left_for_center(QPoint(left_x, fifth_center.y()), self.info_button)
-        )
-        self.hide_button.raise_()
-        self.info_button.raise_()
-
-
 def _card_overlay(card: Any) -> QWidget | None:
     image_label = getattr(card, "_fh6_image_label", None)
     if image_label is None:
@@ -235,13 +172,20 @@ def _install_folder_button(card: Any, record: Any) -> QToolButton | None:
     return button
 
 
-class _FourLeftActionAligner(QObject):
+class LiveryCardActionAligner(QObject):
     _EVENTS = {
         QEvent.Type.Show,
         QEvent.Type.Resize,
         QEvent.Type.LayoutRequest,
         QEvent.Type.PolishRequest,
     }
+
+    ROWS = (
+        ("_fh6_game_move_button", "_fh6_check_box"),
+        ("_fh6_hide_button", "_fh6_triangle_box"),
+        ("_fh6_info_button", "_fh6_excluded_box"),
+        ("_fh6_folder_button", "_fh6_zoom_button"),
+    )
 
     def __init__(self, card: Any, overlay: QWidget) -> None:
         super().__init__(overlay)
@@ -255,50 +199,22 @@ class _FourLeftActionAligner(QObject):
         return False
 
     def reposition(self) -> None:
-        rows = (
-            ("_fh6_game_move_button", "_fh6_check_box"),
-            ("_fh6_hide_button", "_fh6_triangle_box"),
-            ("_fh6_info_button", "_fh6_excluded_box"),
-            ("_fh6_folder_button", "_fh6_zoom_button"),
-        )
         left_x = 8 + (CARD_ACTION_BUTTON_SIZE - 1) // 2
-        for left_name, _right_name in rows:
+        for left_name, _right_name in self.ROWS:
             left = getattr(self.card, left_name, None)
-            if isinstance(left, QToolButton) and left.isVisible():
+            if isinstance(left, QToolButton) and not left.isHidden():
                 left_x = _center_in_overlay(left, self.overlay).x()
                 break
-        for left_name, right_name in rows:
+        for left_name, right_name in self.ROWS:
             left = getattr(self.card, left_name, None)
             right = getattr(self.card, right_name, None)
             if not isinstance(left, QToolButton) or not isinstance(right, QToolButton):
                 continue
-            if not left.isVisible() or not right.isVisible():
+            if left.isHidden() or right.isHidden():
                 continue
             right_center = _center_in_overlay(right, self.overlay)
             left.move(_top_left_for_center(QPoint(left_x, right_center.y()), left))
             left.raise_()
-
-
-def _repoint_existing_aligners(card: Any) -> None:
-    triangle = getattr(card, "_fh6_triangle_box", None)
-    excluded = getattr(card, "_fh6_excluded_box", None)
-    hide_aligner = getattr(card, "_fh6_hide_aligner", None)
-    if hide_aligner is not None and isinstance(triangle, QToolButton):
-        if hasattr(hide_aligner, "target_button"):
-            hide_aligner.target_button = triangle
-    card_aligner = getattr(card, "_fh6_card_action_aligner", None)
-    if card_aligner is not None:
-        if isinstance(triangle, QToolButton) and hasattr(card_aligner, "fourth_button"):
-            card_aligner.fourth_button = triangle
-        if isinstance(excluded, QToolButton) and hasattr(card_aligner, "fifth_button"):
-            card_aligner.fifth_button = excluded
-
-
-def _reposition_action_aligners(card: Any) -> None:
-    for name in ("_fh6_hide_aligner", "_fh6_card_action_aligner", "_fh6_four_left_action_aligner"):
-        reposition = getattr(getattr(card, name, None), "reposition", None)
-        if callable(reposition):
-            reposition()
 
 
 def configure_livery_card_actions(card: Any, record: Any) -> None:
@@ -310,12 +226,11 @@ def configure_livery_card_actions(card: Any, record: Any) -> None:
     if overlay is None:
         return
     _install_folder_button(card, record)
-    aligner = _FourLeftActionAligner(card, overlay)
-    card._fh6_four_left_action_aligner = aligner
-    _repoint_existing_aligners(card)
-    _reposition_action_aligners(card)
-    QTimer.singleShot(0, lambda target=card: _reposition_action_aligners(target))
-    QTimer.singleShot(50, lambda target=card: _reposition_action_aligners(target))
+    aligner = LiveryCardActionAligner(card, overlay)
+    card._fh6_action_aligner = aligner
+    aligner.reposition()
+    QTimer.singleShot(0, aligner.reposition)
+    QTimer.singleShot(50, aligner.reposition)
 
 
 def _fix_card_actions(card: Any) -> None:
@@ -323,7 +238,6 @@ def _fix_card_actions(card: Any) -> None:
     info_button = getattr(card, "_fh6_info_button", None)
     zoom_button = getattr(card, "_fh6_zoom_button", None)
     memo_button = getattr(card, "_fh6_memo_button", None)
-    move_button = getattr(card, "_fh6_game_move_button", None)
     image_label = getattr(card, "_fh6_image_label", None)
 
     if not all(
@@ -351,15 +265,3 @@ def _fix_card_actions(card: Any) -> None:
 
     update_hide_icon(hide_button.isChecked())
     hide_button.toggled.connect(update_hide_icon)
-
-    anchor = move_button if isinstance(move_button, QToolButton) else None
-    aligner = _CardActionAligner(
-        overlay,
-        hide_button,
-        info_button,
-        anchor,
-        zoom_button,
-        memo_button,
-    )
-    card._fh6_card_action_aligner = aligner
-    QTimer.singleShot(0, aligner.reposition)

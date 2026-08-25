@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtWidgets import QHBoxLayout, QSizePolicy, QToolButton, QWidget
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QHBoxLayout, QSizePolicy, QWidget
 
 
 def _move_change_banner_to_reserved_slot(window: Any) -> None:
@@ -79,22 +79,3 @@ def _compact_change_banner(window: Any) -> None:
         f"새로고침 변경 · 추가 {added} · 삭제 {removed} · 변경 {changed}\n클릭하여 보기"
     )
     banner.show()
-
-
-def _align_left_actions_to_right_second_third(card: Any) -> None:
-    aligner = getattr(card, "_fh6_card_action_aligner", None)
-    triangle = getattr(card, "_fh6_triangle_box", None)
-    excluded = getattr(card, "_fh6_excluded_box", None)
-    if aligner is None:
-        return
-    if not isinstance(triangle, QToolButton) or not isinstance(excluded, QToolButton):
-        return
-
-    # The legacy aligner calls these anchors fourth/fifth because it originally
-    # targeted the zoom/memo rows. Repoint them to the right-side 2nd/3rd controls
-    # (triangle / excluded) so hide and info share those exact centerlines.
-    aligner.fourth_button = triangle
-    aligner.fifth_button = excluded
-    reposition = getattr(aligner, "reposition", None)
-    if callable(reposition):
-        QTimer.singleShot(0, reposition)

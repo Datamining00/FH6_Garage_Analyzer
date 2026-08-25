@@ -14,8 +14,6 @@ from PySide6.QtWidgets import (
 
 from fh6garage import change_dialog_cards as feature
 from fh6garage import card_action_alignment as actions
-from fh6garage.card_action_alignment import _CardActionAligner
-from fh6garage.ui_cleanup import _HideButtonAligner
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -112,26 +110,13 @@ class ChangeDialogRuntimeFixTests(unittest.TestCase):
         card._fh6_info_button = info
         card._fh6_folder_button = folder
 
-        hide_aligner = _HideButtonAligner(overlay, hide, zoom, info)
-        card_aligner = _CardActionAligner(
-            overlay, hide, info, move, zoom, memo
-        )
-        four_aligner = actions._FourLeftActionAligner(card, overlay)
-        card._fh6_hide_aligner = hide_aligner
-        card._fh6_card_action_aligner = card_aligner
-        card._fh6_four_left_action_aligner = four_aligner
+        aligner = actions.LiveryCardActionAligner(card, overlay)
+        card._fh6_action_aligner = aligner
 
         overlay.show()
         self.app.processEvents()
-        actions._repoint_existing_aligners(card)
+        aligner.reposition()
 
-        # Exercise every aligner, including the two legacy ones, then make the
-        # four-row owner run last exactly as the runtime fix does.
-        actions._reposition_action_aligners(card)
-
-        self.assertIs(hide_aligner.target_button, triangle)
-        self.assertIs(card_aligner.fourth_button, triangle)
-        self.assertIs(card_aligner.fifth_button, excluded)
         self.assertEqual(move.geometry().center().y(), check.geometry().center().y())
         self.assertEqual(hide.geometry().center().y(), triangle.geometry().center().y())
         self.assertEqual(info.geometry().center().y(), excluded.geometry().center().y())

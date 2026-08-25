@@ -3139,10 +3139,6 @@ class MainWindow(QMainWindow):
                 card.setProperty("liverySource", "my_designs")
         decorate_creator_copy_label(self, card, record.header.creator or "")
         _normalize_card_actions(card)
-        if content_type == "livery":
-            from .release_layout import _align_left_actions_to_right_second_third
-
-            _align_left_actions_to_right_second_third(card)
         return card
 
     def _livery_search_text(self, record: LiveryRecord, note: str = "") -> str:

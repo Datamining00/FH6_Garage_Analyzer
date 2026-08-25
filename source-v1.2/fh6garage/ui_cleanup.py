@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6.QtCore import QEvent, QObject, Qt, QTimer
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QButtonGroup,
@@ -75,54 +75,6 @@ def _remove_direct_labels(layout: Any) -> None:
             widget.deleteLater()
 
 
-class _HideButtonAligner(QObject):
-    """Keep the card hide button centered on the right-side fourth action."""
-
-    _WATCHED_EVENTS = {
-        QEvent.Type.Show,
-        QEvent.Type.Resize,
-        QEvent.Type.LayoutRequest,
-    }
-
-    def __init__(
-        self,
-        overlay: QWidget,
-        hide_button: QToolButton,
-        target_button: QToolButton,
-        info_button: QToolButton,
-    ) -> None:
-        super().__init__(overlay)
-        self.overlay = overlay
-        self.hide_button = hide_button
-        self.target_button = target_button
-        self.info_button = info_button
-        overlay.installEventFilter(self)
-
-    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
-        if event.type() in self._WATCHED_EVENTS:
-            QTimer.singleShot(0, self.reposition)
-        return False
-
-    def reposition(self) -> None:
-        if (
-            self.overlay is None
-            or self.hide_button is None
-            or self.target_button is None
-            or self.info_button is None
-        ):
-            return
-        target_geometry = self.target_button.geometry()
-        info_geometry = self.info_button.geometry()
-        if target_geometry.width() <= 0 or info_geometry.width() <= 0:
-            return
-        x = info_geometry.x() + (
-            info_geometry.width() - self.hide_button.width()
-        ) // 2
-        y = target_geometry.center().y() - self.hide_button.height() // 2
-        self.hide_button.move(max(0, x), max(0, y))
-        self.hide_button.raise_()
-
-
 def _install_card_hide_button(self: Any, card: Any, key: str) -> None:
     if getattr(card, "_fh6_hide_button", None) is not None:
         return
@@ -169,15 +121,7 @@ def _install_card_hide_button(self: Any, card: Any, key: str) -> None:
         lambda enabled, k=key: self._fh6_v132_set_livery_hidden(k, enabled)
     )
 
-    aligner = _HideButtonAligner(
-        overlay,
-        hide_button,
-        zoom_button,
-        info_button,
-    )
     card._fh6_hide_button = hide_button
-    card._fh6_hide_aligner = aligner
-    QTimer.singleShot(0, aligner.reposition)
 
 
 def _normalize_path_rows(self: Any) -> None:
