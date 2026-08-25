@@ -132,10 +132,10 @@ class V132CompactCardLayoutTests(unittest.TestCase):
         icon_fix = "apply_v1_3_2_icon_overlay_fix(MainWindow)"
         compact = "apply_v1_3_2_compact_card_layout_patch(MainWindow)"
         thread_fix = "apply_v1_3_2_thread_affinity_fix(MainWindow)"
-        self.assertIn(icon_fix, source)
+        self.assertNotIn(icon_fix, source)
         self.assertNotIn(compact, source)
         self.assertIn(thread_fix, source)
-        self.assertLess(source.index(icon_fix), source.index(thread_fix))
+        self.assertIn(thread_fix, source)
         ui_source = (ROOT / "fh6garage" / "ui.py").read_text(encoding="utf-8")
         self.assertIn("_compact_window_chrome(self)", ui_source)
         self.assertIn("_configure_card_metadata(card)", ui_source)

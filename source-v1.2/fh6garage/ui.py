@@ -49,6 +49,7 @@ from PySide6.QtWidgets import (
 
 from .annotations import AnnotationStore, append_note
 from .card_metadata_layout import _compact_window_chrome, _configure_card_metadata
+from .card_visuals import _fix_busy_overlay, _normalize_card_actions
 from .car_db import CarDatabase, CarDatabaseError, REMOTE_SOURCE_PAGE
 from .game_navigation import (
     GameGridSession,
@@ -80,6 +81,7 @@ from .saved_content_view import (
     vehicle_brand_sort_key,
 )
 from .tune_data import TuneDataError, read_tune_data
+from .thumbnail_display import _configure_aspect_card, _load_original_pixmap
 from .view_operations import ViewOperationCoordinator
 
 
@@ -690,6 +692,7 @@ class MainWindow(QMainWindow):
         _compact_window_chrome(self)
         self._busy_overlay = BusyOverlay(self)
         self._busy_overlay.setGeometry(self.rect())
+        _fix_busy_overlay(self)
         self._view_operations = ViewOperationCoordinator(self)
         initialize_ui_performance_state(self)
         self._apply_pointing_cursors(self)
@@ -3093,6 +3096,8 @@ class MainWindow(QMainWindow):
         card._fh6_content_type = content_type
         self._apply_pointing_cursors(card)
         _configure_card_metadata(card)
+        _configure_aspect_card(card)
+        _normalize_card_actions(card)
         return card
 
     def _livery_search_text(self, record: LiveryRecord, note: str = "") -> str:
@@ -3734,26 +3739,43 @@ class MainWindow(QMainWindow):
 
     def _load_livery_card_thumbnail(self, card: QFrame) -> None:
         if getattr(card, "_fh6_thumbnail_loaded", False):
+            controller = getattr(card, "_fh6_aspect_thumbnail_controller", None)
+            if controller is not None:
+                controller.schedule()
             return
         label = getattr(card, "_fh6_image_label", None)
+        controller = getattr(card, "_fh6_aspect_thumbnail_controller", None)
         path = getattr(card, "_fh6_thumbnail_path", None)
-        if label is None:
+        if not isinstance(label, QLabel):
             return
-        pixmap = self._pixmap_for(path, QSize(560, 215))
-        if pixmap is None:
+        cache = getattr(self, "_fh6_thumbnail_pixmap_cache", None)
+        if cache is not None and hasattr(cache, "get_or_load"):
+            pixmap = cache.get_or_load(path)
+        else:
+            pixmap = _load_original_pixmap(path)
+        if pixmap.isNull():
             label.setPixmap(QPixmap())
             label.setText("No thumbnail")
             label.setObjectName("muted")
+            if controller is not None:
+                controller.clear_source()
         else:
-            label.setText("")
-            label.setPixmap(pixmap)
+            label.setObjectName("muted")
+            if controller is not None:
+                controller.set_source(pixmap)
+            else:
+                label.setText("")
+                label.setPixmap(pixmap)
         card._fh6_thumbnail_loaded = True
 
     def _unload_livery_card_thumbnail(self, card: QFrame) -> None:
         if not getattr(card, "_fh6_thumbnail_loaded", False):
             return
+        controller = getattr(card, "_fh6_aspect_thumbnail_controller", None)
+        if controller is not None:
+            controller.clear_source()
         label = getattr(card, "_fh6_image_label", None)
-        if label is not None:
+        if isinstance(label, QLabel):
             label.setPixmap(QPixmap())
             label.setText("Thumbnail")
             label.setObjectName("muted")

@@ -10,7 +10,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QApplication, QFrame, QLabel, QVBoxLayout, QWidget
 
-from fh6garage.v1_3_2_global_ui_patch import (
+from fh6garage.thumbnail_display import (
     DEFAULT_THUMBNAIL_ASPECT,
     _AspectFitThumbnailController,
     _load_original_pixmap,
@@ -106,7 +106,10 @@ class V132GlobalUiTests(unittest.TestCase):
         global_ui = "apply_v1_3_2_global_ui_patch(MainWindow)"
         thread_fix = "apply_v1_3_2_thread_affinity_fix(MainWindow)"
         self.assertNotIn(perf, source)
-        self.assertLess(source.index(global_ui), source.index(thread_fix))
+        self.assertNotIn(global_ui, source)
+        self.assertIn(thread_fix, source)
+        ui_source = (ROOT / "fh6garage" / "ui.py").read_text(encoding="utf-8")
+        self.assertIn("_configure_aspect_card(card)", ui_source)
 
 
 if __name__ == "__main__":

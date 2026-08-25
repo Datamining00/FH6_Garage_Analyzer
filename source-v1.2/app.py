@@ -36,8 +36,6 @@ from fh6garage.v1_3_2_ui_cleanup_patch import apply_v1_3_2_ui_cleanup_patch
 from fh6garage.v1_3_2_ui_followup_patch import apply_v1_3_2_ui_followup_patch
 from fh6garage.v1_3_2_manifest_registry_patch import apply_v1_3_2_manifest_registry_patch
 from fh6garage.v1_3_2_card_alignment_patch import apply_v1_3_2_card_alignment_patch
-from fh6garage.v1_3_2_global_ui_patch import apply_v1_3_2_global_ui_patch
-from fh6garage.v1_3_2_icon_overlay_fix import apply_v1_3_2_icon_overlay_fix
 from fh6garage.v1_3_2_responsiveness_sort_patch import apply_v1_3_2_responsiveness_sort_patch
 from fh6garage.v1_3_2_refresh_diff_patch import apply_v1_3_2_refresh_diff_patch
 from fh6garage.v1_3_2_change_view_alias_patch import apply_v1_3_2_change_view_alias_patch
@@ -83,16 +81,6 @@ def main() -> int:
     apply_v1_3_2_ui_followup_patch(MainWindow)
     apply_v1_3_2_manifest_registry_patch(MainWindow)
     apply_v1_3_2_card_alignment_patch(MainWindow)
-
-    # Geometry/aspect correction is deliberately layered after card reuse so
-    # cached cards retain the same aspect controller through sort/filter/source
-    # changes.
-    apply_v1_3_2_global_ui_patch(MainWindow)
-
-    # Normalize the final card action geometry only after all earlier card
-    # patches have installed their controls. Also harden both thumbnail and busy
-    # overlays against inherited black background/text palette combinations.
-    apply_v1_3_2_icon_overlay_fix(MainWindow)
 
     # Keep the indeterminate busy overlay repainting during synchronous card
     # rebuild/layout work and make first-click download/date sorting newest-first.

@@ -11,7 +11,7 @@ from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import QApplication, QLabel, QStackedLayout, QToolButton, QVBoxLayout, QWidget
 
 from fh6garage.ui import BusyOverlay
-from fh6garage.v1_3_2_icon_overlay_fix import (
+from fh6garage.card_visuals import (
     CARD_ACTION_BUTTON_SIZE,
     CARD_ACTION_ICON_SIZE,
     CARD_ACTION_RADIUS,
@@ -98,11 +98,12 @@ class V132IconOverlayFixTests(unittest.TestCase):
         global_ui = "apply_v1_3_2_global_ui_patch(MainWindow)"
         icon_overlay = "apply_v1_3_2_icon_overlay_fix(MainWindow)"
         thread_fix = "apply_v1_3_2_thread_affinity_fix(MainWindow)"
-        self.assertIn(global_ui, source)
-        self.assertIn(icon_overlay, source)
+        self.assertNotIn(global_ui, source)
+        self.assertNotIn(icon_overlay, source)
         self.assertIn(thread_fix, source)
-        self.assertLess(source.index(global_ui), source.index(icon_overlay))
-        self.assertLess(source.index(icon_overlay), source.index(thread_fix))
+        ui_source = (ROOT / "fh6garage" / "ui.py").read_text(encoding="utf-8")
+        self.assertIn("_fix_busy_overlay(self)", ui_source)
+        self.assertIn("_normalize_card_actions(card)", ui_source)
         self.assertNotIn("apply_v1_3_2_card_width_overlay_patch(MainWindow)", source)
         self.assertNotIn("apply_v1_3_2_card_rail_patch(MainWindow)", source)
 
