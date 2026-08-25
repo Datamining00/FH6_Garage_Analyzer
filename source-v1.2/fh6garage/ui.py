@@ -50,6 +50,7 @@ from PySide6.QtWidgets import (
 from .annotations import AnnotationStore, append_note
 from .auction_card_loader import schedule_auction_cards
 from .auction_registry_state import is_auction_livery_registered
+from .auction_ui_safety import is_auction_livery
 from .card_metadata_layout import _compact_window_chrome, _configure_card_metadata
 from .card_action_alignment import _fix_card_actions
 from .card_state_sync import (
@@ -2246,6 +2247,9 @@ class MainWindow(QMainWindow):
         content_type: str,
         key: str,
     ) -> None:
+        record = self._record_for_content_key(content_type, key)
+        if content_type == "livery" and is_auction_livery(record):
+            return
         if content_type == "livery" and self._fh6_v132_is_livery_hidden(key):
             labels = visibility_labels((get_language() or "ko").startswith("ko"))
             self._show_status(labels["hidden_move"], 3500)
@@ -2258,7 +2262,6 @@ class MainWindow(QMainWindow):
             )
             return
         session = self._game_navigation_sessions.get(content_type)
-        record = self._record_for_content_key(content_type, key)
         if session is None or record is None or not session.contains(key):
             QMessageBox.warning(
                 self,
@@ -2657,6 +2660,7 @@ class MainWindow(QMainWindow):
     def _is_duplicate_livery(self, record: LiveryRecord | None) -> bool:
         return bool(
             record
+            and not is_auction_livery(record)
             and record.content_sha256
             and record.content_sha256 in self._duplicate_livery_hashes()
         )
@@ -3050,21 +3054,23 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(0, lambda: _refresh_dialog_memo_button(self, c, k))
         )
 
-        game_move_button = QToolButton()
-        game_move_button.setIcon(QIcon(_classification_pixmap("move", True, 24)))
-        game_move_button.setIconSize(QSize(23, 23))
-        game_move_button.setToolTip(tr("content.game_move_tip"))
-        game_move_button.setAccessibleName(tr("content.game_move_accessible", noun=item_label))
-        game_move_button.setFixedSize(38, 38)
-        game_move_button.setStyleSheet(
-            "QToolButton { background:rgba(255,255,255,242); color:#5f39d8; "
-            "border:2px solid #8c74ee; border-radius:19px; padding:0; }"
-            "QToolButton:hover { color:white; border-color:#6e4bf2; background:#6e4bf2; }"
-        )
-        game_move_button.clicked.connect(
-            lambda _checked=False, t=content_type, k=key:
-            self._request_game_navigation(t, k)
-        )
+        game_move_button = None
+        if not (content_type == "livery" and is_auction_livery(record)):
+            game_move_button = QToolButton()
+            game_move_button.setIcon(QIcon(_classification_pixmap("move", True, 24)))
+            game_move_button.setIconSize(QSize(23, 23))
+            game_move_button.setToolTip(tr("content.game_move_tip"))
+            game_move_button.setAccessibleName(tr("content.game_move_accessible", noun=item_label))
+            game_move_button.setFixedSize(38, 38)
+            game_move_button.setStyleSheet(
+                "QToolButton { background:rgba(255,255,255,242); color:#5f39d8; "
+                "border:2px solid #8c74ee; border-radius:19px; padding:0; }"
+                "QToolButton:hover { color:white; border-color:#6e4bf2; background:#6e4bf2; }"
+            )
+            game_move_button.clicked.connect(
+                lambda _checked=False, t=content_type, k=key:
+                self._request_game_navigation(t, k)
+            )
 
         if content_type == "livery":
             info_active = bool((record.header.description or "").strip())
@@ -3115,7 +3121,7 @@ class MainWindow(QMainWindow):
         left_actions = QVBoxLayout()
         left_actions.setContentsMargins(0, 0, 0, 0)
         left_actions.setSpacing(6)
-        if content_type == "livery":
+        if content_type == "livery" and game_move_button is not None:
             left_actions.addWidget(game_move_button, 0, Qt.AlignmentFlag.AlignTop)
         left_actions.addStretch(1)
         left_actions.addWidget(info_button, 0, Qt.AlignmentFlag.AlignBottom)
