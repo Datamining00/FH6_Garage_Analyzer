@@ -9,7 +9,7 @@ from PySide6.QtWidgets import QApplication, QPushButton, QToolButton
 
 from fh6garage.creator_aliases import CreatorAliasStore
 from fh6garage.refresh_history import LiverySnapshotEntry
-from fh6garage.creator_change_views import _archive_card
+from fh6garage.change_dialog_cards import _archive_card_like_main
 
 
 _APP = QApplication.instance() or QApplication([])
@@ -114,7 +114,7 @@ class ChangeViewContractTests(unittest.TestCase):
                 content_sha256="hash",
                 thumbnail_cache="",
             )
-            card = _archive_card(_ArchiveWindow(store), entry, "삭제 전")
+            card = _archive_card_like_main(_ArchiveWindow(store), entry, "삭제 전", 420)
             self.assertTrue(bool(card.property("fh6ArchiveCard")))
             self.assertEqual(card.findChildren(QPushButton), [])
             self.assertEqual(card.findChildren(QToolButton), [])

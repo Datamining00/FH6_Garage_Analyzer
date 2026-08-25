@@ -326,6 +326,10 @@ def _archive_card_like_main(window: Any, entry: LiverySnapshotEntry, heading: st
 
 def _current_card_same_size(window: Any, entry: LiverySnapshotEntry, card_width: int) -> QWidget:
     card = _change_view._current_change_card(window, entry)
+    if card is None:
+        return _archive_card_like_main(
+            window, entry, _txt("현재 기록", "Current snapshot"), card_width
+        )
     card.setMinimumWidth(0)
     card.setMaximumWidth(card_width)
     card.setFixedWidth(card_width)

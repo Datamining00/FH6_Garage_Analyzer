@@ -57,12 +57,12 @@ class ChangeDialogRuntimeFixTests(unittest.TestCase):
         window.refresh_diff_banner = banner
         window.refresh_diff_view_button = view
         view.clicked.connect(
-            lambda _checked=False: feature._change_view._open_integrated_change_dialog(window)
+            lambda _checked=False: feature._change_view.open_change_dialog(window)
         )
 
         calls: list[object] = []
-        original = feature._change_view._open_integrated_change_dialog
-        feature._change_view._open_integrated_change_dialog = lambda owner: calls.append(owner)
+        original = feature._change_view.open_change_dialog
+        feature._change_view.open_change_dialog = lambda owner: calls.append(owner)
         try:
             from fh6garage.release_layout import (
                 _move_change_banner_to_reserved_slot,
@@ -76,7 +76,7 @@ class ChangeDialogRuntimeFixTests(unittest.TestCase):
             view.click()
             self.assertEqual(calls, [window])
         finally:
-            feature._change_view._open_integrated_change_dialog = original
+            feature._change_view.open_change_dialog = original
             slot.deleteLater()
 
     def test_all_retained_aligners_finish_on_requested_rows(self) -> None:

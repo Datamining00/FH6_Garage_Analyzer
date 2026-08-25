@@ -2,37 +2,25 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6.QtCore import QSize, Qt
-from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
-    QButtonGroup,
-    QDialog,
     QFrame,
-    QGridLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QScrollArea,
-    QSizePolicy,
-    QVBoxLayout,
     QWidget,
 )
 
-from .creator_alias_views import creator_display, decorate_creator_copy_label
-from .i18n import get_language, tr
+from .creator_alias_views import decorate_creator_copy_label
+from .i18n import get_language
 from .models import LiveryRecord
-from .refresh_history import (
-    LiveryRefreshChange,
-    LiverySnapshotEntry,
-    cached_thumbnail_path,
-)
+from .refresh_history import LiverySnapshotEntry
 
 
 def _txt(ko: str, en: str) -> str:
     return ko if get_language() == "ko" else en
 
 
-def _open_integrated_change_dialog(window: Any) -> None:
+def open_change_dialog(window: Any) -> None:
     from .change_dialog_responsive import _open_responsive_change_dialog
 
     _open_responsive_change_dialog(window)
@@ -68,65 +56,6 @@ def _find_current_livery(window: Any, entry: LiverySnapshotEntry | None) -> Live
     return None
 
 
-def _archive_card(window: Any, entry: LiverySnapshotEntry, heading: str) -> QFrame:
-    card = QFrame()
-    card.setObjectName("panel")
-    card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-    layout = QVBoxLayout(card)
-    layout.setContentsMargins(12, 12, 12, 12)
-    layout.setSpacing(8)
-
-    badge = QLabel(heading)
-    badge.setStyleSheet(
-        "background:#f0ecff;color:#5f39d8;border-radius:7px;"
-        "padding:4px 8px;font-weight:700;"
-    )
-    badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    layout.addWidget(badge)
-
-    image = QLabel()
-    image.setMinimumHeight(220)
-    image.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    image.setStyleSheet("background:#f1f2f6;border-radius:9px;color:#737787;")
-    path = cached_thumbnail_path(entry)
-    pixmap = None
-    if path is not None:
-        try:
-            pixmap = window._pixmap_for(path, QSize(560, 260))
-        except Exception:
-            pixmap = None
-    if isinstance(pixmap, QPixmap) and not pixmap.isNull():
-        image.setPixmap(pixmap)
-    else:
-        image.setText(_txt("썸네일 없음", "No thumbnail"))
-    layout.addWidget(image)
-
-    vehicle = QLabel(window._car_label(entry.car_id))
-    vehicle.setStyleSheet("font-weight:700;font-size:11pt;")
-    vehicle.setWordWrap(True)
-    layout.addWidget(vehicle)
-
-    title = QLabel(f"{tr('card.title_label')}: {entry.name or '—'}")
-    title.setWordWrap(True)
-    layout.addWidget(title)
-
-    creator = QLabel(f"{tr('card.creator_label')}: {creator_display(window, entry.creator)}")
-    creator.setWordWrap(True)
-    if entry.creator:
-        creator.setToolTip(_txt("기록 당시 제작자: ", "Recorded creator: ") + entry.creator)
-    layout.addWidget(creator)
-
-    if entry.description:
-        description = QLabel(entry.description)
-        description.setObjectName("muted")
-        description.setWordWrap(True)
-        layout.addWidget(description)
-
-    # Historical/deleted cards intentionally contain no action buttons.
-    card.setProperty("fh6ArchiveCard", True)
-    return card
-
-
 def _status_style(status: str) -> str:
     return {
         "added": "background:#e9f7ee;color:#237a43;border:1px solid #bfe6cc;",
@@ -143,10 +72,10 @@ def _status_text(status: str) -> str:
     return _txt("~ 변경", "~ Changed")
 
 
-def _current_change_card(window: Any, entry: LiverySnapshotEntry) -> QWidget:
+def _current_change_card(window: Any, entry: LiverySnapshotEntry) -> QWidget | None:
     record = _find_current_livery(window, entry)
     if record is None:
-        return _archive_card(window, entry, _txt("현재 기록", "Current snapshot"))
+        return None
     key = window._content_annotation_key("livery", record)
     card = window._make_saved_content_card("livery", record, key)
     decorate_creator_copy_label(window, card, record.header.creator or "")
@@ -155,129 +84,6 @@ def _current_change_card(window: Any, entry: LiverySnapshotEntry) -> QWidget:
     except Exception:
         pass
     return card
-
-
-def _change_wrapper(window: Any, change: LiveryRefreshChange) -> tuple[QFrame, str]:
-    status = change.status
-    wrapper = QFrame()
-    wrapper.setObjectName("changeResultItem")
-    wrapper.setStyleSheet(
-        "QFrame#changeResultItem { background:#ffffff;border:1px solid #e4e6ed;"
-        "border-radius:12px; }"
-    )
-    outer = QVBoxLayout(wrapper)
-    outer.setContentsMargins(10, 10, 10, 10)
-    outer.setSpacing(8)
-
-    badge = QLabel(_status_text(status))
-    badge.setStyleSheet(
-        _status_style(status) + "border-radius:7px;padding:5px 9px;font-weight:700;"
-    )
-    badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    outer.addWidget(badge, 0, Qt.AlignmentFlag.AlignLeft)
-
-    if status == "added" and change.after is not None:
-        outer.addWidget(_current_change_card(window, change.after))
-    elif status == "removed" and change.before is not None:
-        outer.addWidget(_archive_card(window, change.before, _txt("삭제 전", "Before removal")))
-    elif status == "changed":
-        compare = QHBoxLayout()
-        compare.setSpacing(10)
-        if change.before is not None:
-            compare.addWidget(_archive_card(window, change.before, _txt("변경 전", "Before")), 1)
-        if change.after is not None:
-            compare.addWidget(_current_change_card(window, change.after), 1)
-        outer.addLayout(compare)
-    return wrapper, status
-
-
-def _open_change_dialog(window: Any) -> None:
-    diff = getattr(window, "_fh6_latest_livery_diff", None)
-    if diff is None or getattr(diff, "baseline", False) or getattr(diff, "total", 0) <= 0:
-        return
-
-    dialog = QDialog(window)
-    dialog.setWindowTitle(_txt("최근 리버리 변경사항", "Recent livery changes"))
-    dialog.setModal(True)
-    dialog.resize(1180, 820)
-    root = QVBoxLayout(dialog)
-    root.setContentsMargins(14, 14, 14, 14)
-    root.setSpacing(10)
-
-    controls = QHBoxLayout()
-    group = QButtonGroup(dialog)
-    group.setExclusive(True)
-    buttons: dict[str, QPushButton] = {}
-    specs = (
-        ("all", _txt("전체", "All"), diff.total),
-        ("added", _txt("추가", "Added"), len(diff.added)),
-        ("removed", _txt("삭제", "Removed"), len(diff.removed)),
-        ("changed", _txt("변경", "Changed"), len(diff.changed)),
-    )
-    for key, label, count in specs:
-        button = QPushButton(f"{label} {count}")
-        button.setObjectName("secondary")
-        button.setCheckable(True)
-        if key == "all":
-            button.setChecked(True)
-        group.addButton(button)
-        buttons[key] = button
-        controls.addWidget(button)
-    controls.addStretch(1)
-    close_button = QPushButton(tr("common.close"))
-    close_button.setObjectName("primary")
-    close_button.clicked.connect(dialog.accept)
-    controls.addWidget(close_button)
-    root.addLayout(controls)
-
-    scroll = QScrollArea()
-    scroll.setWidgetResizable(True)
-    scroll.setFrameShape(QFrame.Shape.NoFrame)
-    host = QWidget()
-    grid = QGridLayout(host)
-    grid.setContentsMargins(2, 2, 2, 2)
-    grid.setHorizontalSpacing(10)
-    grid.setVerticalSpacing(10)
-    grid.setAlignment(Qt.AlignmentFlag.AlignTop)
-    scroll.setWidget(host)
-    root.addWidget(scroll, 1)
-
-    items: list[tuple[QWidget, str]] = [
-        _change_wrapper(window, change)
-        for change in [*diff.added, *diff.removed, *diff.changed]
-    ]
-
-    def repack(filter_name: str) -> None:
-        while grid.count():
-            item = grid.takeAt(0)
-            widget = item.widget()
-            if widget is not None:
-                widget.hide()
-        row = 0
-        col = 0
-        for widget, status in items:
-            if filter_name != "all" and status != filter_name:
-                continue
-            if status == "changed":
-                if col:
-                    row += 1
-                    col = 0
-                grid.addWidget(widget, row, 0, 1, 2)
-                widget.show()
-                row += 1
-                continue
-            grid.addWidget(widget, row, col)
-            widget.show()
-            col += 1
-            if col >= 2:
-                col = 0
-                row += 1
-        host.adjustSize()
-
-    for key, button in buttons.items():
-        button.clicked.connect(lambda _checked=False, k=key: repack(k))
-    repack("all")
-    dialog.exec()
 
 
 def initialize_change_view_ui(window: Any) -> None:
@@ -293,7 +99,7 @@ def initialize_change_view_ui(window: Any) -> None:
     label.setStyleSheet("color:#4f35aa;font-weight:700;")
     view = QPushButton(_txt("보기", "View"))
     view.setObjectName("secondary")
-    view.clicked.connect(lambda: _open_integrated_change_dialog(window))
+    view.clicked.connect(lambda: open_change_dialog(window))
     row.addWidget(label)
     row.addStretch(1)
     row.addWidget(view)

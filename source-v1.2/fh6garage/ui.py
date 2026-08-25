@@ -150,8 +150,8 @@ from .creator_alias_views import (
     refresh_alias_views,
 )
 from .creator_change_views import (
-    _open_change_dialog,
     initialize_change_view_ui,
+    open_change_dialog,
     update_change_banner,
 )
 
@@ -5279,7 +5279,7 @@ class MainWindow(QMainWindow):
         open_alias_dialog(self)
 
     def _fh6_open_refresh_diff_view(self) -> None:
-        _open_change_dialog(self)
+        open_change_dialog(self)
 
     def _fh6_refresh_alias_views(self) -> None:
         refresh_alias_views(self)
