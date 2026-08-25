@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 from . import creator_change_views as _change_view
+from .creator_alias_views import creator_display
 from .i18n import tr
 from .refresh_history import (
     LiveryRefreshChange,
@@ -294,7 +295,7 @@ def _archive_card_like_main(window: Any, entry: LiverySnapshotEntry, heading: st
     metadata.setContentsMargins(0, 0, 0, 0)
     metadata.setHorizontalSpacing(0)
     title = QLabel(f"{tr('card.title_label')}: {entry.name or '—'}")
-    creator = QLabel(f"{tr('card.creator_label')}: {_change_view._creator_display(window, entry.creator)}")
+    creator = QLabel(f"{tr('card.creator_label')}: {creator_display(window, entry.creator)}")
     title.setToolTip(title.text())
     creator.setToolTip(
         (_txt("삭제 당시 제작자: ", "Recorded creator: ") + entry.creator)

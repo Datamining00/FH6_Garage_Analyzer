@@ -5,28 +5,22 @@ from typing import Any
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
-    QAbstractItemView,
     QButtonGroup,
-    QComboBox,
     QDialog,
     QFrame,
     QGridLayout,
     QHBoxLayout,
-    QHeaderView,
     QLabel,
-    QMessageBox,
     QPushButton,
     QScrollArea,
     QSizePolicy,
-    QTableWidget,
-    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
-from .creator_aliases import CreatorAliasStore
+from .creator_alias_views import creator_display, decorate_creator_copy_label
 from .i18n import get_language, tr
-from .models import LiveryRecord, TuningRecord
+from .models import LiveryRecord
 from .refresh_history import (
     LiveryRefreshChange,
     LiverySnapshotEntry,
@@ -42,20 +36,6 @@ def _open_integrated_change_dialog(window: Any) -> None:
     from .change_dialog_responsive import _open_responsive_change_dialog
 
     _open_responsive_change_dialog(window)
-
-
-def _creator_display(window: Any, raw_name: str) -> str:
-    raw = (raw_name or "").strip()
-    if not raw:
-        return tr("creator.none")
-    return window.creator_aliases.display_name(raw)
-
-
-def _creator_canonical(window: Any, raw_name: str) -> str:
-    raw = (raw_name or "").strip()
-    if not raw:
-        return ""
-    return window.creator_aliases.canonical_name(raw)
 
 
 def _find_current_livery(window: Any, entry: LiverySnapshotEntry | None) -> LiveryRecord | None:
@@ -86,57 +66,6 @@ def _find_current_livery(window: Any, entry: LiverySnapshotEntry | None) -> Live
         if len(matches) == 1:
             return matches[0]
     return None
-
-
-def _decorate_creator_copy_label(window: Any, card: QWidget, raw_creator: str) -> None:
-    display = _creator_display(window, raw_creator)
-    prefix = tr("card.creator_label")
-    for label in card.findChildren(QLabel):
-        if getattr(label, "prefix", None) != prefix:
-            continue
-        setter = getattr(label, "setCopyValue", None)
-        if callable(setter):
-            setter(display)
-        else:
-            label.setText(f"{prefix}: {display}")
-        for controller in getattr(card, "_fh6_metadata_elide_controllers", []):
-            if getattr(controller, "label", None) is label:
-                schedule = getattr(controller, "schedule", None)
-                if callable(schedule):
-                    schedule()
-        break
-
-
-def _normalize_card_alias_properties(window: Any, content_type: str, card: QWidget) -> None:
-    key = str(card.property("annotationKey") or "")
-    if not key:
-        return
-    record = window._record_for_content_key(content_type, key)
-    if record is None:
-        return
-
-    raw = (record.header.creator or "").strip()
-    current_search = str(card.property("searchText") or "")
-    last_augmented = getattr(card, "_fh6_alias_last_search", None)
-    if last_augmented is None or current_search != last_augmented:
-        card._fh6_alias_base_search = current_search
-    base_search = str(getattr(card, "_fh6_alias_base_search", current_search))
-
-    if raw:
-        group = window.creator_aliases.group_for(raw)
-        display = window.creator_aliases.display_name(raw)
-        augmented = " ".join(
-            piece for piece in (base_search, display, *group.all_names()) if piece
-        ).casefold()
-        card.setProperty("creatorGroupKey", f"creator:{group.current.casefold()}")
-        card.setProperty("creatorGroupLabel", display)
-    else:
-        augmented = base_search.casefold()
-        card.setProperty("creatorGroupKey", "creator:")
-        card.setProperty("creatorGroupLabel", tr("creator.none"))
-
-    card.setProperty("searchText", augmented)
-    card._fh6_alias_last_search = augmented
 
 
 def _archive_card(window: Any, entry: LiverySnapshotEntry, heading: str) -> QFrame:
@@ -181,7 +110,7 @@ def _archive_card(window: Any, entry: LiverySnapshotEntry, heading: str) -> QFra
     title.setWordWrap(True)
     layout.addWidget(title)
 
-    creator = QLabel(f"{tr('card.creator_label')}: {_creator_display(window, entry.creator)}")
+    creator = QLabel(f"{tr('card.creator_label')}: {creator_display(window, entry.creator)}")
     creator.setWordWrap(True)
     if entry.creator:
         creator.setToolTip(_txt("기록 당시 제작자: ", "Recorded creator: ") + entry.creator)
@@ -220,7 +149,7 @@ def _current_change_card(window: Any, entry: LiverySnapshotEntry) -> QWidget:
         return _archive_card(window, entry, _txt("현재 기록", "Current snapshot"))
     key = window._content_annotation_key("livery", record)
     card = window._make_saved_content_card("livery", record, key)
-    _decorate_creator_copy_label(window, card, record.header.creator or "")
+    decorate_creator_copy_label(window, card, record.header.creator or "")
     try:
         window._load_livery_card_thumbnail(card)
     except Exception:
@@ -351,58 +280,7 @@ def _open_change_dialog(window: Any) -> None:
     dialog.exec()
 
 
-def _observed_creator_names(window: Any) -> list[str]:
-    names: dict[str, str] = {}
-    result = getattr(window, "result", None)
-    if result is not None:
-        for record in [*result.liveries, *result.tunings]:
-            name = (record.header.creator or "").strip()
-            if name:
-                names.setdefault(name.casefold(), name)
-    for group in window.creator_aliases.groups:
-        for name in group.all_names():
-            if name:
-                names.setdefault(name.casefold(), name)
-    return sorted(names.values(), key=str.casefold)
-
-
-def _refresh_alias_views(window: Any) -> None:
-    reset_cards = getattr(window, "_fh6_v132_reset_ui_card_cache", None)
-    if callable(reset_cards):
-        reset_cards()
-    if getattr(window, "result", None) is None:
-        return
-    window._populate_creator_table()
-    window._populate_livery_table()
-    window._populate_tuning_table()
-    window._filter_dashboard_table(window.car_search.text())
-    if window.dashboard_content_stack.currentIndex() == 1:
-        window._update_selected_creator()
-
-
-def _open_alias_dialog(window: Any) -> None:
-    # Kept as the stable call site while the dialog implementation is separated
-    # from the release patch layer.
-    from .creator_alias_dialog import open_creator_alias_dialog
-
-    open_creator_alias_dialog(window)
-
-
-def initialize_creator_alias_ui(window: Any) -> None:
-    sidebar = window.findChild(QFrame, "sidebar")
-    if sidebar is not None and sidebar.layout() is not None:
-        button = QPushButton(_txt("제작자 이름 관리", "Creator aliases"), sidebar)
-        button.setObjectName("creatorAliasManagerButton")
-        button.setCursor(Qt.CursorShape.PointingHandCursor)
-        button.setStyleSheet(
-            "QPushButton { color:#c7c9d4;background:transparent;border:0;"
-            "padding:8px 10px;text-align:left;border-radius:8px; }"
-            "QPushButton:hover { background:#242632;color:white; }"
-        )
-        button.clicked.connect(lambda: _open_alias_dialog(window))
-        sidebar.layout().insertWidget(1 + len(getattr(window, "nav_buttons", [])), button)
-        window.creator_alias_button = button
-
+def initialize_change_view_ui(window: Any) -> None:
     banner = QFrame()
     banner.setObjectName("refreshDiffBanner")
     banner.setStyleSheet(

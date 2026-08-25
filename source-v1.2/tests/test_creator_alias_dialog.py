@@ -36,11 +36,11 @@ class CreatorAliasDialogTests(unittest.TestCase):
     def test_alias_dialog_is_nonmodal_and_initial_inputs_are_blank(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             window = _DummyWindow(Path(temp) / "creator_aliases.json")
-            old_observed = creator_alias_dialog._alias._observed_creator_names
-            old_refresh = creator_alias_dialog._alias._refresh_alias_views
+            old_observed = creator_alias_dialog._alias.observed_creator_names
+            old_refresh = creator_alias_dialog._alias.refresh_alias_views
             try:
-                creator_alias_dialog._alias._observed_creator_names = lambda _window: ["OldName", "NewName"]
-                creator_alias_dialog._alias._refresh_alias_views = lambda _window: None
+                creator_alias_dialog._alias.observed_creator_names = lambda _window: ["OldName", "NewName"]
+                creator_alias_dialog._alias.refresh_alias_views = lambda _window: None
                 creator_alias_dialog.open_creator_alias_dialog(window)
                 dialog = window._fh6_alias_dialog
                 self.assertIsInstance(dialog, QDialog)
@@ -53,8 +53,8 @@ class CreatorAliasDialogTests(unittest.TestCase):
                 dialog.close()
                 self.app.processEvents()
             finally:
-                creator_alias_dialog._alias._observed_creator_names = old_observed
-                creator_alias_dialog._alias._refresh_alias_views = old_refresh
+                creator_alias_dialog._alias.observed_creator_names = old_observed
+                creator_alias_dialog._alias.refresh_alias_views = old_refresh
 
     def test_selected_group_unlink_dissolves_only_that_group(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

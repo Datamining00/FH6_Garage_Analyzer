@@ -141,14 +141,17 @@ from .window_responsiveness import (
     _save_window_geometry,
     _schedule_resize_settle,
 )
-from .creator_change_views import (
-    _creator_display,
-    _decorate_creator_copy_label,
-    _normalize_card_alias_properties,
-    _open_alias_dialog,
-    _open_change_dialog,
-    _refresh_alias_views,
+from .creator_alias_views import (
+    creator_display,
+    decorate_creator_copy_label,
     initialize_creator_alias_ui,
+    normalize_card_alias_properties,
+    open_alias_dialog,
+    refresh_alias_views,
+)
+from .creator_change_views import (
+    _open_change_dialog,
+    initialize_change_view_ui,
     update_change_banner,
 )
 
@@ -775,6 +778,7 @@ class MainWindow(QMainWindow):
         _install_cache_row(self)
         _restore_cache_path(self)
         initialize_creator_alias_ui(self)
+        initialize_change_view_ui(self)
         _normalize_path_rows(self)
         _align_path_rows(self)
         _configure_livery_source_switch(self)
@@ -2759,7 +2763,7 @@ class MainWindow(QMainWindow):
     def _relayout_livery_grid(self, text: str = "") -> None:
         """Pack matching cards contiguously into two columns."""
         for card in self._livery_grid_cards:
-            _normalize_card_alias_properties(self, "livery", card)
+            normalize_card_alias_properties(self, "livery", card)
         self.livery_grid_host.setUpdatesEnabled(False)
         self._clear_livery_grid_layout()
 
@@ -2803,7 +2807,7 @@ class MainWindow(QMainWindow):
 
     def _relayout_tuning_grid(self, text: str = "") -> None:
         for card in self._tuning_grid_cards:
-            _normalize_card_alias_properties(self, "tuning", card)
+            normalize_card_alias_properties(self, "tuning", card)
         self.tuning_grid_host.setUpdatesEnabled(False)
         self._clear_tuning_grid_layout()
         visible_cards: list[QFrame] = []
@@ -3135,7 +3139,7 @@ class MainWindow(QMainWindow):
                 _add_auction_badge(card)
             else:
                 card.setProperty("liverySource", "my_designs")
-        _decorate_creator_copy_label(self, card, record.header.creator or "")
+        decorate_creator_copy_label(self, card, record.header.creator or "")
         _normalize_card_actions(card)
         if content_type == "livery":
             from .release_layout import _align_left_actions_to_right_second_third
@@ -4322,14 +4326,14 @@ class MainWindow(QMainWindow):
         for r in records:
             row=t.rowCount(); t.insertRow(row); t.setRowHeight(row,54)
             it=QTableWidgetItem(); it.setIcon(self._icon_for(r.thumbnail_path)); t.setItem(row,0,it)
-            for c,v in enumerate((r.header.name or "(unnamed)",_creator_display(self, r.header.creator or "")),1): t.setItem(row,c,QTableWidgetItem(str(v)))
+            for c,v in enumerate((r.header.name or "(unnamed)",creator_display(self, r.header.creator or "")),1): t.setItem(row,c,QTableWidgetItem(str(v)))
 
     def _fill_selected_tunings(self, records: list[TuningRecord]) -> None:
         t=self.selected_tunings; t.setRowCount(0)
         for r in records:
             row=t.rowCount(); t.insertRow(row); t.setRowHeight(row,54)
             it=QTableWidgetItem(); it.setIcon(self._icon_for(r.thumbnail_path)); t.setItem(row,0,it)
-            for c,v in enumerate((r.header.name or "(unnamed)",_creator_display(self, r.header.creator or ""),self._fmt_bytes(r.data_size)),1): t.setItem(row,c,QTableWidgetItem(str(v)))
+            for c,v in enumerate((r.header.name or "(unnamed)",creator_display(self, r.header.creator or ""),self._fmt_bytes(r.data_size)),1): t.setItem(row,c,QTableWidgetItem(str(v)))
 
     def _apply_pointing_cursors(self, root: QWidget) -> None:
         """Use the hand cursor for controls that are intended to be clicked."""
@@ -5272,13 +5276,13 @@ class MainWindow(QMainWindow):
             self.creator_table.setRowHidden(row, bool(needle) and needle not in haystack)
 
     def _fh6_open_creator_alias_manager(self) -> None:
-        _open_alias_dialog(self)
+        open_alias_dialog(self)
 
     def _fh6_open_refresh_diff_view(self) -> None:
         _open_change_dialog(self)
 
     def _fh6_refresh_alias_views(self) -> None:
-        _refresh_alias_views(self)
+        refresh_alias_views(self)
 
     def _fh6_update_refresh_diff_banner(self) -> None:
         update_change_banner(self)

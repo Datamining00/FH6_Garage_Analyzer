@@ -136,7 +136,7 @@ class ChangeViewContractTests(unittest.TestCase):
         self.assertIn("def _fh6_open_refresh_diff_view", ui_source)
 
     def test_alias_search_and_group_properties_include_all_names(self):
-        view_path = Path(__file__).resolve().parents[1] / "fh6garage" / "creator_change_views.py"
+        view_path = Path(__file__).resolve().parents[1] / "fh6garage" / "creator_alias_views.py"
         source = view_path.read_text(encoding="utf-8")
         self.assertIn("*group.all_names()", source)
         self.assertIn("creatorGroupKey", source)

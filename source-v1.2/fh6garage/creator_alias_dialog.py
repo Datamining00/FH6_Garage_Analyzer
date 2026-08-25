@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from . import creator_change_views as _alias
+from . import creator_alias_views as _alias
 from .i18n import tr
 
 
@@ -108,7 +108,7 @@ def open_creator_alias_dialog(window: Any) -> None:
 
     def rebuild(*, preserve_inputs: bool = True) -> None:
         nonlocal first_rebuild
-        names = _alias._observed_creator_names(window)
+        names = _alias.observed_creator_names(window)
         source_text = source.currentText().strip() if preserve_inputs and not first_rebuild else ""
         target_text = target.currentText().strip() if preserve_inputs and not first_rebuild else ""
 
@@ -168,7 +168,7 @@ def open_creator_alias_dialog(window: Any) -> None:
 
         old_group = window.creator_aliases.find_group(old)
         new_group = window.creator_aliases.find_group(new)
-        observed = {name.casefold() for name in _alias._observed_creator_names(window)}
+        observed = {name.casefold() for name in _alias.observed_creator_names(window)}
         different_group = new_group is not None and old_group is not new_group
         if new.casefold() in observed or different_group:
             answer = QMessageBox.question(
@@ -185,7 +185,7 @@ def open_creator_alias_dialog(window: Any) -> None:
                 return
 
         window.creator_aliases.merge(old, new)
-        _alias._refresh_alias_views(window)
+        _alias.refresh_alias_views(window)
         source.setCurrentIndex(-1)
         target.setCurrentIndex(-1)
         if source.lineEdit() is not None:
@@ -217,7 +217,7 @@ def open_creator_alias_dialog(window: Any) -> None:
         for name in list(names[1:]):
             window.creator_aliases.split(str(name))
 
-        _alias._refresh_alias_views(window)
+        _alias.refresh_alias_views(window)
         rebuild(preserve_inputs=True)
 
     def reset_aliases() -> None:
@@ -239,7 +239,7 @@ def open_creator_alias_dialog(window: Any) -> None:
             QMessageBox.warning(dialog, _alias._txt("초기화 실패", "Reset failed"), str(exc))
             return
 
-        _alias._refresh_alias_views(window)
+        _alias.refresh_alias_views(window)
         rebuild(preserve_inputs=False)
         message = _alias._txt("이름 매칭을 초기화했습니다.", "Creator name matching was reset.")
         if backup is not None:
