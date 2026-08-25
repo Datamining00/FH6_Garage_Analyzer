@@ -4,7 +4,6 @@ import ctypes
 import os
 import sys
 from ctypes import wintypes
-from typing import Any
 
 from PySide6.QtCore import QProcess, QRect, Qt
 from PySide6.QtGui import QColor, QPainter, QPen, QPixmap
@@ -14,9 +13,6 @@ from .i18n import get_language, normalize_language, tr
 
 
 IMAGE_MIN_HEIGHT = 260
-GRID_TARGET_CARD_WIDTH = 420
-GRID_MIN_COLUMNS = 2
-GRID_MAX_COLUMNS = 4
 
 
 def _language_icon_pixmap(size: int = 24) -> QPixmap:
@@ -53,24 +49,6 @@ def _restart_failed_message() -> str:
     if get_language() == "ko":
         return "프로그램을 자동으로 다시 시작하지 못했습니다. 직접 다시 실행해 주세요."
     return "The application could not restart automatically. Please launch it again manually."
-
-
-def _grid_column_count(self: Any, content_type: str) -> int:
-    scroll = getattr(self, f"{content_type}_grid_scroll", None)
-    layout = getattr(self, f"{content_type}_grid_layout", None)
-    if scroll is None or layout is None:
-        return GRID_MIN_COLUMNS
-    viewport = scroll.viewport()
-    if viewport is None or viewport.width() <= 0:
-        return GRID_MIN_COLUMNS
-
-    margins = layout.contentsMargins()
-    inner_width = max(
-        1,
-        viewport.width() - margins.left() - margins.right() - 4,
-    )
-    columns = inner_width // GRID_TARGET_CARD_WIDTH
-    return max(GRID_MIN_COLUMNS, min(GRID_MAX_COLUMNS, int(columns)))
 
 
 def apply_v1_3_ui_patches(MainWindow) -> None:
@@ -229,104 +207,6 @@ def apply_v1_3_ui_patches(MainWindow) -> None:
         if image_label is not None:
             image_label.setMinimumHeight(IMAGE_MIN_HEIGHT)
         return card
-
-    def patched_layout_visible_grid_cards(self, content_type: str, cards) -> None:
-        columns = _grid_column_count(self, content_type)
-        setattr(self, f"_fh6_{content_type}_grid_columns", columns)
-
-        # Preserve the proven existing layout path at the normal two-column
-        # width. Only the 3/4-column states need a generalized layout.
-        if columns == 2:
-            original_layout_cards(self, content_type, cards)
-            return
-
-        layout = getattr(self, f"{content_type}_grid_layout")
-        vehicle_group_button = getattr(self, f"{content_type}_group_button")
-        creator_group_button = getattr(
-            self,
-            f"{content_type}_creator_group_button",
-        )
-        group_by_vehicle = vehicle_group_button.isChecked()
-        group_by_creator = creator_group_button.isChecked()
-
-        if not group_by_vehicle and not group_by_creator:
-            for index, card in enumerate(cards):
-                layout.addWidget(card, index // columns, index % columns)
-                card.setVisible(True)
-            return
-
-        if group_by_creator:
-            key_property = "creatorGroupKey"
-            label_property = "creatorGroupLabel"
-            fallback_label = tr("creator.none")
-        else:
-            key_property = "vehicleGroupKey"
-            label_property = "vehicleGroupLabel"
-            fallback_label = "Unknown vehicle"
-
-        grouped: dict[str, list] = {}
-        labels: dict[str, str] = {}
-        for card in cards:
-            group_key = str(card.property(key_property) or "unknown")
-            group_label = str(card.property(label_property) or fallback_label)
-            grouped.setdefault(group_key, []).append(card)
-            labels.setdefault(group_key, group_label)
-
-        headers = (
-            self._livery_group_headers
-            if content_type == "livery"
-            else self._tuning_group_headers
-        )
-        noun = (
-            tr("content.noun_livery")
-            if content_type == "livery"
-            else tr("content.noun_tuning")
-        )
-
-        row = 0
-        for group_key, group_cards in grouped.items():
-            header = headers.get(group_key)
-            if header is None:
-                header = QLabel()
-                header.setObjectName("vehicleGroupHeader")
-                header.setStyleSheet(
-                    "QLabel#vehicleGroupHeader { background:#eee9ff; color:#5335c7; "
-                    "border:1px solid #d9d0ff; border-radius:8px; padding:9px 12px; "
-                    "font-size:11pt; font-weight:700; }"
-                )
-                header.setMinimumHeight(38)
-                headers[group_key] = header
-
-            if group_by_creator:
-                header.setText(
-                    tr(
-                        "content.creator_group_header",
-                        creator=labels[group_key],
-                        noun=noun,
-                        count=len(group_cards),
-                    )
-                )
-            else:
-                header.setText(
-                    tr(
-                        "content.group_header",
-                        vehicle=labels[group_key],
-                        noun=noun,
-                        count=len(group_cards),
-                    )
-                )
-
-            layout.addWidget(header, row, 0, 1, columns)
-            header.setVisible(True)
-            row += 1
-            for index, card in enumerate(group_cards):
-                layout.addWidget(
-                    card,
-                    row + index // columns,
-                    index % columns,
-                )
-                card.setVisible(True)
-            row += (len(group_cards) + columns - 1) // columns
 
     MainWindow._build_ui = patched_build_ui
     MainWindow._on_language_preference_changed = patched_language_changed

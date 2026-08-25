@@ -93,7 +93,6 @@ from .saved_content_cards import (
 )
 from .saved_content_presenter import (
     FilterState,
-    build_grid_sections,
     build_search_text,
     filter_matches,
     search_matches,
@@ -2719,92 +2718,6 @@ class MainWindow(QMainWindow):
         cards: list[QFrame],
     ) -> None:
         _dynamic_layout_visible_grid_cards(self, content_type, cards)
-        return
-        layout = (
-            self.livery_grid_layout
-            if content_type == "livery"
-            else self.tuning_grid_layout
-        )
-        vehicle_group_button = getattr(self, f"{content_type}_group_button")
-        creator_group_button = getattr(
-            self,
-            f"{content_type}_creator_group_button",
-        )
-        group_by_vehicle = vehicle_group_button.isChecked()
-        group_by_creator = creator_group_button.isChecked()
-
-        if group_by_creator:
-            group_mode = "creator"
-        elif group_by_vehicle:
-            group_mode = "vehicle"
-        else:
-            group_mode = "none"
-
-        sections = build_grid_sections(
-            cards,
-            group_mode=group_mode,
-            vehicle_key=lambda card: str(
-                card.property("vehicleGroupKey") or "unknown"
-            ),
-            vehicle_label=lambda card: str(
-                card.property("vehicleGroupLabel") or "Unknown vehicle"
-            ),
-            creator_key=lambda card: str(
-                card.property("creatorGroupKey") or "unknown"
-            ),
-            creator_label=lambda card: str(
-                card.property("creatorGroupLabel") or tr("creator.none")
-            ),
-        )
-
-        if group_mode == "none":
-            for index, card in enumerate(sections[0].items):
-                layout.addWidget(card, index // 2, index % 2)
-                card.setVisible(True)
-            return
-
-        headers: dict[str, QLabel] = (
-            self._livery_group_headers
-            if content_type == "livery"
-            else self._tuning_group_headers
-        )
-        noun = tr("content.noun_livery") if content_type == "livery" else tr("content.noun_tuning")
-        row = 0
-        for section in sections:
-            group_key = section.key
-            group_label = section.label
-            group_cards = section.items
-            header = headers.get(group_key)
-            if header is None:
-                header = QLabel()
-                header.setObjectName("vehicleGroupHeader")
-                header.setStyleSheet(
-                    "QLabel#vehicleGroupHeader { background:#eee9ff; color:#3e2a95; "
-                    "border:1px solid #d9d0ff; border-radius:8px; padding:9px 12px; "
-                    "font-size:11pt; font-weight:700; }"
-                )
-                header.setMinimumHeight(38)
-                headers[group_key] = header
-            if group_by_creator:
-                header.setText(
-                    tr(
-                        "content.creator_group_header",
-                        creator=group_label,
-                        noun=noun,
-                        count=len(group_cards),
-                    )
-                )
-            else:
-                header.setText(
-                    tr("content.group_header", vehicle=group_label, noun=noun, count=len(group_cards))
-                )
-            layout.addWidget(header, row, 0, 1, 2)
-            header.setVisible(True)
-            row += 1
-            for index, card in enumerate(group_cards):
-                layout.addWidget(card, row + index // 2, index % 2)
-                card.setVisible(True)
-            row += (len(group_cards) + 1) // 2
 
     def _fh6_grid_column_count(self, content_type: str) -> int:
         return grid_column_count(self, content_type)
