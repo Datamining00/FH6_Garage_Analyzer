@@ -16,14 +16,20 @@ from PySide6.QtWidgets import (
 )
 
 from .i18n import get_language, tr
+from .livery_visibility import (
+    AUCTION_APPLIED_MODE,
+    AUCTION_UNAPPLIED_MODE,
+    HIDDEN_MODE,
+    is_auction_livery_applied,
+    is_livery_hidden,
+    set_livery_hidden,
+)
 from .models import LiveryRecord
 from .ui import APP_STYLE, MultiStatusFilterButton
 
-
-_HIDDEN_MODE = 11
-_AUCTION_APPLIED_MODE = 12
-_AUCTION_UNAPPLIED_MODE = 13
-_HIDDEN_PREFIX = "hidden_livery_v1_3_2:"
+_HIDDEN_MODE = HIDDEN_MODE
+_AUCTION_APPLIED_MODE = AUCTION_APPLIED_MODE
+_AUCTION_UNAPPLIED_MODE = AUCTION_UNAPPLIED_MODE
 
 
 def _t(key: str) -> str:
@@ -189,14 +195,11 @@ def apply_v1_3_2_visibility_patches(MainWindow) -> None:
     MultiStatusFilterButton.__init__ = filter_init
     MultiStatusFilterButton._row_toggled = row_toggled
 
-    def hidden_pref_key(self, key: str) -> str:
-        return f"{_HIDDEN_PREFIX}{key}"
-
     def is_hidden(self, key: str) -> bool:
-        return self.local_preferences.get_bool(hidden_pref_key(self, key), False)
+        return is_livery_hidden(self.local_preferences, key)
 
     def set_hidden(self, key: str, hidden: bool) -> None:
-        self.local_preferences.set_bool(hidden_pref_key(self, key), bool(hidden))
+        set_livery_hidden(self.local_preferences, key, hidden)
         self._reset_game_navigation_sessions()
         self._filter_livery_views(
             self.livery_search.text(),
@@ -204,13 +207,7 @@ def apply_v1_3_2_visibility_patches(MainWindow) -> None:
         )
 
     def is_auction_applied(record: Any) -> bool:
-        if not isinstance(record, LiveryRecord) or record.kind != "SoulBoundLivery":
-            return False
-        path = record.thumbnail_path
-        try:
-            return bool(path is not None and path.is_file())
-        except OSError:
-            return False
+        return is_auction_livery_applied(record)
 
     def card_allowed(self, card) -> bool:
         key = str(card.property("annotationKey") or "")
@@ -271,9 +268,7 @@ def apply_v1_3_2_visibility_patches(MainWindow) -> None:
                     table.setRowHidden(row, True)
                     continue
                 applied = is_auction_applied(record)
-                if applied_filter and not applied:
-                    table.setRowHidden(row, True)
-                elif unapplied_filter and applied:
+                if applied_filter and not applied or unapplied_filter and applied:
                     table.setRowHidden(row, True)
 
     def saved_content_records(self, content_type: str):

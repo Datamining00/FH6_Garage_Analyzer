@@ -19,7 +19,10 @@ class V132VisibilityContractTests(unittest.TestCase):
         self.assertLess(visibility, thread_fix)
 
     def test_applied_auction_rule_requires_real_current_webp(self) -> None:
-        source = self._source()
+        root = Path(__file__).resolve().parents[1]
+        source = (root / "fh6garage" / "livery_visibility.py").read_text(
+            encoding="utf-8"
+        )
         self.assertIn('record.kind != "SoulBoundLivery"', source)
         self.assertIn("path = record.thumbnail_path", source)
         self.assertIn("path.is_file()", source)
@@ -33,15 +36,23 @@ class V132VisibilityContractTests(unittest.TestCase):
 
     def test_hidden_filter_is_default_exclusion_and_explicit_recovery(self) -> None:
         source = self._source()
-        self.assertIn("_HIDDEN_MODE = 11", source)
+        root = Path(__file__).resolve().parents[1]
+        rules = (root / "fh6garage" / "livery_visibility.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("HIDDEN_MODE = 11", rules)
         self.assertIn("hidden_only = _HIDDEN_MODE in modes", source)
         self.assertIn("elif hidden:", source)
         self.assertIn("table.setRowHidden(row, True)", source)
 
     def test_auction_applied_and_unapplied_filters_are_mutually_exclusive(self) -> None:
         source = self._source()
-        self.assertIn("_AUCTION_APPLIED_MODE = 12", source)
-        self.assertIn("_AUCTION_UNAPPLIED_MODE = 13", source)
+        root = Path(__file__).resolve().parents[1]
+        rules = (root / "fh6garage" / "livery_visibility.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("AUCTION_APPLIED_MODE = 12", rules)
+        self.assertIn("AUCTION_UNAPPLIED_MODE = 13", rules)
         self.assertIn("other.blockSignals(True)", source)
         self.assertIn("other.setChecked(False)", source)
 
