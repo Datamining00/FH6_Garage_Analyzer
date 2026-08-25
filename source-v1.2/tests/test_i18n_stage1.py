@@ -8,6 +8,10 @@ from fh6garage.i18n import DEFAULT_LANGUAGE, set_language, tr
 
 ROOT = Path(__file__).resolve().parents[1]
 UI_SOURCE = ROOT / "fh6garage" / "ui.py"
+UI_MODULES = "\n".join(
+    path.read_text(encoding="utf-8")
+    for path in (ROOT / "fh6garage").glob("*.py")
+)
 PARSER_SOURCE = ROOT / "fh6garage" / "parsers.py"
 
 
@@ -36,7 +40,7 @@ class I18nStage1Tests(unittest.TestCase):
         )
 
     def test_main_ui_uses_translation_keys_for_stage1_controls(self) -> None:
-        source = UI_SOURCE.read_text(encoding="utf-8")
+        source = UI_MODULES
         required = (
             'tr("nav.dashboard")',
             'tr("sidebar.always_on_top")',

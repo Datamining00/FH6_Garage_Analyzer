@@ -15,15 +15,21 @@ class LanguageSelectorContractTests(unittest.TestCase):
         self.assertLess(source.index(apply_call), source.index(window_call))
 
     def test_sidebar_selector_persists_without_live_language_switch(self):
-        source = (ROOT / "fh6garage" / "ui.py").read_text(encoding="utf-8")
-        start = source.index("    def _on_language_preference_changed")
-        end = source.index("    @Slot(bool)", start)
-        handler = source[start:end]
-        self.assertIn('self.settings.setValue("language", normalized)', handler)
-        self.assertIn('tr("language.restart_required")', handler)
-        self.assertNotIn("set_language(", handler)
-        self.assertIn("SUPPORTED_LANGUAGES.items()", source)
-        self.assertIn("self.language_combo.currentIndexChanged.connect", source)
+        ui_source = (ROOT / "fh6garage" / "ui.py").read_text(encoding="utf-8")
+        followup_source = (ROOT / "fh6garage" / "ui_followup.py").read_text(
+            encoding="utf-8"
+        )
+        builder_source = (ROOT / "fh6garage" / "main_window_builder.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("persist_language_preference(self, index)", ui_source)
+        self.assertIn('owner.settings.setValue("language", normalized)', followup_source)
+        self.assertIn('tr("language.restart_required")', followup_source)
+        self.assertNotIn("set_language(", followup_source)
+        self.assertIn("SUPPORTED_LANGUAGES.items()", builder_source)
+        self.assertIn(
+            "owner.language_combo.currentIndexChanged.connect", builder_source
+        )
 
 
 if __name__ == "__main__":

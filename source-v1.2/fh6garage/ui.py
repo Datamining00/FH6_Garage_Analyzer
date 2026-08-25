@@ -13,8 +13,6 @@ from PySide6.QtWidgets import (
     QAbstractButton,
     QAbstractItemView,
     QButtonGroup,
-    QCheckBox,
-    QComboBox,
     QDialog,
     QDoubleSpinBox,
     QFileDialog,
@@ -28,11 +26,9 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QMenu,
     QPushButton,
-    QScrollArea,
     QSizePolicy,
     QSpinBox,
     QStackedLayout,
-    QStackedWidget,
     QTableWidget,
     QTableWidgetItem,
     QPlainTextEdit,
@@ -70,8 +66,9 @@ from .game_navigation_controller import (
     execute_game_navigation,
     request_game_navigation,
 )
-from .i18n import SUPPORTED_LANGUAGES, get_language, tr
+from .i18n import get_language, tr
 from .image_preview_dialog import show_livery_image
+from .main_window_builder import build_main_window
 from .models import LiveryRecord, ScanResult, TuningRecord
 from .livery_visibility import (
     AUCTION_APPLIED_MODE,
@@ -104,6 +101,7 @@ from .saved_content_presenter import (
     search_matches,
 )
 from .saved_content_layout import _dynamic_layout_visible_grid_cards, grid_column_count
+from .saved_content_pages import build_livery_page, build_tuning_page
 from .saved_content_view import (
     SortSpec,
     sort_records,
@@ -882,113 +880,7 @@ class MainWindow(QMainWindow):
         self._show_status(tr("common.copied"), 1000)
 
     def _build_ui(self) -> None:
-        root = QWidget()
-        self.setCentralWidget(root)
-        outer = QHBoxLayout(root)
-        outer.setContentsMargins(0, 0, 0, 0)
-        outer.setSpacing(0)
-
-        sidebar = QFrame()
-        sidebar.setObjectName("sidebar")
-        sidebar.setFixedWidth(170)
-        side = QVBoxLayout(sidebar)
-        side.setContentsMargins(15, 18, 15, 18)
-        brand = QLabel("FH6\nASSISTANT")
-        brand.setObjectName("brand")
-        side.addWidget(brand)
-
-        self.nav_group = QButtonGroup(self)
-        self.nav_group.setExclusive(True)
-        self.nav_buttons: list[QPushButton] = []
-        for index, text in enumerate((tr("nav.dashboard"), tr("nav.livery"), tr("nav.tuning"))):
-            button = QPushButton(text)
-            button.setObjectName("nav")
-            button.setCheckable(True)
-            if index == 0:
-                button.setChecked(True)
-            button.clicked.connect(lambda checked=False, i=index: self.pages.setCurrentIndex(i))
-            self.nav_group.addButton(button)
-            self.nav_buttons.append(button)
-            side.addWidget(button)
-        side.addStretch(1)
-
-        self.language_label = QLabel(tr("language.label"))
-        self.language_label.setStyleSheet(
-            "color:#8d91a0; padding:0 6px 2px 6px; font-size:9pt;"
-        )
-        side.addWidget(self.language_label)
-
-        self.language_combo = QComboBox()
-        self.language_combo.setAccessibleName(tr("language.label"))
-        for language_code, display_name in SUPPORTED_LANGUAGES.items():
-            self.language_combo.addItem(display_name, language_code)
-        active_language_index = self.language_combo.findData(get_language())
-        if active_language_index >= 0:
-            self.language_combo.setCurrentIndex(active_language_index)
-        self.language_combo.setStyleSheet(
-            "QComboBox { background:#242632; color:#f0f1f5; "
-            "border:1px solid #343746; border-radius:7px; padding:6px 8px; }"
-            "QComboBox:hover { border-color:#6e4bf2; }"
-            "QComboBox::drop-down { border:0; width:22px; }"
-            "QComboBox QAbstractItemView { background:#242632; color:#f0f1f5; "
-            "selection-background-color:#6e4bf2; selection-color:white; }"
-        )
-        self.language_combo.currentIndexChanged.connect(
-            self._on_language_preference_changed
-        )
-        side.addWidget(self.language_combo)
-
-        self.always_on_top_box = QCheckBox(tr("sidebar.always_on_top"))
-        self.always_on_top_box.setStyleSheet(
-            "QCheckBox { color:#c7c9d4; spacing:7px; padding:7px 6px; }"
-            "QCheckBox:hover { color:white; }"
-        )
-        self.always_on_top_box.setChecked(
-            self.settings.value("window_always_on_top", False, bool)
-        )
-        self.always_on_top_box.setToolTip(
-            tr("sidebar.always_on_top_tip")
-        )
-        self.always_on_top_box.toggled.connect(self._set_always_on_top)
-        side.addWidget(self.always_on_top_box)
-        version = QLabel("v1.3.2\nLIVERY & TUNING")
-        version.setStyleSheet("color:#777b8b; padding:8px;")
-        side.addWidget(version)
-        outer.addWidget(sidebar)
-
-        content = QWidget()
-        content_layout = QVBoxLayout(content)
-        content_layout.setContentsMargins(22, 18, 22, 18)
-        content_layout.setSpacing(14)
-
-        top = QHBoxLayout()
-        self.path_edit = QLineEdit()
-        self.path_edit.setReadOnly(True)
-        self.path_edit.setPlaceholderText(tr("save.placeholder"))
-        choose = QPushButton(tr("save.choose_folder"))
-        choose.setObjectName("primary")
-        choose.clicked.connect(self.choose_save_folder)
-        refresh = QPushButton(tr("save.refresh"))
-        refresh.setObjectName("secondary")
-        refresh.clicked.connect(self.refresh_scan)
-        top.addWidget(self.path_edit, 1)
-        top.addWidget(choose)
-        top.addWidget(refresh)
-        content_layout.addLayout(top)
-
-        self.pages = QStackedWidget()
-        self.pages.addWidget(self._dashboard_page())
-        self.pages.addWidget(self._livery_page())
-        self.pages.addWidget(self._tuning_page())
-        # A scan normally completes while the dashboard page is visible.  At that
-        # point the livery/tuning pages are hidden, so QWidget.isVisible() is false
-        # for every card and the lazy thumbnail pass intentionally skips them.
-        # Refresh again whenever a stacked page actually becomes current so the
-        # first visible frame already contains its thumbnails; no resize/scroll
-        # interaction should be required to trigger loading.
-        self.pages.currentChanged.connect(self._on_main_page_changed)
-        content_layout.addWidget(self.pages, 1)
-        outer.addWidget(content, 1)
+        build_main_window(self)
 
     def _page_header(self, title: str, subtitle: str) -> QVBoxLayout:
         layout = QVBoxLayout()
@@ -1044,131 +936,10 @@ class MainWindow(QMainWindow):
         return build_dashboard_page(self, SummaryCard, DashboardSortBar)
 
     def _livery_page(self) -> QWidget:
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addLayout(self._page_header(tr("content.livery_page"), ""))
-
-        (
-            controls,
-            self.livery_search,
-            self.livery_check_filter,
-            self.livery_sort_group,
-            self.livery_sort_buttons,
-        ) = self._build_saved_content_controls("livery")
-        layout.addLayout(controls)
-
-        self.livery_grid_scroll = QScrollArea()
-        self.livery_grid_scroll.setObjectName("liveryGridScroll")
-        self.livery_grid_scroll.setWidgetResizable(True)
-        self.livery_grid_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        # Grid cards must always fit the actual viewport. A horizontal scrollbar
-        # was a symptom of the two cards' minimum-size hints exceeding the
-        # available width and made the right-hand card look clipped.
-        self.livery_grid_scroll.setHorizontalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
-        )
-        self.livery_grid_scroll.setVerticalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAlwaysOn
-        )
-        self.livery_grid_scroll.setStyleSheet(
-            "QScrollArea#liveryGridScroll { background:#f7f8fb; border:0; }"
-        )
-
-        viewport = self.livery_grid_scroll.viewport()
-        viewport.setObjectName("liveryGridViewport")
-        viewport.setStyleSheet(
-            "QWidget#liveryGridViewport { background:#f7f8fb; }"
-        )
-
-        self.livery_grid_host = QWidget()
-        self.livery_grid_host.setObjectName("liveryGridHost")
-        self.livery_grid_host.setMinimumWidth(0)
-        self.livery_grid_host.setStyleSheet(
-            "QWidget#liveryGridHost { background:#f7f8fb; }"
-        )
-        self.livery_grid_layout = QGridLayout(self.livery_grid_host)
-        self.livery_grid_layout.setContentsMargins(2, 2, 2, 2)
-        self.livery_grid_layout.setHorizontalSpacing(14)
-        self.livery_grid_layout.setVerticalSpacing(14)
-        self.livery_grid_layout.setColumnStretch(0, 1)
-        self.livery_grid_layout.setColumnStretch(1, 1)
-        self.livery_grid_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        self.livery_grid_scroll.setWidget(self.livery_grid_host)
-        self.livery_grid_scroll.verticalScrollBar().valueChanged.connect(
-            self._schedule_visible_livery_thumbnails
-        )
-        self.livery_grid_scroll.verticalScrollBar().rangeChanged.connect(
-            lambda *_args: self._sync_livery_grid_card_widths()
-        )
-
-        # Receive the actual viewport's resize event during live Windows border
-        # dragging.  This is synchronous and does not wait for a timer tick.
-        self.livery_grid_scroll.viewport().installEventFilter(self)
-
-        layout.addWidget(self.livery_grid_scroll, 1)
-        return page
+        return build_livery_page(self)
 
     def _tuning_page(self) -> QWidget:
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addLayout(
-            self._page_header(
-                tr("dashboard.saved_tuning"),
-                "",
-            )
-        )
-
-        (
-            controls,
-            self.tuning_search,
-            self.tuning_check_filter,
-            self.tuning_sort_group,
-            self.tuning_sort_buttons,
-        ) = self._build_saved_content_controls("tuning")
-        layout.addLayout(controls)
-        self.tuning_grid_scroll = QScrollArea()
-        self.tuning_grid_scroll.setObjectName("tuningGridScroll")
-        self.tuning_grid_scroll.setWidgetResizable(True)
-        self.tuning_grid_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        self.tuning_grid_scroll.setHorizontalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
-        )
-        self.tuning_grid_scroll.setVerticalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAlwaysOn
-        )
-        self.tuning_grid_scroll.setStyleSheet(
-            "QScrollArea#tuningGridScroll { background:#f7f8fb; border:0; }"
-        )
-        tuning_viewport = self.tuning_grid_scroll.viewport()
-        tuning_viewport.setObjectName("tuningGridViewport")
-        tuning_viewport.setStyleSheet(
-            "QWidget#tuningGridViewport { background:#f7f8fb; }"
-        )
-        self.tuning_grid_host = QWidget()
-        self.tuning_grid_host.setObjectName("tuningGridHost")
-        self.tuning_grid_host.setMinimumWidth(0)
-        self.tuning_grid_host.setStyleSheet(
-            "QWidget#tuningGridHost { background:#f7f8fb; }"
-        )
-        self.tuning_grid_layout = QGridLayout(self.tuning_grid_host)
-        self.tuning_grid_layout.setContentsMargins(2, 2, 2, 2)
-        self.tuning_grid_layout.setHorizontalSpacing(14)
-        self.tuning_grid_layout.setVerticalSpacing(14)
-        self.tuning_grid_layout.setColumnStretch(0, 1)
-        self.tuning_grid_layout.setColumnStretch(1, 1)
-        self.tuning_grid_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        self.tuning_grid_scroll.setWidget(self.tuning_grid_host)
-        self.tuning_grid_scroll.verticalScrollBar().valueChanged.connect(
-            self._schedule_visible_tuning_thumbnails
-        )
-        self.tuning_grid_scroll.verticalScrollBar().rangeChanged.connect(
-            lambda *_args: self._sync_tuning_grid_card_widths()
-        )
-        self.tuning_grid_scroll.viewport().installEventFilter(self)
-        layout.addWidget(self.tuning_grid_scroll, 1)
-        return page
+        return build_tuning_page(self)
 
     def _table(self, headers: tuple[str, ...]) -> QTableWidget:
         table = QTableWidget(0, len(headers))
