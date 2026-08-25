@@ -280,18 +280,3 @@ def _responsive_sync_grid_card_widths(self: Any, content_type: str) -> None:
         _yield_busy_events(self, force=(index == 0))
     host.setMinimumWidth(0)
     host.updateGeometry()
-
-
-def _install_download_sort_default(MainWindow: Any) -> None:
-    original = MainWindow._set_saved_content_sort_mode
-
-    def patched(self: Any, content_type: str, mode: str) -> None:
-        if content_type in {"livery", "tuning"} and mode == "download":
-            mode_attr = "_livery_sort_mode" if content_type == "livery" else "_tuning_sort_mode"
-            descending_attr = "_livery_sort_descending" if content_type == "livery" else "_tuning_sort_descending"
-            if getattr(self, mode_attr, "__initial__") != "download":
-                setattr(self, mode_attr, "download")
-                setattr(self, descending_attr, False)
-        original(self, content_type, mode)
-
-    MainWindow._set_saved_content_sort_mode = patched

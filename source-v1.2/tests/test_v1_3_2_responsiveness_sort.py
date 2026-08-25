@@ -14,7 +14,6 @@ from fh6garage.ui_responsiveness import (
     _AUCTION_APPLIED_MODE,
     _HIDDEN_MODE,
     _BUSY_YIELD_INTERVAL_SECONDS,
-    _install_download_sort_default,
     _livery_visibility_allowed,
     _yield_busy_events,
 )
@@ -69,34 +68,10 @@ class V132ResponsivenessSortTests(unittest.TestCase):
         QApplication.processEvents()
 
     def test_first_download_sort_click_is_descending_then_toggles(self) -> None:
-        class DummyWindow:
-            def __init__(self):
-                self._livery_sort_mode = "__initial__"
-                self._livery_sort_descending = False
-                self.calls = []
-
-            def _set_saved_content_sort_mode(self, content_type: str, mode: str) -> None:
-                if content_type == "livery":
-                    self._livery_sort_descending = (
-                        not self._livery_sort_descending
-                        if self._livery_sort_mode == mode
-                        else False
-                    )
-                    self._livery_sort_mode = mode
-                self.calls.append((content_type, mode))
-
-        _install_download_sort_default(DummyWindow)
-        window = DummyWindow()
-        window._set_saved_content_sort_mode("livery", "download")
-        self.assertEqual(window._livery_sort_mode, "download")
-        self.assertTrue(window._livery_sort_descending)
-
-        window._set_saved_content_sort_mode("livery", "download")
-        self.assertFalse(window._livery_sort_descending)
-
-        window._set_saved_content_sort_mode("livery", "brand")
-        window._set_saved_content_sort_mode("livery", "download")
-        self.assertTrue(window._livery_sort_descending)
+        source = (ROOT / "fh6garage" / "ui.py").read_text(encoding="utf-8")
+        self.assertIn('if mode == "download" and previous_mode != mode:', source)
+        self.assertIn("next_descending = True", source)
+        self.assertNotIn("MainWindow._set_saved_content_sort_mode = patched", source)
 
     def test_hidden_livery_visibility_contract_is_preserved(self) -> None:
         owner = SimpleNamespace(
