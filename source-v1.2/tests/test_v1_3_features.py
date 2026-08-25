@@ -5,7 +5,10 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-UI = (ROOT / "fh6garage" / "ui.py").read_text(encoding="utf-8")
+UI = "\n".join(
+    path.read_text(encoding="utf-8")
+    for path in (ROOT / "fh6garage").glob("*.py")
+)
 I18N = (ROOT / "fh6garage" / "i18n.py").read_text(encoding="utf-8")
 
 
@@ -22,15 +25,15 @@ class V13FeatureContractTests(unittest.TestCase):
         self.assertIn("def _set_creator_grouping", UI)
         self.assertIn('"creatorGroupKey"', UI)
         self.assertIn('"creatorGroupLabel"', UI)
-        self.assertIn('tr(\n                        "content.creator_group_header"', UI)
+        self.assertIn('"content.creator_group_header"', UI)
 
     def test_livery_memo_creator_tools_contract(self) -> None:
         self.assertIn("def _creator_livery_note_count", UI)
         self.assertIn('tr("memo.add_same_creator")', UI)
         self.assertIn('tr("memo.clear_same_creator")', UI)
         self.assertIn('"memo.append_confirm_message"', UI)
-        self.assertIn('self._car_label(livery_record.header.car_id)', UI)
-        self.assertIn('tr(\n                    "memo.creator_value"', UI)
+        self.assertIn('_car_label(livery_record.header.car_id)', UI)
+        self.assertIn('"memo.creator_value"', UI)
 
     def test_new_i18n_keys_have_korean_and_english(self) -> None:
         for key in (

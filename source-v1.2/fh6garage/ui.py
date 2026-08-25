@@ -40,7 +40,7 @@ from PySide6.QtWidgets import (
     QWidgetAction,
 )
 
-from .annotations import AnnotationStore, append_note
+from .annotations import AnnotationStore
 from .auction_card_loader import schedule_auction_cards
 from .auction_registry_state import is_auction_livery_registered
 from .auction_ui_safety import is_auction_livery
@@ -51,10 +51,20 @@ from .card_state_sync import (
     _sync_cached_hidden_card,
 )
 from .card_visuals import _fix_busy_overlay, _normalize_card_actions
+from .card_annotation_controller import (
+    handle_check_clicked,
+    handle_excluded_clicked,
+    handle_memo_clicked,
+    handle_triangle_clicked,
+)
 from .car_db import CarDatabase, CarDatabaseError, REMOTE_SOURCE_PAGE
 from .car_db_override_dialog import open_car_db_override_dialog
 from .creator_aliases import CreatorAliasStore
 from .creator_alias_view import aggregate_creator_alias_stats, sort_by_creator_alias
+from .creator_note_controller import (
+    apply_note_to_same_creator,
+    clear_notes_for_same_creator,
+)
 from .content_note_dialog import edit_content_note_dialog
 from .content_detail_dialogs import show_livery_metadata, show_tuning_details
 from .dashboard_page_builder import build_dashboard_page
@@ -99,6 +109,11 @@ from .saved_content_presenter import (
     build_search_text,
     filter_matches,
     search_matches,
+)
+from .saved_content_state_controller import (
+    set_grouping,
+    set_sort_mode,
+    update_sort_button_labels,
 )
 from .saved_content_layout import _dynamic_layout_visible_grid_cards, grid_column_count
 from .saved_content_pages import build_livery_page, build_tuning_page
@@ -984,49 +999,11 @@ class MainWindow(QMainWindow):
         content_type: str,
         enabled: bool,
     ) -> None:
-        self.local_preferences.set_bool(
-            f"{content_type}_group_by_vehicle",
-            enabled,
-        )
-        if enabled:
-            other = getattr(
-                self,
-                f"{content_type}_creator_group_button",
-                None,
-            )
-            if other is not None and other.isChecked():
-                other.blockSignals(True)
-                other.setChecked(False)
-                other.blockSignals(False)
-                self.local_preferences.set_bool(
-                    f"{content_type}_group_by_creator",
-                    False,
-                )
-        search = (
-            self.livery_search
-            if content_type == "livery"
-            else self.tuning_search
-        )
-        if self.result is None:
-            return
-        noun = (
-            tr("content.noun_livery")
-            if content_type == "livery"
-            else tr("content.noun_tuning")
-        )
-        message = tr(
-            "content.grouping_vehicle" if enabled else "content.relayout",
-            noun=noun,
-        )
-        text = search.text()
-        self._view_operations.request(
+        set_grouping(
+            self,
             content_type,
-            message,
-            lambda: self._filter_saved_content_views(
-                content_type,
-                text,
-                preserve_scroll=True,
-            ),
+            enabled,
+            group_kind="vehicle",
         )
 
     @Slot(str, bool)
@@ -1035,45 +1012,11 @@ class MainWindow(QMainWindow):
         content_type: str,
         enabled: bool,
     ) -> None:
-        self.local_preferences.set_bool(
-            f"{content_type}_group_by_creator",
-            enabled,
-        )
-        if enabled:
-            other = getattr(self, f"{content_type}_group_button", None)
-            if other is not None and other.isChecked():
-                other.blockSignals(True)
-                other.setChecked(False)
-                other.blockSignals(False)
-                self.local_preferences.set_bool(
-                    f"{content_type}_group_by_vehicle",
-                    False,
-                )
-        search = (
-            self.livery_search
-            if content_type == "livery"
-            else self.tuning_search
-        )
-        if self.result is None:
-            return
-        noun = (
-            tr("content.noun_livery")
-            if content_type == "livery"
-            else tr("content.noun_tuning")
-        )
-        message = tr(
-            "content.grouping_creator" if enabled else "content.relayout",
-            noun=noun,
-        )
-        text = search.text()
-        self._view_operations.request(
+        set_grouping(
+            self,
             content_type,
-            message,
-            lambda: self._filter_saved_content_views(
-                content_type,
-                text,
-                preserve_scroll=True,
-            ),
+            enabled,
+            group_kind="creator",
         )
 
     @Slot()
@@ -1478,86 +1421,13 @@ class MainWindow(QMainWindow):
         content_type: str,
         mode: str,
     ) -> None:
-        if (
-            content_type not in {"livery", "tuning"}
-            or mode not in {"default", "brand", "creator", "download"}
-        ):
-            return
-
-        noun = tr("content.noun_livery") if content_type == "livery" else tr("content.noun_tuning")
-        # Download order is a flat chronology. Disable grouping when the mode
-        # is selected, but keep the buttons available for a later user choice.
-        if mode == "download":
-            for button_name, pref_name in (
-                (f"{content_type}_group_button", f"{content_type}_group_by_vehicle"),
-                (f"{content_type}_creator_group_button", f"{content_type}_group_by_creator"),
-            ):
-                group_button = getattr(self, button_name)
-                if group_button.isChecked():
-                    group_button.blockSignals(True)
-                    group_button.setChecked(False)
-                    group_button.blockSignals(False)
-                    self.local_preferences.set_bool(pref_name, False)
-
-        mode_attr = (
-            "_livery_sort_mode"
-            if content_type == "livery"
-            else "_tuning_sort_mode"
-        )
-        descending_attr = (
-            "_livery_sort_descending"
-            if content_type == "livery"
-            else "_tuning_sort_descending"
-        )
-        previous_mode = getattr(self, mode_attr)
-        previous_descending = bool(getattr(self, descending_attr))
-        if mode == "download" and previous_mode != mode:
-            next_descending = True
-        else:
-            next_descending = (
-                not previous_descending if previous_mode == mode else False
-            )
-        setattr(self, descending_attr, next_descending)
-        setattr(self, mode_attr, mode)
-        self._update_sort_button_labels(content_type)
-
-        if self.result is None:
-            return
-
-        populate = (
-            self._populate_livery_view
-            if content_type == "livery"
-            else self._populate_tuning_view
-        )
-        self._view_operations.request(
-            content_type,
-            tr("content.sorting", noun=noun),
-            populate,
-        )
+        set_sort_mode(self, content_type, mode)
 
     def _update_sort_button_labels(self, content_type: str) -> None:
-        buttons = (
-            self.livery_sort_buttons
-            if content_type == "livery"
-            else self.tuning_sort_buttons
-        )
-        mode = self._livery_sort_mode if content_type == "livery" else self._tuning_sort_mode
-        descending = (
-            self._livery_sort_descending
-            if content_type == "livery"
-            else self._tuning_sort_descending
-        )
-        labels = {
-            "default": tr("content.sort_default"),
-            "brand": tr("content.sort_brand"),
-            "creator": tr("content.sort_creator"),
-            "download": tr("content.sort_download"),
-        }
-        for key, button in buttons.items():
-            arrow = ("↓" if descending else "↑") if key == mode else ""
-            button.setText(labels[key] + arrow)
+        update_sort_button_labels(self, content_type)
 
     @Slot(str)
+
     def _set_livery_sort_mode(self, mode: str) -> None:
         # Compatibility wrapper used by older internal call sites.
         self._set_saved_content_sort_mode("livery", mode)
@@ -2167,106 +2037,15 @@ class MainWindow(QMainWindow):
             and self.annotations.get(self._annotation_key(record)).note.strip()
         )
 
-    def _apply_note_to_same_creator(self, source_key: str, source_note: str) -> None:
-        source_record = self._record_for_annotation_key(source_key)
-        if source_record is None:
-            return
-        creator = (source_record.header.creator or "").strip()
-        note = (source_note or "").strip()
-        if not creator:
-            QMessageBox.information(self, tr("memo.creator_missing_title"), tr("memo.creator_missing_apply"))
-            return
-        if not note:
-            QMessageBox.information(self, tr("memo.missing_title"), tr("memo.enter_first"))
-            return
-
-        creator_key = creator.casefold()
-        targets = [
-            record
-            for record in self._custom_liveries()
-            if (record.header.creator or "").strip().casefold() == creator_key
-        ]
-        answer = QMessageBox.question(
-            self,
-            tr("memo.append_confirm_title"),
-            tr(
-                "memo.append_confirm_message",
-                creator=creator,
-                targets=len(targets),
-                existing=self._creator_livery_note_count(creator),
-            ),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if answer != QMessageBox.StandardButton.Yes:
-            return
-
-        # Keep the source editor as the authoritative text for the selected item.
-        # Every other target preserves its existing memo and receives this text below it.
-        self.annotations.set(source_key, note=note, save=False)
-        affected = 0
-        for record in targets:
-            key = self._annotation_key(record)
-            current = self.annotations.get(key).note
-            merged = append_note(current, note)
-            if merged != current:
-                affected += 1
-            self.annotations.set(key, note=merged, save=False)
-        self.annotations.save()
-        self._refresh_annotation_widgets()
-        self._show_status(tr("memo.apply_status", creator=creator), 3500)
-        QMessageBox.information(
-            self,
-            tr("memo.apply_title"),
-            tr(
-                "memo.apply_message",
-                creator=creator,
-                targets=len(targets),
-                affected=affected,
-            ),
-        )
+    def _apply_note_to_same_creator(
+        self,
+        source_key: str,
+        source_note: str,
+    ) -> None:
+        apply_note_to_same_creator(self, source_key, source_note)
 
     def _clear_notes_for_same_creator(self, source_key: str) -> bool:
-        source_record = self._record_for_annotation_key(source_key)
-        if source_record is None:
-            return False
-        creator = (source_record.header.creator or "").strip()
-        if not creator:
-            QMessageBox.information(self, tr("memo.creator_missing_title"), tr("memo.creator_missing_remove"))
-            return False
-
-        creator_key = creator.casefold()
-        targets = [
-            record for record in self._custom_liveries()
-            if (record.header.creator or "").strip().casefold() == creator_key
-        ]
-        with_notes = sum(
-            1 for record in targets
-            if self.annotations.get(self._annotation_key(record)).note.strip()
-        )
-        if with_notes == 0:
-            QMessageBox.information(self, tr("memo.none_to_remove_title"), tr("memo.none_to_remove_message", creator=creator))
-            return False
-
-        answer = QMessageBox.question(
-            self,
-            tr("memo.clear_title"),
-            tr("memo.clear_message", creator=creator, count=with_notes),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if answer != QMessageBox.StandardButton.Yes:
-            return False
-
-        for record in targets:
-            key = self._annotation_key(record)
-            self.annotations.set(key, note="", save=False)
-        self.annotations.save()
-        self._refresh_annotation_widgets()
-        self._show_status(tr("memo.clear_status", creator=creator, count=with_notes), 3500)
-        return True
-
-
+        return clear_notes_for_same_creator(self, source_key)
 
     def _refresh_annotation_widgets(self) -> None:
         for key, card in self._livery_card_by_key.items():
@@ -2893,29 +2672,7 @@ class MainWindow(QMainWindow):
         key: str,
         checked: bool,
     ) -> None:
-        self.annotations.set_checked(key, checked)
-        self._sync_saved_content_annotation(
-            content_type,
-            key,
-        )
-
-        cards = (
-            self._livery_card_by_key
-            if content_type == "livery"
-            else self._tuning_card_by_key
-        )
-        card = cards.get(key)
-        if card is not None:
-            checkbox = getattr(card, "_fh6_check_box", None)
-            if checkbox is not None:
-                checkbox.blockSignals(True)
-                checkbox.setChecked(checked)
-                checkbox.blockSignals(False)
-            card.setProperty("checked", checked)
-
-        self._refresh_after_annotation_change(
-            content_type, filter_modes={1, 10}
-        )
+        handle_check_clicked(self, content_type, key, checked)
 
     def _handle_saved_content_triangle_clicked(
         self,
@@ -2923,26 +2680,7 @@ class MainWindow(QMainWindow):
         key: str,
         enabled: bool,
     ) -> None:
-        self.annotations.set_triangle(key, enabled)
-        self._sync_saved_content_annotation(content_type, key)
-
-        cards = (
-            self._livery_card_by_key
-            if content_type == "livery"
-            else self._tuning_card_by_key
-        )
-        card = cards.get(key)
-        if card is not None:
-            triangle_box = getattr(card, "_fh6_triangle_box", None)
-            if triangle_box is not None:
-                triangle_box.blockSignals(True)
-                triangle_box.setChecked(enabled)
-                triangle_box.blockSignals(False)
-            card.setProperty("triangle", enabled)
-
-        self._refresh_after_annotation_change(
-            content_type, filter_modes={5, 10}
-        )
+        handle_triangle_clicked(self, content_type, key, enabled)
 
     def _handle_saved_content_excluded_clicked(
         self,
@@ -2950,68 +2688,14 @@ class MainWindow(QMainWindow):
         key: str,
         enabled: bool,
     ) -> None:
-        self.annotations.set_excluded(key, enabled)
-        self._sync_saved_content_annotation(content_type, key)
-        cards = self._livery_card_by_key if content_type == "livery" else self._tuning_card_by_key
-        card = cards.get(key)
-        if card is not None:
-            excluded_box = getattr(card, "_fh6_excluded_box", None)
-            if excluded_box is not None:
-                excluded_box.blockSignals(True)
-                excluded_box.setChecked(enabled)
-                excluded_box.blockSignals(False)
-            card.setProperty("excluded", enabled)
-        self._refresh_after_annotation_change(
-            content_type, filter_modes={7, 10}
-        )
+        handle_excluded_clicked(self, content_type, key, enabled)
 
     def _handle_saved_content_memo_clicked(
         self,
         content_type: str,
         key: str,
     ) -> None:
-        current = self.annotations.get(key).note
-        note = self._edit_content_note_dialog(
-            current,
-            content_type,
-            key,
-        )
-        if note is None:
-            return
-
-        self.annotations.set_note(key, note)
-        self._sync_saved_content_annotation(
-            content_type,
-            key,
-        )
-
-        cards = (
-            self._livery_card_by_key
-            if content_type == "livery"
-            else self._tuning_card_by_key
-        )
-        card = cards.get(key)
-        if card is not None:
-            self._refresh_card_search_text(card, key)
-            memo_button = getattr(card, "_fh6_memo_button", None)
-            if memo_button is not None:
-                clean_note = (note or "").strip()
-                memo_button.setIcon(self._detail_memo_icon(bool(clean_note)))
-                memo_button.setToolTip(
-                    (clean_note + tr("memo.edit_suffix"))
-                    if clean_note
-                    else tr("memo.none_add")
-                )
-
-        self._show_status(
-            tr("memo.saved"),
-            1800,
-        )
-        self._refresh_after_annotation_change(
-            content_type,
-            filter_modes={3, 4},
-            search_sensitive=True,
-        )
+        handle_memo_clicked(self, content_type, key)
 
     def _icon_for(self, path: Optional[Path]) -> QIcon:
         # Small table icons are owned by their table items. Do not keep a second
