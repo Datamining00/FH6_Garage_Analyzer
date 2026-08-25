@@ -6,8 +6,6 @@ from PySide6.QtCore import QEvent, QObject, QPoint, QRectF, QSize, Qt, QTimer
 from PySide6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPen, QPixmap
 from PySide6.QtWidgets import QLayout, QToolButton, QWidget
 
-from .card_visuals import _normalize_card_actions
-
 
 def _eye_slash_pixmap(active: bool, size: int = 22) -> QPixmap:
     """Draw a stable eye-slash at the same apparent scale as card action icons.
@@ -222,21 +220,3 @@ def _fix_card_actions(card: Any) -> None:
     card._fh6_card_action_aligner = aligner
     QTimer.singleShot(0, aligner.reposition)
 
-
-def apply_v1_3_2_card_alignment_patch(MainWindow) -> None:
-    if getattr(MainWindow, "_fh6_v132_card_alignment_patched", False):
-        return
-
-    original_make_card = MainWindow._make_saved_content_card
-
-    def patched_make_card(self, content_type: str, record: Any, key: str):
-        card = original_make_card(self, content_type, record, key)
-        if content_type == "livery":
-            _fix_card_actions(card)
-            # The aligner creates its controller after the base card returns;
-            # normalize once more so final icon geometry and centerlines agree.
-            _normalize_card_actions(card)
-        return card
-
-    MainWindow._make_saved_content_card = patched_make_card
-    MainWindow._fh6_v132_card_alignment_patched = True

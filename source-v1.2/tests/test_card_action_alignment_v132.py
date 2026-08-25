@@ -2,16 +2,17 @@ from __future__ import annotations
 
 import sys
 import unittest
+from pathlib import Path
 
 from PySide6.QtCore import QSize
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QToolButton, QWidget
 
-from fh6garage.ui import _classification_pixmap
-from fh6garage.v1_3_2_card_alignment_patch import (
+from fh6garage.card_action_alignment import (
     _CardActionAligner,
     _eye_slash_pixmap,
 )
+from fh6garage.ui import _classification_pixmap
 
 
 def _alpha_bounds(image) -> tuple[int, int]:
@@ -31,6 +32,14 @@ class CardActionAlignmentV132Tests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls._app = QApplication.instance() or QApplication(sys.argv[:1])
+
+    def test_runtime_alignment_patch_is_removed(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        app_source = (root / "app.py").read_text(encoding="utf-8")
+        self.assertNotIn("apply_v1_3_2_card_alignment_patch(MainWindow)", app_source)
+        self.assertFalse(
+            (root / "fh6garage" / "v1_3_2_card_alignment_patch.py").exists()
+        )
 
     def test_left_actions_lock_to_right_fourth_and_fifth_centers(self) -> None:
         overlay = QWidget()

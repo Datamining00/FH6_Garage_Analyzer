@@ -14,8 +14,8 @@ from PySide6.QtWidgets import (
 
 from fh6garage import v1_3_2_change_dialog_folder_patch as feature
 from fh6garage import v1_3_2_change_dialog_runtime_fix as runtime_fix
+from fh6garage.card_action_alignment import _CardActionAligner
 from fh6garage.ui_cleanup import _HideButtonAligner
-from fh6garage.v1_3_2_card_alignment_patch import _CardActionAligner
 
 ROOT = Path(__file__).resolve().parents[1]
 
