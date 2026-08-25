@@ -17,7 +17,6 @@ from .auction_thumbnails import is_thumbnail_cache_dir
 from .i18n import get_language
 from .models import LiveryRecord
 from .thumbnail_cache_location import fixed_default_thumbnail_cache
-from .ui import SummaryCard
 from .ui_cleanup import (
     _align_path_rows,
     _configure_livery_source_switch,
@@ -311,7 +310,6 @@ def apply_v1_3_2_patches(MainWindow) -> None:
 
     original_init = MainWindow.__init__
     original_build_ui = MainWindow._build_ui
-    original_dashboard_page = MainWindow._dashboard_page
     original_livery_page = MainWindow._livery_page
     original_build_controls = MainWindow._build_saved_content_controls
     original_populate_all = MainWindow._populate_all
@@ -326,25 +324,6 @@ def apply_v1_3_2_patches(MainWindow) -> None:
         _normalize_path_rows(self)
         _align_path_rows(self)
         _configure_livery_source_switch(self)
-
-    def patched_dashboard_page(self):
-        page = original_dashboard_page(self)
-        self.card_livery.title.setText(_t("my_designs"))
-
-        page_layout = page.layout()
-        cards = page_layout.itemAt(1).layout() if page_layout is not None else None
-        if cards is not None:
-            cards.removeWidget(self.card_tuning)
-            self.card_auction = SummaryCard(_t("auction"), "—")
-            cards.addWidget(self.card_auction, 0, 2)
-            cards.addWidget(self.card_tuning, 0, 3)
-
-        section = getattr(self, "saved_livery_section", None)
-        if section is not None:
-            for label in section.findChildren(QLabel):
-                label.setText(_t("my_designs"))
-                break
-        return page
 
     def patched_livery_page(self):
         page = original_livery_page(self)
@@ -428,7 +407,6 @@ def apply_v1_3_2_patches(MainWindow) -> None:
 
     MainWindow.__init__ = patched_init
     MainWindow._build_ui = patched_build_ui
-    MainWindow._dashboard_page = patched_dashboard_page
     MainWindow._livery_page = patched_livery_page
     MainWindow._build_saved_content_controls = patched_build_controls
     MainWindow._populate_all = patched_populate_all

@@ -1062,9 +1062,10 @@ class MainWindow(QMainWindow):
         cards = QGridLayout()
         cards.setSpacing(12)
         self.card_cars = SummaryCard(tr("dashboard.garage_cars"), "—")
-        self.card_livery = SummaryCard(tr("dashboard.saved_livery"), "—")
+        self.card_livery = SummaryCard(tr("content.source_my_designs"), "—")
+        self.card_auction = SummaryCard(tr("content.source_auction"), "—")
         self.card_tuning = SummaryCard(tr("dashboard.saved_tuning"), "—")
-        for i, card in enumerate((self.card_cars, self.card_livery, self.card_tuning)):
+        for i, card in enumerate((self.card_cars, self.card_livery, self.card_auction, self.card_tuning)):
             cards.addWidget(card, 0, i)
         layout.addLayout(cards)
 
@@ -1223,7 +1224,7 @@ class MainWindow(QMainWindow):
         right_l.addWidget(self.selected_hint)
 
         self.saved_livery_section = self._dashboard_saved_section_header(
-            tr("dashboard.saved_livery"),
+            tr("content.source_my_designs"),
             "livery",
         )
         right_l.addWidget(self.saved_livery_section)
