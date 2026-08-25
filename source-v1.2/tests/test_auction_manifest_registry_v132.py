@@ -41,6 +41,21 @@ def _write_manifest(
 
 
 class AuctionManifestRegistryTests(unittest.TestCase):
+    def test_runtime_registry_patch_is_removed_and_scan_integrated(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        app_source = (root / "app.py").read_text(encoding="utf-8")
+        scan_source = (
+            root / "fh6garage" / "scan_result_processing.py"
+        ).read_text(encoding="utf-8")
+        self.assertNotIn(
+            "apply_v1_3_2_manifest_registry_patch(MainWindow)",
+            app_source,
+        )
+        self.assertFalse(
+            (root / "fh6garage" / "v1_3_2_manifest_registry_patch.py").exists()
+        )
+        self.assertIn("rebuild_auction_registry_state(owner, cache_path)", scan_source)
+
     def test_registered_auction_identities_do_not_depend_on_hydration(self) -> None:
         registered = [
             "0368_bde1c885b0ea852euh9hw3skbs9pmf7vy7frhm14xkw_bigThumb.webp",

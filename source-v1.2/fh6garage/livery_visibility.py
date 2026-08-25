@@ -6,8 +6,6 @@ from PySide6.QtCore import QRect, QSize, Qt
 from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import QPushButton, QWidgetAction
 
-from .models import LiveryRecord
-
 HIDDEN_MODE = 11
 AUCTION_APPLIED_MODE = 12
 AUCTION_UNAPPLIED_MODE = 13
@@ -34,17 +32,6 @@ def set_livery_hidden(
     hidden: bool,
 ) -> None:
     preferences.set_bool(hidden_preference_key(content_key), bool(hidden))
-
-
-def is_auction_livery_applied(record: object) -> bool:
-    """Return whether a SoulBound record resolves to an existing cache image."""
-    if not isinstance(record, LiveryRecord) or record.kind != "SoulBoundLivery":
-        return False
-    path = record.thumbnail_path
-    try:
-        return bool(path is not None and path.is_file())
-    except OSError:
-        return False
 
 
 def eye_slash_pixmap(active: bool, size: int = 22) -> QPixmap:

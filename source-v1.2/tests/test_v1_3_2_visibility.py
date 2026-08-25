@@ -17,15 +17,15 @@ class V132VisibilityContractTests(unittest.TestCase):
             (root / "fh6garage" / "v1_3_2_visibility_patch.py").exists()
         )
 
-    def test_applied_auction_rule_requires_real_current_webp(self) -> None:
+    def test_applied_auction_rule_uses_manifest_registry(self) -> None:
         root = Path(__file__).resolve().parents[1]
-        source = (root / "fh6garage" / "livery_visibility.py").read_text(
+        source = (root / "fh6garage" / "auction_registry_state.py").read_text(
             encoding="utf-8"
         )
         self.assertIn('record.kind != "SoulBoundLivery"', source)
-        self.assertIn("path = record.thumbnail_path", source)
-        self.assertIn("path.is_file()", source)
-        self.assertNotIn("container_download_timestamp", source)
+        self.assertIn("registry.auction_identities", source)
+        self.assertIn("_fh6_v132_registered_auction_keys", source)
+        self.assertNotIn("thumbnail_path", source)
 
     def test_hidden_liveries_are_removed_from_navigation_sessions(self) -> None:
         source = self._source()

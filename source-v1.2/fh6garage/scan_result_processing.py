@@ -6,6 +6,7 @@ from time import perf_counter
 
 from PySide6.QtCore import QThread, QTimer
 
+from .auction_registry_state import rebuild_auction_registry_state
 from .auction_thumbnails import (
     AuctionThumbnailManifestError,
     AuctionThumbnailMatchStats,
@@ -88,10 +89,10 @@ def populate_scan_result_ui(owner: object, populate_content: Callable[[], None])
     """Prepare and measure a scan result while execution is on the GUI thread."""
     ui_started = perf_counter()
     result = getattr(owner, "result", None)
+    cache_getter = getattr(owner, "_fh6_v132_current_cache_path", None)
+    cache_path = cache_getter() if callable(cache_getter) else None
     if result is not None:
         try:
-            cache_getter = getattr(owner, "_fh6_v132_current_cache_path", None)
-            cache_path = cache_getter() if callable(cache_getter) else None
             owner._fh6_v132_match_stats = assign_auction_thumbnails(  # type: ignore[attr-defined]
                 result.liveries,
                 cache_path,
@@ -99,6 +100,7 @@ def populate_scan_result_ui(owner: object, populate_content: Callable[[], None])
         except Exception:  # noqa: BLE001 - cache integration is optional
             owner._fh6_v132_match_stats = None  # type: ignore[attr-defined]
 
+    rebuild_auction_registry_state(owner, cache_path)
     rebuild_record_indexes(owner)
     owner._fh6_v132_initial_scan_build = True  # type: ignore[attr-defined]
     try:

@@ -30,7 +30,6 @@ from fh6garage.v1_3_1_patch import apply_v1_3_1_patches
 from fh6garage.v1_3_2_patch import apply_v1_3_2_patches
 from fh6garage.v1_3_2_safety_patch import apply_v1_3_2_safety_patches
 from fh6garage.v1_3_2_startup_patch import apply_v1_3_2_startup_patches
-from fh6garage.v1_3_2_manifest_registry_patch import apply_v1_3_2_manifest_registry_patch
 from fh6garage.v1_3_2_refresh_diff_patch import apply_v1_3_2_refresh_diff_patch
 from fh6garage.v1_3_2_change_view_alias_patch import apply_v1_3_2_change_view_alias_patch
 from fh6garage.v1_3_2_change_view_alias_sync_patch import apply_v1_3_2_change_view_alias_sync_patch
@@ -68,7 +67,6 @@ def main() -> int:
     apply_v1_3_2_patches(MainWindow)
     apply_v1_3_2_safety_patches(MainWindow)
     apply_v1_3_2_startup_patches()
-    apply_v1_3_2_manifest_registry_patch(MainWindow)
 
     # Snapshot visible livery instances and cache only thumbnail copies under
     # LocalAppData so the latest add/remove/change diff can retain deleted images.

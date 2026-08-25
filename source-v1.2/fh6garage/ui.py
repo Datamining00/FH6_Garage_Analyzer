@@ -49,6 +49,7 @@ from PySide6.QtWidgets import (
 
 from .annotations import AnnotationStore, append_note
 from .auction_card_loader import schedule_auction_cards
+from .auction_registry_state import is_auction_livery_registered
 from .card_metadata_layout import _compact_window_chrome, _configure_card_metadata
 from .card_action_alignment import _fix_card_actions
 from .card_visuals import _fix_busy_overlay, _normalize_card_actions
@@ -67,7 +68,6 @@ from .livery_visibility import (
     HIDDEN_MODE,
     eye_slash_pixmap,
     install_visibility_filter_rows,
-    is_auction_livery_applied,
     is_livery_hidden,
     set_livery_hidden,
     visibility_labels,
@@ -2199,9 +2199,8 @@ class MainWindow(QMainWindow):
             preserve_scroll=True,
         )
 
-    @staticmethod
-    def _fh6_v132_is_auction_applied(record: object) -> bool:
-        return is_auction_livery_applied(record)
+    def _fh6_v132_is_auction_applied(self, record: object) -> bool:
+        return is_auction_livery_registered(self, record)
 
     def _reset_game_navigation_sessions(self) -> None:
         self._game_navigation_generation += 1
