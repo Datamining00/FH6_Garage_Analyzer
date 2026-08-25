@@ -35,7 +35,6 @@ from fh6garage.v1_3_2_change_view_alias_patch import apply_v1_3_2_change_view_al
 from fh6garage.v1_3_2_change_view_alias_sync_patch import apply_v1_3_2_change_view_alias_sync_patch
 from fh6garage.v1_3_2_release_layout_patch import apply_v1_3_2_release_layout_patch
 from fh6garage.v1_3_2_change_dialog_folder_patch import apply_v1_3_2_change_dialog_folder_patch
-from fh6garage.v1_3_2_change_dialog_responsive_ui_fix import apply_v1_3_2_change_dialog_responsive_ui_fix
 from fh6garage.v1_3_2_alias_manager_change_card_fix import apply_v1_3_2_alias_manager_change_card_fix
 
 
@@ -93,7 +92,6 @@ def main() -> int:
     # The standalone change window must calculate card geometry from its own
     # viewport, not from a hidden/main-grid width. Reuse the main 2/3/4-column
     # formula on every resize and force the same light application theme.
-    apply_v1_3_2_change_dialog_responsive_ui_fix(MainWindow)
 
     # Cache thumbnail matching is authoritative for auction visibility: unmatched
     # SoulBound cards are hidden by default and appear only through the explicit

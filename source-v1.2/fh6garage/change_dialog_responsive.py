@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from PySide6.QtCore import QEvent, QObject, QSize, Qt, QTimer
 from PySide6.QtWidgets import (
@@ -23,7 +24,6 @@ from .v1_3_ui_patch import (
     GRID_MIN_COLUMNS,
     GRID_TARGET_CARD_WIDTH,
 )
-
 
 _DIALOG_BACKGROUND = "#f7f8fb"
 _DIALOG_MIN_SIZE = QSize(760, 560)
@@ -261,11 +261,3 @@ def _open_responsive_change_dialog(window: Any) -> None:
     # pointing at an already-destroyed QScrollArea.
     controller.request_now()
 
-
-def apply_v1_3_2_change_dialog_responsive_ui_fix(MainWindow) -> None:
-    """Use the main grid's responsive geometry and light theme in the change window."""
-    if getattr(MainWindow, "_fh6_v132_change_dialog_responsive_ui_fixed", False):
-        return
-
-    _feature._open_change_dialog_same_as_main = _open_responsive_change_dialog
-    MainWindow._fh6_v132_change_dialog_responsive_ui_fixed = True

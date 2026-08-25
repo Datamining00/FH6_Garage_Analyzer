@@ -479,6 +479,14 @@ def _open_change_dialog_same_as_main(window: Any) -> None:
     dialog.activateWindow()
 
 
+def _open_responsive_change_view(window: Any) -> None:
+    # Import lazily because the responsive implementation reuses the card
+    # factories in this module.
+    from .change_dialog_responsive import _open_responsive_change_dialog
+
+    _open_responsive_change_dialog(window)
+
+
 def apply_v1_3_2_change_dialog_folder_patch(MainWindow) -> None:
     """Match change-view cards to the main grid and add a read-only folder action."""
     if getattr(MainWindow, "_fh6_v132_change_dialog_folder_patched", False):
@@ -493,5 +501,5 @@ def apply_v1_3_2_change_dialog_folder_patch(MainWindow) -> None:
         return card
 
     MainWindow._make_saved_content_card = patched_make_card
-    _change_view._open_change_dialog = _open_change_dialog_same_as_main
+    _change_view._open_change_dialog = _open_responsive_change_view
     MainWindow._fh6_v132_change_dialog_folder_patched = True

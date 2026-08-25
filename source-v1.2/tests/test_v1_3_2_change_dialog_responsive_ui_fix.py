@@ -10,8 +10,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication, QGridLayout, QWidget
 
+from fh6garage import change_dialog_responsive as patch
 from fh6garage import v1_3_2_change_dialog_folder_patch as feature
-from fh6garage import v1_3_2_change_dialog_responsive_ui_fix as patch
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -132,13 +132,15 @@ class ChangeDialogResponsiveUiFixTests(unittest.TestCase):
         controller_source = inspect.getsource(patch._ViewportResizeController)
         self.assertIn("QTimer(self)", controller_source)
 
-    def test_patch_order_precedes_window_creation(self) -> None:
+    def test_runtime_patch_is_removed(self) -> None:
         app = (ROOT / "app.py").read_text(encoding="utf-8")
-        runtime_pos = app.index("apply_v1_3_2_change_dialog_folder_patch(MainWindow)")
-        responsive_pos = app.index("apply_v1_3_2_change_dialog_responsive_ui_fix(MainWindow)")
-        thread_pos = app.index("window = MainWindow(project_root=root)")
-        self.assertLess(runtime_pos, responsive_pos)
-        self.assertLess(responsive_pos, thread_pos)
+        self.assertNotIn(
+            "apply_v1_3_2_change_dialog_responsive_ui_fix(MainWindow)",
+            app,
+        )
+        self.assertFalse(
+            (ROOT / "fh6garage" / "v1_3_2_change_dialog_responsive_ui_fix.py").exists()
+        )
 
 
 if __name__ == "__main__":
