@@ -13,12 +13,10 @@ from PySide6.QtWidgets import (
     QPushButton,
 )
 
-from .auction_thumbnails import (
-    auto_detect_thumbnail_cache,
-    is_thumbnail_cache_dir,
-)
+from .auction_thumbnails import is_thumbnail_cache_dir
 from .i18n import get_language
 from .models import LiveryRecord
+from .thumbnail_cache_location import fixed_default_thumbnail_cache
 from .ui import SummaryCard
 from .ui_cleanup import (
     _align_path_rows,
@@ -121,7 +119,7 @@ def _choose_cache_folder(self: Any) -> None:
 
 
 def _auto_detect_cache(self: Any, *, silent: bool = False, rescan: bool = True) -> bool:
-    path = auto_detect_thumbnail_cache()
+    path = fixed_default_thumbnail_cache()
     if path is None:
         if not silent:
             QMessageBox.information(
@@ -227,32 +225,23 @@ def _install_cache_row(self: Any) -> None:
         return
 
     row = QHBoxLayout()
-    row.setSpacing(8)
-    label = QLabel(_t("cache_label"))
-    label.setObjectName("muted")
-    label.setMinimumWidth(132)
-
     self.cache_path_edit = QLineEdit()
     self.cache_path_edit.setReadOnly(True)
     self.cache_path_edit.setPlaceholderText(_t("cache_placeholder"))
 
     choose = QPushButton(_t("cache_choose"))
-    choose.setObjectName("secondary")
+    choose.setObjectName("primary")
     choose.clicked.connect(self._fh6_v132_choose_cache_folder)
 
-    auto = QPushButton(_t("cache_auto"))
-    auto.setObjectName("secondary")
-    auto.clicked.connect(
-        lambda _checked=False: self._fh6_v132_auto_detect_cache(
-            silent=False,
-            rescan=True,
-        )
+    refresh = QPushButton(
+        "새로고침" if (get_language() or "ko").lower().startswith("ko") else "Refresh"
     )
+    refresh.setObjectName("secondary")
+    refresh.clicked.connect(lambda _checked=False: _refresh_for_cache_change(self))
 
-    row.addWidget(label)
     row.addWidget(self.cache_path_edit, 1)
     row.addWidget(choose)
-    row.addWidget(auto)
+    row.addWidget(refresh)
     layout.insertLayout(1, row)
 
 

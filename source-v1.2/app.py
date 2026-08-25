@@ -28,7 +28,6 @@ from fh6garage.ui import MainWindow
 from fh6garage.v1_3_ui_patch import apply_v1_3_ui_patches
 from fh6garage.v1_3_1_patch import apply_v1_3_1_patches
 from fh6garage.v1_3_2_patch import apply_v1_3_2_patches
-from fh6garage.v1_3_2_startup_patch import apply_v1_3_2_startup_patches
 from fh6garage.v1_3_2_change_view_alias_patch import apply_v1_3_2_change_view_alias_patch
 
 
@@ -56,7 +55,6 @@ def main() -> int:
     apply_v1_3_ui_patches(MainWindow)
     apply_v1_3_1_patches(MainWindow)
     apply_v1_3_2_patches(MainWindow)
-    apply_v1_3_2_startup_patches()
 
     # Present latest refresh changes as cards and resolve user-managed creator
     # aliases across display/search/sort/group/statistics. This never writes FH6

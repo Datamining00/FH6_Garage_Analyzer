@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from fh6garage.v1_3_2_startup_patch import fixed_default_thumbnail_cache
+from fh6garage.thumbnail_cache_location import fixed_default_thumbnail_cache
 
 
 class V132StartupTests(unittest.TestCase):
@@ -48,10 +48,10 @@ class V132StartupTests(unittest.TestCase):
             )
             self.assertEqual(fixed_default_thumbnail_cache(local), expected)
 
-    def test_app_uses_startup_patch_and_original_livery_construction(self) -> None:
+    def test_startup_runtime_patch_is_removed(self) -> None:
         root = Path(__file__).resolve().parents[1]
         source = (root / "app.py").read_text(encoding="utf-8")
-        self.assertIn("apply_v1_3_2_startup_patches()", source)
+        self.assertNotIn("apply_v1_3_2_startup_patches", source)
         self.assertNotIn("apply_v1_3_2_performance_patches", source)
         self.assertFalse(
             (root / "fh6garage" / "v1_3_2_performance_patch.py").exists()
@@ -60,11 +60,11 @@ class V132StartupTests(unittest.TestCase):
     def test_manual_picker_remains_but_auto_discovery_button_is_removed(self) -> None:
         root = Path(__file__).resolve().parents[1]
         source = (
-            root / "fh6garage" / "v1_3_2_startup_patch.py"
+            root / "fh6garage" / "v1_3_2_patch.py"
         ).read_text(encoding="utf-8")
-        self.assertIn("v132._install_cache_row = _install_fixed_cache_row", source)
         self.assertIn("choose.setObjectName(\"primary\")", source)
         self.assertIn("refresh.setObjectName(\"secondary\")", source)
+        self.assertNotIn("auto = QPushButton", source)
         self.assertNotIn("Microsoft.*", source)
         self.assertNotIn("os.scandir", source)
 
