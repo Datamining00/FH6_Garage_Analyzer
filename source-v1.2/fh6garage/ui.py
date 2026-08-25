@@ -52,6 +52,11 @@ from .auction_card_loader import schedule_auction_cards
 from .auction_registry_state import is_auction_livery_registered
 from .card_metadata_layout import _compact_window_chrome, _configure_card_metadata
 from .card_action_alignment import _fix_card_actions
+from .card_state_sync import (
+    _refresh_dialog_memo_button,
+    _sync_cached_annotation_card,
+    _sync_cached_hidden_card,
+)
 from .card_visuals import _fix_busy_overlay, _normalize_card_actions
 from .change_dialog_cards import _repair_card_actions
 from .car_db import CarDatabase, CarDatabaseError, REMOTE_SOURCE_PAGE
@@ -2203,6 +2208,7 @@ class MainWindow(QMainWindow):
             self.livery_search.text(),
             preserve_scroll=True,
         )
+        _sync_cached_hidden_card(self, key, hidden)
 
     def _fh6_v132_is_auction_applied(self, record: object) -> bool:
         return is_auction_livery_registered(self, record)
@@ -3037,6 +3043,10 @@ class MainWindow(QMainWindow):
             lambda _checked=False, t=content_type, k=key:
             self._handle_saved_content_memo_clicked(t, k)
         )
+        memo_button.clicked.connect(
+            lambda _checked=False, c=card, k=key:
+            QTimer.singleShot(0, lambda: _refresh_dialog_memo_button(self, c, k))
+        )
 
         game_move_button = QToolButton()
         game_move_button.setIcon(QIcon(_classification_pixmap("move", True, 24)))
@@ -3565,6 +3575,7 @@ class MainWindow(QMainWindow):
                         else tr("memo.none_add")
                     )
             break
+        _sync_cached_annotation_card(self, content_type, key)
 
     def _sync_table_annotation(
         self,

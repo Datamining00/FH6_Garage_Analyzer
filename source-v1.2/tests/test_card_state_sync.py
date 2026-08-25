@@ -7,7 +7,7 @@ import unittest
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QFrame, QToolButton
 
-from fh6garage.v1_3_2_change_view_alias_sync_patch import (
+from fh6garage.card_state_sync import (
     _sync_cached_annotation_card,
     _sync_cached_hidden_card,
 )
@@ -40,7 +40,7 @@ class _Window:
         return QIcon()
 
 
-class ChangeViewAliasSyncTests(unittest.TestCase):
+class CardStateSyncTests(unittest.TestCase):
     @staticmethod
     def _card():
         card = QFrame()
@@ -82,14 +82,10 @@ class ChangeViewAliasSyncTests(unittest.TestCase):
         self.assertFalse(card._fh6_hide_button.isChecked())
         card.deleteLater()
 
-    def test_patch_order_alias_then_sync_then_window(self):
+    def test_runtime_patch_is_removed(self):
         app_path = Path(__file__).resolve().parents[1] / "app.py"
         source = app_path.read_text(encoding="utf-8")
-        alias_call = source.index("apply_v1_3_2_change_view_alias_patch(MainWindow)")
-        sync_call = source.index("apply_v1_3_2_change_view_alias_sync_patch(MainWindow)")
-        thread_call = source.index("window = MainWindow(project_root=root)")
-        self.assertLess(alias_call, sync_call)
-        self.assertLess(sync_call, thread_call)
+        self.assertNotIn("apply_v1_3_2_change_view_alias_sync_patch", source)
 
 
 if __name__ == "__main__":

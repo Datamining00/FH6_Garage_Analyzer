@@ -32,7 +32,6 @@ from fh6garage.v1_3_2_safety_patch import apply_v1_3_2_safety_patches
 from fh6garage.v1_3_2_startup_patch import apply_v1_3_2_startup_patches
 from fh6garage.v1_3_2_refresh_diff_patch import apply_v1_3_2_refresh_diff_patch
 from fh6garage.v1_3_2_change_view_alias_patch import apply_v1_3_2_change_view_alias_patch
-from fh6garage.v1_3_2_change_view_alias_sync_patch import apply_v1_3_2_change_view_alias_sync_patch
 
 
 def resource_root() -> Path:
@@ -70,11 +69,6 @@ def main() -> int:
     # aliases across display/search/sort/group/statistics. This never writes FH6
     # content; scan completion remains the class-defined Qt slot in ui.py.
     apply_v1_3_2_change_view_alias_patch(MainWindow)
-
-    # Current cards opened from the change viewer are separate widgets from the
-    # main-grid cache. Mirror their annotation/hide actions back to that cache so
-    # both views remain visually consistent immediately.
-    apply_v1_3_2_change_view_alias_sync_patch(MainWindow)
 
     # Add the folder action and base standalone change-view card implementation.
 
