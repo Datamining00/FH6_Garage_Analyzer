@@ -62,6 +62,7 @@ from .card_visuals import _fix_busy_overlay, _normalize_card_actions
 from .change_dialog_cards import _repair_card_actions
 from .car_db import CarDatabase, CarDatabaseError, REMOTE_SOURCE_PAGE
 from .creator_aliases import CreatorAliasStore
+from .creator_alias_view import aggregate_creator_alias_stats, sort_by_creator_alias
 from .game_navigation import (
     GameGridSession,
     GameNavigationError,
@@ -1979,43 +1980,11 @@ class MainWindow(QMainWindow):
             )
 
     def _creator_content_stats(self) -> list[tuple[str, int, int]]:
-        """Return creator -> custom-livery/tuning counts.
-
-        Creator matching is case-insensitive, while the first non-empty display
-        spelling encountered is preserved for presentation.
-        """
-        if not self.result:
-            return []
-
-        stats: dict[str, dict[str, object]] = {}
-
-        def ensure_creator(raw_name: str) -> dict[str, object]:
-            display = (raw_name or "").strip() or tr("creator.none")
-            key = display.casefold()
-            bucket = stats.get(key)
-            if bucket is None:
-                bucket = {"name": display, "livery": 0, "tuning": 0}
-                stats[key] = bucket
-            elif bucket["name"] == tr("creator.none") and display != tr("creator.none"):
-                bucket["name"] = display
-            return bucket
-
-        for record in self.result.liveries:
-            if record.kind != "Livery":
-                continue
-            bucket = ensure_creator(record.header.creator or "")
-            bucket["livery"] = int(bucket["livery"]) + 1
-
-        for record in self.result.tunings:
-            bucket = ensure_creator(record.header.creator or "")
-            bucket["tuning"] = int(bucket["tuning"]) + 1
-
-        rows = [
-            (str(bucket["name"]), int(bucket["livery"]), int(bucket["tuning"]))
-            for bucket in stats.values()
-        ]
-        rows.sort(key=lambda row: (row[0] == tr("creator.none"), row[0].casefold()))
-        return rows
+        return aggregate_creator_alias_stats(
+            self.result,
+            self.creator_aliases,
+            tr("creator.none"),
+        )
 
     def _populate_creator_table(self) -> None:
         table = self.creator_table
@@ -2106,6 +2075,14 @@ class MainWindow(QMainWindow):
             if content_type == "livery"
             else self._tuning_sort_descending
         )
+
+        if mode == "creator":
+            return sort_by_creator_alias(
+                records,
+                self.creator_aliases,
+                self._vehicle_brand_sort_key,
+                descending=descending,
+            )
 
         sorted_records = sort_records(
             records,

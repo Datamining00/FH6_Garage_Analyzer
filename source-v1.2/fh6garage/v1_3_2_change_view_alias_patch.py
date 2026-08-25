@@ -456,72 +456,12 @@ def apply_v1_3_2_change_view_alias_patch(MainWindow) -> None:
     if getattr(MainWindow, "_fh6_v132_change_view_alias_patched", False):
         return
 
-    original_sorted_saved_content = MainWindow._sorted_saved_content
     original_filter_dashboard = MainWindow._filter_dashboard_table
     original_populate_creator_table = MainWindow._populate_creator_table
     original_fill_selected_liveries = MainWindow._fill_selected_liveries
     original_fill_selected_tunings = MainWindow._fill_selected_tunings
     original_relayout_livery = MainWindow._relayout_livery_grid
     original_relayout_tuning = MainWindow._relayout_tuning_grid
-
-    def patched_sorted_saved_content(self, content_type: str):
-        mode = self._livery_sort_mode if content_type == "livery" else self._tuning_sort_mode
-        if mode != "creator":
-            return original_sorted_saved_content(self, content_type)
-        records = self._saved_content_records(content_type)
-        descending = self._livery_sort_descending if content_type == "livery" else self._tuning_sort_descending
-
-        def creator_key(record: LiveryRecord | TuningRecord) -> tuple:
-            raw = (record.header.creator or "").strip()
-            canonical = _creator_canonical(self, raw)
-            return (
-                1 if not raw else 0,
-                canonical.casefold(),
-                tuple(name.casefold() for name in self.creator_aliases.search_names(raw)) if raw else (),
-                self._vehicle_brand_sort_key(record),
-                (record.header.name or "").casefold(),
-            )
-
-        ordered = sorted(records, key=creator_key)
-        if not descending:
-            return ordered
-        available = [record for record in ordered if (record.header.creator or "").strip()]
-        unavailable = [record for record in ordered if not (record.header.creator or "").strip()]
-        return list(reversed(available)) + unavailable
-
-    def alias_creator_stats(self):
-        if not self.result:
-            return []
-        stats: dict[str, dict[str, object]] = {}
-
-        def bucket_for(raw_name: str) -> dict[str, object]:
-            raw = (raw_name or "").strip()
-            if not raw:
-                key = ""
-                display = tr("creator.none")
-            else:
-                display = self.creator_aliases.canonical_name(raw)
-                key = display.casefold()
-            bucket = stats.get(key)
-            if bucket is None:
-                bucket = {"name": display, "livery": 0, "tuning": 0}
-                stats[key] = bucket
-            return bucket
-
-        for record in self.result.liveries:
-            if record.kind != "Livery":
-                continue
-            bucket = bucket_for(record.header.creator or "")
-            bucket["livery"] = int(bucket["livery"]) + 1
-        for record in self.result.tunings:
-            bucket = bucket_for(record.header.creator or "")
-            bucket["tuning"] = int(bucket["tuning"]) + 1
-        rows = [
-            (str(bucket["name"]), int(bucket["livery"]), int(bucket["tuning"]))
-            for bucket in stats.values()
-        ]
-        rows.sort(key=lambda row: (row[0] == tr("creator.none"), row[0].casefold()))
-        return rows
 
     def patched_populate_creator_table(self) -> None:
         original_populate_creator_table(self)
@@ -608,8 +548,6 @@ def apply_v1_3_2_change_view_alias_patch(MainWindow) -> None:
             _normalize_card_alias_properties(self, "tuning", card)
         original_relayout_tuning(self, text)
 
-    MainWindow._sorted_saved_content = patched_sorted_saved_content
-    MainWindow._creator_content_stats = alias_creator_stats
     MainWindow._populate_creator_table = patched_populate_creator_table
     MainWindow._filter_dashboard_table = patched_filter_dashboard
     MainWindow._update_selected_creator = patched_update_selected_creator
