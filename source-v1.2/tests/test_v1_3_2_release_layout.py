@@ -9,7 +9,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication, QFrame, QHBoxLayout, QLabel, QPushButton, QToolButton, QVBoxLayout, QWidget
 
-from fh6garage.v1_3_2_release_layout_patch import (
+from fh6garage.release_layout import (
     _align_left_actions_to_right_second_third,
     _compact_change_banner,
     _move_change_banner_to_reserved_slot,
@@ -106,13 +106,9 @@ class ReleaseLayoutTests(unittest.TestCase):
         self.assertIs(aligner.fifth_button, excluded)
         self.assertGreaterEqual(aligner.calls, 1)
 
-    def test_release_patch_stays_before_window_creation(self) -> None:
+    def test_release_runtime_patch_is_removed(self) -> None:
         source = (ROOT / "app.py").read_text(encoding="utf-8")
-        release_layout = "apply_v1_3_2_release_layout_patch(MainWindow)"
-        thread_fix = "window = MainWindow(project_root=root)"
-        self.assertIn(release_layout, source)
-        self.assertIn(thread_fix, source)
-        self.assertLess(source.index(release_layout), source.index(thread_fix))
+        self.assertNotIn("apply_v1_3_2_release_layout_patch", source)
 
     def test_portable_spec_exists(self) -> None:
         spec = ROOT / "FH6_Assistant_v1.3.2_portable.spec"

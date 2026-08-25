@@ -33,7 +33,6 @@ from fh6garage.v1_3_2_startup_patch import apply_v1_3_2_startup_patches
 from fh6garage.v1_3_2_refresh_diff_patch import apply_v1_3_2_refresh_diff_patch
 from fh6garage.v1_3_2_change_view_alias_patch import apply_v1_3_2_change_view_alias_patch
 from fh6garage.v1_3_2_change_view_alias_sync_patch import apply_v1_3_2_change_view_alias_sync_patch
-from fh6garage.v1_3_2_release_layout_patch import apply_v1_3_2_release_layout_patch
 
 
 def resource_root() -> Path:
@@ -76,10 +75,6 @@ def main() -> int:
     # main-grid cache. Mirror their annotation/hide actions back to that cache so
     # both views remain visually consistent immediately.
     apply_v1_3_2_change_view_alias_sync_patch(MainWindow)
-
-    # Put the compact refresh-change notice below Full Refresh and keep the legacy
-    # hide/info left actions on the triangle/excluded rows.
-    apply_v1_3_2_release_layout_patch(MainWindow)
 
     # Add the folder action and base standalone change-view card implementation.
 

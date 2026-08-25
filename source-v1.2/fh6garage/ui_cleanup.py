@@ -320,6 +320,10 @@ def _align_path_rows(self: Any) -> None:
     save_row.setStretchFactor(self.path_edit, 1)
     cache_row.setStretchFactor(self.cache_path_edit, 1)
     self._fh6_v132_reserved_backup_slot = reserved_slot
+    from .release_layout import _compact_change_banner, _move_change_banner_to_reserved_slot
+
+    _move_change_banner_to_reserved_slot(self)
+    _compact_change_banner(self)
 
     def finalize_geometry() -> None:
         selector = max(

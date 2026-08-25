@@ -64,7 +64,7 @@ class ChangeDialogRuntimeFixTests(unittest.TestCase):
         original = feature._change_view._open_integrated_change_dialog
         feature._change_view._open_integrated_change_dialog = lambda owner: calls.append(owner)
         try:
-            from fh6garage.v1_3_2_release_layout_patch import (
+            from fh6garage.release_layout import (
                 _move_change_banner_to_reserved_slot,
             )
 
