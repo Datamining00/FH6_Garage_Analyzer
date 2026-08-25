@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from fh6garage import change_dialog_cards as feature
+from fh6garage import card_action_alignment as actions
 from fh6garage.card_action_alignment import _CardActionAligner
 from fh6garage.ui_cleanup import _HideButtonAligner
 
@@ -115,18 +116,18 @@ class ChangeDialogRuntimeFixTests(unittest.TestCase):
         card_aligner = _CardActionAligner(
             overlay, hide, info, move, zoom, memo
         )
-        four_aligner = feature._FourLeftActionAligner(card, overlay)
+        four_aligner = actions._FourLeftActionAligner(card, overlay)
         card._fh6_hide_aligner = hide_aligner
         card._fh6_card_action_aligner = card_aligner
         card._fh6_four_left_action_aligner = four_aligner
 
         overlay.show()
         self.app.processEvents()
-        feature._repoint_legacy_aligners(card)
+        actions._repoint_existing_aligners(card)
 
         # Exercise every aligner, including the two legacy ones, then make the
         # four-row owner run last exactly as the runtime fix does.
-        feature._force_card_action_geometry(card)
+        actions._reposition_action_aligners(card)
 
         self.assertIs(hide_aligner.target_button, triangle)
         self.assertIs(card_aligner.fourth_button, triangle)

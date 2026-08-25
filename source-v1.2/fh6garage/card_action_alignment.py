@@ -1,10 +1,21 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QEvent, QObject, QPoint, QRectF, QSize, Qt, QTimer
-from PySide6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPen, QPixmap
-from PySide6.QtWidgets import QLayout, QToolButton, QWidget
+from PySide6.QtCore import QEvent, QObject, QPoint, QRectF, QSize, Qt, QTimer, QUrl
+from PySide6.QtGui import QColor, QDesktopServices, QIcon, QPainter, QPainterPath, QPen, QPixmap
+from PySide6.QtWidgets import QLayout, QStyle, QToolButton, QWidget
+
+from .i18n import get_language
+
+
+CARD_ACTION_BUTTON_SIZE = 30
+CARD_ACTION_ICON_SIZE = 20
+
+
+def _txt(ko: str, en: str) -> str:
+    return ko if get_language() == "ko" else en
 
 
 def _eye_slash_pixmap(active: bool, size: int = 22) -> QPixmap:
@@ -174,6 +185,139 @@ class _CardActionAligner(QObject):
         self.info_button.raise_()
 
 
+def _card_overlay(card: Any) -> QWidget | None:
+    image_label = getattr(card, "_fh6_image_label", None)
+    if image_label is None:
+        return None
+    image_host = image_label.parentWidget()
+    stack = image_host.layout() if image_host is not None else None
+    overlay = stack.currentWidget() if stack is not None and hasattr(stack, "currentWidget") else None
+    return overlay if isinstance(overlay, QWidget) else None
+
+
+def _open_record_folder(record: Any) -> None:
+    raw_path = getattr(record, "container_path", None)
+    if raw_path is None:
+        return
+    path = Path(raw_path)
+    if path.is_dir():
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
+
+
+def _install_folder_button(card: Any, record: Any) -> QToolButton | None:
+    existing = getattr(card, "_fh6_folder_button", None)
+    if isinstance(existing, QToolButton):
+        return existing
+    overlay = _card_overlay(card)
+    if overlay is None:
+        return None
+
+    button = QToolButton(overlay)
+    button.setObjectName("fh6FolderButton")
+    button.setFixedSize(CARD_ACTION_BUTTON_SIZE, CARD_ACTION_BUTTON_SIZE)
+    button.setIconSize(QSize(CARD_ACTION_ICON_SIZE, CARD_ACTION_ICON_SIZE))
+    button.setCursor(Qt.CursorShape.PointingHandCursor)
+    button.setToolTip(_txt("리버리 폴더 열기", "Open livery folder"))
+    button.setIcon(card.style().standardIcon(QStyle.StandardPixmap.SP_DirOpenIcon))
+    reference = getattr(card, "_fh6_info_button", None)
+    if isinstance(reference, QToolButton):
+        button.setAutoRaise(reference.autoRaise())
+        if reference.styleSheet():
+            button.setStyleSheet(reference.styleSheet())
+
+    path = Path(getattr(record, "container_path", ""))
+    button.setEnabled(path.is_dir())
+    if not path.is_dir():
+        button.setToolTip(_txt("리버리 폴더를 찾을 수 없음", "Livery folder not found"))
+    button.clicked.connect(lambda _checked=False, r=record: _open_record_folder(r))
+    button.show()
+    card._fh6_folder_button = button
+    return button
+
+
+class _FourLeftActionAligner(QObject):
+    _EVENTS = {
+        QEvent.Type.Show,
+        QEvent.Type.Resize,
+        QEvent.Type.LayoutRequest,
+        QEvent.Type.PolishRequest,
+    }
+
+    def __init__(self, card: Any, overlay: QWidget) -> None:
+        super().__init__(overlay)
+        self.card = card
+        self.overlay = overlay
+        overlay.installEventFilter(self)
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        if event.type() in self._EVENTS:
+            QTimer.singleShot(0, self.reposition)
+        return False
+
+    def reposition(self) -> None:
+        rows = (
+            ("_fh6_game_move_button", "_fh6_check_box"),
+            ("_fh6_hide_button", "_fh6_triangle_box"),
+            ("_fh6_info_button", "_fh6_excluded_box"),
+            ("_fh6_folder_button", "_fh6_zoom_button"),
+        )
+        left_x = 8 + (CARD_ACTION_BUTTON_SIZE - 1) // 2
+        for left_name, _right_name in rows:
+            left = getattr(self.card, left_name, None)
+            if isinstance(left, QToolButton) and left.isVisible():
+                left_x = _center_in_overlay(left, self.overlay).x()
+                break
+        for left_name, right_name in rows:
+            left = getattr(self.card, left_name, None)
+            right = getattr(self.card, right_name, None)
+            if not isinstance(left, QToolButton) or not isinstance(right, QToolButton):
+                continue
+            if not left.isVisible() or not right.isVisible():
+                continue
+            right_center = _center_in_overlay(right, self.overlay)
+            left.move(_top_left_for_center(QPoint(left_x, right_center.y()), left))
+            left.raise_()
+
+
+def _repoint_existing_aligners(card: Any) -> None:
+    triangle = getattr(card, "_fh6_triangle_box", None)
+    excluded = getattr(card, "_fh6_excluded_box", None)
+    hide_aligner = getattr(card, "_fh6_hide_aligner", None)
+    if hide_aligner is not None and isinstance(triangle, QToolButton):
+        if hasattr(hide_aligner, "target_button"):
+            hide_aligner.target_button = triangle
+    card_aligner = getattr(card, "_fh6_card_action_aligner", None)
+    if card_aligner is not None:
+        if isinstance(triangle, QToolButton) and hasattr(card_aligner, "fourth_button"):
+            card_aligner.fourth_button = triangle
+        if isinstance(excluded, QToolButton) and hasattr(card_aligner, "fifth_button"):
+            card_aligner.fifth_button = excluded
+
+
+def _reposition_action_aligners(card: Any) -> None:
+    for name in ("_fh6_hide_aligner", "_fh6_card_action_aligner", "_fh6_four_left_action_aligner"):
+        reposition = getattr(getattr(card, name, None), "reposition", None)
+        if callable(reposition):
+            reposition()
+
+
+def configure_livery_card_actions(card: Any, record: Any) -> None:
+    """Install and align the complete livery-card action set once."""
+    if bool(card.property("fh6ArchiveCard")):
+        return
+    _fix_card_actions(card)
+    overlay = _card_overlay(card)
+    if overlay is None:
+        return
+    _install_folder_button(card, record)
+    aligner = _FourLeftActionAligner(card, overlay)
+    card._fh6_four_left_action_aligner = aligner
+    _repoint_existing_aligners(card)
+    _reposition_action_aligners(card)
+    QTimer.singleShot(0, lambda target=card: _reposition_action_aligners(target))
+    QTimer.singleShot(50, lambda target=card: _reposition_action_aligners(target))
+
+
 def _fix_card_actions(card: Any) -> None:
     hide_button = getattr(card, "_fh6_hide_button", None)
     info_button = getattr(card, "_fh6_info_button", None)
@@ -219,4 +363,3 @@ def _fix_card_actions(card: Any) -> None:
     )
     card._fh6_card_action_aligner = aligner
     QTimer.singleShot(0, aligner.reposition)
-

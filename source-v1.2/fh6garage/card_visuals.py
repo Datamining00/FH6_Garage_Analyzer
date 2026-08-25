@@ -71,6 +71,7 @@ def _card_action_buttons(card: Any) -> list[QToolButton]:
         "_fh6_game_move_button",
         "_fh6_hide_button",
         "_fh6_info_button",
+        "_fh6_folder_button",
         "_fh6_check_box",
         "_fh6_triangle_box",
         "_fh6_excluded_box",
@@ -163,4 +164,3 @@ def _fix_busy_overlay(window: Any) -> None:
     # the parent widget. The latter is inherited by descendants in Qt style
     # sheets and can produce a black panel with dark text on some Windows styles.
     overlay.setStyleSheet(_BUSY_OVERLAY_STYLE)
-

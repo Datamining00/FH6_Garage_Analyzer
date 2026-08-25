@@ -4,6 +4,7 @@ import inspect
 import unittest
 from pathlib import Path
 
+from fh6garage import card_action_alignment as actions
 from fh6garage import change_dialog_cards as patch
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -26,14 +27,14 @@ class ChangeDialogFolderPatchTests(unittest.TestCase):
         self.assertIn("_main_livery_columns(window)", source)
 
     def test_four_left_rows_match_requested_right_rows(self) -> None:
-        source = inspect.getsource(patch._FourLeftActionAligner.reposition)
+        source = inspect.getsource(actions._FourLeftActionAligner.reposition)
         self.assertIn('(\"_fh6_game_move_button\", \"_fh6_check_box\")', source)
         self.assertIn('(\"_fh6_hide_button\", \"_fh6_triangle_box\")', source)
         self.assertIn('(\"_fh6_info_button\", \"_fh6_excluded_box\")', source)
         self.assertIn('(\"_fh6_folder_button\", \"_fh6_zoom_button\")', source)
 
     def test_folder_action_only_opens_existing_container_directory(self) -> None:
-        source = inspect.getsource(patch._open_record_folder)
+        source = inspect.getsource(actions._open_record_folder)
         self.assertIn("path.is_dir()", source)
         self.assertIn("QDesktopServices.openUrl", source)
         self.assertNotIn("unlink", source)
@@ -41,9 +42,9 @@ class ChangeDialogFolderPatchTests(unittest.TestCase):
         self.assertNotIn("rmtree", source)
 
     def test_folder_button_uses_release_icon_geometry(self) -> None:
-        self.assertEqual(patch.CARD_ACTION_BUTTON_SIZE, 30)
-        self.assertEqual(patch.CARD_ACTION_ICON_SIZE, 20)
-        source = inspect.getsource(patch._install_folder_button)
+        self.assertEqual(actions.CARD_ACTION_BUTTON_SIZE, 30)
+        self.assertEqual(actions.CARD_ACTION_ICON_SIZE, 20)
+        source = inspect.getsource(actions._install_folder_button)
         self.assertIn("SP_DirOpenIcon", source)
         self.assertIn("_fh6_folder_button", source)
 
