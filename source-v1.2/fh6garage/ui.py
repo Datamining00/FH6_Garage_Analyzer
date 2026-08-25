@@ -140,7 +140,11 @@ from .window_responsiveness import (
     _save_window_geometry,
     _schedule_resize_settle,
 )
-from .v1_3_2_change_view_alias_patch import initialize_creator_alias_ui
+from .v1_3_2_change_view_alias_patch import (
+    _decorate_creator_copy_label,
+    initialize_creator_alias_ui,
+    update_change_banner,
+)
 
 
 APP_STYLE = """
@@ -1788,6 +1792,7 @@ class MainWindow(QMainWindow):
         from .release_layout import _compact_change_banner
 
         _compact_change_banner(self)
+        update_change_banner(self)
 
     def _populate_all_content(self) -> None:
         _ensure_scan_generation(self)
@@ -3134,6 +3139,7 @@ class MainWindow(QMainWindow):
                 _add_auction_badge(card)
             else:
                 card.setProperty("liverySource", "my_designs")
+        _decorate_creator_copy_label(self, card, record.header.creator or "")
         _normalize_card_actions(card)
         if content_type == "livery":
             from .release_layout import _align_left_actions_to_right_second_third

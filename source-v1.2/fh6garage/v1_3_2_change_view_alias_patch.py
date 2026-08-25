@@ -433,13 +433,29 @@ def initialize_creator_alias_ui(window: Any) -> None:
             content_layout.insertWidget(1, banner)
 
 
+def update_change_banner(window: Any) -> None:
+    banner = getattr(window, "refresh_diff_banner", None)
+    label = getattr(window, "refresh_diff_banner_label", None)
+    if banner is None or label is None:
+        return
+    diff = getattr(window, "_fh6_latest_livery_diff", None)
+    if diff is None or diff.baseline or diff.total <= 0:
+        banner.hide()
+        return
+    label.setText(
+        _txt(
+            f"새로고침 변경 · 추가 {len(diff.added)} · 삭제 {len(diff.removed)} · 변경 {len(diff.changed)}",
+            f"Refresh changes · Added {len(diff.added)} · Removed {len(diff.removed)} · Changed {len(diff.changed)}",
+        )
+    )
+    banner.show()
+
+
 def apply_v1_3_2_change_view_alias_patch(MainWindow) -> None:
     """Add creator aliases and a card-based latest-refresh change viewer."""
     if getattr(MainWindow, "_fh6_v132_change_view_alias_patched", False):
         return
 
-    original_populate_all = MainWindow._populate_all
-    original_make_card = MainWindow._make_saved_content_card
     original_sorted_saved_content = MainWindow._sorted_saved_content
     original_filter_dashboard = MainWindow._filter_dashboard_table
     original_populate_creator_table = MainWindow._populate_creator_table
@@ -447,32 +463,6 @@ def apply_v1_3_2_change_view_alias_patch(MainWindow) -> None:
     original_fill_selected_tunings = MainWindow._fill_selected_tunings
     original_relayout_livery = MainWindow._relayout_livery_grid
     original_relayout_tuning = MainWindow._relayout_tuning_grid
-
-    def update_change_banner(self) -> None:
-        banner = getattr(self, "refresh_diff_banner", None)
-        label = getattr(self, "refresh_diff_banner_label", None)
-        if banner is None or label is None:
-            return
-        diff = getattr(self, "_fh6_latest_livery_diff", None)
-        if diff is None or diff.baseline or diff.total <= 0:
-            banner.hide()
-            return
-        label.setText(
-            _txt(
-                f"새로고침 변경 · 추가 {len(diff.added)} · 삭제 {len(diff.removed)} · 변경 {len(diff.changed)}",
-                f"Refresh changes · Added {len(diff.added)} · Removed {len(diff.removed)} · Changed {len(diff.changed)}",
-            )
-        )
-        banner.show()
-
-    def patched_populate_all(self) -> None:
-        original_populate_all(self)
-        update_change_banner(self)
-
-    def patched_make_card(self, content_type: str, record: Any, key: str):
-        card = original_make_card(self, content_type, record, key)
-        _decorate_creator_copy_label(self, card, record.header.creator or "")
-        return card
 
     def patched_sorted_saved_content(self, content_type: str):
         mode = self._livery_sort_mode if content_type == "livery" else self._tuning_sort_mode
@@ -618,8 +608,6 @@ def apply_v1_3_2_change_view_alias_patch(MainWindow) -> None:
             _normalize_card_alias_properties(self, "tuning", card)
         original_relayout_tuning(self, text)
 
-    MainWindow._populate_all = patched_populate_all
-    MainWindow._make_saved_content_card = patched_make_card
     MainWindow._sorted_saved_content = patched_sorted_saved_content
     MainWindow._creator_content_stats = alias_creator_stats
     MainWindow._populate_creator_table = patched_populate_creator_table
