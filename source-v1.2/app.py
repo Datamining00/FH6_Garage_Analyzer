@@ -40,7 +40,6 @@ from fh6garage.v1_3_2_global_ui_patch import apply_v1_3_2_global_ui_patch
 from fh6garage.v1_3_2_icon_overlay_fix import apply_v1_3_2_icon_overlay_fix
 from fh6garage.v1_3_2_compact_card_layout_patch import apply_v1_3_2_compact_card_layout_patch
 from fh6garage.v1_3_2_responsiveness_sort_patch import apply_v1_3_2_responsiveness_sort_patch
-from fh6garage.v1_3_2_responsive_columns_fix import apply_v1_3_2_responsive_columns_fix
 from fh6garage.v1_3_2_refresh_diff_patch import apply_v1_3_2_refresh_diff_patch
 from fh6garage.v1_3_2_change_view_alias_patch import apply_v1_3_2_change_view_alias_patch
 from fh6garage.v1_3_2_change_view_alias_sync_patch import apply_v1_3_2_change_view_alias_sync_patch
@@ -103,11 +102,6 @@ def main() -> int:
     # Keep the indeterminate busy overlay repainting during synchronous card
     # rebuild/layout work and make first-click download/date sorting newest-first.
     apply_v1_3_2_responsiveness_sort_patch(MainWindow)
-
-    # The responsiveness patch historically rebuilt cards in a hard-coded
-    # two-column grid. Restore the v1.3 2/3/4-column calculation while retaining
-    # its cooperative event-yield and newest-first date sorting behavior.
-    apply_v1_3_2_responsive_columns_fix(MainWindow)
 
     # Snapshot visible livery instances and cache only thumbnail copies under
     # LocalAppData so the latest add/remove/change diff can retain deleted images.

@@ -10,7 +10,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtWidgets import QApplication, QFrame, QGridLayout, QWidget
 
 from fh6garage.v1_3_ui_patch import _grid_column_count
-from fh6garage.v1_3_2_responsive_columns_fix import (
+from fh6garage.saved_content_layout import (
     _current_grid_columns,
     _dynamic_layout_visible_grid_cards,
     _dynamic_sync_grid_card_widths,
@@ -161,18 +161,17 @@ class V132ResponsiveColumnsFixTests(unittest.TestCase):
         self.assertEqual(_current_grid_columns(low, "livery"), 2)
         self.assertEqual(_current_grid_columns(high, "livery"), 4)
 
-    def test_patch_order_is_responsive_then_column_fix_then_thread_finalizer(self) -> None:
+    def test_layout_is_integrated_into_responsiveness_before_finalizer(self) -> None:
         source = (ROOT / "app.py").read_text(encoding="utf-8")
         responsive = "apply_v1_3_2_responsiveness_sort_patch(MainWindow)"
         columns_fix = "apply_v1_3_2_responsive_columns_fix(MainWindow)"
         refresh = "apply_v1_3_2_refresh_diff_patch(MainWindow)"
         thread_fix = "apply_v1_3_2_thread_affinity_fix(MainWindow)"
         self.assertIn(responsive, source)
-        self.assertIn(columns_fix, source)
+        self.assertNotIn(columns_fix, source)
         self.assertIn(refresh, source)
         self.assertIn(thread_fix, source)
-        self.assertLess(source.index(responsive), source.index(columns_fix))
-        self.assertLess(source.index(columns_fix), source.index(refresh))
+        self.assertLess(source.index(responsive), source.index(refresh))
         self.assertLess(source.index(refresh), source.index(thread_fix))
 
 

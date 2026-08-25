@@ -300,6 +300,11 @@ def apply_v1_3_2_responsiveness_sort_patch(MainWindow: Any) -> None:
     if getattr(MainWindow, "_fh6_v132_responsiveness_sort_patched", False):
         return
 
+    from .saved_content_layout import (
+        _dynamic_layout_visible_grid_cards,
+        _dynamic_sync_grid_card_widths,
+    )
+
     original_init = MainWindow.__init__
     original_begin_busy = MainWindow._begin_busy
 
@@ -320,11 +325,23 @@ def apply_v1_3_2_responsiveness_sort_patch(MainWindow: Any) -> None:
     MainWindow._keep_busy_responsive = _responsive_keep_busy
     MainWindow._clear_livery_grid_layout = lambda self: _responsive_clear_grid_layout(self, "livery")
     MainWindow._clear_tuning_grid_layout = lambda self: _responsive_clear_grid_layout(self, "tuning")
-    MainWindow._layout_visible_grid_cards = _responsive_layout_visible_grid_cards
+    # v1.4 uses the final 2/3/4-column implementation directly. The previous
+    # release installed a second runtime patch to replace these 2-column
+    # helpers after this patch had already run.
+    global _responsive_layout_visible_grid_cards
+    global _responsive_sync_grid_card_widths
+    _responsive_layout_visible_grid_cards = _dynamic_layout_visible_grid_cards
+    _responsive_sync_grid_card_widths = _dynamic_sync_grid_card_widths
+
+    MainWindow._layout_visible_grid_cards = _dynamic_layout_visible_grid_cards
     MainWindow._relayout_livery_grid = _responsive_relayout_livery_grid
     MainWindow._relayout_tuning_grid = _responsive_relayout_tuning_grid
-    MainWindow._sync_livery_grid_card_widths = lambda self: _responsive_sync_grid_card_widths(self, "livery")
-    MainWindow._sync_tuning_grid_card_widths = lambda self: _responsive_sync_grid_card_widths(self, "tuning")
+    MainWindow._sync_livery_grid_card_widths = (
+        lambda self: _dynamic_sync_grid_card_widths(self, "livery")
+    )
+    MainWindow._sync_tuning_grid_card_widths = (
+        lambda self: _dynamic_sync_grid_card_widths(self, "tuning")
+    )
 
     _install_download_sort_default(MainWindow)
     MainWindow._fh6_v132_responsiveness_sort_patched = True
