@@ -48,6 +48,7 @@ from PySide6.QtWidgets import (
 )
 
 from .annotations import AnnotationStore, append_note
+from .auction_card_loader import schedule_auction_cards
 from .card_metadata_layout import _compact_window_chrome, _configure_card_metadata
 from .card_visuals import _fix_busy_overlay, _normalize_card_actions
 from .car_db import CarDatabase, CarDatabaseError, REMOTE_SOURCE_PAGE
@@ -2020,11 +2021,21 @@ class MainWindow(QMainWindow):
             else self._tuning_sort_descending
         )
 
-        return sort_records(
+        sorted_records = sort_records(
             records,
             SortSpec(mode=mode, descending=descending),
             self._car_label,
         )
+        if (
+            content_type == "livery"
+            and getattr(self, "_fh6_v132_initial_scan_build", False)
+        ):
+            return [
+                record
+                for record in sorted_records
+                if not isinstance(record, LiveryRecord) or record.kind == "Livery"
+            ]
+        return sorted_records
 
     def _sorted_liveries(self) -> list[LiveryRecord]:
         return [
@@ -2616,12 +2627,18 @@ class MainWindow(QMainWindow):
         )
 
     def _duplicate_livery_hashes(self) -> set[str]:
+        cached = getattr(self, "_fh6_v132_duplicate_hashes", None)
+        if isinstance(cached, set):
+            return cached
         counts = Counter(
             record.content_sha256
             for record in self._custom_liveries()
             if record.content_sha256
         )
         return {digest for digest, count in counts.items() if count > 1}
+
+    def _fh6_v132_schedule_auction_cards(self) -> None:
+        schedule_auction_cards(self)
 
     def _is_duplicate_livery(self, record: LiveryRecord | None) -> bool:
         return bool(

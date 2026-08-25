@@ -17,7 +17,7 @@ class V132ThreadAffinityContractTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         package = root / "fh6garage"
         self.assertFalse((package / "v1_3_2_thread_affinity_patch.py").exists())
-        for name in ("v1_3_2_patch.py", "v1_3_2_list_fix.py"):
+        for name in ("v1_3_2_patch.py", "auction_card_loader.py"):
             source = (package / name).read_text(encoding="utf-8")
             self.assertNotIn("MainWindow._scan_finished =", source)
 
