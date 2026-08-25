@@ -60,7 +60,6 @@ from .card_annotation_controller import (
 from .car_db import CarDatabase, CarDatabaseError, REMOTE_SOURCE_PAGE
 from .car_db_override_dialog import open_car_db_override_dialog
 from .creator_aliases import CreatorAliasStore
-from .creator_alias_view import aggregate_creator_alias_stats, sort_by_creator_alias
 from .creator_note_controller import (
     apply_note_to_same_creator,
     clear_notes_for_same_creator,
@@ -68,6 +67,16 @@ from .creator_note_controller import (
 from .content_note_dialog import edit_content_note_dialog
 from .content_detail_dialogs import show_livery_metadata, show_tuning_details
 from .dashboard_page_builder import build_dashboard_page
+from .dashboard_table_controller import (
+    car_sort_key,
+    creator_content_stats,
+    creator_sort_key,
+    force_table_top,
+    order_key,
+    populate_car_table,
+    populate_creator_table,
+    sort_dashboard,
+)
 from .game_navigation import (
     GameGridSession,
     NavigationItem,
@@ -117,10 +126,11 @@ from .saved_content_state_controller import (
 )
 from .saved_content_layout import _dynamic_layout_visible_grid_cards, grid_column_count
 from .saved_content_pages import build_livery_page, build_tuning_page
-from .saved_content_view import (
-    SortSpec,
-    sort_records,
-    vehicle_brand_sort_key,
+from .saved_content_records import (
+    custom_liveries,
+    saved_content_records,
+    sorted_saved_content,
+    vehicle_brand_key,
 )
 from .thumbnail_display import _configure_aspect_card, _load_original_pixmap
 from .ui_responsiveness import (
@@ -1129,277 +1139,66 @@ class MainWindow(QMainWindow):
 
     @staticmethod
     def _order_key(value: object) -> object:
-        if isinstance(value, str):
-            return value.casefold()
-        return value
+        return order_key(value)
 
     def _car_dashboard_sort_key(self, summary) -> tuple:
-        section = self._dashboard_car_sort_section
-        if section == 0:
-            return (summary.car_id,)
+        return car_sort_key(self, summary)
 
-        if section == 1:
-            info = self.car_db.get(summary.car_id)
-            label = (info.label or summary.label or "").strip()
-            unknown = label.startswith("Car ID ")
-            manufacturer = (info.manufacturer or "").strip()
-
-            # Fallback for community/override labels such as
-            # "1969 Toyota 2000 GT": year is ignored; manufacturer is Toyota.
-            if not manufacturer:
-                parts = label.split()
-                if len(parts) >= 2 and parts[0].isdigit() and len(parts[0]) == 4:
-                    manufacturer = parts[1]
-                elif parts:
-                    manufacturer = parts[0]
-
-            return (
-                1 if unknown else 0,
-                manufacturer.casefold(),
-                re.sub(r"^\d{4}\s+", "", label).casefold(),
-                summary.car_id,
-            )
-
-        if section == 2:
-            return (summary.livery_count, summary.car_id)
-        if section == 3:
-            return (summary.tuning_count, summary.car_id)
-        return (summary.car_id,)
-
-    def _creator_dashboard_sort_key(self, row: tuple[str, int, int]) -> tuple:
-        creator, livery_count, tuning_count = row
-        total = livery_count + tuning_count
-        section = self._dashboard_creator_sort_section
-        if section == 0:
-            return (total, creator.casefold())
-        if section == 1:
-            return (creator == tr("creator.none"), creator.casefold())
-        if section == 2:
-            return (livery_count, creator.casefold())
-        if section == 3:
-            return (tuning_count, creator.casefold())
-        return (creator.casefold(),)
+    def _creator_dashboard_sort_key(
+        self,
+        row: tuple[str, int, int],
+    ) -> tuple:
+        return creator_sort_key(self, row)
 
     @staticmethod
     def _force_table_top(table: QTableWidget) -> None:
-        """Force the viewport to row 0 after Qt completes selection/layout work."""
-        def move_top() -> None:
-            table.scrollToTop()
-            table.verticalScrollBar().setValue(
-                table.verticalScrollBar().minimum()
-            )
-
-        move_top()
-        QTimer.singleShot(0, move_top)
-        QTimer.singleShot(40, move_top)
+        force_table_top(table)
 
     @Slot(int, object)
-    def _sort_car_dashboard(self, section: int, order: Qt.SortOrder) -> None:
-        self._begin_busy(tr("dashboard.sorting_vehicles"))
-        try:
-            self._dashboard_car_sort_section = int(section)
-            self._dashboard_car_sort_order = order
-            self.car_sort_bar.set_active_sort(section, order)
-            self._populate_car_table()
-            self._filter_dashboard_table(self.car_search.text())
-            self._force_table_top(self.car_table)
-        finally:
-            self._end_busy()
+    def _sort_car_dashboard(
+        self,
+        section: int,
+        order: Qt.SortOrder,
+    ) -> None:
+        sort_dashboard(self, "car", section, order)
 
     @Slot(int, object)
-    def _sort_creator_dashboard(self, section: int, order: Qt.SortOrder) -> None:
-        self._begin_busy(tr("dashboard.sorting_creators"))
-        try:
-            self._dashboard_creator_sort_section = int(section)
-            self._dashboard_creator_sort_order = order
-            self.creator_sort_bar.set_active_sort(section, order)
-            self._populate_creator_table()
-            self._filter_dashboard_table(self.car_search.text())
-            self._force_table_top(self.creator_table)
-        finally:
-            self._end_busy()
+    def _sort_creator_dashboard(
+        self,
+        section: int,
+        order: Qt.SortOrder,
+    ) -> None:
+        sort_dashboard(self, "creator", section, order)
 
     def _populate_car_table(self) -> None:
-        table = self.car_table
-        selected_id: Optional[int] = None
-        selected_rows = table.selectionModel().selectedRows() if table.selectionModel() else []
-        if selected_rows:
-            item = table.item(selected_rows[0].row(), 0)
-            if item:
-                try:
-                    selected_id = int(item.data(Qt.ItemDataRole.UserRole))
-                except (TypeError, ValueError):
-                    selected_id = None
-
-        table.setRowCount(0)
-        if not self.result:
-            return
-
-        rows = sorted(self.result.car_summaries, key=self._car_dashboard_sort_key)
-        if self._dashboard_car_sort_order == Qt.SortOrder.DescendingOrder:
-            rows.reverse()
-
-        selected_row = -1
-        for summary in rows:
-            row = table.rowCount()
-            table.insertRow(row)
-            values = (
-                summary.car_id,
-                summary.label,
-                summary.livery_count,
-                summary.tuning_count,
-            )
-            for col, value in enumerate(values):
-                item = QTableWidgetItem(str(value))
-                item.setData(Qt.ItemDataRole.UserRole, summary.car_id)
-                item.setTextAlignment(
-                    Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
-                )
-                table.setItem(row, col, item)
-            if selected_id == summary.car_id:
-                selected_row = row
-
-        if selected_row >= 0:
-            table.selectRow(selected_row)
-        elif table.rowCount():
-            table.selectRow(0)
-
-        if hasattr(self, "car_sort_bar"):
-            self.car_sort_bar.set_active_sort(
-                self._dashboard_car_sort_section,
-                self._dashboard_car_sort_order,
-            )
+        populate_car_table(self)
 
     def _creator_content_stats(self) -> list[tuple[str, int, int]]:
-        return aggregate_creator_alias_stats(
-            self.result,
-            self.creator_aliases,
-            tr("creator.none"),
-        )
+        return creator_content_stats(self)
 
     def _populate_creator_table(self) -> None:
-        table = self.creator_table
-        selected_creator = ""
-        selected_rows = table.selectionModel().selectedRows() if table.selectionModel() else []
-        if selected_rows:
-            item = table.item(selected_rows[0].row(), 1)
-            if item:
-                selected_creator = str(item.data(Qt.ItemDataRole.UserRole) or item.text())
-
-        table.setRowCount(0)
-
-        rows = sorted(self._creator_content_stats(), key=self._creator_dashboard_sort_key)
-        if self._dashboard_creator_sort_order == Qt.SortOrder.DescendingOrder:
-            rows.reverse()
-
-        selected_row = -1
-        for creator, livery_count, tuning_count in rows:
-            row = table.rowCount()
-            table.insertRow(row)
-            total = livery_count + tuning_count
-            for col, value in enumerate((total, creator, livery_count, tuning_count)):
-                item = QTableWidgetItem(str(value))
-                item.setData(Qt.ItemDataRole.UserRole, creator)
-                item.setTextAlignment(
-                    Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
-                )
-                table.setItem(row, col, item)
-            if selected_creator and creator.casefold() == selected_creator.casefold():
-                selected_row = row
-
-        for row in range(table.rowCount()):
-            item = table.item(row, 1)
-            if item is None:
-                continue
-            canonical = str(item.data(Qt.ItemDataRole.UserRole) or item.text() or "").strip()
-            if not canonical or canonical == tr("creator.none"):
-                continue
-            item.setText(self.creator_aliases.display_name(canonical))
-            item.setToolTip(" / ".join(self.creator_aliases.search_names(canonical)))
-
-        if selected_row >= 0:
-            table.selectRow(selected_row)
-        elif table.rowCount():
-            table.selectRow(0)
-
-        if hasattr(self, "creator_sort_bar"):
-            self.creator_sort_bar.set_active_sort(
-                self._dashboard_creator_sort_section,
-                self._dashboard_creator_sort_order,
-            )
+        populate_creator_table(self)
 
     def _custom_liveries(self) -> list[LiveryRecord]:
-        if not self.result:
-            return []
-        return [record for record in self.result.liveries if record.kind == "Livery"]
+        return custom_liveries(self)
 
     def _vehicle_brand_sort_key(
         self,
         record: LiveryRecord | TuningRecord,
     ) -> tuple:
-        """Sort saved content by manufacturer-first vehicle display text."""
-        return vehicle_brand_sort_key(record, self._car_label)
+        return vehicle_brand_key(self, record)
 
     def _saved_content_records(
         self,
         content_type: str,
     ) -> list[LiveryRecord | TuningRecord]:
-        if not self.result:
-            return []
-        if content_type == "livery":
-            records = list(self._fh6_v132_display_liveries())
-            if getattr(self, "_fh6_hidden_navigation_scope", False):
-                records = [
-                    record
-                    for record in records
-                    if not self._fh6_v132_is_livery_hidden(
-                        self._content_annotation_key("livery", record)
-                    )
-                ]
-            return records
-        if content_type == "tuning":
-            return list(self.result.tunings)
-        return []
+        return saved_content_records(self, content_type)
 
     def _sorted_saved_content(
         self,
         content_type: str,
     ) -> list[LiveryRecord | TuningRecord]:
-        records = self._saved_content_records(content_type)
-        mode = (
-            self._livery_sort_mode
-            if content_type == "livery"
-            else self._tuning_sort_mode
-        )
-        descending = (
-            self._livery_sort_descending
-            if content_type == "livery"
-            else self._tuning_sort_descending
-        )
-
-        if mode == "creator":
-            return sort_by_creator_alias(
-                records,
-                self.creator_aliases,
-                self._vehicle_brand_sort_key,
-                descending=descending,
-            )
-
-        sorted_records = sort_records(
-            records,
-            SortSpec(mode=mode, descending=descending),
-            self._car_label,
-        )
-        if (
-            content_type == "livery"
-            and getattr(self, "_fh6_v132_initial_scan_build", False)
-        ):
-            return [
-                record
-                for record in sorted_records
-                if not isinstance(record, LiveryRecord) or record.kind == "Livery"
-            ]
-        return sorted_records
+        return sorted_saved_content(self, content_type)
 
     def _sorted_liveries(self) -> list[LiveryRecord]:
         return [
