@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QHBoxLayout, QSizePolicy, QToolButton, QWidget
 
 
@@ -29,6 +29,10 @@ def _move_change_banner_to_reserved_slot(window: Any) -> None:
         slot_layout.setSpacing(0)
 
     banner.setParent(slot)
+    slot.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
+    slot.setEnabled(True)
+    banner.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
+    banner.setEnabled(True)
     banner.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
     banner.setStyleSheet(
         "QFrame#refreshDiffBanner { background:#eee9ff; border:1px solid #d8ceff; "
@@ -46,6 +50,8 @@ def _move_change_banner_to_reserved_slot(window: Any) -> None:
     if label is not None:
         label.hide()
     if view is not None:
+        view.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
+        view.setEnabled(True)
         view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         view.setStyleSheet(
             "QPushButton { background:transparent; color:#5538b6; border:0; "

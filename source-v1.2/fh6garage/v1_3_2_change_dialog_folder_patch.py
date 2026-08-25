@@ -177,6 +177,45 @@ def _install_four_left_actions(card: Any, record: Any) -> None:
     QTimer.singleShot(0, aligner.reposition)
 
 
+def _repoint_legacy_aligners(card: Any) -> None:
+    triangle = getattr(card, "_fh6_triangle_box", None)
+    excluded = getattr(card, "_fh6_excluded_box", None)
+    hide_aligner = getattr(card, "_fh6_hide_aligner", None)
+    if (
+        hide_aligner is not None
+        and isinstance(triangle, QToolButton)
+        and hasattr(hide_aligner, "target_button")
+    ):
+        hide_aligner.target_button = triangle
+    card_aligner = getattr(card, "_fh6_card_action_aligner", None)
+    if card_aligner is not None:
+        if isinstance(triangle, QToolButton) and hasattr(card_aligner, "fourth_button"):
+            card_aligner.fourth_button = triangle
+        if isinstance(excluded, QToolButton) and hasattr(card_aligner, "fifth_button"):
+            card_aligner.fifth_button = excluded
+
+
+def _force_card_action_geometry(card: Any) -> None:
+    for name in (
+        "_fh6_hide_aligner",
+        "_fh6_card_action_aligner",
+        "_fh6_four_left_action_aligner",
+    ):
+        reposition = getattr(getattr(card, name, None), "reposition", None)
+        if callable(reposition):
+            reposition()
+
+
+def _repair_card_actions(card: Any, record: Any) -> None:
+    if bool(card.property("fh6ArchiveCard")):
+        return
+    _install_four_left_actions(card, record)
+    _repoint_legacy_aligners(card)
+    _force_card_action_geometry(card)
+    QTimer.singleShot(0, lambda target=card: _force_card_action_geometry(target))
+    QTimer.singleShot(50, lambda target=card: _force_card_action_geometry(target))
+
+
 def _main_livery_card_width(window: Any) -> int:
     scroll = getattr(window, "livery_grid_scroll", None)
     layout = getattr(window, "livery_grid_layout", None)
@@ -450,7 +489,7 @@ def apply_v1_3_2_change_dialog_folder_patch(MainWindow) -> None:
     def patched_make_card(self, content_type: str, record: Any, key: str):
         card = original_make_card(self, content_type, record, key)
         if content_type == "livery" and not bool(card.property("fh6ArchiveCard")):
-            _install_four_left_actions(card, record)
+            _repair_card_actions(card, record)
         return card
 
     MainWindow._make_saved_content_card = patched_make_card

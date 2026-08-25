@@ -13,7 +13,6 @@ from PySide6.QtWidgets import (
 )
 
 from fh6garage import v1_3_2_change_dialog_folder_patch as feature
-from fh6garage import v1_3_2_change_dialog_runtime_fix as runtime_fix
 from fh6garage.card_action_alignment import _CardActionAligner
 from fh6garage.ui_cleanup import _HideButtonAligner
 
@@ -33,13 +32,12 @@ class ChangeDialogRuntimeFixTests(unittest.TestCase):
         )
         self.assertTrue((ROOT / "fh6garage" / "ui_cleanup.py").is_file())
 
-    def test_runtime_fix_stays_before_window_creation(self) -> None:
+    def test_runtime_fix_is_removed(self) -> None:
         app = (ROOT / "app.py").read_text(encoding="utf-8")
-        feature_pos = app.index("apply_v1_3_2_change_dialog_folder_patch(MainWindow)")
-        runtime_pos = app.index("apply_v1_3_2_change_dialog_runtime_fix(MainWindow)")
-        thread_pos = app.index("window = MainWindow(project_root=root)")
-        self.assertLess(feature_pos, runtime_pos)
-        self.assertLess(runtime_pos, thread_pos)
+        self.assertNotIn("apply_v1_3_2_change_dialog_runtime_fix(MainWindow)", app)
+        self.assertFalse(
+            (ROOT / "fh6garage" / "v1_3_2_change_dialog_runtime_fix.py").exists()
+        )
 
     def test_change_slot_becomes_mouse_enabled_and_button_opens_view(self) -> None:
         slot = QWidget()
@@ -58,12 +56,19 @@ class ChangeDialogRuntimeFixTests(unittest.TestCase):
         window._fh6_v132_reserved_backup_slot = slot
         window.refresh_diff_banner = banner
         window.refresh_diff_view_button = view
+        view.clicked.connect(
+            lambda _checked=False: feature._change_view._open_change_dialog(window)
+        )
 
         calls: list[object] = []
-        original = feature._open_change_dialog_same_as_main
-        feature._open_change_dialog_same_as_main = lambda owner: calls.append(owner)
+        original = feature._change_view._open_change_dialog
+        feature._change_view._open_change_dialog = lambda owner: calls.append(owner)
         try:
-            runtime_fix._repair_change_button(window)
+            from fh6garage.v1_3_2_release_layout_patch import (
+                _move_change_banner_to_reserved_slot,
+            )
+
+            _move_change_banner_to_reserved_slot(window)
             self.assertFalse(
                 slot.testAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
             )
@@ -71,7 +76,7 @@ class ChangeDialogRuntimeFixTests(unittest.TestCase):
             view.click()
             self.assertEqual(calls, [window])
         finally:
-            feature._open_change_dialog_same_as_main = original
+            feature._change_view._open_change_dialog = original
             slot.deleteLater()
 
     def test_all_retained_aligners_finish_on_requested_rows(self) -> None:
@@ -117,11 +122,11 @@ class ChangeDialogRuntimeFixTests(unittest.TestCase):
 
         overlay.show()
         self.app.processEvents()
-        runtime_fix._repoint_legacy_aligners(card)
+        feature._repoint_legacy_aligners(card)
 
         # Exercise every aligner, including the two legacy ones, then make the
         # four-row owner run last exactly as the runtime fix does.
-        runtime_fix._force_card_action_geometry(card)
+        feature._force_card_action_geometry(card)
 
         self.assertIs(hide_aligner.target_button, triangle)
         self.assertIs(card_aligner.fourth_button, triangle)
