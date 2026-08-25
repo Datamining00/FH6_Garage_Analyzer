@@ -167,11 +167,10 @@ class V132ResponsiveColumnsFixTests(unittest.TestCase):
         columns_fix = "apply_v1_3_2_responsive_columns_fix(MainWindow)"
         refresh = "apply_v1_3_2_refresh_diff_patch(MainWindow)"
         thread_fix = "apply_v1_3_2_thread_affinity_fix(MainWindow)"
-        self.assertIn(responsive, source)
+        self.assertNotIn(responsive, source)
         self.assertNotIn(columns_fix, source)
         self.assertIn(refresh, source)
         self.assertIn(thread_fix, source)
-        self.assertLess(source.index(responsive), source.index(refresh))
         self.assertLess(source.index(refresh), source.index(thread_fix))
 
 

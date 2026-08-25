@@ -127,16 +127,17 @@ class V132ResponsivenessSortTests(unittest.TestCase):
             _livery_visibility_allowed(owner, _PropertyCard(annotationKey="normal"))
         )
 
-    def test_patch_order_keeps_thread_affinity_fix_final(self) -> None:
+    def test_responsiveness_is_integrated_and_thread_fix_remains_final(self) -> None:
         source = (ROOT / "app.py").read_text(encoding="utf-8")
         compact = "apply_v1_3_2_compact_card_layout_patch(MainWindow)"
         responsive = "apply_v1_3_2_responsiveness_sort_patch(MainWindow)"
         thread_fix = "apply_v1_3_2_thread_affinity_fix(MainWindow)"
-        self.assertIn(compact, source)
-        self.assertIn(responsive, source)
+        self.assertNotIn(compact, source)
+        self.assertNotIn(responsive, source)
         self.assertIn(thread_fix, source)
-        self.assertLess(source.index(compact), source.index(responsive))
-        self.assertLess(source.index(responsive), source.index(thread_fix))
+        ui_source = (ROOT / "fh6garage" / "ui.py").read_text(encoding="utf-8")
+        self.assertIn("_yield_busy_events(self, force=True)", ui_source)
+        self.assertIn("_schedule_grid_followup(self, \"livery\")", ui_source)
 
 
 if __name__ == "__main__":

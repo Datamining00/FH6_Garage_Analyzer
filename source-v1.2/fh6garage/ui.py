@@ -82,6 +82,12 @@ from .saved_content_view import (
 )
 from .tune_data import TuneDataError, read_tune_data
 from .thumbnail_display import _configure_aspect_card, _load_original_pixmap
+from .ui_responsiveness import (
+    _livery_visibility_allowed,
+    _responsive_clear_grid_layout,
+    _schedule_grid_followup,
+    _yield_busy_events,
+)
 from .view_operations import ViewOperationCoordinator
 
 
@@ -672,6 +678,10 @@ class MainWindow(QMainWindow):
         self._game_navigation_generation = 0
         self._game_navigation_pending = False
         self._busy_depth = 0
+        self._fh6_busy_last_yield = 0.0
+        self._fh6_busy_event_pump_active = False
+        self._fh6_livery_grid_followup_pending = False
+        self._fh6_tuning_grid_followup_pending = False
         self._search_debounce_timers: dict[int, QTimer] = {}
 
         # Dashboard defaults:
@@ -721,6 +731,8 @@ class MainWindow(QMainWindow):
         QApplication.processEvents(
             QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents
         )
+        self._fh6_busy_last_yield = 0.0
+        _yield_busy_events(self, force=True)
 
     def _end_busy(self) -> None:
         self._busy_depth = max(0, self._busy_depth - 1)
@@ -729,10 +741,7 @@ class MainWindow(QMainWindow):
 
     def _keep_busy_responsive(self, index: int, interval: int = 12) -> None:
         """Let the indeterminate progress animation repaint during rebuilds."""
-        if self._busy_depth and index % interval == 0:
-            QApplication.processEvents(
-                QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents
-            )
+        _yield_busy_events(self, force=(index == 0))
 
     def _connect_debounced_search(
         self,
@@ -2037,11 +2046,13 @@ class MainWindow(QMainWindow):
         )
         previous_mode = getattr(self, mode_attr)
         previous_descending = bool(getattr(self, descending_attr))
-        setattr(
-            self,
-            descending_attr,
-            not previous_descending if previous_mode == mode else False,
-        )
+        if mode == "download" and previous_mode != mode:
+            next_descending = True
+        else:
+            next_descending = (
+                not previous_descending if previous_mode == mode else False
+            )
+        setattr(self, descending_attr, next_descending)
         setattr(self, mode_attr, mode)
         self._update_sort_button_labels(content_type)
 
@@ -2516,24 +2527,10 @@ class MainWindow(QMainWindow):
         _populate_tuning_grid_reusing_cards(self)
 
     def _clear_livery_grid_layout(self) -> None:
-        while self.livery_grid_layout.count():
-            item = self.livery_grid_layout.takeAt(0)
-            widget = item.widget()
-            if widget is not None:
-                widget.setVisible(False)
-
-        for header in self._livery_group_headers.values():
-            header.setVisible(False)
+        _responsive_clear_grid_layout(self, "livery")
 
     def _clear_tuning_grid_layout(self) -> None:
-        while self.tuning_grid_layout.count():
-            item = self.tuning_grid_layout.takeAt(0)
-            widget = item.widget()
-            if widget is not None:
-                widget.setVisible(False)
-
-        for header in self._tuning_group_headers.values():
-            header.setVisible(False)
+        _responsive_clear_grid_layout(self, "tuning")
 
     def _saved_content_filter_matches(
         self,
@@ -2693,7 +2690,7 @@ class MainWindow(QMainWindow):
 
         visible_cards: list[QFrame] = []
         duplicate_hashes = self._duplicate_livery_hashes()
-        for card in self._livery_grid_cards:
+        for index, card in enumerate(self._livery_grid_cards):
             haystack = str(card.property("searchText") or "")
             checked = bool(card.property("checked"))
             triangle = bool(card.property("triangle"))
@@ -2713,10 +2710,13 @@ class MainWindow(QMainWindow):
                 excluded,
                 duplicate,
             )
+            if matched and not _livery_visibility_allowed(self, card):
+                matched = False
             if not matched:
                 self._unload_livery_card_thumbnail(card)
-                continue
-            visible_cards.append(card)
+            else:
+                visible_cards.append(card)
+            _yield_busy_events(self, force=(index == 0))
 
         self._layout_visible_grid_cards("livery", visible_cards)
         self.livery_grid_layout.activate()
@@ -2724,14 +2724,13 @@ class MainWindow(QMainWindow):
         self.livery_grid_host.update()
 
         self._sync_livery_grid_card_widths()
-        QTimer.singleShot(0, self._sync_livery_grid_card_widths)
-        QTimer.singleShot(0, self._refresh_visible_livery_thumbnails)
+        _schedule_grid_followup(self, "livery")
 
     def _relayout_tuning_grid(self, text: str = "") -> None:
         self.tuning_grid_host.setUpdatesEnabled(False)
         self._clear_tuning_grid_layout()
         visible_cards: list[QFrame] = []
-        for card in self._tuning_grid_cards:
+        for index, card in enumerate(self._tuning_grid_cards):
             haystack = str(card.property("searchText") or "")
             checked = bool(card.property("checked"))
             triangle = bool(card.property("triangle"))
@@ -2746,8 +2745,9 @@ class MainWindow(QMainWindow):
             )
             if not matched:
                 self._unload_livery_card_thumbnail(card)
-                continue
-            visible_cards.append(card)
+            else:
+                visible_cards.append(card)
+            _yield_busy_events(self, force=(index == 0))
 
         self._layout_visible_grid_cards("tuning", visible_cards)
         self.tuning_grid_layout.activate()
@@ -2755,8 +2755,7 @@ class MainWindow(QMainWindow):
         self.tuning_grid_host.update()
 
         self._sync_tuning_grid_card_widths()
-        QTimer.singleShot(0, self._sync_tuning_grid_card_widths)
-        QTimer.singleShot(0, self._refresh_visible_tuning_thumbnails)
+        _schedule_grid_followup(self, "tuning")
 
     def _sync_livery_grid_card_widths(self) -> None:
         """Fit exactly two cards inside the visible QScrollArea viewport.

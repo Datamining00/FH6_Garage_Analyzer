@@ -36,7 +36,6 @@ from fh6garage.v1_3_2_ui_cleanup_patch import apply_v1_3_2_ui_cleanup_patch
 from fh6garage.v1_3_2_ui_followup_patch import apply_v1_3_2_ui_followup_patch
 from fh6garage.v1_3_2_manifest_registry_patch import apply_v1_3_2_manifest_registry_patch
 from fh6garage.v1_3_2_card_alignment_patch import apply_v1_3_2_card_alignment_patch
-from fh6garage.v1_3_2_responsiveness_sort_patch import apply_v1_3_2_responsiveness_sort_patch
 from fh6garage.v1_3_2_refresh_diff_patch import apply_v1_3_2_refresh_diff_patch
 from fh6garage.v1_3_2_change_view_alias_patch import apply_v1_3_2_change_view_alias_patch
 from fh6garage.v1_3_2_change_view_alias_sync_patch import apply_v1_3_2_change_view_alias_sync_patch
@@ -81,10 +80,6 @@ def main() -> int:
     apply_v1_3_2_ui_followup_patch(MainWindow)
     apply_v1_3_2_manifest_registry_patch(MainWindow)
     apply_v1_3_2_card_alignment_patch(MainWindow)
-
-    # Keep the indeterminate busy overlay repainting during synchronous card
-    # rebuild/layout work and make first-click download/date sorting newest-first.
-    apply_v1_3_2_responsiveness_sort_patch(MainWindow)
 
     # Snapshot visible livery instances and cache only thumbnail copies under
     # LocalAppData so the latest add/remove/change diff can retain deleted images.

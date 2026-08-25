@@ -7,7 +7,7 @@ from PySide6.QtWidgets import QFrame, QLabel
 from .i18n import tr
 from .models import LiveryRecord
 from .v1_3_ui_patch import GRID_MAX_COLUMNS, GRID_MIN_COLUMNS
-from . import v1_3_2_responsiveness_sort_patch as _responsive
+from . import ui_responsiveness as _responsive
 
 
 def _current_grid_columns(self: Any, content_type: str) -> int:
@@ -191,4 +191,3 @@ def _dynamic_sync_grid_card_widths(self: Any, content_type: str) -> None:
 
     host.setMinimumWidth(0)
     host.updateGeometry()
-
