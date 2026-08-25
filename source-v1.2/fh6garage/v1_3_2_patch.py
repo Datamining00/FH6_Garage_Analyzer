@@ -309,7 +309,6 @@ def apply_v1_3_2_patches(MainWindow) -> None:
         return
 
     original_init = MainWindow.__init__
-    original_build_ui = MainWindow._build_ui
     original_livery_page = MainWindow._livery_page
     original_build_controls = MainWindow._build_saved_content_controls
     original_populate_all = MainWindow._populate_all
@@ -317,13 +316,6 @@ def apply_v1_3_2_patches(MainWindow) -> None:
     original_record_for_content_key = MainWindow._record_for_content_key
     original_make_card = MainWindow._make_saved_content_card
     original_livery_search_text = MainWindow._livery_search_text
-
-    def patched_build_ui(self) -> None:
-        original_build_ui(self)
-        _install_cache_row(self)
-        _normalize_path_rows(self)
-        _align_path_rows(self)
-        _configure_livery_source_switch(self)
 
     def patched_livery_page(self):
         page = original_livery_page(self)
@@ -406,7 +398,6 @@ def apply_v1_3_2_patches(MainWindow) -> None:
         return f"{base} {source}".lower()
 
     MainWindow.__init__ = patched_init
-    MainWindow._build_ui = patched_build_ui
     MainWindow._livery_page = patched_livery_page
     MainWindow._build_saved_content_controls = patched_build_controls
     MainWindow._populate_all = patched_populate_all

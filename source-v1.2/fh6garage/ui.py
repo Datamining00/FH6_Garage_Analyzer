@@ -111,9 +111,22 @@ from .ui_responsiveness import (
     _schedule_grid_followup,
     _yield_busy_events,
 )
-from .ui_cleanup import _install_card_hide_button
+from .ui_cleanup import (
+    _align_path_rows,
+    _configure_livery_source_switch,
+    _install_card_hide_button,
+    _normalize_path_rows,
+)
 from .ui_followup import IMAGE_MIN_HEIGHT, configure_language_controls, persist_language_preference, restart_application, set_always_on_top
 from .view_operations import ViewOperationCoordinator
+from .v1_3_2_patch import (
+    _auto_detect_cache,
+    _choose_cache_folder,
+    _current_cache_path,
+    _display_liveries,
+    _install_cache_row,
+    _set_source_enabled,
+)
 from .window_responsiveness import (
     _ensure_resize_timer,
     _finalize_resize,
@@ -743,6 +756,10 @@ class MainWindow(QMainWindow):
         QApplication.instance().setStyleSheet(APP_STYLE)
         self._build_ui()
         configure_language_controls(self)
+        _install_cache_row(self)
+        _normalize_path_rows(self)
+        _align_path_rows(self)
+        _configure_livery_source_switch(self)
         _ensure_resize_timer(self)
         _restore_window_geometry(self)
         app = QApplication.instance()
@@ -764,6 +781,21 @@ class MainWindow(QMainWindow):
 
     def _fh6_v131_finalize_resize(self) -> None:
         _finalize_resize(self)
+
+    def _fh6_v132_choose_cache_folder(self) -> None:
+        _choose_cache_folder(self)
+
+    def _fh6_v132_auto_detect_cache(self, *, silent: bool = False, rescan: bool = True) -> bool:
+        return _auto_detect_cache(self, silent=silent, rescan=rescan)
+
+    def _fh6_v132_set_source_enabled(self, source: str, enabled: bool) -> None:
+        _set_source_enabled(self, source, enabled)
+
+    def _fh6_v132_current_cache_path(self) -> Path | None:
+        return _current_cache_path(self)
+
+    def _fh6_v132_display_liveries(self) -> list[LiveryRecord]:
+        return _display_liveries(self)
         self._busy_overlay = BusyOverlay(self)
         self._busy_overlay.setGeometry(self.rect())
         _fix_busy_overlay(self)
