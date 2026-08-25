@@ -4,7 +4,14 @@ from typing import Any
 
 from PySide6.QtCore import QEvent, QObject, Qt, QTimer
 from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QLabel, QPushButton, QToolButton, QWidget
+from PySide6.QtWidgets import (
+    QButtonGroup,
+    QLabel,
+    QPushButton,
+    QSizePolicy,
+    QToolButton,
+    QWidget,
+)
 
 from .i18n import get_language
 from .livery_visibility import eye_slash_pixmap
@@ -248,3 +255,107 @@ def _normalize_path_rows(self: Any) -> None:
     self.full_refresh_button = refresh_button
     self._fh6_v132_reserved_backup_slot_width = action_width
 
+
+def _widget_index(layout: Any, target: QWidget) -> int:
+    if layout is None:
+        return -1
+    for index in range(layout.count()):
+        item = layout.itemAt(index)
+        if item is not None and item.widget() is target:
+            return index
+    return -1
+
+
+def _remove_items_after(layout: Any, index: int) -> None:
+    if layout is None or index < 0:
+        return
+    for child_index in reversed(range(index + 1, layout.count())):
+        item = layout.takeAt(child_index)
+        if item is None:
+            continue
+        widget = item.widget()
+        if widget is not None:
+            widget.hide()
+            widget.deleteLater()
+
+
+def _align_path_rows(self: Any) -> None:
+    """Use fixed widgets for exact save/cache toolbar column alignment."""
+    if not hasattr(self, "path_edit") or not hasattr(self, "cache_path_edit"):
+        return
+    content = self.path_edit.parentWidget()
+    root_layout = content.layout() if content is not None else None
+    if root_layout is None:
+        return
+    save_row = _layout_with_widget(root_layout, self.path_edit)
+    cache_row = _layout_with_widget(root_layout, self.cache_path_edit)
+    if save_row is None or cache_row is None:
+        return
+    save_buttons = _direct_buttons(save_row)
+    cache_buttons = _direct_buttons(cache_row)
+    if len(save_buttons) < 2 or not cache_buttons:
+        return
+    save_choose = save_buttons[0]
+    refresh_button = save_buttons[-1]
+    cache_choose = cache_buttons[0]
+    save_row.setContentsMargins(0, 0, 0, 0)
+    cache_row.setContentsMargins(0, 0, 0, 0)
+    save_row.setSpacing(8)
+    cache_row.setSpacing(8)
+    selector_width = max(save_choose.sizeHint().width(), cache_choose.sizeHint().width())
+    save_choose.setFixedWidth(selector_width)
+    cache_choose.setFixedWidth(selector_width)
+    action_width = max(1, refresh_button.sizeHint().width())
+    refresh_button.setFixedWidth(action_width)
+    _remove_items_after(cache_row, _widget_index(cache_row, cache_choose))
+    reserved_slot = QWidget(content)
+    reserved_slot.setObjectName("fh6ReservedBackupSlot")
+    reserved_slot.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+    reserved_slot.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
+    reserved_slot.setFixedWidth(action_width)
+    reserved_slot.setMinimumHeight(refresh_button.minimumHeight())
+    cache_row.addWidget(reserved_slot)
+    self.path_edit.setMinimumWidth(0)
+    self.cache_path_edit.setMinimumWidth(0)
+    save_row.setStretchFactor(self.path_edit, 1)
+    cache_row.setStretchFactor(self.cache_path_edit, 1)
+    self._fh6_v132_reserved_backup_slot = reserved_slot
+
+    def finalize_geometry() -> None:
+        selector = max(
+            save_choose.width(),
+            cache_choose.width(),
+            save_choose.sizeHint().width(),
+            cache_choose.sizeHint().width(),
+        )
+        action = max(refresh_button.width(), refresh_button.sizeHint().width(), 1)
+        save_choose.setFixedWidth(selector)
+        cache_choose.setFixedWidth(selector)
+        refresh_button.setFixedWidth(action)
+        reserved_slot.setFixedWidth(action)
+
+    QTimer.singleShot(0, finalize_geometry)
+
+
+def _configure_livery_source_switch(self: Any) -> None:
+    """Normalize My Designs/Auction controls into an exclusive selection."""
+    saved = getattr(self, "livery_my_designs_toggle", None)
+    auction = getattr(self, "livery_auction_toggle", None)
+    if not isinstance(saved, QPushButton) or not isinstance(auction, QPushButton):
+        return
+    auction_only = auction.isChecked() and not saved.isChecked()
+    saved.blockSignals(True)
+    auction.blockSignals(True)
+    saved.setChecked(not auction_only)
+    auction.setChecked(auction_only)
+    saved.blockSignals(False)
+    auction.blockSignals(False)
+    group = QButtonGroup(self)
+    group.setExclusive(True)
+    group.addButton(saved)
+    group.addButton(auction)
+    self._fh6_v132_livery_source_group = group
+    setter = getattr(self, "_fh6_v132_set_source_enabled", None)
+    if callable(setter):
+        setter("my_designs", saved.isChecked())
+        setter("auction", auction.isChecked())

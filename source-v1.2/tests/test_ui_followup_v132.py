@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from fh6garage.v1_3_2_ui_followup_patch import (
+from fh6garage.ui_cleanup import (
     _align_path_rows,
     _configure_livery_source_switch,
 )
