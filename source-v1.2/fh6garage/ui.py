@@ -119,7 +119,7 @@ from .ui_cleanup import (
 )
 from .ui_followup import IMAGE_MIN_HEIGHT, configure_language_controls, persist_language_preference, restart_application, set_always_on_top
 from .view_operations import ViewOperationCoordinator
-from .v1_3_2_patch import (
+from .auction_ui_features import (
     _add_auction_badge,
     _auto_detect_cache,
     _choose_cache_folder,

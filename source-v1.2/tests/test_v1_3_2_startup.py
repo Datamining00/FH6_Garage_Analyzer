@@ -60,7 +60,7 @@ class V132StartupTests(unittest.TestCase):
     def test_manual_picker_remains_but_auto_discovery_button_is_removed(self) -> None:
         root = Path(__file__).resolve().parents[1]
         source = (
-            root / "fh6garage" / "v1_3_2_patch.py"
+            root / "fh6garage" / "auction_ui_features.py"
         ).read_text(encoding="utf-8")
         self.assertIn("choose.setObjectName(\"primary\")", source)
         self.assertIn("refresh.setObjectName(\"secondary\")", source)

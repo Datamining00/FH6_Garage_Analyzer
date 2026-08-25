@@ -1,3 +1,5 @@
+"""Auction livery source selection, cache location, and card presentation."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -309,4 +311,3 @@ def _add_auction_badge(card: Any) -> None:
     badge.show()
     badge.raise_()
     card._fh6_auction_badge = badge
-
