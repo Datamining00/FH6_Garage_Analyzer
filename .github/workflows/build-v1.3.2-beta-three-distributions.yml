@@ -238,6 +238,22 @@ jobs:
           foreach ($directory in @("data", "icons", "fh6garage", "tests")) {
             Copy-Item "source-v1.2\$directory" $dst -Recurse -Force
           }
+          Get-ChildItem $dst -Directory -Recurse -Filter "__pycache__" |
+            Sort-Object FullName -Descending |
+            Remove-Item -Recurse -Force
+          Get-ChildItem $dst -File -Recurse |
+            Where-Object { $_.Extension -in @(".pyc", ".pyo") } |
+            Remove-Item -Force
+          $bytecode = @(
+            Get-ChildItem $dst -File -Recurse |
+              Where-Object {
+                $_.Extension -in @(".pyc", ".pyo") -or
+                $_.DirectoryName -match "[\\/]__pycache__([\\/]|$)"
+              }
+          )
+          if ($bytecode.Count -gt 0) {
+            throw "Source package contains generated Python bytecode."
+          }
           @"
           FH6 Assistant v1.3.2 - Source candidate
 
