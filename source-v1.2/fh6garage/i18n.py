@@ -268,7 +268,7 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
     "content.tuning_info_tip": {"ko": "튜닝 Data 세부 정보 보기", "en": "View tuning Data details"},
     "card.vehicle_label": {"ko": "차량명", "en": "Vehicle"},
     "card.title_label": {"ko": "제목", "en": "Title"},
-    "card.creator_label": {"ko": "제작자명", "en": "Creator"},
+    "card.creator_label": {"ko": "제작자", "en": "Creator"},
     "db.last_update": {"ko": "/ 마지막 업데이트: {date}", "en": "/ Last update: {date}"},
     "db.local_download_time": {"ko": "로컬 DB 다운로드 시각: {value}", "en": "Local DB download time: {value}"},
     "db.source_last_modified": {"ko": "\n원본 Last-Modified: {value}", "en": "\nSource Last-Modified: {value}"},

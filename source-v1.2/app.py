@@ -38,7 +38,6 @@ from fh6garage.v1_3_2_manifest_registry_patch import apply_v1_3_2_manifest_regis
 from fh6garage.v1_3_2_card_alignment_patch import apply_v1_3_2_card_alignment_patch
 from fh6garage.v1_3_2_global_ui_patch import apply_v1_3_2_global_ui_patch
 from fh6garage.v1_3_2_icon_overlay_fix import apply_v1_3_2_icon_overlay_fix
-from fh6garage.v1_3_2_compact_card_layout_patch import apply_v1_3_2_compact_card_layout_patch
 from fh6garage.v1_3_2_responsiveness_sort_patch import apply_v1_3_2_responsiveness_sort_patch
 from fh6garage.v1_3_2_refresh_diff_patch import apply_v1_3_2_refresh_diff_patch
 from fh6garage.v1_3_2_change_view_alias_patch import apply_v1_3_2_change_view_alias_patch
@@ -94,10 +93,6 @@ def main() -> int:
     # patches have installed their controls. Also harden both thumbnail and busy
     # overlays against inherited black background/text palette combinations.
     apply_v1_3_2_icon_overlay_fix(MainWindow)
-
-    # Reclaim horizontal space around the saved-content grid and make the title
-    # and creator metadata use equal halves with pixel-based elision.
-    apply_v1_3_2_compact_card_layout_patch(MainWindow)
 
     # Keep the indeterminate busy overlay repainting during synchronous card
     # rebuild/layout work and make first-click download/date sorting newest-first.

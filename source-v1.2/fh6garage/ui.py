@@ -48,6 +48,7 @@ from PySide6.QtWidgets import (
 )
 
 from .annotations import AnnotationStore, append_note
+from .card_metadata_layout import _compact_window_chrome, _configure_card_metadata
 from .car_db import CarDatabase, CarDatabaseError, REMOTE_SOURCE_PAGE
 from .game_navigation import (
     GameGridSession,
@@ -686,6 +687,7 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(960, 680)
         QApplication.instance().setStyleSheet(APP_STYLE)
         self._build_ui()
+        _compact_window_chrome(self)
         self._busy_overlay = BusyOverlay(self)
         self._busy_overlay.setGeometry(self.rect())
         self._view_operations = ViewOperationCoordinator(self)
@@ -3090,6 +3092,7 @@ class MainWindow(QMainWindow):
         card._fh6_info_button = info_button
         card._fh6_content_type = content_type
         self._apply_pointing_cursors(card)
+        _configure_card_metadata(card)
         return card
 
     def _livery_search_text(self, record: LiveryRecord, note: str = "") -> str:

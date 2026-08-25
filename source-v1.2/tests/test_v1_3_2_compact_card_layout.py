@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 from shiboken6 import delete as shiboken_delete
 
 from fh6garage.ui import CopyValueLabel
-from fh6garage.v1_3_2_compact_card_layout_patch import (
+from fh6garage.card_metadata_layout import (
     CONTENT_HORIZONTAL_MARGIN,
     GRID_HORIZONTAL_SPACING,
     GRID_SIDE_MARGIN,
@@ -127,16 +127,18 @@ class V132CompactCardLayoutTests(unittest.TestCase):
         # the C++ QLabel has been destroyed. It must silently become a no-op.
         controller.apply()
 
-    def test_patch_order_keeps_icon_fix_and_thread_finalizer(self) -> None:
+    def test_compact_layout_is_integrated_and_thread_finalizer_remains(self) -> None:
         source = (ROOT / "app.py").read_text(encoding="utf-8")
         icon_fix = "apply_v1_3_2_icon_overlay_fix(MainWindow)"
         compact = "apply_v1_3_2_compact_card_layout_patch(MainWindow)"
         thread_fix = "apply_v1_3_2_thread_affinity_fix(MainWindow)"
         self.assertIn(icon_fix, source)
-        self.assertIn(compact, source)
+        self.assertNotIn(compact, source)
         self.assertIn(thread_fix, source)
-        self.assertLess(source.index(icon_fix), source.index(compact))
-        self.assertLess(source.index(compact), source.index(thread_fix))
+        self.assertLess(source.index(icon_fix), source.index(thread_fix))
+        ui_source = (ROOT / "fh6garage" / "ui.py").read_text(encoding="utf-8")
+        self.assertIn("_compact_window_chrome(self)", ui_source)
+        self.assertIn("_configure_card_metadata(card)", ui_source)
 
 
 if __name__ == "__main__":
