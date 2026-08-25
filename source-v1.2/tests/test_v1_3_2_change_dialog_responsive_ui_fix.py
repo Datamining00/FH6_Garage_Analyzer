@@ -11,7 +11,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtWidgets import QApplication, QGridLayout, QWidget
 
 from fh6garage import change_dialog_responsive as patch
-from fh6garage import v1_3_2_change_dialog_folder_patch as feature
+from fh6garage import change_dialog_cards as feature
 
 ROOT = Path(__file__).resolve().parents[1]
 

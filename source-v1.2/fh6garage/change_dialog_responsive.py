@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from . import v1_3_2_change_dialog_folder_patch as _feature
+from . import change_dialog_cards as _feature
 from .i18n import tr
 from .ui import APP_STYLE
 from .v1_3_ui_patch import (
@@ -260,4 +260,3 @@ def _open_responsive_change_dialog(window: Any) -> None:
     # QTimer; closing the dialog deletes that timer and cannot leave a callback
     # pointing at an already-destroyed QScrollArea.
     controller.request_now()
-

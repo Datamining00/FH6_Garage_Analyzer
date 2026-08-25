@@ -53,6 +53,7 @@ from .auction_registry_state import is_auction_livery_registered
 from .card_metadata_layout import _compact_window_chrome, _configure_card_metadata
 from .card_action_alignment import _fix_card_actions
 from .card_visuals import _fix_busy_overlay, _normalize_card_actions
+from .change_dialog_cards import _repair_card_actions
 from .car_db import CarDatabase, CarDatabaseError, REMOTE_SOURCE_PAGE
 from .game_navigation import (
     GameGridSession,
@@ -3174,6 +3175,7 @@ class MainWindow(QMainWindow):
         if content_type == "livery":
             _install_card_hide_button(self, card, key)
             _fix_card_actions(card)
+            _repair_card_actions(card, record)
         _normalize_card_actions(card)
         return card
 

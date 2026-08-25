@@ -38,6 +38,12 @@ def _txt(ko: str, en: str) -> str:
     return ko if get_language() == "ko" else en
 
 
+def _open_integrated_change_dialog(window: Any) -> None:
+    from .change_dialog_responsive import _open_responsive_change_dialog
+
+    _open_responsive_change_dialog(window)
+
+
 def _creator_display(window: Any, raw_name: str) -> str:
     raw = (raw_name or "").strip()
     if not raw:
@@ -613,7 +619,7 @@ def apply_v1_3_2_change_view_alias_patch(MainWindow) -> None:
         label.setStyleSheet("color:#4f35aa;font-weight:700;")
         view = QPushButton(_txt("보기", "View"))
         view.setObjectName("secondary")
-        view.clicked.connect(lambda: _open_change_dialog(self))
+        view.clicked.connect(lambda: _open_integrated_change_dialog(self))
         row.addWidget(label)
         row.addStretch(1)
         row.addWidget(view)

@@ -10,7 +10,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtWidgets import QApplication, QFrame, QVBoxLayout, QWidget
 
 from fh6garage import livery_visibility as patch
-from fh6garage.v1_3_2_change_dialog_folder_patch import (
+from fh6garage.change_dialog_cards import (
     _strengthen_recent_card_frames,
 )
 

@@ -34,7 +34,6 @@ from fh6garage.v1_3_2_refresh_diff_patch import apply_v1_3_2_refresh_diff_patch
 from fh6garage.v1_3_2_change_view_alias_patch import apply_v1_3_2_change_view_alias_patch
 from fh6garage.v1_3_2_change_view_alias_sync_patch import apply_v1_3_2_change_view_alias_sync_patch
 from fh6garage.v1_3_2_release_layout_patch import apply_v1_3_2_release_layout_patch
-from fh6garage.v1_3_2_change_dialog_folder_patch import apply_v1_3_2_change_dialog_folder_patch
 from fh6garage.v1_3_2_alias_manager_change_card_fix import apply_v1_3_2_alias_manager_change_card_fix
 
 
@@ -84,7 +83,6 @@ def main() -> int:
     apply_v1_3_2_release_layout_patch(MainWindow)
 
     # Add the folder action and base standalone change-view card implementation.
-    apply_v1_3_2_change_dialog_folder_patch(MainWindow)
 
     # Make the compact change button clickable and make all historical card
     # aligners agree with move/hide/info/folder = check/triangle/excluded/zoom.

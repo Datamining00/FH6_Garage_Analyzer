@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from . import v1_3_2_change_dialog_folder_patch as _change_dialog
+from . import change_dialog_cards as _change_dialog
 from . import v1_3_2_change_view_alias_patch as _alias
 from .i18n import tr
 
