@@ -30,6 +30,7 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
     "nav.tuning": {"ko": "튜닝", "en": "Tuning"},
     "content.source_my_designs": {"ko": "내 디자인 리버리", "en": "My Designs liveries"},
     "content.source_auction": {"ko": "경매장 리버리", "en": "Auction liveries"},
+    "content.livery_page": {"ko": "리버리", "en": "Liveries"},
     "sidebar.always_on_top": {"ko": "항상 위에 표시", "en": "Always on top"},
     "sidebar.always_on_top_tip": {
         "ko": "활성화하면 다른 창 위에 표시되며, 인게임 이동 중에도 창을 숨기지 않습니다.",

@@ -244,6 +244,14 @@ def _install_cache_row(self: Any) -> None:
     layout.insertLayout(1, row)
 
 
+def _restore_cache_path(self: Any) -> None:
+    stored = self.settings.value(_CACHE_SETTING_KEY, "", str).strip()
+    if stored and is_thumbnail_cache_dir(Path(stored)):
+        _set_cache_path(self, Path(stored), persist=False)
+    else:
+        self._fh6_v132_auto_detect_cache(silent=True, rescan=False)
+
+
 def _install_source_controls(self: Any, controls: Any) -> None:
     row = QHBoxLayout()
     row.setSpacing(7)
@@ -302,113 +310,3 @@ def _add_auction_badge(card: Any) -> None:
     badge.raise_()
     card._fh6_auction_badge = badge
 
-
-def apply_v1_3_2_patches(MainWindow) -> None:
-    """Add auction/SoulBound livery browsing without touching game navigation order."""
-    if getattr(MainWindow, "_fh6_v132_patched", False):
-        return
-
-    original_init = MainWindow.__init__
-    original_livery_page = MainWindow._livery_page
-    original_build_controls = MainWindow._build_saved_content_controls
-    original_populate_all = MainWindow._populate_all
-    original_sorted_saved_content = MainWindow._sorted_saved_content
-    original_record_for_content_key = MainWindow._record_for_content_key
-    original_make_card = MainWindow._make_saved_content_card
-    original_livery_search_text = MainWindow._livery_search_text
-
-    def patched_livery_page(self):
-        page = original_livery_page(self)
-        for label in page.findChildren(QLabel):
-            if label.objectName() == "pageTitle":
-                label.setText(_t("livery_page"))
-                break
-        return page
-
-    def patched_build_controls(self, content_type: str):
-        result = original_build_controls(self, content_type)
-        if content_type == "livery":
-            _install_source_controls(self, result[0])
-        return result
-
-    def patched_init(self, project_root) -> None:
-        original_init(self, project_root)
-        self.setWindowTitle("FH6 Assistant v1.3.2")
-        for label in self.findChildren(QLabel):
-            if label.text().startswith("v1.3.1\n") or label.text().startswith("v1.3\n"):
-                label.setText("v1.3.2\nLIVERY & TUNING")
-                break
-
-        stored = self.settings.value(_CACHE_SETTING_KEY, "", str).strip()
-        if stored and is_thumbnail_cache_dir(Path(stored)):
-            _set_cache_path(self, Path(stored), persist=False)
-        else:
-            self._fh6_v132_auto_detect_cache(
-                silent=True,
-                rescan=False,
-            )
-
-    def patched_populate_all(self) -> None:
-        original_populate_all(self)
-        if self.result is None:
-            return
-        self.card_livery.title.setText(_t("my_designs"))
-        if hasattr(self, "card_auction"):
-            count = sum(
-                record.kind == "SoulBoundLivery"
-                for record in self.result.liveries
-            )
-            self.card_auction.value.setText(str(count))
-
-    def patched_sorted_saved_content(self, content_type: str):
-        if content_type != "livery":
-            return original_sorted_saved_content(self, content_type)
-        return _sort_display_liveries(self)
-
-    def patched_record_for_content_key(self, content_type: str, key: str):
-        if content_type != "livery" or self.result is None:
-            return original_record_for_content_key(self, content_type, key)
-        for record in self.result.liveries:
-            if record.kind not in {"Livery", "SoulBoundLivery"}:
-                continue
-            if self._content_annotation_key("livery", record) == key:
-                return record
-        return None
-
-    def patched_make_card(self, content_type: str, record, key: str):
-        card = original_make_card(self, content_type, record, key)
-        if (
-            content_type == "livery"
-            and isinstance(record, LiveryRecord)
-            and record.kind == "SoulBoundLivery"
-        ):
-            move_button = getattr(card, "_fh6_game_move_button", None)
-            if move_button is not None:
-                move_button.setEnabled(False)
-                move_button.hide()
-            card.setProperty("liverySource", "auction")
-            _add_auction_badge(card)
-        elif content_type == "livery":
-            card.setProperty("liverySource", "my_designs")
-        return card
-
-    def patched_livery_search_text(self, record: LiveryRecord, note: str = "") -> str:
-        base = original_livery_search_text(self, record, note)
-        source = _t("auction") if record.kind == "SoulBoundLivery" else _t("my_designs")
-        return f"{base} {source}".lower()
-
-    MainWindow.__init__ = patched_init
-    MainWindow._livery_page = patched_livery_page
-    MainWindow._build_saved_content_controls = patched_build_controls
-    MainWindow._populate_all = patched_populate_all
-    MainWindow._sorted_saved_content = patched_sorted_saved_content
-    MainWindow._record_for_content_key = patched_record_for_content_key
-    MainWindow._make_saved_content_card = patched_make_card
-    MainWindow._livery_search_text = patched_livery_search_text
-
-    MainWindow._fh6_v132_choose_cache_folder = _choose_cache_folder
-    MainWindow._fh6_v132_auto_detect_cache = _auto_detect_cache
-    MainWindow._fh6_v132_set_source_enabled = _set_source_enabled
-    MainWindow._fh6_v132_current_cache_path = _current_cache_path
-    MainWindow._fh6_v132_display_liveries = _display_liveries
-    MainWindow._fh6_v132_patched = True

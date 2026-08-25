@@ -52,9 +52,9 @@ class V131PatchTests(unittest.TestCase):
         self.app.processEvents()
 
     def test_v131_title_and_sidebar_version(self) -> None:
-        self.assertEqual(self.window.windowTitle(), "FH6 Assistant v1.3.1")
+        self.assertEqual(self.window.windowTitle(), "FH6 Assistant v1.3.2")
         labels = [label.text() for label in self.window.findChildren(QLabel)]
-        self.assertIn("v1.3.1\nLIVERY & TUNING", labels)
+        self.assertIn("v1.3.2\nLIVERY & TUNING", labels)
 
     def test_window_geometry_is_saved(self) -> None:
         self.window.showNormal()
@@ -120,11 +120,7 @@ class V131BuildMetadataTests(unittest.TestCase):
         self.assertIn('app.setApplicationVersion("1.3.2")', source)
         self.assertNotIn("apply_v1_3_ui_patches", source)
         self.assertNotIn("apply_v1_3_1_patches", source)
-        self.assertIn("apply_v1_3_2_patches(MainWindow)", source)
-        self.assertLess(
-            source.index("app = QApplication(sys.argv)"),
-            source.index("apply_v1_3_2_patches(MainWindow)"),
-        )
+        self.assertNotIn("apply_v1_3_2_patches", source)
 
     def test_windows_version_metadata_is_current_release(self) -> None:
         source = (ROOT / "version_info.txt").read_text(encoding="utf-8")

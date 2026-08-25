@@ -120,11 +120,14 @@ from .ui_cleanup import (
 from .ui_followup import IMAGE_MIN_HEIGHT, configure_language_controls, persist_language_preference, restart_application, set_always_on_top
 from .view_operations import ViewOperationCoordinator
 from .v1_3_2_patch import (
+    _add_auction_badge,
     _auto_detect_cache,
     _choose_cache_folder,
     _current_cache_path,
     _display_liveries,
     _install_cache_row,
+    _install_source_controls,
+    _restore_cache_path,
     _set_source_enabled,
 )
 from .window_responsiveness import (
@@ -748,7 +751,7 @@ class MainWindow(QMainWindow):
         self._dashboard_creator_sort_section = 1
         self._dashboard_creator_sort_order = Qt.SortOrder.AscendingOrder
 
-        self.setWindowTitle("FH6 Assistant v1.3.1")
+        self.setWindowTitle("FH6 Assistant v1.3.2")
         self.resize(1460, 900)
         # Allow a narrower compact layout while preventing the two-row toolbar
         # and card metadata from being vertically clipped.
@@ -757,6 +760,7 @@ class MainWindow(QMainWindow):
         self._build_ui()
         configure_language_controls(self)
         _install_cache_row(self)
+        _restore_cache_path(self)
         _normalize_path_rows(self)
         _align_path_rows(self)
         _configure_livery_source_switch(self)
@@ -996,7 +1000,7 @@ class MainWindow(QMainWindow):
         )
         self.always_on_top_box.toggled.connect(self._set_always_on_top)
         side.addWidget(self.always_on_top_box)
-        version = QLabel("v1.3.1\nLIVERY & TUNING")
+        version = QLabel("v1.3.2\nLIVERY & TUNING")
         version.setStyleSheet("color:#777b8b; padding:8px;")
         side.addWidget(version)
         outer.addWidget(sidebar)
@@ -1282,7 +1286,7 @@ class MainWindow(QMainWindow):
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addLayout(self._page_header(tr("dashboard.saved_livery"), ""))
+        layout.addLayout(self._page_header(tr("content.livery_page"), ""))
 
         (
             controls,
@@ -1606,6 +1610,9 @@ class MainWindow(QMainWindow):
         action_row.addStretch(1)
         controls.addLayout(action_row)
 
+        if content_type == "livery":
+            _install_source_controls(self, controls)
+
         return (
             controls,
             search,
@@ -1786,6 +1793,9 @@ class MainWindow(QMainWindow):
         self.card_cars.value.setText(str(meta.reported_car_count) if meta.reported_car_count is not None else "—")
         custom = sum(1 for x in r.liveries if x.kind == "Livery")
         self.card_livery.value.setText(str(custom))
+        self.card_auction.value.setText(
+            str(sum(1 for record in r.liveries if record.kind == "SoulBoundLivery"))
+        )
         self.card_tuning.value.setText(str(len(r.tunings)))
         self._populate_car_table()
         self._populate_creator_table()
@@ -2058,7 +2068,7 @@ class MainWindow(QMainWindow):
         if not self.result:
             return []
         if content_type == "livery":
-            records = list(self._custom_liveries())
+            records = list(self._fh6_v132_display_liveries())
             if getattr(self, "_fh6_hidden_navigation_scope", False):
                 records = [
                     record
@@ -3115,6 +3125,11 @@ class MainWindow(QMainWindow):
             _install_card_hide_button(self, card, key)
             _fix_card_actions(card)
             _repair_card_actions(card, record)
+            if record.kind == "SoulBoundLivery":
+                card.setProperty("liverySource", "auction")
+                _add_auction_badge(card)
+            else:
+                card.setProperty("liverySource", "my_designs")
         _normalize_card_actions(card)
         if content_type == "livery":
             from .release_layout import _align_left_actions_to_right_second_third
@@ -3123,7 +3138,13 @@ class MainWindow(QMainWindow):
         return card
 
     def _livery_search_text(self, record: LiveryRecord, note: str = "") -> str:
-        return self._saved_content_search_text(record, note)
+        base = self._saved_content_search_text(record, note)
+        source = (
+            tr("content.source_auction")
+            if record.kind == "SoulBoundLivery"
+            else tr("content.source_my_designs")
+        )
+        return f"{base} {source}".lower()
 
     def _saved_content_search_text(
         self,
