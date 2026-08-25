@@ -65,9 +65,11 @@ from .creator_alias_view import aggregate_creator_alias_stats, sort_by_creator_a
 from .dashboard_page_builder import build_dashboard_page
 from .game_navigation import (
     GameGridSession,
-    GameNavigationError,
     NavigationItem,
-    send_arrow_keys_to_fh6,
+)
+from .game_navigation_controller import (
+    execute_game_navigation,
+    request_game_navigation,
 )
 from .i18n import SUPPORTED_LANGUAGES, get_language, tr
 from .models import LiveryRecord, ScanResult, TuningRecord
@@ -2068,154 +2070,7 @@ class MainWindow(QMainWindow):
         content_type: str,
         key: str,
     ) -> None:
-        record = self._record_for_content_key(content_type, key)
-        if content_type == "livery" and is_auction_livery(record):
-            return
-        if content_type == "livery" and self._fh6_v132_is_livery_hidden(key):
-            labels = visibility_labels((get_language() or "ko").startswith("ko"))
-            self._show_status(labels["hidden_move"], 3500)
-            return
-        if self._game_navigation_pending:
-            QMessageBox.information(
-                self,
-                tr("navigation.pending_title"),
-                tr("navigation.pending_message"),
-            )
-            return
-        session = self._game_navigation_sessions.get(content_type)
-        if session is None or record is None or not session.contains(key):
-            QMessageBox.warning(
-                self,
-                tr("navigation.unavailable_title"),
-                tr("navigation.unavailable_message"),
-            )
-            return
-        dialog = QDialog(self)
-        dialog.setWindowTitle(tr("navigation.dialog_title"))
-        dialog.setModal(True)
-        dialog.setMinimumWidth(520)
-        layout = QVBoxLayout(dialog)
-        layout.setContentsMargins(16, 14, 16, 14)
-        layout.setSpacing(10)
-        target_name = record.header.name or tr("detail.no_title")
-        vehicle_name = self._car_label(record.car_id)
-
-        target_panel = QFrame()
-        target_panel.setObjectName("panel")
-        target_layout = QVBoxLayout(target_panel)
-        target_layout.setContentsMargins(12, 9, 12, 9)
-        target_layout.setSpacing(2)
-        vehicle_label = QLabel(vehicle_name)
-        vehicle_label.setStyleSheet("font-weight: 700; font-size: 11pt;")
-        title_label = QLabel(target_name)
-        title_label.setObjectName("muted")
-        target_layout.addWidget(vehicle_label)
-        target_layout.addWidget(title_label)
-        layout.addWidget(target_panel)
-
-        description = QLabel(tr("navigation.description"))
-        description.setWordWrap(True)
-        layout.addWidget(description)
-
-        delete_notice = QLabel(tr("navigation.delete_notice"))
-        delete_notice.setWordWrap(True)
-        delete_notice.setStyleSheet(
-            "background: #fff7e8; color: #7a4b00; border: 1px solid #f0d6a6; "
-            "border-radius: 8px; padding: 8px 10px;"
-        )
-        layout.addWidget(delete_notice)
-
-        settings_panel = QFrame()
-        settings_panel.setObjectName("panel")
-        settings_layout = QGridLayout(settings_panel)
-        settings_layout.setContentsMargins(12, 9, 12, 9)
-        settings_layout.setHorizontalSpacing(12)
-        settings_layout.setVerticalSpacing(7)
-        settings_title = QLabel(tr("navigation.settings_title"))
-        settings_title.setStyleSheet("font-weight: 700;")
-        settings_layout.addWidget(settings_title, 0, 0, 1, 2)
-
-        settings_layout.addWidget(QLabel(tr("navigation.delay")), 1, 0)
-        delay_spin = QDoubleSpinBox()
-        delay_spin.setRange(0.1, 30.0)
-        delay_spin.setDecimals(1)
-        delay_spin.setSingleStep(0.1)
-        delay_spin.setSuffix(tr("common.seconds_suffix"))
-        delay_spin.setValue(
-            self.settings.value("game_navigation_delay", 1.0, float)
-        )
-        settings_layout.addWidget(delay_spin, 1, 1)
-
-        settings_layout.addWidget(QLabel(tr("navigation.arrow_interval")), 2, 0)
-        arrow_interval_spin = QSpinBox()
-        arrow_interval_spin.setRange(20, 500)
-        arrow_interval_spin.setSuffix(tr("common.milliseconds_suffix"))
-        arrow_interval_spin.setValue(
-            self.settings.value("game_navigation_arrow_interval_ms", 70, int)
-        )
-        settings_layout.addWidget(arrow_interval_spin, 2, 1)
-
-        auto_activate_box = QCheckBox(tr("navigation.auto_activate"))
-        auto_activate_box.setChecked(
-            self.settings.value("game_navigation_auto_activate", True, bool)
-        )
-        auto_activate_box.setToolTip(tr("navigation.auto_activate_tip"))
-        settings_layout.addWidget(auto_activate_box, 3, 0, 1, 2)
-        settings_layout.setColumnStretch(1, 1)
-        layout.addWidget(settings_panel)
-
-        choice: dict[str, str] = {"mode": ""}
-        button_row = QHBoxLayout()
-        delete_button = QPushButton(tr("navigation.move_delete"))
-        delete_button.setObjectName("secondary")
-        apply_button = QPushButton(tr("navigation.move_apply"))
-        apply_button.setObjectName("primary")
-        cancel_button = QPushButton(tr("common.cancel"))
-        cancel_button.setObjectName("secondary")
-        delete_button.clicked.connect(
-            lambda: (choice.__setitem__("mode", "delete"), dialog.accept())
-        )
-        apply_button.clicked.connect(
-            lambda: (choice.__setitem__("mode", "apply"), dialog.accept())
-        )
-        cancel_button.clicked.connect(dialog.reject)
-        button_row.addWidget(delete_button)
-        button_row.addWidget(apply_button)
-        button_row.addStretch(1)
-        button_row.addWidget(cancel_button)
-        layout.addLayout(button_row)
-
-        if dialog.exec() != QDialog.DialogCode.Accepted or not choice["mode"]:
-            return
-        delay = delay_spin.value()
-        auto_activate = auto_activate_box.isChecked()
-        arrow_interval_ms = arrow_interval_spin.value()
-        try:
-            planned_keys = session.plan_from_first(key)
-        except GameNavigationError as exc:
-            QMessageBox.warning(self, tr("navigation.unavailable_title"), str(exc))
-            return
-        self.settings.setValue("game_navigation_delay", delay)
-        self.settings.setValue("game_navigation_auto_activate", auto_activate)
-        self.settings.setValue(
-            "game_navigation_arrow_interval_ms",
-            arrow_interval_ms,
-        )
-        self._game_navigation_pending = True
-        generation = self._game_navigation_generation
-        mode = choice["mode"]
-        delay_text = tr("navigation.delay_text", value=f"{delay:g}")
-        wait_message = (
-            tr("navigation.wait_auto", delay=delay_text)
-            if auto_activate
-            else tr("navigation.wait_manual", delay=delay_text)
-        )
-        self._show_status(wait_message, int((delay + 8) * 1000))
-        QTimer.singleShot(
-            int(round(delay * 1000)),
-            lambda t=content_type, k=key, keys=planned_keys, m=mode, g=generation, a=auto_activate, ar=arrow_interval_ms:
-            self._execute_game_navigation(t, k, keys, m, g, a, ar),
-        )
+        request_game_navigation(self, content_type, key)
 
     def _execute_game_navigation(
         self,
@@ -2227,37 +2082,16 @@ class MainWindow(QMainWindow):
         auto_activate: bool,
         arrow_interval_ms: int,
     ) -> None:
-        self._game_navigation_pending = False
-        if generation != self._game_navigation_generation:
-            self._show_status(tr("navigation.cancelled_refresh"), 5000)
-            return
-        session = self._game_navigation_sessions.get(content_type)
-        if session is None or not session.contains(key):
-            self._show_status(tr("navigation.cancelled_changed"), 5000)
-            return
-        try:
-            window_title = send_arrow_keys_to_fh6(
-                planned_keys,
-                interval=arrow_interval_ms / 1000.0,
-                auto_activate=auto_activate,
-            )
-        except GameNavigationError as exc:
-            QMessageBox.warning(self, tr("navigation.cancel_title"), str(exc))
-            self._show_status(tr("navigation.focus_failed"), 5000)
-            return
-
-        deleted = mode == "delete"
-        session.complete_move(
+        execute_game_navigation(
+            self,
+            content_type,
             key,
-            deleted=deleted,
+            planned_keys,
+            mode,
+            generation,
+            auto_activate,
+            arrow_interval_ms,
         )
-        count = len(planned_keys)
-        if deleted:
-            message = tr("navigation.complete_deleted", count=count, window=window_title)
-        else:
-            message = tr("navigation.complete_applied", count=count, window=window_title)
-        self._show_status(message, 8000)
-
 
     def _populate_livery_view(self) -> None:
         self._fh6_v132_auction_build_generation = (

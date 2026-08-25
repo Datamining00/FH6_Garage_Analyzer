@@ -8,6 +8,10 @@ from fh6garage.i18n import DEFAULT_LANGUAGE, set_language, tr
 
 ROOT = Path(__file__).resolve().parents[1]
 UI = (ROOT / "fh6garage" / "ui.py").read_text(encoding="utf-8")
+UI_MODULES = "\n".join(
+    path.read_text(encoding="utf-8")
+    for path in (ROOT / "fh6garage").glob("*.py")
+)
 CAR_DB = (ROOT / "fh6garage" / "car_db.py").read_text(encoding="utf-8")
 GAME_NAV = (ROOT / "fh6garage" / "game_navigation.py").read_text(encoding="utf-8")
 SCANNER = (ROOT / "fh6garage" / "scanner.py").read_text(encoding="utf-8")
@@ -45,7 +49,7 @@ class I18nStage3Tests(unittest.TestCase):
             'tr("dashboard.search_creator")',
         ):
             with self.subTest(fragment=fragment):
-                self.assertIn(fragment, UI)
+                self.assertIn(fragment, UI_MODULES)
 
     def test_error_modules_are_i18n_aware(self) -> None:
         self.assertIn('from .i18n import tr', CAR_DB)

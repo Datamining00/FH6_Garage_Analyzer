@@ -7,6 +7,14 @@ from fh6garage.auction_ui_safety import is_auction_livery
 from fh6garage.models import HeaderInfo, LiveryRecord
 
 ROOT = Path(__file__).resolve().parents[1]
+UI_SOURCES = "\n".join(
+    (ROOT / "fh6garage" / name).read_text(encoding="utf-8")
+    for name in (
+        "ui.py",
+        "game_navigation_controller.py",
+        "saved_content_card_actions.py",
+    )
+)
 
 
 def _record(kind: str) -> LiveryRecord:
@@ -25,14 +33,14 @@ class AuctionUiSafetyTests(unittest.TestCase):
         self.assertFalse(is_auction_livery(None))
 
     def test_navigation_and_duplicate_checks_reject_auction_records(self) -> None:
-        source = (ROOT / "fh6garage" / "ui.py").read_text(encoding="utf-8")
-        self.assertIn("is_auction_livery(record)", source)
-        self.assertIn("not is_auction_livery(record)", source)
+        self.assertIn("is_auction_livery(record)", UI_SOURCES)
+        self.assertIn("not is_auction_livery(record)", UI_SOURCES)
 
     def test_auction_card_never_creates_game_move_control(self) -> None:
-        source = (ROOT / "fh6garage" / "ui.py").read_text(encoding="utf-8")
-        self.assertIn('content_type == "livery" and is_auction_livery(record)', source)
-        self.assertIn('game_move_button = None', source)
+        self.assertIn(
+            'content_type == "livery" and is_auction_livery(record)', UI_SOURCES
+        )
+        self.assertIn('game_move = None', UI_SOURCES)
 
     def test_runtime_patch_is_removed(self) -> None:
         app_source = (ROOT / "app.py").read_text(encoding="utf-8")
