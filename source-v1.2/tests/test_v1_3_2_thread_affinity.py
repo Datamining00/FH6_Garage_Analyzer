@@ -25,11 +25,17 @@ class V132ThreadAffinityContractTests(unittest.TestCase):
 
     def test_postprocessing_moved_to_populate_all(self) -> None:
         root = Path(__file__).resolve().parents[1]
-        source = (root / "fh6garage" / "v1_3_2_thread_affinity_patch.py").read_text(encoding="utf-8")
-        self.assertIn("def patched_populate_all", source)
-        self.assertIn("assign_auction_thumbnails", source)
-        self.assertIn("_fh6_v132_initial_scan_build = True", source)
-        self.assertIn("QTimer.singleShot(0, scheduler)", source)
+        patch_source = (
+            root / "fh6garage" / "v1_3_2_thread_affinity_patch.py"
+        ).read_text(encoding="utf-8")
+        processing_source = (
+            root / "fh6garage" / "scan_result_processing.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("def patched_populate_all", patch_source)
+        self.assertIn("populate_scan_result_ui", patch_source)
+        self.assertIn("def assign_auction_thumbnails", processing_source)
+        self.assertIn("_fh6_v132_initial_scan_build = True", processing_source)
+        self.assertIn("QTimer.singleShot(0, scheduler)", processing_source)
 
     def test_both_content_types_receive_constant_time_indexes(self) -> None:
         root = Path(__file__).resolve().parents[1]
