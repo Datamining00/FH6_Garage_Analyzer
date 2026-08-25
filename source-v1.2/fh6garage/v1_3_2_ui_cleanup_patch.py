@@ -7,10 +7,9 @@ from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QLabel, QPushButton, QToolButton, QWidget, QWidgetAction
 
 from .i18n import get_language
+from .livery_visibility import eye_slash_pixmap
 from .models import LiveryRecord
 from .ui import MultiStatusFilterButton
-from .v1_3_2_visibility_patch import _eye_slash_pixmap
-
 
 _HIDDEN_MODE = 11
 _AUCTION_APPLIED_MODE = 12
@@ -157,12 +156,12 @@ def _install_card_hide_button(self: Any, card: Any, key: str) -> None:
     hide_button.setCheckable(True)
     icon = QIcon()
     icon.addPixmap(
-        _eye_slash_pixmap(False),
+        eye_slash_pixmap(False),
         QIcon.Mode.Normal,
         QIcon.State.Off,
     )
     icon.addPixmap(
-        _eye_slash_pixmap(True),
+        eye_slash_pixmap(True),
         QIcon.Mode.Normal,
         QIcon.State.On,
     )

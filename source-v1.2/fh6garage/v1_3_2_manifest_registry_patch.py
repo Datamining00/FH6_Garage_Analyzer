@@ -4,12 +4,10 @@ from typing import Any
 
 from PySide6.QtCore import Qt
 
-from . import v1_3_2_visibility_patch as visibility_patch
 from .auction_manifest_registry import read_auction_manifest_registry
 from .auction_thumbnails import AuctionThumbnailManifestError, _header_livery_token
 from .i18n import get_language
 from .models import LiveryRecord
-
 
 _AUCTION_UNAPPLIED_MODE = 13
 
@@ -50,17 +48,6 @@ def apply_v1_3_2_manifest_registry_patch(MainWindow) -> None:
     original_populate_all = MainWindow._populate_all
     original_layout_visible_grid_cards = MainWindow._layout_visible_grid_cards
     original_filter_saved_content_table = MainWindow._filter_saved_content_table
-    original_visibility_t = visibility_patch._t
-
-    def patched_visibility_t(key: str) -> str:
-        override = _registry_tooltip(key)
-        return override if override is not None else original_visibility_t(key)
-
-    # MultiStatusFilterButton instances are constructed after patches are
-    # installed, so replacing the module-global translator here also updates the
-    # remaining '미적용 경매장 리버리' tooltip without rebuilding i18n tables.
-    visibility_patch._t = patched_visibility_t
-
     def rebuild_registry_state(self) -> None:
         self._fh6_v132_registered_auction_keys = set()
         self._fh6_v132_manifest_registry = None

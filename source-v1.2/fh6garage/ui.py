@@ -59,6 +59,17 @@ from .game_navigation import (
 )
 from .i18n import SUPPORTED_LANGUAGES, get_language, normalize_language, tr
 from .models import LiveryRecord, ScanResult, TuningRecord
+from .livery_visibility import (
+    AUCTION_APPLIED_MODE,
+    AUCTION_UNAPPLIED_MODE,
+    HIDDEN_MODE,
+    eye_slash_pixmap,
+    install_visibility_filter_rows,
+    is_auction_livery_applied,
+    is_livery_hidden,
+    set_livery_hidden,
+    visibility_labels,
+)
 from .preferences import LocalPreferences
 from .scanner import SaveLayoutError, scan_save
 from .scan_result_processing import populate_scan_result_ui
@@ -300,6 +311,11 @@ class MultiStatusFilterButton(QToolButton):
             menu.addAction(widget_action)
             self._actions[mode] = row
         self.setMenu(menu)
+        if include_duplicate:
+            install_visibility_filter_rows(
+                self,
+                visibility_labels((get_language() or "ko").startswith("ko")),
+            )
 
     def _row_toggled(self, mode: int, checked: bool) -> None:
         """Keep logically incompatible filter choices mutually exclusive."""
@@ -313,6 +329,10 @@ class MultiStatusFilterButton(QToolButton):
                 incompatible = {4}
             elif mode == 4:
                 incompatible = {3}
+            elif mode == AUCTION_APPLIED_MODE:
+                incompatible = {AUCTION_UNAPPLIED_MODE}
+            elif mode == AUCTION_UNAPPLIED_MODE:
+                incompatible = {AUCTION_APPLIED_MODE}
             for other_mode in incompatible:
                 other = self._actions.get(other_mode)
                 if other is not None and other.isChecked():
@@ -1970,7 +1990,16 @@ class MainWindow(QMainWindow):
         if not self.result:
             return []
         if content_type == "livery":
-            return list(self._custom_liveries())
+            records = list(self._custom_liveries())
+            if getattr(self, "_fh6_hidden_navigation_scope", False):
+                records = [
+                    record
+                    for record in records
+                    if not self._fh6_v132_is_livery_hidden(
+                        self._content_annotation_key("livery", record)
+                    )
+                ]
+            return records
         if content_type == "tuning":
             return list(self.result.tunings)
         return []
@@ -2146,26 +2175,45 @@ class MainWindow(QMainWindow):
         record = self._record_for_content_key("livery", key)
         return record if isinstance(record, LiveryRecord) else None
 
+    def _fh6_v132_is_livery_hidden(self, key: str) -> bool:
+        return is_livery_hidden(self.local_preferences, key)
+
+    def _fh6_v132_set_livery_hidden(self, key: str, hidden: bool) -> None:
+        set_livery_hidden(self.local_preferences, key, hidden)
+        self._reset_game_navigation_sessions()
+        self._filter_livery_views(
+            self.livery_search.text(),
+            preserve_scroll=True,
+        )
+
+    @staticmethod
+    def _fh6_v132_is_auction_applied(record: object) -> bool:
+        return is_auction_livery_applied(record)
+
     def _reset_game_navigation_sessions(self) -> None:
         self._game_navigation_generation += 1
         self._game_navigation_pending = False
         sessions: dict[str, GameGridSession] = {}
-        for content_type in ("livery", "tuning"):
-            records = self._saved_content_records(content_type)
-            sessions[content_type] = GameGridSession(
-                NavigationItem(
-                    key=self._content_annotation_key(content_type, record),
-                    car_id=record.car_id,
-                    tie_breaker="|".join(
-                        (
-                            record.container_name,
-                            record.header.guid or "",
-                            record.header.name or "",
-                        )
-                    ),
+        self._fh6_hidden_navigation_scope = True
+        try:
+            for content_type in ("livery", "tuning"):
+                records = self._saved_content_records(content_type)
+                sessions[content_type] = GameGridSession(
+                    NavigationItem(
+                        key=self._content_annotation_key(content_type, record),
+                        car_id=record.car_id,
+                        tie_breaker="|".join(
+                            (
+                                record.container_name,
+                                record.header.guid or "",
+                                record.header.name or "",
+                            )
+                        ),
+                    )
+                    for record in records
                 )
-                for record in records
-            )
+        finally:
+            self._fh6_hidden_navigation_scope = False
         self._game_navigation_sessions = sessions
 
     def _request_game_navigation(
@@ -2173,6 +2221,10 @@ class MainWindow(QMainWindow):
         content_type: str,
         key: str,
     ) -> None:
+        if content_type == "livery" and self._fh6_v132_is_livery_hidden(key):
+            labels = visibility_labels((get_language() or "ko").startswith("ko"))
+            self._show_status(labels["hidden_move"], 3500)
+            return
         if self._game_navigation_pending:
             QMessageBox.information(
                 self,
@@ -3216,6 +3268,25 @@ class MainWindow(QMainWindow):
                     )
                 ),
             )
+            if content_type == "livery" and not table.isRowHidden(row):
+                modes = self.livery_check_filter.selected_modes()
+                hidden = self._fh6_v132_is_livery_hidden(key) if key else False
+                if (HIDDEN_MODE in modes and not hidden) or (
+                    HIDDEN_MODE not in modes and hidden
+                ):
+                    table.setRowHidden(row, True)
+                    continue
+                if AUCTION_APPLIED_MODE in modes or AUCTION_UNAPPLIED_MODE in modes:
+                    if not isinstance(record, LiveryRecord) or record.kind != "SoulBoundLivery":
+                        table.setRowHidden(row, True)
+                        continue
+                    applied = self._fh6_v132_is_auction_applied(record)
+                    if (
+                        AUCTION_APPLIED_MODE in modes and not applied
+                    ) or (
+                        AUCTION_UNAPPLIED_MODE in modes and applied
+                    ):
+                        table.setRowHidden(row, True)
 
     def _request_saved_content_filter(
         self,
@@ -4328,6 +4399,8 @@ class MainWindow(QMainWindow):
         return QIcon(pixmap)
 
     def _show_livery_metadata(self, record: LiveryRecord) -> None:
+        key = self._content_annotation_key("livery", record)
+        labels = visibility_labels((get_language() or "ko").startswith("ko"))
         dialog = QDialog(self)
         dialog.setWindowTitle(tr("detail.livery_info_title"))
         dialog.setModal(True)
@@ -4343,6 +4416,34 @@ class MainWindow(QMainWindow):
         title = QLabel(tr("detail.livery_prefix", name=record.header.name or tr("detail.no_title")))
         title.setObjectName("muted")
         layout.addWidget(title)
+
+        hide_row = QHBoxLayout()
+        hide_row.addStretch(1)
+        hide_button = QToolButton()
+        hide_button.setCheckable(True)
+        icon = QIcon()
+        icon.addPixmap(eye_slash_pixmap(False), QIcon.Mode.Normal, QIcon.State.Off)
+        icon.addPixmap(eye_slash_pixmap(True), QIcon.Mode.Normal, QIcon.State.On)
+        hide_button.setIcon(icon)
+        hide_button.setIconSize(QSize(22, 22))
+        hide_button.setChecked(self._fh6_v132_is_livery_hidden(key))
+        hide_button.setToolTip(labels["hide_toggle"])
+        hide_button.setAccessibleName(labels["hide_toggle"])
+        hide_button.setFixedSize(38, 38)
+        hide_button.setStyleSheet(
+            "QToolButton { background:white; border:1px solid #dfe1e8; "
+            "border-radius:9px; padding:0; }"
+            "QToolButton:hover { border-color:#8c74ee; background:#f5f2ff; }"
+            "QToolButton:checked { border-color:#8c74ee; background:#eee9ff; }"
+        )
+        hide_button.toggled.connect(
+            lambda enabled, content_key=key: self._fh6_v132_set_livery_hidden(
+                content_key, enabled
+            )
+        )
+        hide_row.addWidget(hide_button)
+        layout.addLayout(hide_row)
+
         layout.addWidget(QLabel(tr("detail.description")))
         description = QPlainTextEdit()
         description.setReadOnly(True)
@@ -4359,6 +4460,7 @@ class MainWindow(QMainWindow):
         row.addStretch(1)
         row.addWidget(close_button)
         layout.addLayout(row)
+        self._apply_pointing_cursors(dialog)
         dialog.exec()
 
     def _show_tuning_details(self, record: TuningRecord) -> None:
