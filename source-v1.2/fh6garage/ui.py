@@ -15,7 +15,6 @@ from PySide6.QtWidgets import (
     QButtonGroup,
     QDialog,
     QDoubleSpinBox,
-    QFileDialog,
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -55,6 +54,13 @@ from .card_annotation_controller import (
     handle_triangle_clicked,
 )
 from .car_db import CarDatabase, CarDatabaseError, REMOTE_SOURCE_PAGE
+from .car_db_update_controller import (
+    cleanup_car_db_update,
+    fail_car_db_update,
+    finish_car_db_update,
+    refresh_db_status,
+    start_car_db_update,
+)
 from .car_db_override_dialog import open_car_db_override_dialog
 from .creator_aliases import CreatorAliasStore
 from .creator_note_controller import (
@@ -109,6 +115,14 @@ from .livery_visibility import (
 from .preferences import LocalPreferences
 from .refresh_diff_service import update_livery_refresh_diff
 from .scanner import SaveLayoutError, scan_save
+from .scan_lifecycle_controller import (
+    choose_save_folder as choose_save_folder_with_controller,
+    cleanup_scan,
+    fail_scan,
+    finish_scan,
+    refresh_scan as refresh_scan_with_controller,
+    start_scan as start_scan_with_controller,
+)
 from .scan_result_processing import populate_scan_result_ui
 from .saved_content_cards import (
     _delete_cached_cards,
@@ -1036,62 +1050,26 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def choose_save_folder(self) -> None:
-        start = self.path_edit.text() or str(Path.home())
-        path = QFileDialog.getExistingDirectory(self, tr("save.folder_dialog"), start)
-        if path:
-            self.path_edit.setText(path)
-            self.settings.setValue("last_save_path", path)
-            self.start_scan(Path(path))
+        choose_save_folder_with_controller(self, ScanWorker)
 
     @Slot()
     def refresh_scan(self) -> None:
-        self.car_db.reload()
-        self._refresh_db_status()
-        if self.path_edit.text():
-            self.start_scan(Path(self.path_edit.text()))
+        refresh_scan_with_controller(self, ScanWorker)
 
     def start_scan(self, path: Path) -> None:
-        if self._scan_thread and self._scan_thread.isRunning():
-            return
-        self._view_operations.cancel_pending()
-        self._begin_busy(tr("scan.loading"))
-        self._show_status(tr("scan.scanning"))
-        thread = QThread(self)
-        worker = ScanWorker(path, self.car_db)
-        worker.moveToThread(thread)
-        thread.started.connect(worker.run)
-        worker.finished.connect(self._scan_finished)
-        worker.failed.connect(self._scan_failed)
-        worker.finished.connect(thread.quit)
-        worker.failed.connect(thread.quit)
-        thread.finished.connect(worker.deleteLater)
-        thread.finished.connect(thread.deleteLater)
-        self._scan_thread = thread
-        self._scan_worker = worker
-        thread.finished.connect(self._scan_cleanup)
-        thread.start()
-
+        start_scan_with_controller(self, path, ScanWorker)
 
     @Slot()
     def _scan_cleanup(self) -> None:
-        self._scan_thread = None
-        self._scan_worker = None
+        cleanup_scan(self)
 
     @Slot(object)
     def _scan_finished(self, result: ScanResult) -> None:
-        try:
-            self.result = result
-            self._reset_game_navigation_sessions()
-            self._populate_all()
-        finally:
-            self._end_busy()
-        self._show_status(tr("scan.complete", liveries=sum(x.kind == "Livery" for x in result.liveries), tunings=len(result.tunings)), 8000)
+        finish_scan(self, result)
 
     @Slot(str)
     def _scan_failed(self, message: str) -> None:
-        self._end_busy()
-        self._show_status(tr("scan.failed"), 5000)
-        QMessageBox.critical(self, tr("scan.failed_title"), message)
+        fail_scan(self, message)
 
     def _populate_all(self) -> None:
         update_livery_refresh_diff(self)
@@ -1858,29 +1836,11 @@ class MainWindow(QMainWindow):
             return []
         return self.car_db.unknown_ids(summary.car_id for summary in self.result.car_summaries)
 
-    def _refresh_db_status(self, unknown_ids: Optional[list[int]] = None) -> None:
-        """Refresh the compact DB metadata shown beside the dashboard title."""
-        if not hasattr(self, "db_last_update_label"):
-            return
-
-        status = self.car_db.status
-        raw = (status.cache_updated_at or "").strip()
-
-        if raw:
-            # Stored value is UTC ISO-8601, e.g. 2026-08-12T14:21:04Z.
-            date_text = raw[:10] if len(raw) >= 10 else raw
-            self.db_last_update_label.setText(
-                tr("db.last_update", date=date_text)
-            )
-            tooltip = tr("db.local_download_time", value=raw)
-            if status.cache_source_last_modified:
-                tooltip += tr("db.source_last_modified", value=status.cache_source_last_modified)
-            self.db_last_update_label.setToolTip(tooltip)
-        else:
-            self.db_last_update_label.setText(tr("db.last_update_unavailable"))
-            self.db_last_update_label.setToolTip(
-                tr("db.not_updated_tip")
-            )
+    def _refresh_db_status(
+        self,
+        unknown_ids: Optional[list[int]] = None,
+    ) -> None:
+        refresh_db_status(self, unknown_ids)
 
     @Slot()
     def _open_car_db_source(self) -> None:
@@ -1888,64 +1848,19 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def start_car_db_update(self) -> None:
-        if self._db_update_thread and self._db_update_thread.isRunning():
-            return
-        answer = QMessageBox.question(
-            self,
-            tr("db.update_title"),
-            tr("db.update_prompt"),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.Yes,
-        )
-        if answer != QMessageBox.StandardButton.Yes:
-            return
-
-        self.db_update_button.setEnabled(False)
-        self.db_update_button.setText(tr("db.checking"))
-        self._begin_busy(tr("db.updating_busy"))
-        self._show_status(tr("db.downloading"))
-        thread = QThread(self)
-        worker = CarDatabaseUpdateWorker(self.car_db.cache_path)
-        worker.moveToThread(thread)
-        thread.started.connect(worker.run)
-        worker.finished.connect(self._car_db_update_finished)
-        worker.failed.connect(self._car_db_update_failed)
-        worker.finished.connect(thread.quit)
-        worker.failed.connect(thread.quit)
-        thread.finished.connect(worker.deleteLater)
-        thread.finished.connect(thread.deleteLater)
-        thread.finished.connect(self._car_db_update_cleanup)
-        self._db_update_thread = thread
-        self._db_update_worker = worker
-        thread.start()
+        start_car_db_update(self, CarDatabaseUpdateWorker)
 
     @Slot(object)
     def _car_db_update_finished(self, update) -> None:
-        self._end_busy()
-        self.car_db = CarDatabase(self.project_root / "data" / "car_names.json")
-        self._refresh_db_status()
-        self._show_status(tr("db.update_complete_status", count=update.count), 8000)
-        QMessageBox.information(
-            self,
-            tr("db.update_complete_title"),
-            tr("db.update_complete_message", count=update.count, path=update.cache_path),
-        )
-        if self.path_edit.text():
-            self.start_scan(Path(self.path_edit.text()))
+        finish_car_db_update(self, update)
 
     @Slot(str)
     def _car_db_update_failed(self, message: str) -> None:
-        self._end_busy()
-        self._show_status(tr("db.update_failed"), 6000)
-        QMessageBox.critical(self, tr("db.update_failed"), message)
+        fail_car_db_update(self, message)
 
     @Slot()
     def _car_db_update_cleanup(self) -> None:
-        self._db_update_thread = None
-        self._db_update_worker = None
-        if hasattr(self, "db_update_button"):
-            self.db_update_button.setEnabled(True)
-            self.db_update_button.setText(tr("db.check_update"))
+        cleanup_car_db_update(self)
 
     @Slot()
     def open_car_db_override(self) -> None:
