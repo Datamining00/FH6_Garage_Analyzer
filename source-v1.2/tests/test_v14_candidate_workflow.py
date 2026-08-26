@@ -17,9 +17,11 @@ class V14CandidateWorkflowContractTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.source = WORKFLOW.read_text(encoding="utf-8")
 
-    def test_workflow_is_manual_only(self) -> None:
+    def test_workflow_is_manual_or_architecture_branch_only(self) -> None:
         self.assertIn("workflow_dispatch:", self.source)
-        self.assertNotIn("\n  push:", self.source)
+        self.assertIn("\n  push:", self.source)
+        self.assertIn("v1.4.0-alpha.1-architecture-refactor", self.source)
+        self.assertNotIn("\n      - main", self.source)
         self.assertNotIn("\n  release:", self.source)
 
     def test_complete_windows_regression_precedes_build(self) -> None:
