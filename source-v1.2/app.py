@@ -56,6 +56,7 @@ from fh6garage.v1_3_2_memory_filter_coordination_patch import apply_v1_3_2_memor
 from fh6garage.v1_3_2_memory_thread_safety_patch import apply_v1_3_2_memory_thread_safety_patch
 from fh6garage.v1_3_2_filter_alias_quality_patch import apply_v1_3_2_filter_alias_quality_patch
 from fh6garage.v1_3_2_dashboard_change_group_patch import apply_v1_3_2_dashboard_change_group_patch
+from fh6garage.v1_3_3_beta_identity_patch import apply_v1_3_3_beta_identity_patch
 from fh6garage.v1_3_2_thread_affinity_patch import apply_v1_3_2_thread_affinity_fix
 
 
@@ -178,6 +179,9 @@ def main() -> int:
     # Finalize dashboard applied/total ratios, remove legacy Saved page headings,
     # and present recent changes as grouped Add / Remove / Duplicate sections.
     apply_v1_3_2_dashboard_change_group_patch(MainWindow)
+
+    # Apply the public v1.3.3 Beta identity without disturbing the verified v1.3.2 feature stack.
+    apply_v1_3_3_beta_identity_patch(MainWindow)
 
     # This must be the final MainWindow patch. It restores the original
     # class-defined @Slot(object) scan callback so all UI rebuilding runs on the
