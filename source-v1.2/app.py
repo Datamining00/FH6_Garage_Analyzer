@@ -71,7 +71,7 @@ def main() -> int:
     # Use a concrete positive base point size before applying application QSS.
     app.setFont(QFont("Segoe UI", 10))
     app.setApplicationName("FH6 Assistant")
-    app.setApplicationVersion("1.3.2")
+    app.setApplicationVersion("1.3.3-beta")
     app.setOrganizationName("LocalOnly")
 
     # Resolve the persisted UI language before constructing any translated widgets.
