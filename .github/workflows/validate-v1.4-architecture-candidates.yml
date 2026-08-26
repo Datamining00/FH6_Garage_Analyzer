@@ -2,6 +2,12 @@ name: Validate FH6 Assistant v1.4 architecture candidates
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - v1.4.0-alpha.1-architecture-refactor
+    paths:
+      - "source-v1.2/**"
+      - ".github/workflows/validate-v1.4-architecture-candidates.yml"
 
 permissions:
   contents: read
