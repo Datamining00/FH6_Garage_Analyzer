@@ -27,7 +27,7 @@ class ChangeDialogFolderPatchTests(unittest.TestCase):
         self.assertIn("_main_livery_columns(window)", source)
 
     def test_four_left_rows_match_requested_right_rows(self) -> None:
-        source = inspect.getsource(actions.LiveryCardActionAligner.reposition)
+        source = inspect.getsource(actions.LiveryCardActionAligner)
         self.assertIn('(\"_fh6_game_move_button\", \"_fh6_check_box\")', source)
         self.assertIn('(\"_fh6_hide_button\", \"_fh6_triangle_box\")', source)
         self.assertIn('(\"_fh6_info_button\", \"_fh6_excluded_box\")', source)
