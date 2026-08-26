@@ -138,7 +138,10 @@ class V132CompactCardLayoutTests(unittest.TestCase):
         ui_source = (ROOT / "fh6garage" / "ui.py").read_text(encoding="utf-8")
         self.assertIn("populate_scan_result_ui(self, self._populate_all_content)", ui_source)
         self.assertIn("_compact_window_chrome(self)", ui_source)
-        self.assertIn("_configure_card_metadata(card)", ui_source)
+        factory_source = (ROOT / "fh6garage" / "saved_content_card_factory.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("_configure_card_metadata(card)", factory_source)
 
 
 if __name__ == "__main__":
