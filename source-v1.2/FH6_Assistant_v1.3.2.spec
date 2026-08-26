@@ -1,6 +1,8 @@
 # -*- mode: python ; coding: utf-8 -*-
 from pathlib import Path
 
+from fh6garage.build_metadata import STANDARD_NAME
+
 project_root = Path(SPECPATH)
 
 a = Analysis(
@@ -27,7 +29,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='FH6 Assistant v1.3.2',
+    name=STANDARD_NAME,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

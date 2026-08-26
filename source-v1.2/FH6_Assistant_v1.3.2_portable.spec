@@ -1,6 +1,8 @@
 # -*- mode: python ; coding: utf-8 -*-
 from pathlib import Path
 
+from fh6garage.build_metadata import PORTABLE_DIR_NAME, STANDARD_NAME
+
 project_root = Path(SPECPATH)
 
 a = Analysis(
@@ -26,7 +28,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='FH6 Assistant v1.3.2',
+    name=STANDARD_NAME,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -43,5 +45,5 @@ coll = COLLECT(
     strip=False,
     upx=False,
     upx_exclude=[],
-    name='FH6 Assistant v1.3.2 Portable',
+    name=PORTABLE_DIR_NAME,
 )
