@@ -110,7 +110,10 @@ class V132GlobalUiTests(unittest.TestCase):
         self.assertNotIn(thread_fix, source)
         ui_source = (ROOT / "fh6garage" / "ui.py").read_text(encoding="utf-8")
         self.assertIn("populate_scan_result_ui(self, self._populate_all_content)", ui_source)
-        self.assertIn("_configure_aspect_card(card)", ui_source)
+        factory_source = (ROOT / "fh6garage" / "saved_content_card_factory.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("_configure_aspect_card(card)", factory_source)
 
 
 if __name__ == "__main__":
