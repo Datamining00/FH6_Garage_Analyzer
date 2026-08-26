@@ -25,6 +25,7 @@ except ModuleNotFoundError as exc:
 
 from fh6garage.i18n import DEFAULT_LANGUAGE, set_language
 from fh6garage.ui import MainWindow
+from fh6garage.version import PRODUCT_NAME, VERSION
 
 
 def resource_root() -> Path:
@@ -38,8 +39,8 @@ def main() -> int:
     app = QApplication(sys.argv)
     # Use a concrete positive base point size before applying application QSS.
     app.setFont(QFont("Segoe UI", 10))
-    app.setApplicationName("FH6 Assistant")
-    app.setApplicationVersion("1.3.2")
+    app.setApplicationName(PRODUCT_NAME)
+    app.setApplicationVersion(VERSION)
     app.setOrganizationName("LocalOnly")
 
     # Resolve the persisted UI language before constructing any translated widgets.

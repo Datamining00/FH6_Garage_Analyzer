@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from .i18n import SUPPORTED_LANGUAGES, get_language, tr
+from .version import SIDEBAR_VERSION
 
 
 def build_main_window(owner: Any) -> None:
@@ -93,7 +94,7 @@ def build_main_window(owner: Any) -> None:
     owner.always_on_top_box.setToolTip(tr("sidebar.always_on_top_tip"))
     owner.always_on_top_box.toggled.connect(owner._set_always_on_top)
     side.addWidget(owner.always_on_top_box)
-    version = QLabel("v1.3.2\nLIVERY & TUNING")
+    version = QLabel(SIDEBAR_VERSION)
     version.setStyleSheet("color:#777b8b; padding:8px;")
     side.addWidget(version)
     outer.addWidget(sidebar)

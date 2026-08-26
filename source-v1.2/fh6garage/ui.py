@@ -164,6 +164,7 @@ from .ui_cleanup import (
 )
 from .ui_followup import IMAGE_MIN_HEIGHT, configure_language_controls, persist_language_preference, restart_application, set_always_on_top
 from .view_operations import ViewOperationCoordinator
+from .version import WINDOW_TITLE
 from .view_filter_controller import (
     filter_saved_content_views,
     refresh_after_annotation_change,
@@ -742,7 +743,7 @@ class MainWindow(QMainWindow):
         self._dashboard_creator_sort_section = 1
         self._dashboard_creator_sort_order = Qt.SortOrder.AscendingOrder
 
-        self.setWindowTitle("FH6 Assistant v1.3.2")
+        self.setWindowTitle(WINDOW_TITLE)
         self.resize(1460, 900)
         # Allow a narrower compact layout while preventing the two-row toolbar
         # and card metadata from being vertically clipped.

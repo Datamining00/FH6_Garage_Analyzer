@@ -1,1 +1,4 @@
-__version__ = "1.2"
+from .version import VERSION
+
+
+__version__ = VERSION
