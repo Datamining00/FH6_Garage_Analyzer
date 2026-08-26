@@ -53,6 +53,7 @@ from fh6garage.v1_3_2_auction_unapplied_recent_frame_fix import apply_v1_3_2_auc
 from fh6garage.v1_3_2_alias_manager_change_card_fix import apply_v1_3_2_alias_manager_change_card_fix
 from fh6garage.v1_3_2_memory_state_patch import apply_v1_3_2_memory_state_patch
 from fh6garage.v1_3_2_memory_filter_coordination_patch import apply_v1_3_2_memory_filter_coordination_patch
+from fh6garage.v1_3_2_memory_thread_safety_patch import apply_v1_3_2_memory_thread_safety_patch
 from fh6garage.v1_3_2_thread_affinity_patch import apply_v1_3_2_thread_affinity_fix
 
 
@@ -163,6 +164,10 @@ def main() -> int:
     # Keep the legacy auction-only filter and the new all-livery state selector
     # mutually exclusive so one state axis cannot contradict the other.
     apply_v1_3_2_memory_filter_coordination_patch(MainWindow)
+
+    # Route worker progress/completion through an explicit QObject bridge so no
+    # memory-scan callback can update Qt widgets from the worker thread.
+    apply_v1_3_2_memory_thread_safety_patch(MainWindow)
 
     # This must be the final MainWindow patch. It restores the original
     # class-defined @Slot(object) scan callback so all UI rebuilding runs on the
