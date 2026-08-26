@@ -11,6 +11,7 @@ from . import v1_3_2_responsiveness_sort_patch as _responsive
 
 _AUCTION_APPLIED_MODE = 12
 _AUCTION_UNAPPLIED_MODE = 13
+_MEMORY_FILTER_DEFAULT = "DEFAULT"
 _RECENT_CARD_FRAME_RULE = (
     "QFrame#panel, QFrame#card { "
     "background:#ffffff; border:1px solid #cfd3dd; border-radius:12px; "
@@ -29,10 +30,35 @@ def _selected_modes(window: Any) -> set[int]:
         return set()
 
 
+def _memory_state_usable(window: Any) -> bool:
+    checker = getattr(window, "_fh6_memory_state_usable", None)
+    if not callable(checker):
+        return False
+    try:
+        return bool(checker())
+    except (RuntimeError, TypeError, ValueError):
+        return False
+
+
+def _memory_filter_mode(window: Any) -> str:
+    return str(
+        getattr(window, "_fh6_memory_livery_filter_mode", _MEMORY_FILTER_DEFAULT)
+        or _MEMORY_FILTER_DEFAULT
+    )
+
+
 def _record_is_unapplied_auction(window: Any, record: Any) -> bool:
-    """Fail closed: a SoulBound livery is applied only with a verified cache match."""
+    """Use memory state when available; otherwise retain the v1.3.2 cache rule."""
     if getattr(record, "kind", None) != "SoulBoundLivery":
         return False
+
+    if _memory_state_usable(window):
+        state_fn = getattr(window, "_fh6_memory_livery_state_for_record", None)
+        if callable(state_fn):
+            try:
+                return state_fn(record) == "unapplied"
+            except (OSError, RuntimeError, TypeError, ValueError):
+                return False
 
     applied_fn = getattr(window, "_fh6_v132_is_auction_applied", None)
     if not callable(applied_fn):
@@ -59,12 +85,18 @@ def _default_auction_visibility_allowed(
     card: Any,
     base_allowed: bool,
 ) -> bool:
-    """Hide unmatched SoulBound cards unless the explicit unapplied filter is active."""
+    """Default view excludes only confirmed-unapplied SoulBound liveries."""
     if not base_allowed:
         return False
 
     modes = _selected_modes(window)
     if _AUCTION_APPLIED_MODE in modes or _AUCTION_UNAPPLIED_MODE in modes:
+        return True
+
+    if (
+        _memory_state_usable(window)
+        and _memory_filter_mode(window) != _MEMORY_FILTER_DEFAULT
+    ):
         return True
 
     record = _card_record(window, card)
@@ -93,7 +125,7 @@ def _strengthen_recent_card_frames(root: QWidget) -> QWidget:
 
 
 def apply_v1_3_2_auction_unapplied_recent_frame_fix(MainWindow: Any) -> None:
-    """Enforce explicit unapplied-auction filtering and clearer recent-card borders."""
+    """Enforce default auction visibility and clearer recent-card borders."""
     if getattr(MainWindow, "_fh6_v132_auction_unapplied_recent_frame_fixed", False):
         return
 
@@ -116,6 +148,12 @@ def apply_v1_3_2_auction_unapplied_recent_frame_fix(MainWindow: Any) -> None:
 
         modes = _selected_modes(self)
         if _AUCTION_APPLIED_MODE in modes or _AUCTION_UNAPPLIED_MODE in modes:
+            return
+
+        if (
+            _memory_state_usable(self)
+            and _memory_filter_mode(self) != _MEMORY_FILTER_DEFAULT
+        ):
             return
 
         table = getattr(self, "livery_table", None)
