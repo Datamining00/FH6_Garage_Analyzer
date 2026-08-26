@@ -54,6 +54,7 @@ from fh6garage.v1_3_2_alias_manager_change_card_fix import apply_v1_3_2_alias_ma
 from fh6garage.v1_3_2_memory_state_patch import apply_v1_3_2_memory_state_patch
 from fh6garage.v1_3_2_memory_filter_coordination_patch import apply_v1_3_2_memory_filter_coordination_patch
 from fh6garage.v1_3_2_memory_thread_safety_patch import apply_v1_3_2_memory_thread_safety_patch
+from fh6garage.v1_3_2_filter_alias_quality_patch import apply_v1_3_2_filter_alias_quality_patch
 from fh6garage.v1_3_2_thread_affinity_patch import apply_v1_3_2_thread_affinity_fix
 
 
@@ -168,6 +169,11 @@ def main() -> int:
     # Route worker progress/completion through an explicit QObject bridge so no
     # memory-scan callback can update Qt widgets from the worker thread.
     apply_v1_3_2_memory_thread_safety_patch(MainWindow)
+
+    # Add live per-filter counts, stronger active-state styling, and collapse
+    # creator-name unlink operations to a single persistence write.  Keep this
+    # before the thread-affinity patch because that patch must remain final.
+    apply_v1_3_2_filter_alias_quality_patch(MainWindow)
 
     # This must be the final MainWindow patch. It restores the original
     # class-defined @Slot(object) scan callback so all UI rebuilding runs on the
