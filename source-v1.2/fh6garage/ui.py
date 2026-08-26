@@ -67,6 +67,16 @@ from .creator_note_controller import (
 from .content_note_dialog import edit_content_note_dialog
 from .content_detail_dialogs import show_livery_metadata, show_tuning_details
 from .dashboard_page_builder import build_dashboard_page
+from .dashboard_selection_controller import (
+    fill_selected_liveries,
+    fill_selected_tunings,
+    filter_dashboard_table,
+    jump_to_selection,
+    selection_search_text,
+    set_content_mode,
+    update_selected_car,
+    update_selected_creator,
+)
 from .dashboard_table_controller import (
     car_sort_key,
     creator_content_stats,
@@ -147,6 +157,12 @@ from .ui_cleanup import (
 )
 from .ui_followup import IMAGE_MIN_HEIGHT, configure_language_controls, persist_language_preference, restart_application, set_always_on_top
 from .view_operations import ViewOperationCoordinator
+from .view_filter_controller import (
+    filter_saved_content_views,
+    refresh_after_annotation_change,
+    request_saved_content_filter,
+    restore_grid_scroll,
+)
 from .auction_ui_features import (
     _add_auction_badge,
     _auto_detect_cache,
@@ -168,7 +184,6 @@ from .window_responsiveness import (
     _schedule_resize_settle,
 )
 from .creator_alias_views import (
-    creator_display,
     decorate_creator_copy_label,
     initialize_creator_alias_ui,
     normalize_card_alias_properties,
@@ -1647,29 +1662,7 @@ class MainWindow(QMainWindow):
         content_type: str,
         text: str,
     ) -> None:
-        """Queue user-initiated filtering so its progress overlay can paint."""
-
-        if self.result is None:
-            self._filter_saved_content_views(
-                content_type,
-                text,
-                preserve_scroll=True,
-            )
-            return
-        noun = (
-            tr("content.noun_livery")
-            if content_type == "livery"
-            else tr("content.noun_tuning")
-        )
-        self._view_operations.request(
-            content_type,
-            tr("content.filtering", noun=noun),
-            lambda: self._filter_saved_content_views(
-                content_type,
-                text,
-                preserve_scroll=True,
-            ),
-        )
+        request_saved_content_filter(self, content_type, text)
 
     def _filter_saved_content_views(
         self,
@@ -1677,34 +1670,16 @@ class MainWindow(QMainWindow):
         text: str,
         preserve_scroll: bool = False,
     ) -> None:
-        if content_type == "livery":
-            self._filter_livery_views(
-                text,
-                preserve_scroll=preserve_scroll,
-            )
-            return
-        if content_type == "tuning":
-            scrollbar = self.tuning_grid_scroll.verticalScrollBar()
-            old_scroll = scrollbar.value()
-            self._relayout_tuning_grid(text)
-            if not preserve_scroll:
-                scrollbar.setValue(0)
-            else:
-                self._restore_grid_scroll(scrollbar, old_scroll)
-                QTimer.singleShot(
-                    0,
-                    self._schedule_visible_tuning_thumbnails,
-                )
+        filter_saved_content_views(
+            self,
+            content_type,
+            text,
+            preserve_scroll=preserve_scroll,
+        )
 
     @staticmethod
     def _restore_grid_scroll(scrollbar: object, value: int) -> None:
-        """Restore after both the immediate and deferred Qt layout passes."""
-        def restore() -> None:
-            scrollbar.setValue(min(value, scrollbar.maximum()))
-
-        restore()
-        QTimer.singleShot(0, restore)
-        QTimer.singleShot(30, restore)
+        restore_grid_scroll(scrollbar, value)
 
     def _refresh_after_annotation_change(
         self,
@@ -1713,31 +1688,12 @@ class MainWindow(QMainWindow):
         filter_modes: set[int],
         search_sensitive: bool = False,
     ) -> None:
-        """Relayout only when the changed annotation can affect visibility.
-
-        Rebuilding a grouped grid for every button click briefly collapses the
-        scroll area and causes both flicker and a jump to the first card.  In
-        the normal ``All`` view the annotation only changes the clicked card,
-        so no layout work is required.
-        """
-        filter_box = (
-            self.livery_check_filter
-            if content_type == "livery"
-            else self.tuning_check_filter
+        refresh_after_annotation_change(
+            self,
+            content_type,
+            filter_modes=filter_modes,
+            search_sensitive=search_sensitive,
         )
-        search = (
-            self.livery_search
-            if content_type == "livery"
-            else self.tuning_search
-        )
-        if filter_box.selected_modes().intersection(filter_modes) or (
-            search_sensitive and bool(search.text().strip())
-        ):
-            self._filter_saved_content_views(
-                content_type,
-                search.text(),
-                preserve_scroll=True,
-            )
 
     @Slot(str)
     def _filter_livery_views(self, text: str, preserve_scroll: bool = False) -> None:
@@ -2143,149 +2099,25 @@ class MainWindow(QMainWindow):
         open_car_db_override_dialog(self, APP_STYLE)
 
     def _dashboard_selection_search_text(self) -> str:
-        if self.dashboard_content_stack.currentIndex() == 0:
-            rows = self.car_table.selectionModel().selectedRows()
-            if not rows:
-                return ""
-            item = self.car_table.item(rows[0].row(), 0)
-            if item is None:
-                return ""
-            try:
-                car_id = int(item.data(Qt.ItemDataRole.UserRole))
-            except (TypeError, ValueError):
-                return ""
-            return self._car_label(car_id).strip()
-
-        rows = self.creator_table.selectionModel().selectedRows()
-        if not rows:
-            return ""
-        item = self.creator_table.item(rows[0].row(), 1)
-        if item is None:
-            return ""
-        creator = str(
-            item.data(Qt.ItemDataRole.UserRole) or item.text() or ""
-        ).strip()
-        if creator == tr("creator.none"):
-            return ""
-        return creator
+        return selection_search_text(self)
 
     def _jump_to_dashboard_selection(self, content_type: str) -> None:
-        if content_type not in {"livery", "tuning"}:
-            return
-        query = self._dashboard_selection_search_text()
-        if not query:
-            QMessageBox.information(
-                self,
-                tr("dashboard.instant_move_unavailable_title"),
-                tr("dashboard.instant_move_unavailable_message"),
-            )
-            return
-
-        page_index = 1 if content_type == "livery" else 2
-        search = self.livery_search if content_type == "livery" else self.tuning_search
-
-        self.nav_buttons[page_index].setChecked(True)
-        self.pages.setCurrentIndex(page_index)
-        search.blockSignals(True)
-        search.setText(query)
-        search.blockSignals(False)
-        self._filter_saved_content_views(content_type, query)
-        search.setFocus(Qt.FocusReason.ShortcutFocusReason)
-        search.selectAll()
+        jump_to_selection(self, content_type)
 
     def _set_dashboard_content_mode(self, index: int) -> None:
-        if index not in (0, 1):
-            return
-        self.dashboard_content_stack.setCurrentIndex(index)
-        self.car_search.blockSignals(True)
-        self.car_search.clear()
-        self.car_search.blockSignals(False)
-
-        if index == 0:
-            self.car_search.setPlaceholderText(tr("dashboard.search_vehicle"))
-            self.selected_hint.clear()
-            self.selected_hint.hide()
-            if self.car_table.rowCount() and not self.car_table.selectionModel().selectedRows():
-                self.car_table.selectRow(0)
-            self._update_selected_car()
-        else:
-            self.car_search.setPlaceholderText(tr("dashboard.search_creator"))
-            self.selected_hint.clear()
-            self.selected_hint.hide()
-            if self.creator_table.rowCount() and not self.creator_table.selectionModel().selectedRows():
-                self.creator_table.selectRow(0)
-            self._update_selected_creator()
-        self._filter_dashboard_table("")
+        set_content_mode(self, index)
 
     def _update_selected_car(self) -> None:
-        if not self.result or self.dashboard_content_stack.currentIndex() != 0:
-            return
-        rows=self.car_table.selectionModel().selectedRows()
-        if not rows: return
-        item=self.car_table.item(rows[0].row(),0)
-        if not item: return
-        car_id=int(item.data(Qt.ItemDataRole.UserRole))
-        summary=next((x for x in self.result.car_summaries if x.car_id==car_id),None)
-        self.selected_title.setText(
-            tr("dashboard.selected_vehicle", value=summary.label if summary else self._car_label(car_id))
-        )
-        self.selected_hint.clear()
-        self.selected_hint.hide()
-        liveries=[x for x in self.result.liveries if x.car_id==car_id and x.kind=="Livery"]
-        tunings=[x for x in self.result.tunings if x.car_id==car_id]
-        self._fill_selected_liveries(liveries)
-        self._fill_selected_tunings(tunings)
+        update_selected_car(self)
 
     def _update_selected_creator(self) -> None:
-        if not self.result or self.dashboard_content_stack.currentIndex() != 1:
-            return
-        rows = self.creator_table.selectionModel().selectedRows()
-        if not rows:
-            return
-        item = self.creator_table.item(rows[0].row(), 1)
-        if not item:
-            return
-        creator = str(item.data(Qt.ItemDataRole.UserRole) or item.text())
-        creator_key = "" if creator == tr("creator.none") else creator.casefold()
-
-        def same_creator(raw_name: str) -> bool:
-            raw = (raw_name or "").strip()
-            if not raw:
-                return not creator_key
-            return self.creator_aliases.canonical_name(raw).casefold() == creator_key
-
-        liveries = [
-            record for record in self.result.liveries
-            if record.kind == "Livery" and same_creator(record.header.creator or "")
-        ]
-        tunings = [
-            record for record in self.result.tunings
-            if same_creator(record.header.creator or "")
-        ]
-        display = (
-            tr("creator.none")
-            if not creator_key
-            else self.creator_aliases.display_name(creator)
-        )
-        self.selected_title.setText(tr("dashboard.selected_creator", value=display))
-        self.selected_hint.clear()
-        self.selected_hint.hide()
-        self._fill_selected_liveries(liveries)
-        self._fill_selected_tunings(tunings)
+        update_selected_creator(self)
 
     def _fill_selected_liveries(self, records: list[LiveryRecord]) -> None:
-        t=self.selected_liveries; t.setRowCount(0)
-        for r in records:
-            row=t.rowCount(); t.insertRow(row); t.setRowHeight(row,54)
-            it=QTableWidgetItem(); it.setIcon(self._icon_for(r.thumbnail_path)); t.setItem(row,0,it)
-            for c,v in enumerate((r.header.name or "(unnamed)",creator_display(self, r.header.creator or "")),1): t.setItem(row,c,QTableWidgetItem(str(v)))
+        fill_selected_liveries(self, records)
 
     def _fill_selected_tunings(self, records: list[TuningRecord]) -> None:
-        t=self.selected_tunings; t.setRowCount(0)
-        for r in records:
-            row=t.rowCount(); t.insertRow(row); t.setRowHeight(row,54)
-            it=QTableWidgetItem(); it.setIcon(self._icon_for(r.thumbnail_path)); t.setItem(row,0,it)
-            for c,v in enumerate((r.header.name or "(unnamed)",creator_display(self, r.header.creator or ""),self._fmt_bytes(r.data_size)),1): t.setItem(row,c,QTableWidgetItem(str(v)))
+        fill_selected_tunings(self, records)
 
     def _apply_pointing_cursors(self, root: QWidget) -> None:
         """Use the hand cursor for controls that are intended to be clicked."""
@@ -2528,26 +2360,7 @@ class MainWindow(QMainWindow):
             return None
 
     def _filter_dashboard_table(self, text: str) -> None:
-        if self.dashboard_content_stack.currentIndex() == 0:
-            self._filter_table(self.car_table, text, (0, 1))
-            return
-        needle = text.strip().casefold()
-        for row in range(self.creator_table.rowCount()):
-            item = self.creator_table.item(row, 1)
-            if item is None:
-                self.creator_table.setRowHidden(row, bool(needle))
-                continue
-            canonical = str(item.data(Qt.ItemDataRole.UserRole) or item.text() or "").strip()
-            if not canonical or canonical == tr("creator.none"):
-                haystack = item.text().casefold()
-            else:
-                haystack = " ".join(
-                    [
-                        self.creator_aliases.display_name(canonical),
-                        *self.creator_aliases.search_names(canonical),
-                    ]
-                ).casefold()
-            self.creator_table.setRowHidden(row, bool(needle) and needle not in haystack)
+        filter_dashboard_table(self, text)
 
     def _fh6_open_creator_alias_manager(self) -> None:
         open_alias_dialog(self)

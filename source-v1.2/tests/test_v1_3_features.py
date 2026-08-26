@@ -16,7 +16,7 @@ class V13FeatureContractTests(unittest.TestCase):
     def test_dashboard_instant_move_contract(self) -> None:
         self.assertIn("def _jump_to_dashboard_selection", UI)
         self.assertIn('tr("dashboard.instant_move")', UI)
-        self.assertIn("self.pages.setCurrentIndex(page_index)", UI)
+        self.assertIn(".pages.setCurrentIndex(page_index)", UI)
         self.assertIn("search.setText(query)", UI)
 
     def test_creator_grouping_contract(self) -> None:
