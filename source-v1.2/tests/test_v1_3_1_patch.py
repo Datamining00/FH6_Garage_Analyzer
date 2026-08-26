@@ -121,7 +121,7 @@ class V131PatchTests(unittest.TestCase):
 class V131BuildMetadataTests(unittest.TestCase):
     def test_app_version_and_patch_order(self) -> None:
         source = (ROOT / "app.py").read_text(encoding="utf-8")
-        self.assertIn('app.setApplicationVersion("1.3.2")', source)
+        self.assertIn('app.setApplicationVersion("1.3.3-beta")', source)
         self.assertIn("apply_v1_3_ui_patches(MainWindow)", source)
         self.assertIn("apply_v1_3_1_patches(MainWindow)", source)
         self.assertIn("apply_v1_3_2_patches(MainWindow)", source)
@@ -136,9 +136,9 @@ class V131BuildMetadataTests(unittest.TestCase):
 
     def test_windows_version_metadata_is_current_release(self) -> None:
         source = (ROOT / "version_info.txt").read_text(encoding="utf-8")
-        self.assertIn("filevers=(1, 3, 2, 0)", source)
-        self.assertIn("prodvers=(1, 3, 2, 0)", source)
-        self.assertIn("FH6 Assistant v1.3.2.exe", source)
+        self.assertIn("filevers=(1, 3, 3, 0)", source)
+        self.assertIn("prodvers=(1, 3, 3, 0)", source)
+        self.assertIn("FH6 Assistant v1.3.3 Beta.exe", source)
 
     def test_v131_spec_exists(self) -> None:
         source = (ROOT / "FH6_Assistant_v1.3.1.spec").read_text(encoding="utf-8")
