@@ -764,6 +764,23 @@ class MainWindow(QMainWindow):
         if app is not None:
             app.aboutToQuit.connect(self._fh6_v131_save_window_geometry)
         _compact_window_chrome(self)
+        self._busy_overlay = BusyOverlay(self)
+        self._busy_overlay.setGeometry(self.rect())
+        _fix_busy_overlay(self)
+        self._view_operations = ViewOperationCoordinator(self)
+        initialize_ui_performance_state(self)
+        self._apply_pointing_cursors(self)
+        self._refresh_db_status()
+        self._set_always_on_top(
+            self.settings.value("window_always_on_top", False, bool),
+            persist=False,
+        )
+
+        last = self.settings.value("last_save_path", "", str)
+        if last and Path(last).is_dir():
+            self.path_edit.setText(last)
+            # Persist only the path. Re-read the live save on every launch.
+            QTimer.singleShot(0, lambda saved=Path(last): self.start_scan(saved))
 
     def _fh6_v131_save_window_geometry(self) -> None:
         _save_window_geometry(self)
@@ -794,23 +811,6 @@ class MainWindow(QMainWindow):
 
     def _fh6_v132_display_liveries(self) -> list[LiveryRecord]:
         return _display_liveries(self)
-        self._busy_overlay = BusyOverlay(self)
-        self._busy_overlay.setGeometry(self.rect())
-        _fix_busy_overlay(self)
-        self._view_operations = ViewOperationCoordinator(self)
-        initialize_ui_performance_state(self)
-        self._apply_pointing_cursors(self)
-        self._refresh_db_status()
-        self._set_always_on_top(
-            self.settings.value("window_always_on_top", False, bool),
-            persist=False,
-        )
-
-        last = self.settings.value("last_save_path", "", str)
-        if last and Path(last).is_dir():
-            self.path_edit.setText(last)
-            # Persist only the path. Re-read the live save on every launch.
-            QTimer.singleShot(0, lambda saved=Path(last): self.start_scan(saved))
 
     def _begin_busy(self, message: str | None = None) -> None:
         if message is None:
