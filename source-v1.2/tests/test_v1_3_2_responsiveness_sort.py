@@ -71,8 +71,8 @@ class V132ResponsivenessSortTests(unittest.TestCase):
         source = (ROOT / "fh6garage" / "saved_content_state_controller.py").read_text(
             encoding="utf-8"
         )
-        self.assertIn('if mode == "download" and previous_mode != mode:', source)
-        self.assertIn("next_descending = True", source)
+        self.assertIn("next_descending = (", source)
+        self.assertIn('if mode == "download" and previous_mode != mode', source)
         self.assertNotIn("MainWindow._set_saved_content_sort_mode = patched", source)
 
     def test_hidden_livery_visibility_contract_is_preserved(self) -> None:
