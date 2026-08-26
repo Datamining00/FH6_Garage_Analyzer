@@ -26,9 +26,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QMenu,
     QPushButton,
-    QSizePolicy,
     QSpinBox,
-    QStackedLayout,
     QTableWidget,
     QTableWidgetItem,
     QPlainTextEdit,
@@ -44,13 +42,12 @@ from .annotations import AnnotationStore
 from .auction_card_loader import schedule_auction_cards
 from .auction_registry_state import is_auction_livery_registered
 from .auction_ui_safety import is_auction_livery
-from .card_metadata_layout import _compact_window_chrome, _configure_card_metadata
-from .card_action_alignment import configure_livery_card_actions
+from .card_metadata_layout import _compact_window_chrome
 from .card_state_sync import (
     _sync_cached_annotation_card,
     _sync_cached_hidden_card,
 )
-from .card_visuals import _fix_busy_overlay, _normalize_card_actions
+from .card_visuals import _fix_busy_overlay
 from .card_annotation_controller import (
     handle_check_clicked,
     handle_excluded_clicked,
@@ -120,14 +117,12 @@ from .saved_content_cards import (
     _populate_tuning_grid_reusing_cards,
     initialize_ui_performance_state,
 )
-from .saved_content_card_metadata import append_card_metadata
-from .saved_content_card_actions import build_card_actions
+from .saved_content_card_factory import make_saved_content_card
 from .saved_content_controls import build_saved_content_controls
 from .saved_content_presenter import (
     FilterState,
     build_search_text,
     filter_matches,
-    search_matches,
 )
 from .saved_content_state_controller import (
     set_grouping,
@@ -142,17 +137,15 @@ from .saved_content_records import (
     sorted_saved_content,
     vehicle_brand_key,
 )
-from .thumbnail_display import _configure_aspect_card, _load_original_pixmap
+from .saved_content_relayout import relayout_saved_content
+from .thumbnail_display import _load_original_pixmap
 from .ui_responsiveness import (
-    _livery_visibility_allowed,
     _responsive_clear_grid_layout,
-    _schedule_grid_followup,
     _yield_busy_events,
 )
 from .ui_cleanup import (
     _align_path_rows,
     _configure_livery_source_switch,
-    _install_card_hide_button,
     _normalize_path_rows,
 )
 from .ui_followup import IMAGE_MIN_HEIGHT, configure_language_controls, persist_language_preference, restart_application, set_always_on_top
@@ -164,7 +157,6 @@ from .view_filter_controller import (
     restore_grid_scroll,
 )
 from .auction_ui_features import (
-    _add_auction_badge,
     _auto_detect_cache,
     _choose_cache_folder,
     _current_cache_path,
@@ -184,9 +176,7 @@ from .window_responsiveness import (
     _schedule_resize_settle,
 )
 from .creator_alias_views import (
-    decorate_creator_copy_label,
     initialize_creator_alias_ui,
-    normalize_card_alias_properties,
     open_alias_dialog,
     refresh_alias_views,
 )
@@ -1457,82 +1447,10 @@ class MainWindow(QMainWindow):
         return grid_column_count(self, content_type)
 
     def _relayout_livery_grid(self, text: str = "") -> None:
-        """Pack matching cards contiguously into two columns."""
-        for card in self._livery_grid_cards:
-            normalize_card_alias_properties(self, "livery", card)
-        self.livery_grid_host.setUpdatesEnabled(False)
-        self._clear_livery_grid_layout()
-
-        visible_cards: list[QFrame] = []
-        duplicate_hashes = self._duplicate_livery_hashes()
-        for index, card in enumerate(self._livery_grid_cards):
-            haystack = str(card.property("searchText") or "")
-            checked = bool(card.property("checked"))
-            triangle = bool(card.property("triangle"))
-            excluded = bool(card.property("excluded"))
-            key = str(card.property("annotationKey") or "")
-            note = self.annotations.get(key).note if key else ""
-            record = self._record_for_content_key("livery", key) if key else None
-            duplicate = bool(
-                isinstance(record, LiveryRecord)
-                and record.content_sha256
-                and record.content_sha256 in duplicate_hashes
-            )
-            matched = search_matches(haystack, text) and self._livery_filter_matches(
-                checked,
-                note,
-                triangle,
-                excluded,
-                duplicate,
-            )
-            if matched and not _livery_visibility_allowed(self, card):
-                matched = False
-            if not matched:
-                self._unload_livery_card_thumbnail(card)
-            else:
-                visible_cards.append(card)
-            _yield_busy_events(self, force=(index == 0))
-
-        self._layout_visible_grid_cards("livery", visible_cards)
-        self.livery_grid_layout.activate()
-        self.livery_grid_host.setUpdatesEnabled(True)
-        self.livery_grid_host.update()
-
-        self._sync_livery_grid_card_widths()
-        _schedule_grid_followup(self, "livery")
+        relayout_saved_content(self, "livery", text)
 
     def _relayout_tuning_grid(self, text: str = "") -> None:
-        for card in self._tuning_grid_cards:
-            normalize_card_alias_properties(self, "tuning", card)
-        self.tuning_grid_host.setUpdatesEnabled(False)
-        self._clear_tuning_grid_layout()
-        visible_cards: list[QFrame] = []
-        for index, card in enumerate(self._tuning_grid_cards):
-            haystack = str(card.property("searchText") or "")
-            checked = bool(card.property("checked"))
-            triangle = bool(card.property("triangle"))
-            excluded = bool(card.property("excluded"))
-            key = str(card.property("annotationKey") or "")
-            note = self.annotations.get(key).note if key else ""
-            matched = (
-                search_matches(haystack, text)
-                and self._saved_content_filter_matches(
-                    "tuning", checked, note, triangle, excluded
-                )
-            )
-            if not matched:
-                self._unload_livery_card_thumbnail(card)
-            else:
-                visible_cards.append(card)
-            _yield_busy_events(self, force=(index == 0))
-
-        self._layout_visible_grid_cards("tuning", visible_cards)
-        self.tuning_grid_layout.activate()
-        self.tuning_grid_host.setUpdatesEnabled(True)
-        self.tuning_grid_host.update()
-
-        self._sync_tuning_grid_card_widths()
-        _schedule_grid_followup(self, "tuning")
+        relayout_saved_content(self, "tuning", text)
 
     def _sync_livery_grid_card_widths(self) -> None:
         _optimized_sync_grid_widths(self, "livery")
@@ -1552,81 +1470,16 @@ class MainWindow(QMainWindow):
         record: LiveryRecord | TuningRecord,
         key: str,
     ) -> QFrame:
-        card = QFrame()
-        card.setObjectName("panel")
-        card.setMinimumHeight(320)
-        card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        outer = QVBoxLayout(card)
-        outer.setContentsMargins(12, 12, 12, 12)
-        outer.setSpacing(8)
-
-        # Thumbnail + check overlay.  The checkbox lives in a small boxed overlay
-        # at the upper-right instead of consuming a separate metadata row.
-        image_host = QWidget()
-        image_stack = QStackedLayout(image_host)
-        image_stack.setContentsMargins(0, 0, 0, 0)
-        image_stack.setStackingMode(QStackedLayout.StackingMode.StackAll)
-
-        image_label = QLabel()
-        image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        image_label.setMinimumHeight(IMAGE_MIN_HEIGHT)
-        image_label.setStyleSheet("background:#f1f2f6;border-radius:9px;")
-        image_label.setText("Thumbnail")
-        image_label.setObjectName("muted")
-        image_stack.addWidget(image_label)
-
-        overlay = QWidget()
-        # APP_STYLE gives every QWidget an opaque background.  Since this widget
-        # sits above the thumbnail in StackAll mode, it must be explicitly
-        # transparent or it hides the vehicle image completely.
-        overlay.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
-        overlay.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        overlay.setStyleSheet("background: transparent;")
-        overlay_layout = QVBoxLayout(overlay)
-        overlay_layout.setContentsMargins(8, 8, 8, 8)
-        annotation = self.annotations.get(key)
-        actions = build_card_actions(
+        return make_saved_content_card(
             self,
-            card,
-            overlay_layout,
             content_type,
             record,
             key,
-            annotation,
-            _classification_toggle_icon,
-            _classification_pixmap,
+            image_min_height=IMAGE_MIN_HEIGHT,
+            copy_label_type=CopyValueLabel,
+            toggle_icon_factory=_classification_toggle_icon,
+            pixmap_factory=_classification_pixmap,
         )
-        image_stack.addWidget(overlay)
-        image_stack.setCurrentWidget(overlay)
-        outer.addWidget(image_host)
-
-        append_card_metadata(self, outer, record, CopyValueLabel)
-
-        card._fh6_image_label = image_label
-        card._fh6_thumbnail_path = record.thumbnail_path
-        card._fh6_thumbnail_loaded = False
-        card._fh6_check_box = actions.check
-        card._fh6_triangle_box = actions.triangle
-        card._fh6_excluded_box = actions.excluded
-        card._fh6_memo_button = actions.memo
-        card._fh6_zoom_button = actions.zoom
-        card._fh6_game_move_button = actions.game_move
-        card._fh6_info_button = actions.info
-        card._fh6_content_type = content_type
-        self._apply_pointing_cursors(card)
-        _configure_card_metadata(card)
-        _configure_aspect_card(card)
-        if content_type == "livery":
-            _install_card_hide_button(self, card, key)
-            configure_livery_card_actions(card, record)
-            if record.kind == "SoulBoundLivery":
-                card.setProperty("liverySource", "auction")
-                _add_auction_badge(card)
-            else:
-                card.setProperty("liverySource", "my_designs")
-        decorate_creator_copy_label(self, card, record.header.creator or "")
-        _normalize_card_actions(card)
-        return card
 
     def _livery_search_text(self, record: LiveryRecord, note: str = "") -> str:
         base = self._saved_content_search_text(record, note)
