@@ -19,10 +19,12 @@ class V132ListFixContractTests(unittest.TestCase):
 
     def test_initial_scan_build_is_my_designs_only(self) -> None:
         root = Path(__file__).resolve().parents[1]
-        source = (root / "fh6garage" / "ui.py").read_text(encoding="utf-8")
+        source = (root / "fh6garage" / "saved_content_records.py").read_text(
+            encoding="utf-8"
+        )
         self.assertIn("_fh6_v132_initial_scan_build", source)
         self.assertIn('record.kind == "Livery"', source)
-        self.assertIn("sorted_records", source)
+        self.assertIn("ordered", source)
 
     def test_scan_finished_slot_is_not_runtime_replaced(self) -> None:
         root = Path(__file__).resolve().parents[1]

@@ -28,25 +28,31 @@ class V132VisibilityContractTests(unittest.TestCase):
         self.assertNotIn("thumbnail_path", source)
 
     def test_hidden_liveries_are_removed_from_navigation_sessions(self) -> None:
-        source = self._source()
-        self.assertIn("_fh6_hidden_navigation_scope", source)
-        self.assertIn("def _reset_game_navigation_sessions", source)
-        self.assertIn('content_type == "livery" and self._fh6_v132_is_livery_hidden(key)', source)
+        root = Path(__file__).resolve().parents[1]
+        ui_source = self._source()
+        records_source = (root / "fh6garage" / "saved_content_records.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("_fh6_hidden_navigation_scope", ui_source)
+        self.assertIn("def _reset_game_navigation_sessions", ui_source)
+        self.assertIn("owner._fh6_v132_is_livery_hidden", records_source)
 
     def test_hidden_filter_is_default_exclusion_and_explicit_recovery(self) -> None:
-        source = self._source()
         root = Path(__file__).resolve().parents[1]
         rules = (root / "fh6garage" / "livery_visibility.py").read_text(
             encoding="utf-8"
         )
+        source = (root / "fh6garage" / "ui_responsiveness.py").read_text(
+            encoding="utf-8"
+        )
         self.assertIn("HIDDEN_MODE = 11", rules)
-        self.assertIn("HIDDEN_MODE in modes and not hidden", source)
-        self.assertIn("HIDDEN_MODE not in modes and hidden", source)
-        self.assertIn("table.setRowHidden(row, True)", source)
+        self.assertIn("if _HIDDEN_MODE in modes:", source)
+        self.assertIn("if not hidden:", source)
+        self.assertIn("elif hidden:", source)
 
     def test_auction_applied_and_unapplied_filters_are_mutually_exclusive(self) -> None:
-        source = self._source()
         root = Path(__file__).resolve().parents[1]
+        source = self._source()
         rules = (root / "fh6garage" / "livery_visibility.py").read_text(
             encoding="utf-8"
         )
@@ -56,7 +62,10 @@ class V132VisibilityContractTests(unittest.TestCase):
         self.assertIn("AUCTION_UNAPPLIED_MODE", source)
 
     def test_hide_button_is_above_description_in_livery_info(self) -> None:
-        source = self._source()
+        root = Path(__file__).resolve().parents[1]
+        source = (root / "fh6garage" / "content_detail_dialogs.py").read_text(
+            encoding="utf-8"
+        )
         hide_row = source.index("layout.addLayout(hide_row)")
         description = source.index('layout.addWidget(QLabel(tr("detail.description")))')
         uploaded = source.index('layout.addWidget(QLabel(tr("detail.uploaded", date=uploaded)))')
