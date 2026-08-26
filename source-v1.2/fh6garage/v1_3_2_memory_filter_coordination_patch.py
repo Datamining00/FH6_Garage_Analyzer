@@ -4,9 +4,46 @@ from typing import Any
 
 from PySide6.QtWidgets import QPushButton
 
+from . import v1_3_2_memory_state_patch as _memory_state
+from .memory_applied_state import MemoryScanResult, normalized_livery_name
+from .models import LiveryRecord
+
 
 FILTER_DEFAULT = "DEFAULT"
 LEGACY_AUCTION_STATE_MODES = (12, 13)
+
+
+def _classify_soulbound_from_memory(
+    window: Any,
+    result: MemoryScanResult,
+) -> tuple[set[str], set[str], set[str]]:
+    """Use the trusted exact memory identity as the primary SoulBound state.
+
+    CacheThumbnails/manifest data is auxiliary evidence only. Missing, stale, or
+    ambiguous cache metadata must not turn a conclusive HIGH/MEDIUM memory
+    snapshot into REVIEW.
+    """
+    records = [
+        record
+        for record in getattr(getattr(window, "result", None), "liveries", [])
+        if isinstance(record, LiveryRecord) and record.kind == "SoulBoundLivery"
+    ]
+
+    applied: set[str] = set()
+    unapplied: set[str] = set()
+    review: set[str] = set()
+
+    for record in records:
+        name = normalized_livery_name(record.container_name)
+        if not name:
+            review.add(str(record.container_name or "<unknown>"))
+            continue
+        if name in result.active_livery_names:
+            applied.add(name)
+        else:
+            unapplied.add(name)
+
+    return applied, unapplied, review
 
 
 def _clear_legacy_auction_state_filter(window: Any) -> None:
@@ -51,6 +88,10 @@ def apply_v1_3_2_memory_filter_coordination_patch(MainWindow: Any) -> None:
     """Keep legacy auction-state and new all-livery state selectors non-conflicting."""
     if getattr(MainWindow, "_fh6_v132_memory_filter_coordination_patched", False):
         return
+
+    # v1.3.3 Beta: exact memory membership is authoritative for SoulBound
+    # applied/unapplied state. Cache/manifest evidence remains auxiliary only.
+    _memory_state._classify_soulbound = _classify_soulbound_from_memory
 
     original_init = MainWindow.__init__
 
