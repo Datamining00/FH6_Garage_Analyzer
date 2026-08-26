@@ -104,7 +104,10 @@ class V132IconOverlayFixTests(unittest.TestCase):
         ui_source = (ROOT / "fh6garage" / "ui.py").read_text(encoding="utf-8")
         self.assertIn("populate_scan_result_ui(self, self._populate_all_content)", ui_source)
         self.assertIn("_fix_busy_overlay(self)", ui_source)
-        self.assertIn("_normalize_card_actions(card)", ui_source)
+        factory_source = (ROOT / "fh6garage" / "saved_content_card_factory.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("_normalize_card_actions(card)", factory_source)
         self.assertNotIn("apply_v1_3_2_card_width_overlay_patch(MainWindow)", source)
         self.assertNotIn("apply_v1_3_2_card_rail_patch(MainWindow)", source)
 
