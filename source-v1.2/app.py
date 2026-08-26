@@ -55,6 +55,7 @@ from fh6garage.v1_3_2_memory_state_patch import apply_v1_3_2_memory_state_patch
 from fh6garage.v1_3_2_memory_filter_coordination_patch import apply_v1_3_2_memory_filter_coordination_patch
 from fh6garage.v1_3_2_memory_thread_safety_patch import apply_v1_3_2_memory_thread_safety_patch
 from fh6garage.v1_3_2_filter_alias_quality_patch import apply_v1_3_2_filter_alias_quality_patch
+from fh6garage.v1_3_2_dashboard_change_group_patch import apply_v1_3_2_dashboard_change_group_patch
 from fh6garage.v1_3_2_thread_affinity_patch import apply_v1_3_2_thread_affinity_fix
 
 
@@ -171,9 +172,12 @@ def main() -> int:
     apply_v1_3_2_memory_thread_safety_patch(MainWindow)
 
     # Add live per-filter counts, stronger active-state styling, and collapse
-    # creator-name unlink operations to a single persistence write.  Keep this
-    # before the thread-affinity patch because that patch must remain final.
+    # creator-name unlink operations to a single persistence write.
     apply_v1_3_2_filter_alias_quality_patch(MainWindow)
+
+    # Finalize dashboard applied/total ratios, remove legacy Saved page headings,
+    # and present recent changes as grouped Add / Remove / Duplicate sections.
+    apply_v1_3_2_dashboard_change_group_patch(MainWindow)
 
     # This must be the final MainWindow patch. It restores the original
     # class-defined @Slot(object) scan callback so all UI rebuilding runs on the
@@ -194,7 +198,7 @@ def main() -> int:
     window.show()
 
     # CI/distribution smoke tests use the real application entry point and then
-    # request an ordinary window close.  Avoiding force-termination also lets a
+    # request an ordinary window close. Avoiding force-termination also lets a
     # PyInstaller OneFile process remove its temporary extraction directory.
     smoke_delay = os.environ.get("FH6_ASSISTANT_SMOKE_TEST_MS", "").strip()
     if smoke_delay:
