@@ -710,6 +710,7 @@ class MainWindow(QMainWindow):
         self.result: Optional[ScanResult] = None
         self._scan_thread: Optional[QThread] = None
         self._scan_worker: Optional[ScanWorker] = None
+        self._pending_scan_request: tuple[Path, type] | None = None
         self._db_update_thread: Optional[QThread] = None
         self._db_update_worker: Optional[CarDatabaseUpdateWorker] = None
         self._livery_grid_cards: list[QFrame] = []
