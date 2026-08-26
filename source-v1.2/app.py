@@ -52,6 +52,7 @@ from fh6garage.v1_3_2_change_dialog_responsive_ui_fix import apply_v1_3_2_change
 from fh6garage.v1_3_2_auction_unapplied_recent_frame_fix import apply_v1_3_2_auction_unapplied_recent_frame_fix
 from fh6garage.v1_3_2_alias_manager_change_card_fix import apply_v1_3_2_alias_manager_change_card_fix
 from fh6garage.v1_3_2_memory_state_patch import apply_v1_3_2_memory_state_patch
+from fh6garage.v1_3_2_memory_filter_coordination_patch import apply_v1_3_2_memory_filter_coordination_patch
 from fh6garage.v1_3_2_thread_affinity_patch import apply_v1_3_2_thread_affinity_fix
 
 
@@ -157,9 +158,11 @@ def main() -> int:
 
     # Add the optional read-only memory scan page, persisted applied-state
     # snapshot, top applied/unapplied selector, and paint-bucket card indicator.
-    # This must remain before the final thread-affinity fix so save refreshes keep
-    # their original Qt @Slot(object) completion path.
     apply_v1_3_2_memory_state_patch(MainWindow)
+
+    # Keep the legacy auction-only filter and the new all-livery state selector
+    # mutually exclusive so one state axis cannot contradict the other.
+    apply_v1_3_2_memory_filter_coordination_patch(MainWindow)
 
     # This must be the final MainWindow patch. It restores the original
     # class-defined @Slot(object) scan callback so all UI rebuilding runs on the
