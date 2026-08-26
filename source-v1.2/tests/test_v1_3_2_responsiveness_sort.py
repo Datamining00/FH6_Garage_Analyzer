@@ -68,7 +68,9 @@ class V132ResponsivenessSortTests(unittest.TestCase):
         QApplication.processEvents()
 
     def test_first_download_sort_click_is_descending_then_toggles(self) -> None:
-        source = (ROOT / "fh6garage" / "ui.py").read_text(encoding="utf-8")
+        source = (ROOT / "fh6garage" / "saved_content_state_controller.py").read_text(
+            encoding="utf-8"
+        )
         self.assertIn('if mode == "download" and previous_mode != mode:', source)
         self.assertIn("next_descending = True", source)
         self.assertNotIn("MainWindow._set_saved_content_sort_mode = patched", source)
@@ -113,7 +115,10 @@ class V132ResponsivenessSortTests(unittest.TestCase):
         ui_source = (ROOT / "fh6garage" / "ui.py").read_text(encoding="utf-8")
         self.assertIn("populate_scan_result_ui(self, self._populate_all_content)", ui_source)
         self.assertIn("_yield_busy_events(self, force=True)", ui_source)
-        self.assertIn("_schedule_grid_followup(self, \"livery\")", ui_source)
+        relayout_source = (ROOT / "fh6garage" / "saved_content_relayout.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("_schedule_grid_followup(owner, content_type)", relayout_source)
 
 
 if __name__ == "__main__":
