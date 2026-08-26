@@ -141,7 +141,12 @@ class ChangeViewContractTests(unittest.TestCase):
         self.assertIn("*group.all_names()", source)
         self.assertIn("creatorGroupKey", source)
         self.assertIn("creatorGroupLabel", source)
-        self.assertIn("self.creator_aliases.search_names(canonical)", source)
+        selection = (
+            Path(__file__).resolve().parents[1]
+            / "fh6garage"
+            / "dashboard_selection_controller.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("owner.creator_aliases.search_names(canonical)", selection)
 
 
 if __name__ == "__main__":
