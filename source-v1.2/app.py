@@ -51,6 +51,7 @@ from fh6garage.v1_3_2_change_dialog_runtime_fix import apply_v1_3_2_change_dialo
 from fh6garage.v1_3_2_change_dialog_responsive_ui_fix import apply_v1_3_2_change_dialog_responsive_ui_fix
 from fh6garage.v1_3_2_auction_unapplied_recent_frame_fix import apply_v1_3_2_auction_unapplied_recent_frame_fix
 from fh6garage.v1_3_2_alias_manager_change_card_fix import apply_v1_3_2_alias_manager_change_card_fix
+from fh6garage.v1_3_2_memory_state_patch import apply_v1_3_2_memory_state_patch
 from fh6garage.v1_3_2_thread_affinity_patch import apply_v1_3_2_thread_affinity_fix
 
 
@@ -144,15 +145,21 @@ def main() -> int:
     # formula on every resize and force the same light application theme.
     apply_v1_3_2_change_dialog_responsive_ui_fix(MainWindow)
 
-    # Cache thumbnail matching is authoritative for auction visibility: unmatched
-    # SoulBound cards are hidden by default and appear only through the explicit
-    # unapplied-auction filter. Also make recent-change card boundaries clearer.
+    # Preserve the default behavior of hiding only unapplied auction liveries.
+    # Once a valid memory snapshot exists, the same rule uses the verified
+    # memory/SoulBound state instead of relying on cache presence alone.
     apply_v1_3_2_auction_unapplied_recent_frame_fix(MainWindow)
 
     # Finalize deleted recent cards and creator-name manager interaction. Deleted
     # cards keep the normal card UI but no actions, and the alias manager remains
     # non-modal so the main window can still be used while it is open.
     apply_v1_3_2_alias_manager_change_card_fix(MainWindow)
+
+    # Add the optional read-only memory scan page, persisted applied-state
+    # snapshot, top applied/unapplied selector, and paint-bucket card indicator.
+    # This must remain before the final thread-affinity fix so save refreshes keep
+    # their original Qt @Slot(object) completion path.
+    apply_v1_3_2_memory_state_patch(MainWindow)
 
     # This must be the final MainWindow patch. It restores the original
     # class-defined @Slot(object) scan callback so all UI rebuilding runs on the
