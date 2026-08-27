@@ -40,6 +40,7 @@ class V134CardActionLayoutTests(unittest.TestCase):
         self.assertIn('grid.addWidget(left_button, row, 0', source)
         self.assertIn('grid.addWidget(right_button, row, 1', source)
         self.assertIn('_legacy_runtime._force_card_action_geometry = lambda _card: None', source)
+        self.assertNotIn('isinstance(root_layout, QVBoxLayout)', source)
 
     def test_patch_runs_before_thread_affinity_finalizer(self) -> None:
         source = (Path(__file__).parents[1] / "app.py").read_text(encoding="utf-8")

@@ -206,7 +206,7 @@ def _arrange_card(card: Any) -> None:
     # grid. Layout ownership prevents later widget.move() calls from becoming
     # the lasting card geometry.
     root_layout = overlay.layout()
-    if not isinstance(root_layout, QVBoxLayout):
+    if root_layout is None:
         return
     _clear_layout(root_layout)
     root_layout.setContentsMargins(EDGE_MARGIN, EDGE_MARGIN, EDGE_MARGIN, EDGE_MARGIN)
@@ -221,7 +221,11 @@ def _arrange_card(card: Any) -> None:
         grid.setRowMinimumHeight(row, ROW_HEIGHT)
         grid.addWidget(left_button, row, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         grid.addWidget(right_button, row, 1, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-    root_layout.addLayout(grid)
+    add_layout = getattr(root_layout, "addLayout", None)
+    if callable(add_layout):
+        add_layout(grid)
+    else:
+        root_layout.addItem(grid)
 
     def enforce_grid() -> None:
         grid.invalidate()
