@@ -51,10 +51,11 @@ def _txt(ko: str, en: str) -> str:
 
 
 _PAINT_ICON_COLORS = {
-    "applied": QColor("#39ff88"),
-    "same_car_applied": QColor("#ffe84a"),
-    "unapplied": QColor("#9ba5b3"),
-    "unknown": QColor("#b9bec8"),
+    # Mid-lightness saturated colors remain distinct on the white card overlay.
+    "applied": QColor("#16a34a"),
+    "same_car_applied": QColor("#d97706"),
+    "unapplied": QColor("#6b7280"),
+    "unknown": QColor("#8a94a3"),
 }
 _PAINT_ICON_CACHE: dict[tuple[str, int], QPixmap] = {}
 

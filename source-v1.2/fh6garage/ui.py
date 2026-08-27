@@ -121,9 +121,9 @@ def _classification_pixmap(kind: str, active: bool, size: int = 24) -> QPixmap:
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
     colors = {
-        "check": (QColor("#39ff88"), QColor("#9ba5b3")),
-        "triangle": (QColor("#ffe84a"), QColor("#9ba5b3")),
-        "excluded": (QColor("#ff4d6d"), QColor("#9ba5b3")),
+        "check": (QColor("#16a34a"), QColor("#9ba5b3")),
+        "triangle": (QColor("#d97706"), QColor("#9ba5b3")),
+        "excluded": (QColor("#dc2626"), QColor("#9ba5b3")),
         "memo": (QColor("#7656e8"), QColor("#9ba5b3")),
         "duplicate": (QColor("#5f39d8"), QColor("#9ba5b3")),
         "info": (QColor("#6e4bf2"), QColor("#9ba5b3")),

@@ -9,7 +9,10 @@ from PySide6.QtWidgets import QApplication, QLabel, QWidget
 from fh6garage.memory_applied_state import PersistedAppliedState
 from fh6garage.models import HeaderInfo, LiveryRecord
 from fh6garage.v1_3_2_dashboard_change_group_patch import _normalize_page_titles
-from fh6garage.v1_3_2_memory_state_patch import _paint_state_for_record
+from fh6garage.v1_3_2_memory_state_patch import (
+    _PAINT_ICON_COLORS,
+    _paint_state_for_record,
+)
 
 
 class RequestedV134ChangesTests(unittest.TestCase):
@@ -51,6 +54,19 @@ class RequestedV134ChangesTests(unittest.TestCase):
 
         self.assertEqual(_paint_state_for_record(window, applied), "applied")
         self.assertEqual(_paint_state_for_record(window, other), "same_car_applied")
+
+    def test_paint_colors_have_white_background_contrast(self) -> None:
+        self.assertEqual(_PAINT_ICON_COLORS["applied"].name(), "#16a34a")
+        self.assertEqual(_PAINT_ICON_COLORS["same_car_applied"].name(), "#d97706")
+        self.assertEqual(_PAINT_ICON_COLORS["unapplied"].name(), "#6b7280")
+
+    def test_classification_icons_use_matching_contrast_colors(self) -> None:
+        source = (Path(__file__).parents[1] / "fh6garage" / "ui.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('"check": (QColor("#16a34a")', source)
+        self.assertIn('"triangle": (QColor("#d97706")', source)
+        self.assertIn('"excluded": (QColor("#dc2626")', source)
 
 
 if __name__ == "__main__":
