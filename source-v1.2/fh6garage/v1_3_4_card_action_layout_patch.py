@@ -116,6 +116,27 @@ class _SixRowActionAligner(QObject):
                 button.raise_()
 
 
+class _ActionLayerResizer(QObject):
+    """Keep the dedicated action layer exactly over the thumbnail overlay."""
+
+    _EVENTS = {QEvent.Type.Show, QEvent.Type.Resize, QEvent.Type.LayoutRequest}
+
+    def __init__(self, overlay: QWidget, layer: QWidget) -> None:
+        super().__init__(overlay)
+        self.overlay = overlay
+        self.layer = layer
+        overlay.installEventFilter(self)
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        if event.type() in self._EVENTS:
+            self.resize_layer()
+        return False
+
+    def resize_layer(self) -> None:
+        self.layer.setGeometry(self.overlay.rect())
+        self.layer.raise_()
+
+
 def _disable_old_aligners(card: Any, overlay: QWidget) -> None:
     for name in (
         "_fh6_card_action_aligner",
@@ -155,6 +176,19 @@ def _placeholder_button(overlay: QWidget, name: str, icon: QIcon, tooltip: str) 
     return button
 
 
+def _unique_placeholder(card: Any, overlay: QWidget, attribute: str, name: str, kind: str, tooltip: str) -> QToolButton:
+    existing = getattr(card, attribute, None)
+    if isinstance(existing, QToolButton):
+        return existing
+    matches = overlay.findChildren(QToolButton, name)
+    button = matches[0] if matches else _placeholder_button(overlay, name, _line_icon(kind), tooltip)
+    for duplicate in matches[1:]:
+        duplicate.hide()
+        duplicate.deleteLater()
+    setattr(card, attribute, button)
+    return button
+
+
 def _arrange_card(card: Any) -> None:
     if bool(card.property("fh6ArchiveCard")):
         return
@@ -178,23 +212,25 @@ def _arrange_card(card: Any) -> None:
     if not all(isinstance(button, QToolButton) for button in required.values()):
         return
 
+    root_layout = overlay.layout()
+    if root_layout is None:
+        return
+
     _disable_old_aligners(card, overlay)
-    for button in required.values():
-        _remove_from_layout(overlay.layout(), button)
-        button.setParent(overlay)
-        button.setIconSize(QSize(ICON_SIZE, ICON_SIZE))
-        button.show()
 
     required["info"].setIcon(_line_icon("info"))
     required["folder"].setIcon(_line_icon("folder"))
 
-    lock = _placeholder_button(overlay, "fh6LockPlaceholderButton", _line_icon("lock"), "잠금 기능 준비 중")
-    lock.setCheckable(True)
-    lock.toggled.connect(lambda active, target=lock: target.setIcon(_line_icon("lock", active=active)))
-    export = _placeholder_button(overlay, "fh6ExportPlaceholderButton", _line_icon("export"), "내보내기 기능 준비 중")
+    lock = _unique_placeholder(
+        card, overlay, "_fh6_lock_placeholder_button", "fh6LockPlaceholderButton", "lock", "잠금 기능 준비 중"
+    )
+    if not lock.isCheckable():
+        lock.setCheckable(True)
+        lock.toggled.connect(lambda active, target=lock: target.setIcon(_line_icon("lock", active=active)))
+    export = _unique_placeholder(
+        card, overlay, "_fh6_export_placeholder_button", "fh6ExportPlaceholderButton", "export", "내보내기 기능 준비 중"
+    )
     export.setEnabled(False)
-    card._fh6_lock_placeholder_button = lock
-    card._fh6_export_placeholder_button = export
 
     left = [required[name] for name in ("move", "zoom", "memo", "info", "folder")]
     left.append(export)
@@ -202,36 +238,44 @@ def _arrange_card(card: Any) -> None:
     right.append(lock)
     right.extend(required[name] for name in ("hide", "check", "triangle", "excluded"))
 
-    # Replace the accumulated historical action layouts with one authoritative
-    # grid. Layout ownership prevents later widget.move() calls from becoming
-    # the lasting card geometry.
-    root_layout = overlay.layout()
-    if root_layout is None:
-        return
-    _clear_layout(root_layout)
-    root_layout.setContentsMargins(EDGE_MARGIN, EDGE_MARGIN, EDGE_MARGIN, EDGE_MARGIN)
-    root_layout.setSpacing(0)
-    grid = QGridLayout()
-    grid.setContentsMargins(0, 0, 0, 0)
+    # Do not reuse the historical overlay layout. Several maintenance patches
+    # still own nested layouts there. A dedicated child layer gives this patch
+    # sole and stable ownership of all twelve action buttons.
+    old_layer = getattr(card, "_fh6_v134_action_layer", None)
+    if isinstance(old_layer, QWidget):
+        old_layer.hide()
+        old_layer.deleteLater()
+    layer = QWidget(overlay)
+    layer.setObjectName("fh6CardActionLayer")
+    layer.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+    layer.setStyleSheet("background: transparent;")
+    layer.setGeometry(overlay.rect())
+    grid = QGridLayout(layer)
+    grid.setContentsMargins(EDGE_MARGIN, EDGE_MARGIN, EDGE_MARGIN, EDGE_MARGIN)
     grid.setHorizontalSpacing(0)
     grid.setVerticalSpacing(BUTTON_GAP)
     grid.setColumnStretch(0, 1)
     grid.setColumnStretch(1, 1)
     for row, (left_button, right_button) in enumerate(zip(left, right)):
+        for button in (left_button, right_button):
+            _remove_from_layout(root_layout, button)
+            button.setParent(layer)
+            button.setIconSize(QSize(ICON_SIZE, ICON_SIZE))
+            button.show()
         grid.setRowMinimumHeight(row, ROW_HEIGHT)
         grid.addWidget(left_button, row, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         grid.addWidget(right_button, row, 1, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-    add_layout = getattr(root_layout, "addLayout", None)
-    if callable(add_layout):
-        add_layout(grid)
-    else:
-        root_layout.addItem(grid)
 
     def enforce_grid() -> None:
         grid.invalidate()
         grid.activate()
 
+    resizer = _ActionLayerResizer(overlay, layer)
+    card._fh6_v134_action_layer = layer
+    card._fh6_v134_action_layer_resizer = resizer
     card._fh6_v134_action_grid = grid
+    layer.show()
+    resizer.resize_layer()
 
     image.setMinimumHeight(THUMBNAIL_MIN_HEIGHT)
     card.setMinimumHeight(CARD_MIN_HEIGHT)

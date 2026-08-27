@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-from PySide6.QtWidgets import QApplication, QToolButton, QWidget
+from PySide6.QtWidgets import QApplication, QFrame, QLabel, QStackedLayout, QToolButton, QVBoxLayout, QWidget
 
 from fh6garage.v1_3_4_card_action_layout_patch import (
     BUTTON_GAP,
@@ -14,6 +14,7 @@ from fh6garage.v1_3_4_card_action_layout_patch import (
     ROW_HEIGHT,
     THUMBNAIL_MIN_HEIGHT,
     _SixRowActionAligner,
+    _arrange_card,
 )
 
 
@@ -21,6 +22,29 @@ _APP = QApplication.instance() or QApplication([])
 
 
 class V134CardActionLayoutTests(unittest.TestCase):
+    @staticmethod
+    def _card_with_complete_actions() -> QFrame:
+        card = QFrame()
+        QVBoxLayout(card)
+        host = QWidget(card)
+        stack = QStackedLayout(host)
+        image = QLabel(host)
+        overlay = QWidget(host)
+        QVBoxLayout(overlay)
+        stack.addWidget(image)
+        stack.addWidget(overlay)
+        stack.setCurrentWidget(overlay)
+        card._fh6_image_label = image
+        for attribute in (
+            "_fh6_game_move_button", "_fh6_zoom_button", "_fh6_memo_button",
+            "_fh6_info_button", "_fh6_folder_button", "_fh6_applied_state_button",
+            "_fh6_hide_button", "_fh6_check_box", "_fh6_triangle_box", "_fh6_excluded_box",
+        ):
+            button = QToolButton(overlay)
+            button.setFixedSize(34, 34)
+            setattr(card, attribute, button)
+        return card
+
     def test_requested_geometry_constants(self) -> None:
         self.assertEqual(ICON_SIZE, 20)
         self.assertEqual(BUTTON_GAP, 5)
@@ -39,6 +63,9 @@ class V134CardActionLayoutTests(unittest.TestCase):
         self.assertIn('host_height + CARD_METADATA_HEIGHT', source)
         self.assertIn('grid.addWidget(left_button, row, 0', source)
         self.assertIn('grid.addWidget(right_button, row, 1', source)
+        self.assertIn('layer = QWidget(overlay)', source)
+        self.assertIn('button.setParent(layer)', source)
+        self.assertIn('_ActionLayerResizer(overlay, layer)', source)
         self.assertIn('_legacy_runtime._force_card_action_geometry = lambda _card: None', source)
         self.assertNotIn('isinstance(root_layout, QVBoxLayout)', source)
 
@@ -69,6 +96,29 @@ class V134CardActionLayoutTests(unittest.TestCase):
             self.assertEqual(right_button.x(), overlay.width() - EDGE_MARGIN - right_button.width())
             self.assertEqual(left_button.y() + left_button.height() / 2, expected_center)
             self.assertEqual(right_button.y() + right_button.height() / 2, expected_center)
+
+    def test_arrange_card_owns_all_buttons_in_one_dedicated_layer(self) -> None:
+        card = self._card_with_complete_actions()
+        _arrange_card(card)
+        _APP.processEvents()
+
+        layer = card._fh6_v134_action_layer
+        grid = card._fh6_v134_action_grid
+        left = (
+            card._fh6_game_move_button, card._fh6_zoom_button, card._fh6_memo_button,
+            card._fh6_info_button, card._fh6_folder_button, card._fh6_export_placeholder_button,
+        )
+        right = (
+            card._fh6_applied_state_button, card._fh6_lock_placeholder_button, card._fh6_hide_button,
+            card._fh6_check_box, card._fh6_triangle_box, card._fh6_excluded_box,
+        )
+        for row, (left_button, right_button) in enumerate(zip(left, right)):
+            self.assertIs(left_button.parentWidget(), layer)
+            self.assertIs(right_button.parentWidget(), layer)
+            self.assertEqual(grid.indexOf(left_button), row * 2)
+            self.assertEqual(grid.indexOf(right_button), row * 2 + 1)
+        self.assertEqual(len(layer.findChildren(QToolButton, "fh6LockPlaceholderButton")), 1)
+        self.assertEqual(len(layer.findChildren(QToolButton, "fh6ExportPlaceholderButton")), 1)
 
 
 if __name__ == "__main__":
