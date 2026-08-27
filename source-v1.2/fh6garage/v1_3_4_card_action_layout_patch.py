@@ -4,7 +4,11 @@ from typing import Any
 
 from PySide6.QtCore import QEvent, QObject, QPoint, QRect, QSize, Qt, QTimer
 from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap, QPolygon
-from PySide6.QtWidgets import QLayout, QToolButton, QWidget
+from PySide6.QtWidgets import QGridLayout, QLayout, QToolButton, QVBoxLayout, QWidget
+
+from . import v1_3_2_change_dialog_runtime_fix as _legacy_runtime
+from .i18n import tr
+from .ui import CopyValueLabel
 
 
 ICON_SIZE = 20
@@ -12,8 +16,8 @@ EDGE_MARGIN = 5
 BUTTON_GAP = 5
 ROW_HEIGHT = 38
 THUMBNAIL_MIN_HEIGHT = 270
-CARD_MIN_HEIGHT = 380
-CARD_METADATA_HEIGHT = 110
+CARD_MIN_HEIGHT = 350
+CARD_METADATA_HEIGHT = 80
 
 
 def _line_icon(kind: str, *, active: bool = False) -> QIcon:
@@ -62,6 +66,15 @@ def _remove_from_layout(layout: QLayout | None, widget: QWidget) -> None:
         child = layout.itemAt(index).layout()
         if child is not None:
             _remove_from_layout(child, widget)
+
+
+def _clear_layout(layout: QLayout) -> None:
+    while layout.count():
+        item = layout.takeAt(0)
+        child = item.layout()
+        if child is not None:
+            _clear_layout(child)
+            child.deleteLater()
 
 
 def _card_overlay(card: Any) -> QWidget | None:
@@ -189,6 +202,33 @@ def _arrange_card(card: Any) -> None:
     right.append(lock)
     right.extend(required[name] for name in ("hide", "check", "triangle", "excluded"))
 
+    # Replace the accumulated historical action layouts with one authoritative
+    # grid. Layout ownership prevents later widget.move() calls from becoming
+    # the lasting card geometry.
+    root_layout = overlay.layout()
+    if not isinstance(root_layout, QVBoxLayout):
+        return
+    _clear_layout(root_layout)
+    root_layout.setContentsMargins(EDGE_MARGIN, EDGE_MARGIN, EDGE_MARGIN, EDGE_MARGIN)
+    root_layout.setSpacing(0)
+    grid = QGridLayout()
+    grid.setContentsMargins(0, 0, 0, 0)
+    grid.setHorizontalSpacing(0)
+    grid.setVerticalSpacing(BUTTON_GAP)
+    grid.setColumnStretch(0, 1)
+    grid.setColumnStretch(1, 1)
+    for row, (left_button, right_button) in enumerate(zip(left, right)):
+        grid.setRowMinimumHeight(row, ROW_HEIGHT)
+        grid.addWidget(left_button, row, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        grid.addWidget(right_button, row, 1, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+    root_layout.addLayout(grid)
+
+    def enforce_grid() -> None:
+        grid.invalidate()
+        grid.activate()
+
+    card._fh6_v134_action_grid = grid
+
     image.setMinimumHeight(THUMBNAIL_MIN_HEIGHT)
     card.setMinimumHeight(CARD_MIN_HEIGHT)
     aspect = getattr(card, "_fh6_aspect_thumbnail_controller", None)
@@ -211,11 +251,32 @@ def _arrange_card(card: Any) -> None:
         aspect.schedule()
         QTimer.singleShot(0, apply_with_card_height)
         QTimer.singleShot(50, apply_with_card_height)
-    aligner = _SixRowActionAligner(overlay, left, right)
-    card._fh6_v134_action_aligner = aligner
-    QTimer.singleShot(0, aligner.reposition)
-    QTimer.singleShot(50, aligner.reposition)
-    QTimer.singleShot(150, aligner.reposition)
+    QTimer.singleShot(0, enforce_grid)
+    QTimer.singleShot(50, enforce_grid)
+    QTimer.singleShot(150, enforce_grid)
+
+    outer = card.layout()
+    if isinstance(outer, QVBoxLayout):
+        outer.setSpacing(3)
+    for label in card.findChildren(CopyValueLabel):
+        if label.prefix == tr("card.vehicle_label"):
+            label.setStyleSheet(
+                "QLabel { background:transparent; color:#171924; border:0; "
+                "padding:1px 2px 0 2px; font-size:11.5pt; font-weight:700; }"
+            )
+            label.setFixedHeight(26)
+        elif label.prefix == tr("card.title_label"):
+            label.setStyleSheet(
+                "QLabel { background:transparent; color:#343744; border:0; "
+                "padding:0 2px; font-size:10pt; font-weight:600; }"
+            )
+            label.setFixedHeight(24)
+        elif label.prefix == tr("card.creator_label"):
+            label.setStyleSheet(
+                "QLabel { background:transparent; color:#6d7282; border:0; "
+                "padding:0 2px; font-size:9.5pt; font-weight:500; }"
+            )
+            label.setFixedHeight(24)
 
 
 def apply_v1_3_4_card_action_layout_patch(MainWindow: Any) -> None:
@@ -235,4 +296,7 @@ def apply_v1_3_4_card_action_layout_patch(MainWindow: Any) -> None:
 
     MainWindow._make_saved_content_card = make_card
     MainWindow._detail_memo_icon = memo_icon
+    # Timers queued by the legacy four-row patch resolve this module global at
+    # execution time. Disable that obsolete geometry owner entirely.
+    _legacy_runtime._force_card_action_geometry = lambda _card: None
     MainWindow._fh6_v134_card_action_layout_patched = True

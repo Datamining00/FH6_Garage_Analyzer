@@ -26,8 +26,8 @@ class V134CardActionLayoutTests(unittest.TestCase):
         self.assertEqual(BUTTON_GAP, 5)
         self.assertEqual(EDGE_MARGIN, 5)
         self.assertGreaterEqual(THUMBNAIL_MIN_HEIGHT, 263)
-        self.assertGreaterEqual(CARD_MIN_HEIGHT, 370)
-        self.assertGreaterEqual(CARD_METADATA_HEIGHT, 100)
+        self.assertGreaterEqual(CARD_MIN_HEIGHT, 340)
+        self.assertGreaterEqual(CARD_METADATA_HEIGHT, 75)
 
     def test_layout_contains_requested_six_rows(self) -> None:
         source = (Path(__file__).parents[1] / "fh6garage" / "v1_3_4_card_action_layout_patch.py").read_text(encoding="utf-8")
@@ -37,6 +37,9 @@ class V134CardActionLayoutTests(unittest.TestCase):
         self.assertIn('export.setEnabled(False)', source)
         self.assertIn('aligner.reposition = lambda: None', source)
         self.assertIn('host_height + CARD_METADATA_HEIGHT', source)
+        self.assertIn('grid.addWidget(left_button, row, 0', source)
+        self.assertIn('grid.addWidget(right_button, row, 1', source)
+        self.assertIn('_legacy_runtime._force_card_action_geometry = lambda _card: None', source)
 
     def test_patch_runs_before_thread_affinity_finalizer(self) -> None:
         source = (Path(__file__).parents[1] / "app.py").read_text(encoding="utf-8")
