@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from PySide6.QtWidgets import QPushButton
@@ -11,6 +12,7 @@ from .models import LiveryRecord
 
 FILTER_DEFAULT = "DEFAULT"
 LEGACY_AUCTION_STATE_MODES = (12, 13)
+_NORMALIZED_LIVERY_NAME_RE = re.compile(r"^Livery_\d+_\d{14}$")
 
 
 def _classify_soulbound_from_memory(
@@ -35,7 +37,7 @@ def _classify_soulbound_from_memory(
 
     for record in records:
         name = normalized_livery_name(record.container_name)
-        if not name:
+        if not name or _NORMALIZED_LIVERY_NAME_RE.fullmatch(name) is None:
             review.add(str(record.container_name or "<unknown>"))
             continue
         if name in result.active_livery_names:
