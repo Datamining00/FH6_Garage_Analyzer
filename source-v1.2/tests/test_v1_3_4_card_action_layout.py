@@ -5,6 +5,7 @@ from pathlib import Path
 
 from fh6garage.v1_3_4_card_action_layout_patch import (
     BUTTON_GAP,
+    CARD_METADATA_HEIGHT,
     CARD_MIN_HEIGHT,
     EDGE_MARGIN,
     ICON_SIZE,
@@ -19,6 +20,7 @@ class V134CardActionLayoutTests(unittest.TestCase):
         self.assertEqual(EDGE_MARGIN, 5)
         self.assertGreaterEqual(THUMBNAIL_MIN_HEIGHT, 263)
         self.assertGreaterEqual(CARD_MIN_HEIGHT, 370)
+        self.assertGreaterEqual(CARD_METADATA_HEIGHT, 100)
 
     def test_layout_contains_requested_six_rows(self) -> None:
         source = (Path(__file__).parents[1] / "fh6garage" / "v1_3_4_card_action_layout_patch.py").read_text(encoding="utf-8")
@@ -26,6 +28,8 @@ class V134CardActionLayoutTests(unittest.TestCase):
         self.assertIn('(\"hide\", \"check\", \"triangle\", \"excluded\")', source)
         self.assertIn('lock.setCheckable(True)', source)
         self.assertIn('export.setEnabled(False)', source)
+        self.assertIn('aligner.reposition = lambda: None', source)
+        self.assertIn('host_height + CARD_METADATA_HEIGHT', source)
 
     def test_patch_runs_before_thread_affinity_finalizer(self) -> None:
         source = (Path(__file__).parents[1] / "app.py").read_text(encoding="utf-8")

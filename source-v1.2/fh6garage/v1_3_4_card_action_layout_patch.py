@@ -13,6 +13,7 @@ BUTTON_GAP = 5
 ROW_HEIGHT = 38
 THUMBNAIL_MIN_HEIGHT = 270
 CARD_MIN_HEIGHT = 380
+CARD_METADATA_HEIGHT = 110
 
 
 def _line_icon(kind: str, *, active: bool = False) -> QIcon:
@@ -112,6 +113,17 @@ def _disable_old_aligners(card: Any, overlay: QWidget) -> None:
         aligner = getattr(card, name, None)
         if isinstance(aligner, QObject):
             overlay.removeEventFilter(aligner)
+            # Older patches also queued direct QTimer callbacks. Removing the
+            # event filter does not cancel those already queued calls, so make
+            # their eventual reposition harmless as well.
+            if hasattr(aligner, "overlay"):
+                aligner.overlay = None
+            if hasattr(aligner, "card"):
+                aligner.card = None
+            try:
+                aligner.reposition = lambda: None
+            except (AttributeError, RuntimeError, TypeError):
+                pass
 
 
 def _placeholder_button(overlay: QWidget, name: str, icon: QIcon, tooltip: str) -> QToolButton:
@@ -187,11 +199,23 @@ def _arrange_card(card: Any) -> None:
             target(width),
         )
         aspect._fh6_v134_minimum_installed = True
+        original_apply = aspect.apply
+
+        def apply_with_card_height() -> None:
+            original_apply()
+            host = getattr(aspect, "host", None)
+            host_height = host.height() if host is not None else THUMBNAIL_MIN_HEIGHT
+            card.setMinimumHeight(max(CARD_MIN_HEIGHT, host_height + CARD_METADATA_HEIGHT))
+
+        aspect.apply = apply_with_card_height
         aspect.schedule()
+        QTimer.singleShot(0, apply_with_card_height)
+        QTimer.singleShot(50, apply_with_card_height)
     aligner = _SixRowActionAligner(overlay, left, right)
     card._fh6_v134_action_aligner = aligner
     QTimer.singleShot(0, aligner.reposition)
     QTimer.singleShot(50, aligner.reposition)
+    QTimer.singleShot(150, aligner.reposition)
 
 
 def apply_v1_3_4_card_action_layout_patch(MainWindow: Any) -> None:
