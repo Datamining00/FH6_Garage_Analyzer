@@ -1,0 +1,214 @@
+from __future__ import annotations
+
+from typing import Any
+
+from PySide6.QtCore import QEvent, QObject, QPoint, QRect, QSize, Qt, QTimer
+from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap, QPolygon
+from PySide6.QtWidgets import QLayout, QToolButton, QWidget
+
+
+ICON_SIZE = 20
+EDGE_MARGIN = 5
+BUTTON_GAP = 5
+ROW_HEIGHT = 38
+THUMBNAIL_MIN_HEIGHT = 270
+CARD_MIN_HEIGHT = 380
+
+
+def _line_icon(kind: str, *, active: bool = False) -> QIcon:
+    pixmap = QPixmap(ICON_SIZE, ICON_SIZE)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    color = QColor("#6e4bf2" if active else "#555a68")
+    painter.setPen(QPen(color, 1.8, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
+    painter.setBrush(Qt.BrushStyle.NoBrush)
+
+    if kind == "memo":
+        painter.drawRoundedRect(QRect(3, 2, 12, 15), 2, 2)
+        painter.drawLine(6, 6, 12, 6)
+        painter.drawLine(6, 9, 11, 9)
+        painter.drawLine(11, 15, 17, 9)
+        painter.drawLine(13, 17, 17, 13)
+    elif kind == "info":
+        painter.drawEllipse(QRect(2, 2, 16, 16))
+        painter.drawPoint(10, 6)
+        painter.drawLine(10, 9, 10, 14)
+    elif kind == "folder":
+        path = QPolygon([QPoint(2, 6), QPoint(7, 6), QPoint(9, 8), QPoint(18, 8), QPoint(17, 17), QPoint(2, 17)])
+        painter.drawPolyline(path)
+        painter.drawLine(2, 6, 2, 17)
+    elif kind == "export":
+        painter.drawRoundedRect(QRect(2, 3, 11, 14), 1.5, 1.5)
+        painter.drawLine(8, 10, 18, 10)
+        painter.drawLine(14, 6, 18, 10)
+        painter.drawLine(14, 14, 18, 10)
+    elif kind == "lock":
+        painter.drawRoundedRect(QRect(3, 8, 14, 10), 2, 2)
+        if active:
+            painter.drawArc(QRect(6, 2, 8, 11), 0, 180 * 16)
+        else:
+            painter.drawArc(QRect(8, 2, 8, 11), 20 * 16, 150 * 16)
+    painter.end()
+    return QIcon(pixmap)
+
+
+def _remove_from_layout(layout: QLayout | None, widget: QWidget) -> None:
+    if layout is None:
+        return
+    layout.removeWidget(widget)
+    for index in range(layout.count()):
+        child = layout.itemAt(index).layout()
+        if child is not None:
+            _remove_from_layout(child, widget)
+
+
+def _card_overlay(card: Any) -> QWidget | None:
+    image = getattr(card, "_fh6_image_label", None)
+    host = image.parentWidget() if image is not None else None
+    stack = host.layout() if host is not None else None
+    overlay = stack.currentWidget() if stack is not None and hasattr(stack, "currentWidget") else None
+    return overlay if isinstance(overlay, QWidget) else None
+
+
+class _SixRowActionAligner(QObject):
+    _EVENTS = {
+        QEvent.Type.Show,
+        QEvent.Type.Resize,
+        QEvent.Type.LayoutRequest,
+        QEvent.Type.PolishRequest,
+    }
+
+    def __init__(self, overlay: QWidget, left: list[QToolButton], right: list[QToolButton]) -> None:
+        super().__init__(overlay)
+        self.overlay = overlay
+        self.left = left
+        self.right = right
+        overlay.installEventFilter(self)
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        if event.type() in self._EVENTS:
+            QTimer.singleShot(0, self.reposition)
+        return False
+
+    def reposition(self) -> None:
+        if self.overlay.width() <= 0:
+            return
+        for column, buttons in (("left", self.left), ("right", self.right)):
+            for row, button in enumerate(buttons):
+                x = EDGE_MARGIN if column == "left" else self.overlay.width() - EDGE_MARGIN - button.width()
+                y = EDGE_MARGIN + row * (ROW_HEIGHT + BUTTON_GAP) + (ROW_HEIGHT - button.height()) // 2
+                button.move(max(0, x), max(0, y))
+                button.raise_()
+
+
+def _disable_old_aligners(card: Any, overlay: QWidget) -> None:
+    for name in (
+        "_fh6_card_action_aligner",
+        "_fh6_four_left_action_aligner",
+        "_fh6_applied_state_aligner",
+        "_fh6_hide_aligner",
+    ):
+        aligner = getattr(card, name, None)
+        if isinstance(aligner, QObject):
+            overlay.removeEventFilter(aligner)
+
+
+def _placeholder_button(overlay: QWidget, name: str, icon: QIcon, tooltip: str) -> QToolButton:
+    button = QToolButton(overlay)
+    button.setObjectName(name)
+    button.setFixedSize(34, 34)
+    button.setIconSize(QSize(ICON_SIZE, ICON_SIZE))
+    button.setIcon(icon)
+    button.setToolTip(tooltip)
+    button.setStyleSheet(
+        "QToolButton { background:rgba(255,255,255,238); border:1px solid #dfe1e8; "
+        "border-radius:8px; padding:0; }"
+        "QToolButton:hover { border-color:#8c74ee; background:#f2edff; }"
+        "QToolButton:checked { border-color:#8c74ee; background:#eee9ff; }"
+    )
+    return button
+
+
+def _arrange_card(card: Any) -> None:
+    if bool(card.property("fh6ArchiveCard")):
+        return
+    overlay = _card_overlay(card)
+    image = getattr(card, "_fh6_image_label", None)
+    if overlay is None or image is None:
+        return
+
+    required = {
+        "move": getattr(card, "_fh6_game_move_button", None),
+        "zoom": getattr(card, "_fh6_zoom_button", None),
+        "memo": getattr(card, "_fh6_memo_button", None),
+        "info": getattr(card, "_fh6_info_button", None),
+        "folder": getattr(card, "_fh6_folder_button", None),
+        "paint": getattr(card, "_fh6_applied_state_button", None),
+        "hide": getattr(card, "_fh6_hide_button", None),
+        "check": getattr(card, "_fh6_check_box", None),
+        "triangle": getattr(card, "_fh6_triangle_box", None),
+        "excluded": getattr(card, "_fh6_excluded_box", None),
+    }
+    if not all(isinstance(button, QToolButton) for button in required.values()):
+        return
+
+    _disable_old_aligners(card, overlay)
+    for button in required.values():
+        _remove_from_layout(overlay.layout(), button)
+        button.setParent(overlay)
+        button.setIconSize(QSize(ICON_SIZE, ICON_SIZE))
+        button.show()
+
+    required["info"].setIcon(_line_icon("info"))
+    required["folder"].setIcon(_line_icon("folder"))
+
+    lock = _placeholder_button(overlay, "fh6LockPlaceholderButton", _line_icon("lock"), "잠금 기능 준비 중")
+    lock.setCheckable(True)
+    lock.toggled.connect(lambda active, target=lock: target.setIcon(_line_icon("lock", active=active)))
+    export = _placeholder_button(overlay, "fh6ExportPlaceholderButton", _line_icon("export"), "내보내기 기능 준비 중")
+    export.setEnabled(False)
+    card._fh6_lock_placeholder_button = lock
+    card._fh6_export_placeholder_button = export
+
+    left = [required[name] for name in ("move", "zoom", "memo", "info", "folder")]
+    left.append(export)
+    right = [required[name] for name in ("paint",)]
+    right.append(lock)
+    right.extend(required[name] for name in ("hide", "check", "triangle", "excluded"))
+
+    image.setMinimumHeight(THUMBNAIL_MIN_HEIGHT)
+    card.setMinimumHeight(CARD_MIN_HEIGHT)
+    aspect = getattr(card, "_fh6_aspect_thumbnail_controller", None)
+    original_target_height = getattr(aspect, "target_height", None)
+    if callable(original_target_height) and not bool(getattr(aspect, "_fh6_v134_minimum_installed", False)):
+        aspect.target_height = lambda width=None, target=original_target_height: max(
+            THUMBNAIL_MIN_HEIGHT,
+            target(width),
+        )
+        aspect._fh6_v134_minimum_installed = True
+        aspect.schedule()
+    aligner = _SixRowActionAligner(overlay, left, right)
+    card._fh6_v134_action_aligner = aligner
+    QTimer.singleShot(0, aligner.reposition)
+    QTimer.singleShot(50, aligner.reposition)
+
+
+def apply_v1_3_4_card_action_layout_patch(MainWindow: Any) -> None:
+    if getattr(MainWindow, "_fh6_v134_card_action_layout_patched", False):
+        return
+    original_make_card = MainWindow._make_saved_content_card
+
+    def make_card(self: Any, content_type: str, record: Any, key: str):
+        card = original_make_card(self, content_type, record, key)
+        if content_type == "livery":
+            _arrange_card(card)
+        return card
+
+    @staticmethod
+    def memo_icon(has_note: bool) -> QIcon:
+        return _line_icon("memo", active=has_note)
+
+    MainWindow._make_saved_content_card = make_card
+    MainWindow._detail_memo_icon = memo_icon
+    MainWindow._fh6_v134_card_action_layout_patched = True

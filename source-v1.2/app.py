@@ -57,6 +57,7 @@ from fh6garage.v1_3_2_memory_thread_safety_patch import apply_v1_3_2_memory_thre
 from fh6garage.v1_3_2_filter_alias_quality_patch import apply_v1_3_2_filter_alias_quality_patch
 from fh6garage.v1_3_2_dashboard_change_group_patch import apply_v1_3_2_dashboard_change_group_patch
 from fh6garage.v1_3_3_beta_identity_patch import apply_v1_3_3_beta_identity_patch
+from fh6garage.v1_3_4_card_action_layout_patch import apply_v1_3_4_card_action_layout_patch
 from fh6garage.v1_3_2_thread_affinity_patch import apply_v1_3_2_thread_affinity_fix
 
 
@@ -182,6 +183,10 @@ def main() -> int:
 
     # Apply the public v1.3.3 Beta identity without disturbing the verified v1.3.2 feature stack.
     apply_v1_3_3_beta_identity_patch(MainWindow)
+
+    # Finalize the v1.3.4 six-row livery action layout after every feature has
+    # installed its card buttons. New lock/export controls are placeholders.
+    apply_v1_3_4_card_action_layout_patch(MainWindow)
 
     # This must be the final MainWindow patch. It restores the original
     # class-defined @Slot(object) scan callback so all UI rebuilding runs on the
