@@ -3,14 +3,21 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
+from PySide6.QtWidgets import QApplication, QToolButton, QWidget
+
 from fh6garage.v1_3_4_card_action_layout_patch import (
     BUTTON_GAP,
     CARD_METADATA_HEIGHT,
     CARD_MIN_HEIGHT,
     EDGE_MARGIN,
     ICON_SIZE,
+    ROW_HEIGHT,
     THUMBNAIL_MIN_HEIGHT,
+    _SixRowActionAligner,
 )
+
+
+_APP = QApplication.instance() or QApplication([])
 
 
 class V134CardActionLayoutTests(unittest.TestCase):
@@ -36,6 +43,28 @@ class V134CardActionLayoutTests(unittest.TestCase):
         layout = source.index("apply_v1_3_4_card_action_layout_patch(MainWindow)")
         finalizer = source.index("apply_v1_3_2_thread_affinity_fix(MainWindow)")
         self.assertLess(layout, finalizer)
+
+    def test_both_columns_use_the_same_six_row_centers(self) -> None:
+        overlay = QWidget()
+        overlay.resize(560, THUMBNAIL_MIN_HEIGHT)
+        left_sizes = (38, 34, 34, 38, 30, 34)
+        right_sizes = (30, 34, 38, 34, 34, 34)
+        left = [QToolButton(overlay) for _ in left_sizes]
+        right = [QToolButton(overlay) for _ in right_sizes]
+        for button, size in zip(left, left_sizes):
+            button.setFixedSize(size, size)
+        for button, size in zip(right, right_sizes):
+            button.setFixedSize(size, size)
+
+        aligner = _SixRowActionAligner(overlay, left, right)
+        aligner.reposition()
+
+        for row, (left_button, right_button) in enumerate(zip(left, right)):
+            expected_center = EDGE_MARGIN + row * (ROW_HEIGHT + BUTTON_GAP) + ROW_HEIGHT / 2
+            self.assertEqual(left_button.x(), EDGE_MARGIN)
+            self.assertEqual(right_button.x(), overlay.width() - EDGE_MARGIN - right_button.width())
+            self.assertEqual(left_button.y() + left_button.height() / 2, expected_center)
+            self.assertEqual(right_button.y() + right_button.height() / 2, expected_center)
 
 
 if __name__ == "__main__":
