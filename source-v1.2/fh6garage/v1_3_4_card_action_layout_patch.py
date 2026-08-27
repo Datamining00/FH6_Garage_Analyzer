@@ -13,10 +13,10 @@ from .ui import CopyValueLabel
 
 ICON_SIZE = 20
 EDGE_MARGIN = 5
-BUTTON_GAP = 5
-ROW_HEIGHT = 38
-THUMBNAIL_MIN_HEIGHT = 270
-CARD_MIN_HEIGHT = 350
+BUTTON_GAP = 3
+ROW_HEIGHT = 34
+THUMBNAIL_MIN_HEIGHT = 240
+CARD_MIN_HEIGHT = 325
 CARD_METADATA_HEIGHT = 80
 
 
@@ -179,8 +179,9 @@ def _arrange_card(card: Any) -> None:
             button.setIconSize(QSize(ICON_SIZE, ICON_SIZE))
             button.show()
         grid.setRowMinimumHeight(row, ROW_HEIGHT)
-        grid.addWidget(left_button, row, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        grid.addWidget(right_button, row, 1, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        vertical = Qt.AlignmentFlag.AlignTop if row == 0 else Qt.AlignmentFlag.AlignBottom if row == 5 else Qt.AlignmentFlag.AlignVCenter
+        grid.addWidget(left_button, row, 0, Qt.AlignmentFlag.AlignLeft | vertical)
+        grid.addWidget(right_button, row, 1, Qt.AlignmentFlag.AlignRight | vertical)
 
     def enforce_grid() -> None:
         grid.invalidate()
@@ -218,22 +219,10 @@ def _arrange_card(card: Any) -> None:
     if isinstance(outer, QVBoxLayout):
         outer.setSpacing(3)
     for label in card.findChildren(CopyValueLabel):
-        if label.prefix == tr("card.vehicle_label"):
+        if label.prefix in (tr("card.vehicle_label"), tr("card.title_label"), tr("card.creator_label")):
             label.setStyleSheet(
                 "QLabel { background:transparent; color:#171924; border:0; "
-                "padding:1px 2px 0 2px; font-size:11.5pt; font-weight:700; }"
-            )
-            label.setFixedHeight(26)
-        elif label.prefix == tr("card.title_label"):
-            label.setStyleSheet(
-                "QLabel { background:transparent; color:#343744; border:0; "
-                "padding:0 2px; font-size:10pt; font-weight:600; }"
-            )
-            label.setFixedHeight(24)
-        elif label.prefix == tr("card.creator_label"):
-            label.setStyleSheet(
-                "QLabel { background:transparent; color:#6d7282; border:0; "
-                "padding:0 2px; font-size:9.5pt; font-weight:500; }"
+                "padding:0 2px; font-size:10.5pt; font-weight:600; }"
             )
             label.setFixedHeight(24)
 

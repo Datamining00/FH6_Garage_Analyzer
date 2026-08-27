@@ -49,10 +49,10 @@ class V134CardActionLayoutTests(unittest.TestCase):
 
     def test_requested_geometry_constants(self) -> None:
         self.assertEqual(ICON_SIZE, 20)
-        self.assertEqual(BUTTON_GAP, 5)
+        self.assertEqual(BUTTON_GAP, 3)
         self.assertEqual(EDGE_MARGIN, 5)
-        self.assertGreaterEqual(THUMBNAIL_MIN_HEIGHT, 263)
-        self.assertGreaterEqual(CARD_MIN_HEIGHT, 340)
+        self.assertGreaterEqual(THUMBNAIL_MIN_HEIGHT, 230)
+        self.assertGreaterEqual(CARD_MIN_HEIGHT, 320)
         self.assertGreaterEqual(CARD_METADATA_HEIGHT, 75)
 
     def test_layout_contains_requested_six_rows(self) -> None:
@@ -102,6 +102,16 @@ class V134CardActionLayoutTests(unittest.TestCase):
         self.assertIn('card._fh6_action_grid = card_action_grid', source)
         self.assertIn('card_action_grid.addWidget(game_move_button, 0, 0', source)
         self.assertIn('card_action_grid.addWidget(excluded_box, 5, 1', source)
+
+    def test_metadata_uses_equal_two_by_two_cells_and_one_text_style(self) -> None:
+        source = (Path(__file__).parents[1] / "fh6garage" / "ui.py").read_text(encoding="utf-8")
+        self.assertIn('metadata_grid.addWidget(vehicle, 0, 0)', source)
+        self.assertIn('metadata_grid.addWidget(acquisition_box, 0, 1)', source)
+        self.assertIn('metadata_grid.addWidget(creator_box, 1, 0)', source)
+        self.assertIn('metadata_grid.addWidget(title_box, 1, 1)', source)
+        self.assertIn('acquisition_box.setObjectName("fh6AcquisitionPlaceholder")', source)
+        self.assertGreaterEqual(source.count('color:#171924; border:0; padding:0 2px;'), 4)
+        self.assertGreaterEqual(source.count('font-size:10.5pt; font-weight:600;'), 4)
 
 
 if __name__ == "__main__":
