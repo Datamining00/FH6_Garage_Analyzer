@@ -148,7 +148,9 @@ class AdaptiveScannerTests(unittest.TestCase):
         counters = warm.diagnostics["scan"]["counters"]
         self.assertEqual(counters["header_cache_hits"], 8)
         self.assertEqual(counters["header_cache_misses"], 0)
-        self.assertEqual(counters["hash_cache_hits"], 7)
+        # SoulBound payloads are not used for duplicate grouping and are no
+        # longer hashed during startup.
+        self.assertEqual(counters["hash_cache_hits"], 6)
         self.assertEqual(counters["hash_cache_misses"], 0)
 
     def test_only_changed_files_miss_the_warm_cache(self) -> None:
@@ -174,7 +176,7 @@ class AdaptiveScannerTests(unittest.TestCase):
         counters = result.diagnostics["scan"]["counters"]
         self.assertEqual(counters["header_cache_hits"], 7)
         self.assertEqual(counters["header_cache_misses"], 1)
-        self.assertEqual(counters["hash_cache_hits"], 6)
+        self.assertEqual(counters["hash_cache_hits"], 5)
         self.assertEqual(counters["hash_cache_misses"], 1)
 
     def test_executor_failure_uses_legacy_sequential_fallback(self) -> None:
@@ -218,7 +220,7 @@ class AdaptiveScannerTests(unittest.TestCase):
 
         counters = result.diagnostics["scan"]["counters"]
         self.assertEqual(counters["header_cache_misses"], 8)
-        self.assertEqual(counters["hash_cache_misses"], 7)
+        self.assertEqual(counters["hash_cache_misses"], 6)
         self.assertEqual(len(result.liveries), 7)
 
     def test_unwritable_cache_location_does_not_block_scan(self) -> None:

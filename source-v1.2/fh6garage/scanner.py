@@ -215,7 +215,11 @@ def _analyze_container(
         content_path = None
 
     digest = ""
-    if not tuning and content_path is not None:
+    # Only ordinary My Designs liveries participate in duplicate-content
+    # grouping. BaseLivery and SoulBoundLivery payload hashes were calculated
+    # during every initial scan but never consumed, causing avoidable reads of
+    # every C_livery file.
+    if job.kind == "Livery" and content_path is not None:
         digest = cache.get_sha256(content_path) or ""
         if not digest:
             digest = _file_sha256(content_path)
@@ -270,7 +274,7 @@ def _analyze_container_legacy(job: ScanJob) -> _ContainerAnalysis:
         ),
         content_sha256=(
             _file_sha256(content_path)
-            if not tuning and content_path is not None
+            if job.kind == "Livery" and content_path is not None
             else ""
         ),
     )

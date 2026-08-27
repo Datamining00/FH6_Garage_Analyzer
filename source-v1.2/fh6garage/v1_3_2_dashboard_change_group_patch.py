@@ -50,19 +50,22 @@ def _txt(ko: str, en: str) -> str:
 
 
 def _normalize_page_titles(window: Any) -> None:
-    """Remove the legacy 'Saved' prefix from livery/tuning page headings."""
-    replacements = {
-        "저장 리버리": "리버리",
-        "Saved liveries": "Liveries",
-        "저장 튜닝": "튜닝",
-        "Saved tunings": "Tuning",
+    """Remove the redundant large livery/tuning headings above search."""
+    saved_page_titles = {
+        "저장 리버리",
+        "리버리",
+        "Saved liveries",
+        "Liveries",
+        "저장 튜닝",
+        "튜닝",
+        "Saved tunings",
+        "Tuning",
     }
     for label in window.findChildren(QLabel):
         if label.objectName() != "pageTitle":
             continue
-        replacement = replacements.get(label.text().strip())
-        if replacement:
-            label.setText(replacement)
+        if label.text().strip() in saved_page_titles:
+            label.hide()
 
 
 def _state_usable(window: Any) -> bool:

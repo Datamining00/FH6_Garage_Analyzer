@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from pathlib import Path
+import sys
 from typing import Any
 
 from PySide6.QtCore import QEvent, QObject, QPoint, QRectF, QSize, Qt, QThread, Signal, Slot
-from PySide6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPen, QPixmap
+from PySide6.QtGui import QColor, QIcon, QImage, QPainter, QPainterPath, QPen, QPixmap
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -49,55 +50,50 @@ def _txt(ko: str, en: str) -> str:
     return ko if (get_language() or "ko").lower().startswith("ko") else en
 
 
+_PAINT_ICON_COLORS = {
+    "applied": QColor("#39ff88"),
+    "same_car_applied": QColor("#ffe84a"),
+    "unapplied": QColor("#9ba5b3"),
+    "unknown": QColor("#b9bec8"),
+}
+_PAINT_ICON_CACHE: dict[tuple[str, int], QPixmap] = {}
+
+
+def _paint_icon_path() -> Path:
+    root = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
+    return root / "icons" / "paint_bucket.png"
+
+
 def _paint_bucket_pixmap(state: str, size: int = CARD_ACTION_ICON_SIZE) -> QPixmap:
-    """Draw a small tilted paint bucket pouring one drop."""
-    pixmap = QPixmap(size, size)
-    pixmap.fill(Qt.GlobalColor.transparent)
-    painter = QPainter(pixmap)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    """Tint the user-provided paint-bucket artwork for the current state."""
+    key = (state, int(size))
+    cached = _PAINT_ICON_CACHE.get(key)
+    if cached is not None:
+        return QPixmap(cached)
 
-    if state == "applied":
-        color = QColor("#6e4bf2")
-    elif state == "unapplied":
-        color = QColor("#8d93a2")
-    else:
-        color = QColor("#b9bec8")
-
-    pen = QPen(color, 1.8)
-    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-    pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
-    painter.setPen(pen)
-    painter.setBrush(Qt.BrushStyle.NoBrush)
-
-    body = QPainterPath()
-    body.moveTo(size * 0.25, size * 0.30)
-    body.lineTo(size * 0.68, size * 0.22)
-    body.lineTo(size * 0.80, size * 0.58)
-    body.lineTo(size * 0.40, size * 0.70)
-    body.closeSubpath()
-    painter.drawPath(body)
-
-    painter.drawArc(
-        QRectF(size * 0.31, size * 0.08, size * 0.40, size * 0.38),
-        15 * 16,
-        150 * 16,
-    )
-    painter.drawLine(
-        QPoint(round(size * 0.36), round(size * 0.44)),
-        QPoint(round(size * 0.73), round(size * 0.34)),
-    )
-    painter.drawLine(
-        QPoint(round(size * 0.78), round(size * 0.55)),
-        QPoint(round(size * 0.90), round(size * 0.70)),
-    )
-    if state in {"applied", "unapplied"}:
-        painter.setBrush(color)
-    drop = QPainterPath()
-    drop.moveTo(size * 0.88, size * 0.72)
-    drop.cubicTo(size * 0.80, size * 0.82, size * 0.82, size * 0.94, size * 0.90, size * 0.94)
-    drop.cubicTo(size * 0.98, size * 0.94, size * 0.99, size * 0.82, size * 0.88, size * 0.72)
-    painter.drawPath(drop)
-    painter.end()
+    source = QImage(str(_paint_icon_path()))
+    if source.isNull():
+        return QPixmap()
+    source = source.scaled(
+        size,
+        size,
+        Qt.AspectRatioMode.KeepAspectRatio,
+        Qt.TransformationMode.SmoothTransformation,
+    ).convertToFormat(QImage.Format.Format_ARGB32)
+    color = _PAINT_ICON_COLORS.get(state, _PAINT_ICON_COLORS["unknown"])
+    red, green, blue, _ = color.getRgb()
+    # The supplied PNG has a white background and black artwork. Convert its
+    # luminance into alpha so only the original bucket silhouette is tinted.
+    for y in range(source.height()):
+        for x in range(source.width()):
+            pixel = source.pixelColor(x, y)
+            luminance = round(
+                0.2126 * pixel.red() + 0.7152 * pixel.green() + 0.0722 * pixel.blue()
+            )
+            alpha = round(pixel.alpha() * (255 - luminance) / 255)
+            source.setPixelColor(x, y, QColor(red, green, blue, alpha))
+    pixmap = QPixmap.fromImage(source)
+    _PAINT_ICON_CACHE[key] = QPixmap(pixmap)
     return pixmap
 
 
@@ -199,17 +195,49 @@ def _livery_state_for_record(window: Any, record: Any) -> str:
     return "unknown"
 
 
+def _paint_state_for_record(window: Any, record: Any) -> str:
+    """Return the three-color display state without changing filter semantics."""
+    state = _livery_state_for_record(window, record)
+    if state != "unapplied" or not isinstance(record, LiveryRecord):
+        return state
+
+    target_car_id = record.car_id
+    if target_car_id is None:
+        return "unapplied"
+    for candidate in getattr(getattr(window, "result", None), "liveries", []):
+        if not isinstance(candidate, LiveryRecord) or candidate.car_id != target_car_id:
+            continue
+        if _livery_state_for_record(window, candidate) == "applied":
+            return "same_car_applied"
+    return "unapplied"
+
+
 def _set_card_state_icon(window: Any, card: Any, record: Any) -> None:
     button = getattr(card, "_fh6_applied_state_button", None)
     if not isinstance(button, QToolButton):
         return
-    state = _livery_state_for_record(window, record)
+    state = _paint_state_for_record(window, record)
     button.setIcon(QIcon(_paint_bucket_pixmap(state)))
     if state == "applied":
         button.setToolTip(_txt("현재 적용 중", "Currently applied"))
         button.setAccessibleName(_txt("현재 적용 중", "Currently applied"))
+    elif state == "same_car_applied":
+        button.setToolTip(
+            _txt(
+                "현재 미적용 · 동일 차량의 다른 리버리가 적용 중",
+                "Currently unapplied · another livery for the same car is applied",
+            )
+        )
+        button.setAccessibleName(
+            _txt("동일 차량의 다른 리버리 적용 중", "Another same-car livery is applied")
+        )
     elif state == "unapplied":
-        button.setToolTip(_txt("현재 미적용", "Currently unapplied"))
+        button.setToolTip(
+            _txt(
+                "현재 미적용 · 해당 차량에 적용된 리버리 없음",
+                "Currently unapplied · no applied livery for this car",
+            )
+        )
         button.setAccessibleName(_txt("현재 미적용", "Currently unapplied"))
     else:
         button.setToolTip(
@@ -633,6 +661,32 @@ def _on_memory_finished(window: Any, result: object) -> None:
         soulbound_unapplied_names=unapplied,
         soulbound_review_names=review,
     )
+    summary = _txt(
+        f"현재 적용 {len(state.active_livery_names)} · 경매장 적용 {len(applied)} · "
+        f"미적용 {len(unapplied)}"
+        + (f" · 재검토 {len(review)}" if review else "")
+        + "\n\n이 결과를 목록에 적용하시겠습니까?",
+        f"Applied {len(state.active_livery_names)} · auction applied {len(applied)} · "
+        f"unapplied {len(unapplied)}"
+        + (f" · review {len(review)}" if review else "")
+        + "\n\nApply this result to the list?",
+    )
+    answer = QMessageBox.question(
+        window,
+        _txt("메모리 스캔 결과", "Memory scan result"),
+        summary,
+        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        QMessageBox.StandardButton.No,
+    )
+    if answer != QMessageBox.StandardButton.Yes:
+        window.memory_scan_detail.setText(
+            _txt(
+                "스캔 결과를 적용하지 않았습니다. 마지막 정상 적용 결과를 유지합니다.",
+                "The scan result was not applied. The last applied valid result is retained.",
+            )
+        )
+        return
+
     window._fh6_memory_state = state
     save_applied_state(state)
     _refresh_memory_page(window)

@@ -102,6 +102,27 @@ class V132ExistingCandidateThumbnailTests(unittest.TestCase):
             self.assertEqual(stats.ambiguous, 0)
             self.assertEqual(stats.unmatched, 1)
 
+    def test_same_design_token_can_share_one_existing_thumbnail_across_cars(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cache = root / "cache"
+            cache.mkdir()
+            token = "j8m2aky97h54da0e8ebajx9ce8"
+            guid = "5f3942b1-bacd-4bea-ba8c-cc289aca120f"
+            _write_manifest(
+                cache,
+                [(f"0999_3005d1dd64f004a3u{token}_bigThumb.webp", guid)],
+            )
+            (cache / f"{guid}.webp").write_bytes(b"RIFF-shared")
+
+            record = _record(root)
+            stats = assign_auction_thumbnails([record], cache)
+
+            self.assertEqual(record.thumbnail_path, cache / f"{guid}.webp")
+            self.assertEqual(stats.matched_by_header_id, 0)
+            self.assertEqual(stats.matched_by_shared_design, 1)
+            self.assertEqual(stats.unmatched, 0)
+
 
 if __name__ == "__main__":
     unittest.main()

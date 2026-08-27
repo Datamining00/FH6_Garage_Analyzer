@@ -41,6 +41,8 @@ def assign_auction_thumbnails(
       1. exact CarOrdinal + header-derived livery token,
       2. keep only manifest rows whose GUID.webp currently exists,
       3. use the result only when exactly one existing file remains.
+      4. if the direct mapping is missing, try one unique existing WebP carrying
+         the same header-derived design token for another SoulBound vehicle.
 
     If two or more matching WebPs still exist, no arbitrary instance is chosen.
     """
@@ -72,6 +74,7 @@ def assign_auction_thumbnails(
         )
 
     by_identity: dict[tuple[int, str], list[ManifestThumbnailEntry]] = {}
+    by_design_token: dict[str, list[ManifestThumbnailEntry]] = {}
     for entry in entries:
         if not entry.livery_token:
             continue
@@ -79,8 +82,10 @@ def assign_auction_thumbnails(
             (entry.car_id, entry.livery_token),
             [],
         ).append(entry)
+        by_design_token.setdefault(entry.livery_token, []).append(entry)
 
     matched = 0
+    shared_design_matched = 0
     ambiguous = 0
 
     for record in auction_records:
@@ -95,19 +100,36 @@ def assign_auction_thumbnails(
             entry for entry in candidates if entry.path.is_file()
         ]
 
-        if len(existing_candidates) != 1:
-            if len(existing_candidates) > 1:
-                ambiguous += 1
+        if len(existing_candidates) == 1:
+            record.thumbnail_path = existing_candidates[0].path
+            matched += 1
+            continue
+        if len(existing_candidates) > 1:
+            ambiguous += 1
             continue
 
-        record.thumbnail_path = existing_candidates[0].path
-        matched += 1
+        # Experimental SoulBound fallback: the same verified 26-character
+        # header token can represent a shared design rendered for several cars.
+        # Deduplicate manifest history rows by actual path and accept only one
+        # existing candidate, never an arbitrary first match.
+        shared_by_path = {
+            str(entry.path).casefold(): entry
+            for entry in by_design_token.get(token, [])
+            if entry.path.is_file()
+        }
+        shared_candidates = list(shared_by_path.values())
+        if len(shared_candidates) == 1:
+            record.thumbnail_path = shared_candidates[0].path
+            shared_design_matched += 1
+        elif len(shared_candidates) > 1:
+            ambiguous += 1
 
     return AuctionThumbnailMatchStats(
         auction_count=len(auction_records),
         matched_by_header_id=matched,
+        matched_by_shared_design=shared_design_matched,
         ambiguous=ambiguous,
-        unmatched=max(0, len(auction_records) - matched),
+        unmatched=max(0, len(auction_records) - matched - shared_design_matched),
     )
 
 
