@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6.QtCore import QEvent, QObject, QPoint, QRect, QSize, Qt, QTimer
+from PySide6.QtCore import QObject, QPoint, QRect, QSize, Qt, QTimer
 from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap, QPolygon
-from PySide6.QtWidgets import QGridLayout, QLayout, QToolButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QGridLayout, QToolButton, QVBoxLayout, QWidget
 
 from . import v1_3_2_change_dialog_runtime_fix as _legacy_runtime
 from .i18n import tr
@@ -58,83 +58,12 @@ def _line_icon(kind: str, *, active: bool = False) -> QIcon:
     return QIcon(pixmap)
 
 
-def _remove_from_layout(layout: QLayout | None, widget: QWidget) -> None:
-    if layout is None:
-        return
-    layout.removeWidget(widget)
-    for index in range(layout.count()):
-        child = layout.itemAt(index).layout()
-        if child is not None:
-            _remove_from_layout(child, widget)
-
-
-def _clear_layout(layout: QLayout) -> None:
-    while layout.count():
-        item = layout.takeAt(0)
-        child = item.layout()
-        if child is not None:
-            _clear_layout(child)
-            child.deleteLater()
-
-
 def _card_overlay(card: Any) -> QWidget | None:
     image = getattr(card, "_fh6_image_label", None)
     host = image.parentWidget() if image is not None else None
     stack = host.layout() if host is not None else None
     overlay = stack.currentWidget() if stack is not None and hasattr(stack, "currentWidget") else None
     return overlay if isinstance(overlay, QWidget) else None
-
-
-class _SixRowActionAligner(QObject):
-    _EVENTS = {
-        QEvent.Type.Show,
-        QEvent.Type.Resize,
-        QEvent.Type.LayoutRequest,
-        QEvent.Type.PolishRequest,
-    }
-
-    def __init__(self, overlay: QWidget, left: list[QToolButton], right: list[QToolButton]) -> None:
-        super().__init__(overlay)
-        self.overlay = overlay
-        self.left = left
-        self.right = right
-        overlay.installEventFilter(self)
-
-    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
-        if event.type() in self._EVENTS:
-            QTimer.singleShot(0, self.reposition)
-        return False
-
-    def reposition(self) -> None:
-        if self.overlay.width() <= 0:
-            return
-        for column, buttons in (("left", self.left), ("right", self.right)):
-            for row, button in enumerate(buttons):
-                x = EDGE_MARGIN if column == "left" else self.overlay.width() - EDGE_MARGIN - button.width()
-                y = EDGE_MARGIN + row * (ROW_HEIGHT + BUTTON_GAP) + (ROW_HEIGHT - button.height()) // 2
-                button.move(max(0, x), max(0, y))
-                button.raise_()
-
-
-class _ActionLayerResizer(QObject):
-    """Keep the dedicated action layer exactly over the thumbnail overlay."""
-
-    _EVENTS = {QEvent.Type.Show, QEvent.Type.Resize, QEvent.Type.LayoutRequest}
-
-    def __init__(self, overlay: QWidget, layer: QWidget) -> None:
-        super().__init__(overlay)
-        self.overlay = overlay
-        self.layer = layer
-        overlay.installEventFilter(self)
-
-    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
-        if event.type() in self._EVENTS:
-            self.resize_layer()
-        return False
-
-    def resize_layer(self) -> None:
-        self.layer.setGeometry(self.overlay.rect())
-        self.layer.raise_()
 
 
 def _disable_old_aligners(card: Any, overlay: QWidget) -> None:
@@ -163,7 +92,7 @@ def _disable_old_aligners(card: Any, overlay: QWidget) -> None:
 def _placeholder_button(overlay: QWidget, name: str, icon: QIcon, tooltip: str) -> QToolButton:
     button = QToolButton(overlay)
     button.setObjectName(name)
-    button.setFixedSize(34, 34)
+    button.setFixedSize(30, 30)
     button.setIconSize(QSize(ICON_SIZE, ICON_SIZE))
     button.setIcon(icon)
     button.setToolTip(tooltip)
@@ -211,9 +140,8 @@ def _arrange_card(card: Any) -> None:
     }
     if not all(isinstance(button, QToolButton) for button in required.values()):
         return
-
-    root_layout = overlay.layout()
-    if root_layout is None:
+    grid = getattr(card, "_fh6_action_grid", None)
+    if not isinstance(grid, QGridLayout):
         return
 
     _disable_old_aligners(card, overlay)
@@ -238,28 +166,16 @@ def _arrange_card(card: Any) -> None:
     right.append(lock)
     right.extend(required[name] for name in ("hide", "check", "triangle", "excluded"))
 
-    # Do not reuse the historical overlay layout. Several maintenance patches
-    # still own nested layouts there. A dedicated child layer gives this patch
-    # sole and stable ownership of all twelve action buttons.
-    old_layer = getattr(card, "_fh6_v134_action_layer", None)
-    if isinstance(old_layer, QWidget):
-        old_layer.hide()
-        old_layer.deleteLater()
-    layer = QWidget(overlay)
-    layer.setObjectName("fh6CardActionLayer")
-    layer.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-    layer.setStyleSheet("background: transparent;")
-    layer.setGeometry(overlay.rect())
-    grid = QGridLayout(layer)
-    grid.setContentsMargins(EDGE_MARGIN, EDGE_MARGIN, EDGE_MARGIN, EDGE_MARGIN)
+    # The grid is created by the original card constructor. This final feature
+    # layer only fills its reserved cells and normalizes icons; it never creates
+    # a competing overlay, event filter, or absolute-position owner.
+    grid.setContentsMargins(0, 0, 0, 0)
     grid.setHorizontalSpacing(0)
     grid.setVerticalSpacing(BUTTON_GAP)
     grid.setColumnStretch(0, 1)
     grid.setColumnStretch(1, 1)
     for row, (left_button, right_button) in enumerate(zip(left, right)):
         for button in (left_button, right_button):
-            _remove_from_layout(root_layout, button)
-            button.setParent(layer)
             button.setIconSize(QSize(ICON_SIZE, ICON_SIZE))
             button.show()
         grid.setRowMinimumHeight(row, ROW_HEIGHT)
@@ -270,12 +186,7 @@ def _arrange_card(card: Any) -> None:
         grid.invalidate()
         grid.activate()
 
-    resizer = _ActionLayerResizer(overlay, layer)
-    card._fh6_v134_action_layer = layer
-    card._fh6_v134_action_layer_resizer = resizer
     card._fh6_v134_action_grid = grid
-    layer.show()
-    resizer.resize_layer()
 
     image.setMinimumHeight(THUMBNAIL_MIN_HEIGHT)
     card.setMinimumHeight(CARD_MIN_HEIGHT)

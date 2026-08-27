@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6.QtCore import QEvent, QObject, Qt, QTimer
+from PySide6.QtCore import QEvent, QObject, QSize, Qt, QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QLabel, QPushButton, QToolButton, QWidget, QWidgetAction
 
@@ -182,6 +182,16 @@ def _install_card_hide_button(self: Any, card: Any, key: str) -> None:
     hide_button.toggled.connect(
         lambda enabled, k=key: self._fh6_v132_set_livery_hidden(k, enabled)
     )
+
+    native_grid = getattr(card, "_fh6_action_grid", None)
+    if native_grid is not None:
+        hide_button.setIconSize(QSize(20, 20))
+        native_grid.addWidget(
+            hide_button, 2, 1,
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
+        )
+        card._fh6_hide_button = hide_button
+        return
 
     aligner = _HideButtonAligner(
         overlay,

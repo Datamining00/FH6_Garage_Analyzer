@@ -76,6 +76,8 @@ def _compact_change_banner(window: Any) -> None:
 
 
 def _align_left_actions_to_right_second_third(card: Any) -> None:
+    if getattr(card, "_fh6_action_grid", None) is not None:
+        return
     aligner = getattr(card, "_fh6_card_action_aligner", None)
     triangle = getattr(card, "_fh6_triangle_box", None)
     excluded = getattr(card, "_fh6_excluded_box", None)

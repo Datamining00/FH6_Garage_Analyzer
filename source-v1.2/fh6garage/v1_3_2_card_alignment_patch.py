@@ -175,6 +175,8 @@ class _CardActionAligner(QObject):
 
 
 def _fix_card_actions(card: Any) -> None:
+    if getattr(card, "_fh6_action_grid", None) is not None:
+        return
     hide_button = getattr(card, "_fh6_hide_button", None)
     info_button = getattr(card, "_fh6_info_button", None)
     zoom_button = getattr(card, "_fh6_zoom_button", None)

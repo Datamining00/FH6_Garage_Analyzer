@@ -279,6 +279,16 @@ def _install_card_state_icon(window: Any, card: Any, record: Any) -> None:
     button.show()
     card._fh6_applied_state_button = button
 
+    native_grid = getattr(card, "_fh6_action_grid", None)
+    if native_grid is not None:
+        button.setIconSize(QSize(20, 20))
+        native_grid.addWidget(
+            button, 0, 1,
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
+        )
+        _set_card_state_icon(window, card, record)
+        return
+
     aligner = _AppliedStateAligner(card, overlay, button)
     card._fh6_applied_state_aligner = aligner
     _set_card_state_icon(window, card, record)

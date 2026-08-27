@@ -86,6 +86,8 @@ def _repair_card_actions(card: Any, record: Any) -> None:
     # four-row aligner. Repeat the idempotent installer here so cached cards and
     # cards created through alternate paths receive the same final controls.
     _feature._install_four_left_actions(card, record)
+    if getattr(card, "_fh6_action_grid", None) is not None:
+        return
     _repoint_legacy_aligners(card)
 
     _force_card_action_geometry(card)
