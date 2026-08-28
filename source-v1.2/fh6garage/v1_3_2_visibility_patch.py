@@ -332,9 +332,9 @@ def apply_v1_3_2_visibility_patches(MainWindow) -> None:
         hide_row.addStretch(1)
         hide_button = QToolButton()
         hide_button.setCheckable(True)
-        icon = QIcon()
-        icon.addPixmap(_eye_slash_pixmap(False), QIcon.Mode.Normal, QIcon.State.Off)
-        icon.addPixmap(_eye_slash_pixmap(True), QIcon.Mode.Normal, QIcon.State.On)
+        from .card_icons import toggle_icon as card_toggle_icon
+
+        icon = card_toggle_icon("visible", "hidden", size=22)
         hide_button.setIcon(icon)
         hide_button.setIconSize(QSize(22, 22))
         hide_button.setChecked(is_hidden(self, key))

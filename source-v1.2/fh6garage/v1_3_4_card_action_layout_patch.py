@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6.QtCore import QObject, QPoint, QRect, QSize, Qt, QTimer
-from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap, QPolygon
+from PySide6.QtCore import QObject, QSize, Qt, QTimer
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QGridLayout, QToolButton, QVBoxLayout, QWidget
 
 from . import v1_3_2_change_dialog_runtime_fix as _legacy_runtime
+from .card_icons import icon as card_icon, toggle_icon as card_toggle_icon
 from .i18n import tr
 from .ui import CopyValueLabel
 
@@ -21,41 +22,10 @@ CARD_METADATA_HEIGHT = 80
 
 
 def _line_icon(kind: str, *, active: bool = False) -> QIcon:
-    pixmap = QPixmap(ICON_SIZE, ICON_SIZE)
-    pixmap.fill(Qt.GlobalColor.transparent)
-    painter = QPainter(pixmap)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    color = QColor("#6e4bf2" if active else "#555a68")
-    painter.setPen(QPen(color, 1.8, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
-    painter.setBrush(Qt.BrushStyle.NoBrush)
-
-    if kind == "memo":
-        painter.drawRoundedRect(QRect(3, 2, 12, 15), 2, 2)
-        painter.drawLine(6, 6, 12, 6)
-        painter.drawLine(6, 9, 11, 9)
-        painter.drawLine(11, 15, 17, 9)
-        painter.drawLine(13, 17, 17, 13)
-    elif kind == "info":
-        painter.drawEllipse(QRect(2, 2, 16, 16))
-        painter.drawPoint(10, 6)
-        painter.drawLine(10, 9, 10, 14)
-    elif kind == "folder":
-        path = QPolygon([QPoint(2, 6), QPoint(7, 6), QPoint(9, 8), QPoint(18, 8), QPoint(17, 17), QPoint(2, 17)])
-        painter.drawPolyline(path)
-        painter.drawLine(2, 6, 2, 17)
-    elif kind == "export":
-        painter.drawRoundedRect(QRect(2, 3, 11, 14), 1.5, 1.5)
-        painter.drawLine(8, 10, 18, 10)
-        painter.drawLine(14, 6, 18, 10)
-        painter.drawLine(14, 14, 18, 10)
-    elif kind == "lock":
-        painter.drawRoundedRect(QRect(3, 8, 14, 10), 2, 2)
-        if active:
-            painter.drawArc(QRect(6, 2, 8, 11), 0, 180 * 16)
-        else:
-            painter.drawArc(QRect(8, 2, 8, 11), 20 * 16, 150 * 16)
-    painter.end()
-    return QIcon(pixmap)
+    mapped = "memo_written" if kind == "memo" and active else kind
+    if kind == "lock":
+        mapped = "lock" if active else "unlock"
+    return card_icon(mapped, "#6e4bf2" if active else "#555a68")
 
 
 def _card_overlay(card: Any) -> QWidget | None:
@@ -148,6 +118,11 @@ def _arrange_card(card: Any) -> None:
 
     required["info"].setIcon(_line_icon("info"))
     required["folder"].setIcon(_line_icon("folder"))
+    required["move"].setIcon(card_icon("move", "#6e4bf2"))
+    required["zoom"].setIcon(card_icon("zoom"))
+    required["check"].setIcon(card_toggle_icon("circle", on_color="#39e75f"))
+    required["triangle"].setIcon(card_toggle_icon("triangle", on_color="#ffe600"))
+    required["excluded"].setIcon(card_toggle_icon("excluded", on_color="#ff4d5a"))
 
     lock = _unique_placeholder(
         card, overlay, "_fh6_lock_placeholder_button", "fh6LockPlaceholderButton", "lock", "잠금 기능 준비 중"
@@ -155,6 +130,7 @@ def _arrange_card(card: Any) -> None:
     if not lock.isCheckable():
         lock.setCheckable(True)
         lock.toggled.connect(lambda active, target=lock: target.setIcon(_line_icon("lock", active=active)))
+    lock.setIcon(card_toggle_icon("unlock", "lock"))
     export = _unique_placeholder(
         card, overlay, "_fh6_export_placeholder_button", "fh6ExportPlaceholderButton", "export", "내보내기 기능 준비 중"
     )

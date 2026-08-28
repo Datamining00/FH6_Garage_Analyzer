@@ -155,17 +155,9 @@ def _install_card_hide_button(self: Any, card: Any, key: str) -> None:
 
     hide_button = QToolButton(overlay)
     hide_button.setCheckable(True)
-    icon = QIcon()
-    icon.addPixmap(
-        _eye_slash_pixmap(False),
-        QIcon.Mode.Normal,
-        QIcon.State.Off,
-    )
-    icon.addPixmap(
-        _eye_slash_pixmap(True),
-        QIcon.Mode.Normal,
-        QIcon.State.On,
-    )
+    from .card_icons import toggle_icon as card_toggle_icon
+
+    icon = card_toggle_icon("visible", "hidden")
     hide_button.setIcon(icon)
     hide_button.setIconSize(zoom_button.iconSize())
     hide_button.setChecked(self._fh6_v132_is_livery_hidden(key))

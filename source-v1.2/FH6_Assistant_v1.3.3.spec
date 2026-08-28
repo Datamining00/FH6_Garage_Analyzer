@@ -10,7 +10,7 @@ a = Analysis(
     datas=[
         (str(project_root / 'data' / 'car_names.json'), 'data'),
         (str(project_root / 'icons' / 'FH6_Assistant.ico'), 'icons'),
-        (str(project_root / 'icons' / 'paint_bucket.png'), 'icons'),
+        (str(project_root / 'icons' / 'cards'), 'icons/cards'),
     ],
     hiddenimports=[],
     hookspath=[],

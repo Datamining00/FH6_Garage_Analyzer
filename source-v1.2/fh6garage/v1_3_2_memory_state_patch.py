@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-import sys
 from typing import Any
 
 from PySide6.QtCore import QEvent, QObject, QPoint, QRectF, QSize, Qt, QThread, Signal, Slot
-from PySide6.QtGui import QColor, QIcon, QImage, QPainter, QPainterPath, QPen, QPixmap
+from PySide6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPen, QPixmap
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -60,11 +59,6 @@ _PAINT_ICON_COLORS = {
 _PAINT_ICON_CACHE: dict[tuple[str, int], QPixmap] = {}
 
 
-def _paint_icon_path() -> Path:
-    root = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
-    return root / "icons" / "paint_bucket.png"
-
-
 def _paint_bucket_pixmap(state: str, size: int = CARD_ACTION_ICON_SIZE) -> QPixmap:
     """Tint the user-provided paint-bucket artwork for the current state."""
     key = (state, int(size))
@@ -72,28 +66,10 @@ def _paint_bucket_pixmap(state: str, size: int = CARD_ACTION_ICON_SIZE) -> QPixm
     if cached is not None:
         return QPixmap(cached)
 
-    source = QImage(str(_paint_icon_path()))
-    if source.isNull():
-        return QPixmap()
-    source = source.scaled(
-        size,
-        size,
-        Qt.AspectRatioMode.KeepAspectRatio,
-        Qt.TransformationMode.SmoothTransformation,
-    ).convertToFormat(QImage.Format.Format_ARGB32)
+    from .card_icons import pixmap as card_pixmap
+
     color = _PAINT_ICON_COLORS.get(state, _PAINT_ICON_COLORS["unknown"])
-    red, green, blue, _ = color.getRgb()
-    # The supplied PNG has a white background and black artwork. Convert its
-    # luminance into alpha so only the original bucket silhouette is tinted.
-    for y in range(source.height()):
-        for x in range(source.width()):
-            pixel = source.pixelColor(x, y)
-            luminance = round(
-                0.2126 * pixel.red() + 0.7152 * pixel.green() + 0.0722 * pixel.blue()
-            )
-            alpha = round(pixel.alpha() * (255 - luminance) / 255)
-            source.setPixelColor(x, y, QColor(red, green, blue, alpha))
-    pixmap = QPixmap.fromImage(source)
+    pixmap = card_pixmap("paint", color, size)
     _PAINT_ICON_CACHE[key] = QPixmap(pixmap)
     return pixmap
 
