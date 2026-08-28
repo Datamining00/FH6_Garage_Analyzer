@@ -17,6 +17,8 @@ ICON_FILES = {
     "visible": "11_visible.png", "hidden": "12_hidden.png",
     "circle": "13_circle.png", "triangle": "14_triangle.png",
     "excluded": "15_x.png", "import": "16_import.png",
+    "collapse_right": "17_collapse_right.png",
+    "expand_left": "18_expand_left.png",
 }
 
 
