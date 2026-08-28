@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 
 from PySide6.QtCore import QObject, QSize, Qt, QTimer
 from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QGridLayout, QToolButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QGridLayout, QLabel, QToolButton, QVBoxLayout, QWidget
 
 from . import v1_3_2_change_dialog_runtime_fix as _legacy_runtime
+from . import v1_3_2_memory_state_patch as _memory_state
 from .card_icons import icon as card_icon, toggle_icon as card_toggle_icon
-from .i18n import tr
+from .i18n import get_language, tr
 from .ui import CopyValueLabel
 
 
@@ -19,12 +20,25 @@ ROW_HEIGHT = 34
 THUMBNAIL_MIN_HEIGHT = 240
 CARD_MIN_HEIGHT = 325
 CARD_METADATA_HEIGHT = 80
+CLASSIFICATION_ACTIVE_COLORS = {
+    "check": "#16a34a",
+    "triangle": "#d97706",
+    "excluded": "#dc2626",
+}
+LOCK_ACTIVE_BACKGROUND = "#6e4bf2"
+LOCK_ACTIVE_BORDER = "#5f39d8"
+LOCK_ACTIVE_ICON = "#ffffff"
+
+
+def _txt(ko: str, en: str) -> str:
+    return ko if (get_language() or "ko").lower().startswith("ko") else en
 
 
 def _line_icon(kind: str, *, active: bool = False) -> QIcon:
     mapped = "memo_written" if kind == "memo" and active else kind
     if kind == "lock":
         mapped = "lock" if active else "unlock"
+        return card_icon(mapped, LOCK_ACTIVE_ICON if active else "#555a68")
     return card_icon(mapped, "#6e4bf2" if active else "#555a68")
 
 
@@ -70,7 +84,7 @@ def _placeholder_button(overlay: QWidget, name: str, icon: QIcon, tooltip: str) 
         "QToolButton { background:rgba(255,255,255,238); border:1px solid #dfe1e8; "
         "border-radius:8px; padding:0; }"
         "QToolButton:hover { border-color:#8c74ee; background:#f2edff; }"
-        "QToolButton:checked { border-color:#8c74ee; background:#eee9ff; }"
+        f"QToolButton:checked {{ border-color:{LOCK_ACTIVE_BORDER}; background:{LOCK_ACTIVE_BACKGROUND}; }}"
     )
     return button
 
@@ -86,6 +100,47 @@ def _unique_placeholder(card: Any, overlay: QWidget, attribute: str, name: str, 
         duplicate.deleteLater()
     setattr(card, attribute, button)
     return button
+
+
+def _normalize_metadata(card: Any) -> None:
+    label_map = {
+        tr("card.vehicle_label"): _txt("차량", "Vehicle"),
+        tr("card.creator_label"): _txt("제작", "Creator"),
+        tr("card.title_label"): _txt("제목", "Title"),
+    }
+    for label in card.findChildren(CopyValueLabel):
+        replacement = label_map.get(label.prefix)
+        if replacement is None:
+            continue
+        label.prefix = replacement
+        label.setCopyValue(label.copy_value)
+        label.setToolTip(
+            tr("common.copy_value_detail", label=replacement, value=label.copy_value)
+        )
+        label.setStyleSheet(
+            "QLabel { background:transparent; color:#171924; border:0; "
+            "padding:0 2px; font-size:10.5pt; font-weight:600; }"
+        )
+        label.setFixedHeight(24)
+
+    source = card.findChild(QLabel, "fh6AcquisitionPlaceholder")
+    if isinstance(source, QLabel):
+        source.setText(f"{_txt('출처', 'Source')}:")
+        source.setStyleSheet(
+            "QLabel { background:transparent; color:#171924; border:0; "
+            "padding:0 2px; font-size:10.5pt; font-weight:600; }"
+        )
+        source.setFixedHeight(24)
+
+    outer = card.layout()
+    if isinstance(outer, QVBoxLayout):
+        # Keep the metadata block visually symmetric: the lower card margin is
+        # identical to the thumbnail-to-first-metadata-row gap.
+        outer.setSpacing(BUTTON_GAP)
+        margins = outer.contentsMargins()
+        outer.setContentsMargins(
+            margins.left(), margins.top(), margins.right(), BUTTON_GAP
+        )
 
 
 def _arrange_card(card: Any) -> None:
@@ -120,9 +175,15 @@ def _arrange_card(card: Any) -> None:
     required["folder"].setIcon(_line_icon("folder"))
     required["move"].setIcon(card_icon("move", "#6e4bf2"))
     required["zoom"].setIcon(card_icon("zoom"))
-    required["check"].setIcon(card_toggle_icon("circle", on_color="#39e75f"))
-    required["triangle"].setIcon(card_toggle_icon("triangle", on_color="#ffe600"))
-    required["excluded"].setIcon(card_toggle_icon("excluded", on_color="#ff4d5a"))
+    required["check"].setIcon(
+        card_toggle_icon("circle", on_color=CLASSIFICATION_ACTIVE_COLORS["check"])
+    )
+    required["triangle"].setIcon(
+        card_toggle_icon("triangle", on_color=CLASSIFICATION_ACTIVE_COLORS["triangle"])
+    )
+    required["excluded"].setIcon(
+        card_toggle_icon("excluded", on_color=CLASSIFICATION_ACTIVE_COLORS["excluded"])
+    )
 
     lock = _unique_placeholder(
         card, overlay, "_fh6_lock_placeholder_button", "fh6LockPlaceholderButton", "lock", "잠금 기능 준비 중"
@@ -130,7 +191,11 @@ def _arrange_card(card: Any) -> None:
     if not lock.isCheckable():
         lock.setCheckable(True)
         lock.toggled.connect(lambda active, target=lock: target.setIcon(_line_icon("lock", active=active)))
-    lock.setIcon(card_toggle_icon("unlock", "lock"))
+    lock.setIcon(
+        card_toggle_icon(
+            "unlock", "lock", on_color=LOCK_ACTIVE_ICON
+        )
+    )
     export = _unique_placeholder(
         card, overlay, "_fh6_export_placeholder_button", "fh6ExportPlaceholderButton", "export", "내보내기 기능 준비 중"
     )
@@ -191,16 +256,20 @@ def _arrange_card(card: Any) -> None:
     QTimer.singleShot(50, enforce_grid)
     QTimer.singleShot(150, enforce_grid)
 
-    outer = card.layout()
-    if isinstance(outer, QVBoxLayout):
-        outer.setSpacing(3)
-    for label in card.findChildren(CopyValueLabel):
-        if label.prefix in (tr("card.vehicle_label"), tr("card.title_label"), tr("card.creator_label")):
-            label.setStyleSheet(
-                "QLabel { background:transparent; color:#171924; border:0; "
-                "padding:0 2px; font-size:10.5pt; font-weight:600; }"
-            )
-            label.setFixedHeight(24)
+    _normalize_metadata(card)
+
+
+def _run_busy(owner: Any, action: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+    begin = getattr(owner, "_begin_busy", None)
+    end = getattr(owner, "_end_busy", None)
+    began = callable(begin)
+    if began:
+        begin(_txt("처리 중", "Processing"))
+    try:
+        return action(*args, **kwargs)
+    finally:
+        if began and callable(end):
+            end()
 
 
 def apply_v1_3_4_card_action_layout_patch(MainWindow: Any) -> None:
@@ -212,14 +281,37 @@ def apply_v1_3_4_card_action_layout_patch(MainWindow: Any) -> None:
         card = original_make_card(self, content_type, record, key)
         if content_type == "livery":
             _arrange_card(card)
+        else:
+            _normalize_metadata(card)
         return card
 
     @staticmethod
     def memo_icon(has_note: bool) -> QIcon:
         return _line_icon("memo", active=has_note)
 
+    original_vehicle_grouping = MainWindow._set_vehicle_grouping
+    original_creator_grouping = MainWindow._set_creator_grouping
+
+    def set_vehicle_grouping(self: Any, content_type: str, enabled: bool) -> Any:
+        return _run_busy(
+            self, original_vehicle_grouping, self, content_type, enabled
+        )
+
+    def set_creator_grouping(self: Any, content_type: str, enabled: bool) -> Any:
+        return _run_busy(
+            self, original_creator_grouping, self, content_type, enabled
+        )
+
+    original_status_filter = _memory_state._set_status_filter_mode
+
+    def set_status_filter(window: Any, mode: str) -> Any:
+        return _run_busy(window, original_status_filter, window, mode)
+
     MainWindow._make_saved_content_card = make_card
     MainWindow._detail_memo_icon = memo_icon
+    MainWindow._set_vehicle_grouping = set_vehicle_grouping
+    MainWindow._set_creator_grouping = set_creator_grouping
+    _memory_state._set_status_filter_mode = set_status_filter
     # Timers queued by the legacy four-row patch resolve this module global at
     # execution time. Disable that obsolete geometry owner entirely.
     _legacy_runtime._force_card_action_geometry = lambda _card: None
