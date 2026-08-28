@@ -61,6 +61,7 @@ from fh6garage.v1_3_4_card_action_layout_patch import apply_v1_3_4_card_action_l
 from fh6garage.v1_3_4_card_features_patch import apply_v1_3_4_card_features_patch
 from fh6garage.v1_3_4_metadata_toggle_icon_patch import apply_v1_3_4_metadata_toggle_icon_patch
 from fh6garage.v1_3_4_backup_export_patch import apply_v1_3_4_backup_export_patch
+from fh6garage.v1_3_4_backup_export_thread_fix_patch import apply_v1_3_4_backup_export_thread_fix_patch
 from fh6garage.v1_3_2_thread_affinity_patch import apply_v1_3_2_thread_affinity_fix
 
 
@@ -201,6 +202,10 @@ def main() -> int:
     # Add the safe external backup repository, visible-item export action, and
     # read-only backup/import status tab. Actual game-save import/delete remains disabled.
     apply_v1_3_4_backup_export_patch(MainWindow)
+
+    # Export hashing/copying runs off the UI thread, while completion and all Qt
+    # updates are explicitly marshalled back to the MainWindow thread.
+    apply_v1_3_4_backup_export_thread_fix_patch(MainWindow)
 
     # This must be the final MainWindow patch. It restores the original
     # class-defined @Slot(object) scan callback so all UI rebuilding runs on the
