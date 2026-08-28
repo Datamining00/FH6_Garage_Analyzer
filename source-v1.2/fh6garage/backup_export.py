@@ -66,7 +66,12 @@ def content_sha256(record: LiveryRecord) -> str:
     path = record.livery_path
     if path is None or not path.is_file():
         return ""
-    return file_sha256(path)
+    digest = file_sha256(path)
+    if digest:
+        # Reuse the on-demand hash for subsequent state checks in this process.
+        # The scanner intentionally skips SoulBound hashing during initial load.
+        record.content_sha256 = digest
+    return digest
 
 
 def folder_fingerprint(path: Path) -> str:
@@ -184,12 +189,31 @@ def _thumbnail_relative(record: LiveryRecord) -> str:
         return ""
 
 
+def _external_preview(root: Path, final_path: Path, record: LiveryRecord, digest: str) -> str:
+    source = record.thumbnail_path
+    if source is None or not source.is_file() or _thumbnail_relative(record):
+        return ""
+    suffix = source.suffix if source.suffix else ".webp"
+    preview_dir = final_path.parent / ".previews"
+    try:
+        preview_dir.mkdir(parents=True, exist_ok=True)
+        preview = preview_dir / f"{safe_component(final_path.name, 'preview')}__{digest[:8]}{suffix}"
+        if not preview.is_file():
+            shutil.copy2(source, preview)
+        return preview.relative_to(root).as_posix()
+    except OSError:
+        # Cache thumbnails are optional preview material, never a condition for a
+        # valid livery backup.
+        return ""
+
+
 def _entry_for(
     root: Path,
     final_path: Path,
     record: LiveryRecord,
     digest: str,
     fingerprint: str,
+    preview_relative: str,
 ) -> dict[str, Any]:
     header = record.header
     return {
@@ -205,6 +229,7 @@ def _entry_for(
         "car_id": header.car_id,
         "guid": header.guid or "",
         "thumbnail_relative": _thumbnail_relative(record),
+        "preview_relative": preview_relative,
         "downloaded_at": record.downloaded_at,
         "backup_time": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
@@ -265,13 +290,26 @@ def export_records(root: Path, records: Iterable[LiveryRecord]) -> ExportSummary
                 shutil.rmtree(final_path, ignore_errors=True)
                 raise BackupRepositoryError("final fingerprint mismatch")
 
-            entry = _entry_for(root, final_path, record, digest, source_fingerprint)
+            preview_relative = _external_preview(root, final_path, record, digest)
+            entry = _entry_for(
+                root,
+                final_path,
+                record,
+                digest,
+                source_fingerprint,
+                preview_relative,
+            )
             entries.append(entry)
             try:
                 save_index(root, payload)
             except Exception:
                 entries.pop()
                 shutil.rmtree(final_path, ignore_errors=True)
+                if preview_relative:
+                    try:
+                        (root / preview_relative).unlink(missing_ok=True)
+                    except OSError:
+                        pass
                 raise
             existing.add(identity)
             summary.exported.append(entry)
@@ -301,8 +339,12 @@ def backup_records(root: Path) -> list[tuple[dict[str, Any], LiveryRecord]]:
         container_path = root / relative
         if not container_path.is_dir():
             continue
+        preview_relative = str(entry.get("preview_relative") or "")
         thumbnail_relative = str(entry.get("thumbnail_relative") or "")
-        thumbnail_path = container_path / thumbnail_relative if thumbnail_relative else None
+        if preview_relative:
+            thumbnail_path = root / preview_relative
+        else:
+            thumbnail_path = container_path / thumbnail_relative if thumbnail_relative else None
         if thumbnail_path is not None and not thumbnail_path.is_file():
             thumbnail_path = None
         livery_path = container_path / "C_livery"
