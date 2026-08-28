@@ -1,0 +1,100 @@
+from __future__ import annotations
+
+from typing import Any
+
+from PySide6.QtCore import QSize
+from PySide6.QtWidgets import QMessageBox, QToolButton
+
+from . import v1_3_4_backup_export_patch as _backup_ui
+from . import v1_3_4_backup_export_performance_ui_patch as _perf
+from .card_icons import icon as card_icon
+from .models import LiveryRecord
+
+
+def _backup_confirm(window: Any, count: int) -> bool:
+    box = QMessageBox(window)
+    box.setWindowTitle(_backup_ui._txt("백업하기", "Back up"))
+    box.setText(
+        _backup_ui._txt(
+            f"{count}개 항목을 백업한 뒤 게임 쪽 원본을 삭제하시겠습니까?\n\n"
+            "현재 버전에서는 게임 세이브 직접 삭제가 안전 검증 전 비활성화되어 있습니다.",
+            f"Delete the game-side source after backing up {count} item(s)?\n\n"
+            "Direct deletion from the game save is disabled until save-layout safety is verified.",
+        )
+    )
+    box.setIcon(QMessageBox.Icon.Question)
+    keep = box.addButton(
+        _backup_ui._txt("원본 유지", "Keep source"),
+        QMessageBox.ButtonRole.AcceptRole,
+    )
+    delete = box.addButton(
+        _backup_ui._txt("원본 삭제", "Delete source"),
+        QMessageBox.ButtonRole.DestructiveRole,
+    )
+    delete.setEnabled(False)
+    delete.setToolTip(
+        _backup_ui._txt(
+            "저장 구조 검증 후 활성화됩니다.",
+            "Available after save-layout verification.",
+        )
+    )
+    box.addButton(
+        _backup_ui._txt("취소", "Cancel"),
+        QMessageBox.ButtonRole.RejectRole,
+    )
+    box.setDefaultButton(keep)
+    box.exec()
+    return box.clickedButton() is keep
+
+
+def apply_v1_3_4_backup_action_wording_patch(MainWindow: Any) -> None:
+    if getattr(MainWindow, "_fh6_v134_backup_action_wording_patched", False):
+        return
+
+    original_confirm = _backup_ui._confirm_keep_source
+    original_configure = _perf._configure_backup_action_button
+
+    def confirm(window: Any, count: int, *, operation: str) -> bool:
+        if operation == "export" and bool(
+            getattr(window, "_fh6_backup_tab_backup_prompt", False)
+        ):
+            return _backup_confirm(window, count)
+        return original_confirm(window, count, operation=operation)
+
+    def request_backup(window: Any, record: LiveryRecord) -> None:
+        window._fh6_backup_tab_backup_prompt = True
+        try:
+            _backup_ui._request_export(window, [record])
+        finally:
+            window._fh6_backup_tab_backup_prompt = False
+
+    def configure(
+        window: Any,
+        card: Any,
+        record: LiveryRecord,
+        location: str,
+    ) -> None:
+        if location != "game":
+            original_configure(window, card, record, location)
+            return
+
+        button = getattr(card, "_fh6_export_placeholder_button", None)
+        if not isinstance(button, QToolButton):
+            return
+        button.setObjectName("fh6BackupButton")
+        button.setEnabled(True)
+        button.setIcon(card_icon("export", _backup_ui._INACTIVE_COLOR, 20))
+        button.setIconSize(QSize(20, 20))
+        button.setStyleSheet(_backup_ui._action_style(False))
+        button.setToolTip(_backup_ui._txt("백업하기", "Back up"))
+        button.setAccessibleName(_backup_ui._txt("백업하기", "Back up"))
+        if not bool(button.property("fh6BackupActionInstalled")):
+            button.setProperty("fh6BackupActionInstalled", True)
+            button.clicked.connect(
+                lambda _checked=False, owner=window, item=record:
+                request_backup(owner, item)
+            )
+
+    _backup_ui._confirm_keep_source = confirm
+    _perf._configure_backup_action_button = configure
+    MainWindow._fh6_v134_backup_action_wording_patched = True
