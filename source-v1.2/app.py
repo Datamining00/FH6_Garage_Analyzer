@@ -59,6 +59,7 @@ from fh6garage.v1_3_2_dashboard_change_group_patch import apply_v1_3_2_dashboard
 from fh6garage.v1_3_3_beta_identity_patch import apply_v1_3_3_beta_identity_patch
 from fh6garage.v1_3_4_card_action_layout_patch import apply_v1_3_4_card_action_layout_patch
 from fh6garage.v1_3_4_card_features_patch import apply_v1_3_4_card_features_patch
+from fh6garage.v1_3_4_metadata_toggle_icon_patch import apply_v1_3_4_metadata_toggle_icon_patch
 from fh6garage.v1_3_2_thread_affinity_patch import apply_v1_3_2_thread_affinity_fix
 
 
@@ -192,6 +193,9 @@ def main() -> int:
     # Add the v1.3.4 card-wide metadata collapse, functional soft lock, and
     # duplicate-content grouping after the final card geometry is installed.
     apply_v1_3_4_card_features_patch(MainWindow)
+
+    # Replace the metadata toggle glyph with packaged 20 px transparent PNG arrows.
+    apply_v1_3_4_metadata_toggle_icon_patch(MainWindow)
 
     # This must be the final MainWindow patch. It restores the original
     # class-defined @Slot(object) scan callback so all UI rebuilding runs on the
