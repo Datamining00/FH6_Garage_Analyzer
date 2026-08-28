@@ -58,16 +58,12 @@ class BackupExportPerformanceTests(unittest.TestCase):
             backup = base / "backup"
             backup.mkdir()
 
-            class Edit:
-                def text(self) -> str:
-                    return str(backup)
-
             class Settings:
                 def value(self, *_args):
-                    return ""
+                    return str(backup)
 
             class Window:
-                backup_path_edit = Edit()
+                backup_path_edit = None
                 settings = Settings()
                 _fh6_backup_presence_cache = ("", set(), set())
 
