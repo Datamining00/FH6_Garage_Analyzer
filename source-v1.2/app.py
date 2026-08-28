@@ -62,6 +62,7 @@ from fh6garage.v1_3_4_card_features_patch import apply_v1_3_4_card_features_patc
 from fh6garage.v1_3_4_metadata_toggle_icon_patch import apply_v1_3_4_metadata_toggle_icon_patch
 from fh6garage.v1_3_4_backup_export_patch import apply_v1_3_4_backup_export_patch
 from fh6garage.v1_3_4_backup_export_thread_fix_patch import apply_v1_3_4_backup_export_thread_fix_patch
+from fh6garage.v1_3_4_backup_export_performance_ui_patch import apply_v1_3_4_backup_export_performance_ui_patch
 from fh6garage.v1_3_2_thread_affinity_patch import apply_v1_3_2_thread_affinity_fix
 
 
@@ -206,6 +207,10 @@ def main() -> int:
     # Export hashing/copying runs off the UI thread, while completion and all Qt
     # updates are explicitly marshalled back to the MainWindow thread.
     apply_v1_3_4_backup_export_thread_fix_patch(MainWindow)
+
+    # Avoid repeated backup-index reads/hashes, build large backup card sets in
+    # event-loop chunks, and mirror the livery search/filter/button styling.
+    apply_v1_3_4_backup_export_performance_ui_patch(MainWindow)
 
     # This must be the final MainWindow patch. It restores the original
     # class-defined @Slot(object) scan callback so all UI rebuilding runs on the
