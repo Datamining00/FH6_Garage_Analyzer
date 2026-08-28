@@ -265,14 +265,12 @@ def _install_livery_lock(window: Any, card: QWidget, key: str) -> None:
             )
         )
 
+    # Restore persisted state without emitting the user-action signal. The
+    # existing QIcon already contains separate checked/unchecked PNG pixmaps, so
+    # the visual state follows setChecked() without any synthetic toggle.
     lock.blockSignals(True)
     lock.setChecked(locked)
     lock.blockSignals(False)
-    # The previous v1.3.4 layer already owns the lock/unlock PNG state. Emit the
-    # ordinary toggle once after restoring the persisted state so that icon and
-    # functional state stay synchronized without drawing a replacement icon.
-    lock.setChecked(not locked)
-    lock.setChecked(locked)
     _set_livery_lock(window, card, key, locked, persist=False)
 
 
