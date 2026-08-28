@@ -6,6 +6,7 @@ from PySide6.QtCore import QObject, QSize, Qt, QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QGridLayout, QLabel, QToolButton, QVBoxLayout, QWidget
 
+from . import v1_3_2_alias_manager_change_card_fix as _alias_fix
 from . import v1_3_2_change_dialog_runtime_fix as _legacy_runtime
 from . import v1_3_2_memory_state_patch as _memory_state
 from .card_icons import icon as card_icon, toggle_icon as card_toggle_icon
@@ -143,6 +144,15 @@ def _normalize_metadata(card: Any) -> None:
         )
 
 
+def _remove_recent_deleted_heading(widget: QWidget) -> QWidget:
+    """Remove the historical 'Before removal' strip even when the card is root."""
+    for label in widget.findChildren(QLabel):
+        if label.text().strip() in {"삭제 전", "Before removal"}:
+            label.hide()
+            label.deleteLater()
+    return widget
+
+
 def _arrange_card(card: Any) -> None:
     if bool(card.property("fh6ArchiveCard")):
         return
@@ -163,8 +173,13 @@ def _arrange_card(card: Any) -> None:
         "triangle": getattr(card, "_fh6_triangle_box", None),
         "excluded": getattr(card, "_fh6_excluded_box", None),
     }
-    if not all(isinstance(button, QToolButton) for button in required.values()):
+    # SoulBound/auction cards intentionally have no My Designs navigation button.
+    # Treat that as a supported card variant instead of aborting all v1.3.4
+    # geometry/metadata normalization. Every other action remains mandatory.
+    mandatory = ("zoom", "memo", "info", "folder", "paint", "hide", "check", "triangle", "excluded")
+    if not all(isinstance(required[name], QToolButton) for name in mandatory):
         return
+    move = required["move"] if isinstance(required["move"], QToolButton) else None
     grid = getattr(card, "_fh6_action_grid", None)
     if not isinstance(grid, QGridLayout):
         return
@@ -173,7 +188,8 @@ def _arrange_card(card: Any) -> None:
 
     required["info"].setIcon(_line_icon("info"))
     required["folder"].setIcon(_line_icon("folder"))
-    required["move"].setIcon(card_icon("move", "#6e4bf2"))
+    if move is not None:
+        move.setIcon(card_icon("move", "#6e4bf2"))
     required["zoom"].setIcon(card_icon("zoom"))
     required["check"].setIcon(
         card_toggle_icon("circle", on_color=CLASSIFICATION_ACTIVE_COLORS["check"])
@@ -185,17 +201,19 @@ def _arrange_card(card: Any) -> None:
         card_toggle_icon("excluded", on_color=CLASSIFICATION_ACTIVE_COLORS["excluded"])
     )
 
-    lock = _unique_placeholder(
-        card, overlay, "_fh6_lock_placeholder_button", "fh6LockPlaceholderButton", "lock", "잠금 기능 준비 중"
-    )
-    if not lock.isCheckable():
-        lock.setCheckable(True)
-        lock.toggled.connect(lambda active, target=lock: target.setIcon(_line_icon("lock", active=active)))
-    lock.setIcon(
-        card_toggle_icon(
-            "unlock", "lock", on_color=LOCK_ACTIVE_ICON
+    lock = None
+    if move is not None:
+        lock = _unique_placeholder(
+            card, overlay, "_fh6_lock_placeholder_button", "fh6LockPlaceholderButton", "lock", "잠금 기능 준비 중"
         )
-    )
+        if not lock.isCheckable():
+            lock.setCheckable(True)
+            lock.toggled.connect(lambda active, target=lock: target.setIcon(_line_icon("lock", active=active)))
+        lock.setIcon(
+            card_toggle_icon(
+                "unlock", "lock", on_color=LOCK_ACTIVE_ICON
+            )
+        )
     export = _unique_placeholder(
         card, overlay, "_fh6_export_placeholder_button", "fh6ExportPlaceholderButton", "export", "내보내기 기능 준비 중"
     )
@@ -203,13 +221,14 @@ def _arrange_card(card: Any) -> None:
 
     left = [required[name] for name in ("move", "zoom", "memo", "info", "folder")]
     left.append(export)
-    right = [required[name] for name in ("paint",)]
-    right.append(lock)
+    right = [required["paint"], lock]
     right.extend(required[name] for name in ("hide", "check", "triangle", "excluded"))
 
     # The grid is created by the original card constructor. This final feature
     # layer only fills its reserved cells and normalizes icons; it never creates
-    # a competing overlay, event filter, or absolute-position owner.
+    # a competing overlay, event filter, or absolute-position owner. Missing
+    # SoulBound move/lock controls leave their normal row slots empty so every
+    # remaining icon keeps the same spacing as a standard livery card.
     grid.setContentsMargins(0, 0, 0, 0)
     grid.setHorizontalSpacing(0)
     grid.setVerticalSpacing(BUTTON_GAP)
@@ -217,12 +236,15 @@ def _arrange_card(card: Any) -> None:
     grid.setColumnStretch(1, 1)
     for row, (left_button, right_button) in enumerate(zip(left, right)):
         for button in (left_button, right_button):
-            button.setIconSize(QSize(ICON_SIZE, ICON_SIZE))
-            button.show()
+            if isinstance(button, QToolButton):
+                button.setIconSize(QSize(ICON_SIZE, ICON_SIZE))
+                button.show()
         grid.setRowMinimumHeight(row, ROW_HEIGHT)
         vertical = Qt.AlignmentFlag.AlignTop if row == 0 else Qt.AlignmentFlag.AlignBottom if row == 5 else Qt.AlignmentFlag.AlignVCenter
-        grid.addWidget(left_button, row, 0, Qt.AlignmentFlag.AlignLeft | vertical)
-        grid.addWidget(right_button, row, 1, Qt.AlignmentFlag.AlignRight | vertical)
+        if isinstance(left_button, QToolButton):
+            grid.addWidget(left_button, row, 0, Qt.AlignmentFlag.AlignLeft | vertical)
+        if isinstance(right_button, QToolButton):
+            grid.addWidget(right_button, row, 1, Qt.AlignmentFlag.AlignRight | vertical)
 
     def enforce_grid() -> None:
         grid.invalidate()
@@ -307,6 +329,16 @@ def apply_v1_3_4_card_action_layout_patch(MainWindow: Any) -> None:
     def set_status_filter(window: Any, mode: str) -> Any:
         return _run_busy(window, original_status_filter, window, mode)
 
+    # The v1.3.2 archive cleanup only walked child QFrames, while the grouped
+    # recent view passes its archive QFrame as the root widget. Keep all legacy
+    # cleanup and additionally remove the root card's historical strip.
+    original_archive_cleanup = _alias_fix._remove_deleted_heading_and_match_main_frame
+
+    def archive_cleanup(widget: QWidget) -> QWidget:
+        result = original_archive_cleanup(widget)
+        return _remove_recent_deleted_heading(result)
+
+    _alias_fix._remove_deleted_heading_and_match_main_frame = archive_cleanup
     MainWindow._make_saved_content_card = make_card
     MainWindow._detail_memo_icon = memo_icon
     MainWindow._set_vehicle_grouping = set_vehicle_grouping
