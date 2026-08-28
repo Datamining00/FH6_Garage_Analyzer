@@ -11,7 +11,7 @@ class BackupActionWordingTests(unittest.TestCase):
             root / "fh6garage" / "v1_3_4_backup_action_wording_patch.py"
         ).read_text(encoding="utf-8")
         self.assertIn('"백업하기"', source)
-        self.assertIn('"게임 쪽 원본"', source)
+        self.assertIn("게임 쪽 원본", source)
         self.assertIn("delete.setEnabled(False)", source)
 
     def test_wording_patch_stays_before_final_thread_affinity_fix(self) -> None:
