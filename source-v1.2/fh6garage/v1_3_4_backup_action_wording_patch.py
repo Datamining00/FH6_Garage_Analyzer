@@ -9,6 +9,9 @@ from . import v1_3_4_backup_export_patch as _backup_ui
 from . import v1_3_4_backup_export_performance_ui_patch as _perf
 from .card_icons import icon as card_icon
 from .models import LiveryRecord
+from .v1_3_4_backup_import_refinement_patch import (
+    apply_v1_3_4_backup_import_refinement_patch,
+)
 
 
 def _backup_confirm(window: Any, count: int) -> bool:
@@ -98,3 +101,7 @@ def apply_v1_3_4_backup_action_wording_patch(MainWindow: Any) -> None:
     _backup_ui._confirm_keep_source = confirm
     _perf._configure_backup_action_button = configure
     MainWindow._fh6_v134_backup_action_wording_patched = True
+
+    # Final v1.3.4 backup layer: repository-only backup view plus verified
+    # restore into both current and numbered save trees.
+    apply_v1_3_4_backup_import_refinement_patch(MainWindow)
