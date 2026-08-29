@@ -12,6 +12,9 @@ from .models import LiveryRecord
 from .v1_3_4_backup_import_refinement_patch import (
     apply_v1_3_4_backup_import_refinement_patch,
 )
+from .v1_3_4_backup_toolbar_followup_patch import (
+    apply_v1_3_4_backup_toolbar_followup_patch,
+)
 
 
 def _backup_confirm(window: Any, count: int) -> bool:
@@ -102,6 +105,7 @@ def apply_v1_3_4_backup_action_wording_patch(MainWindow: Any) -> None:
     _perf._configure_backup_action_button = configure
     MainWindow._fh6_v134_backup_action_wording_patched = True
 
-    # Final v1.3.4 backup layer: repository-only backup view plus verified
-    # restore into both current and numbered save trees.
+    # Final v1.3.4 backup layers: verified dual-tree restore first, then the
+    # exclusive source/location filters, compact counts, and backup bulk export.
     apply_v1_3_4_backup_import_refinement_patch(MainWindow)
+    apply_v1_3_4_backup_toolbar_followup_patch(MainWindow)
