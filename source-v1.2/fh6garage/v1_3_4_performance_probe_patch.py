@@ -11,6 +11,7 @@ from PySide6.QtWidgets import QApplication, QFrame, QHBoxLayout, QLabel, QPlainT
 
 from . import performance_metrics as _metrics
 from . import ui as _ui
+from . import v1_3_2_responsiveness_sort_patch as _responsive
 from . import v1_3_4_backup_export_patch as _backup_ui
 from . import v1_3_4_backup_export_performance_ui_patch as _perf
 from . import v1_3_4_backup_import_refinement_patch as _import
@@ -18,6 +19,7 @@ from .i18n import get_language
 
 
 _SETTING_KEY = "performance_profiling_enabled"
+_SLOW_WIDTH_SYNC_MS = 10.0
 
 
 def _txt(ko: str, en: str) -> str:
@@ -33,19 +35,33 @@ def _count_items(counter: Callable[..., int | None] | None, args: tuple[Any, ...
         return None
 
 
+def _phase_accumulate(owner: Any, name: str, elapsed_ms: float) -> None:
+    if owner is None or int(getattr(owner, "_fh6_perf_livery_relayout_depth", 0) or 0) <= 0:
+        return
+    phases = getattr(owner, "_fh6_perf_livery_relayout_phases", None)
+    if not isinstance(phases, dict):
+        return
+    phases[name] = float(phases.get(name, 0.0) or 0.0) + float(elapsed_ms)
+
+
 def _timed(
     name: str,
     fn: Callable[..., Any],
     *,
     item_count: Callable[..., int | None] | None = None,
     startup_name: str | None = None,
+    aggregate_only: bool = False,
+    slow_threshold_ms: float | None = None,
+    phase_name: str | None = None,
 ):
     """Measure a runtime path and optionally mirror it into always-on startup data."""
     @wraps(fn)
     def wrapped(*args: Any, **kwargs: Any):
         runtime = _metrics.is_enabled()
         startup = bool(startup_name and _metrics.startup_active())
-        if not runtime and not startup:
+        owner = args[0] if args else None
+        relayout_phase = bool(phase_name and int(getattr(owner, "_fh6_perf_livery_relayout_depth", 0) or 0) > 0)
+        if not runtime and not startup and not relayout_phase:
             return fn(*args, **kwargs)
         count = _count_items(item_count, args, kwargs)
         started = time.perf_counter_ns()
@@ -53,21 +69,47 @@ def _timed(
             return fn(*args, **kwargs)
         finally:
             elapsed = (time.perf_counter_ns() - started) / 1_000_000.0
+            if phase_name:
+                _phase_accumulate(owner, phase_name, elapsed)
             if startup and startup_name:
                 _metrics.record_startup(startup_name, elapsed, item_count=count)
             if runtime:
-                _metrics.record(name, elapsed, item_count=count)
+                if aggregate_only:
+                    _metrics.add_sample(name, elapsed)
+                    if slow_threshold_ms is not None and elapsed >= slow_threshold_ms:
+                        _metrics.record(f"{name}.slow", elapsed, item_count=count)
+                else:
+                    _metrics.record(name, elapsed, item_count=count)
     return wrapped
 
 
+def _format_copy_payload() -> str:
+    startup = _metrics.format_startup() or _txt("측정 기록 없음", "No startup measurements")
+    summary = _metrics.format_aggregate(300, max_rows=60) or _txt("집계 기록 없음", "No aggregate measurements")
+    recent = _metrics.format_recent(300) or _txt("런타임 측정 기록 없음", "No runtime measurements")
+    return (
+        f"[{_txt('최근 시작 결과', 'Latest startup')} ]\n{startup}\n\n"
+        f"[{_txt('런타임 집계', 'Runtime summary')} ]\n{summary}\n\n"
+        f"[{_txt('최근 런타임 이벤트', 'Recent runtime events')} ]\n{recent}"
+    )
+
+
 def _refresh_text(window: Any) -> None:
+    startup_edit = getattr(window, "performance_startup_view", None)
+    if isinstance(startup_edit, QPlainTextEdit):
+        startup_edit.setPlainText(_metrics.format_startup() or _txt("측정 기록 없음", "No startup measurements"))
+        startup_edit.moveCursor(startup_edit.textCursor().MoveOperation.End)
+
+    summary_edit = getattr(window, "performance_summary_view", None)
+    if isinstance(summary_edit, QPlainTextEdit):
+        summary_edit.setPlainText(_metrics.format_aggregate(300, max_rows=40) or _txt("집계 기록 없음", "No aggregate measurements"))
+
     edit = getattr(window, "performance_log_view", None)
-    if not isinstance(edit, QPlainTextEdit):
-        return
-    edit.setPlainText(_metrics.format_recent(150) or _txt("측정 기록 없음", "No measurements yet"))
-    cursor = edit.textCursor()
-    cursor.movePosition(cursor.MoveOperation.End)
-    edit.setTextCursor(cursor)
+    if isinstance(edit, QPlainTextEdit):
+        edit.setPlainText(_metrics.format_recent(150) or _txt("런타임 측정 기록 없음", "No runtime measurements"))
+        cursor = edit.textCursor()
+        cursor.movePosition(cursor.MoveOperation.End)
+        edit.setTextCursor(cursor)
 
 
 def _set_enabled(window: Any, enabled: bool) -> None:
@@ -102,7 +144,7 @@ def _clear(window: Any) -> None:
 
 
 def _copy(window: Any) -> None:
-    QApplication.clipboard().setText(_metrics.format_recent(300))
+    QApplication.clipboard().setText(_format_copy_payload())
     window._show_status(_txt("성능 측정 결과를 복사했습니다.", "Performance results copied."), 3000)
 
 
@@ -115,11 +157,20 @@ def _open_log_folder(window: Any) -> None:
     QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
 
 
+def _readonly_view(*, maximum_height: int | None = None) -> QPlainTextEdit:
+    view = QPlainTextEdit()
+    view.setReadOnly(True)
+    view.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
+    if maximum_height is not None:
+        view.setMaximumHeight(maximum_height)
+    return view
+
+
 def _performance_page(window: Any) -> QWidget:
     page = QWidget()
     layout = QVBoxLayout(page)
     layout.setContentsMargins(0, 0, 0, 0)
-    layout.setSpacing(12)
+    layout.setSpacing(8)
 
     title = QLabel(_txt("성능 측정", "Performance profiling"))
     title.setObjectName("pageTitle")
@@ -127,7 +178,7 @@ def _performance_page(window: Any) -> QWidget:
 
     subtitle = QLabel(
         _txt(
-            "초기 실행은 매번 자동 측정하며, ON/OFF는 실행 후 런타임 측정에만 적용됩니다.",
+            "초기 실행은 매번 자동 측정합니다. ON/OFF는 실행 후 런타임 측정에만 적용됩니다.",
             "Startup is measured on every launch. The ON/OFF switch controls runtime measurements only.",
         )
     )
@@ -163,26 +214,31 @@ def _performance_page(window: Any) -> QWidget:
     status.setObjectName("muted")
     layout.addWidget(status)
 
-    info = QLabel(
-        _txt(
-            "항상 측정: 전체 시작, QApplication, 설정, 패치 설치, MainWindow, 스캔, 초기 populate, 최초 화면 준비. "
-            "런타임 측정: 리버리 relayout 세부 구간, 썸네일, 백업 인덱스/목록, 내보내기/들여오기, SHA-256, fingerprint, index 저장.",
-            "Always measured: total startup, QApplication, settings, patch install, MainWindow, scan, initial populate and first ready state. "
-            "Runtime: livery relayout phases, thumbnails, backup index/list work, export/import, SHA-256, fingerprint and index writes.",
-        )
-    )
-    info.setObjectName("muted")
-    info.setWordWrap(True)
-    layout.addWidget(info)
+    startup_label = QLabel(_txt("최근 시작 결과", "Latest startup"))
+    startup_label.setObjectName("muted")
+    layout.addWidget(startup_label)
+    startup_view = _readonly_view(maximum_height=210)
+    startup_view.setPlaceholderText(_txt("측정 기록 없음", "No startup measurements"))
+    layout.addWidget(startup_view)
 
-    view = QPlainTextEdit()
-    view.setReadOnly(True)
-    view.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
-    view.setPlaceholderText(_txt("측정 기록 없음", "No measurements yet"))
+    summary_label = QLabel(_txt("런타임 집계 · 최근 세션", "Runtime summary · recent session"))
+    summary_label.setObjectName("muted")
+    layout.addWidget(summary_label)
+    summary_view = _readonly_view(maximum_height=180)
+    summary_view.setPlaceholderText(_txt("집계 기록 없음", "No aggregate measurements"))
+    layout.addWidget(summary_view)
+
+    recent_label = QLabel(_txt("최근 런타임 이벤트", "Recent runtime events"))
+    recent_label.setObjectName("muted")
+    layout.addWidget(recent_label)
+    view = _readonly_view()
+    view.setPlaceholderText(_txt("런타임 측정 기록 없음", "No runtime measurements"))
     layout.addWidget(view, 1)
 
     window.performance_toggle_button = toggle
     window.performance_status_label = status
+    window.performance_startup_view = startup_view
+    window.performance_summary_view = summary_view
     window.performance_log_view = view
     return page
 
@@ -234,14 +290,153 @@ def _schedule_startup_ready(window: Any) -> None:
         window._fh6_startup_finish_scheduled = False
         _refresh_text(window)
 
-    # Two event-loop turns let the final thread-affinity layer queue SoulBound
-    # append/layout work before the startup-ready timestamp is closed.
     QTimer.singleShot(0, lambda: QTimer.singleShot(0, second_turn))
 
 
+def _wrap_relayout(MainWindow: Any) -> None:
+    original = MainWindow._relayout_livery_grid
+
+    @wraps(original)
+    def wrapped(self: Any, *args: Any, **kwargs: Any):
+        runtime = _metrics.is_enabled()
+        startup = _metrics.startup_active()
+        if not runtime and not startup:
+            return original(self, *args, **kwargs)
+
+        depth = int(getattr(self, "_fh6_perf_livery_relayout_depth", 0) or 0)
+        outer = depth == 0
+        if outer:
+            self._fh6_perf_livery_relayout_phases = {}
+        self._fh6_perf_livery_relayout_depth = depth + 1
+        started = time.perf_counter_ns()
+        try:
+            return original(self, *args, **kwargs)
+        finally:
+            elapsed = (time.perf_counter_ns() - started) / 1_000_000.0
+            self._fh6_perf_livery_relayout_depth = max(0, int(getattr(self, "_fh6_perf_livery_relayout_depth", 1)) - 1)
+            count = len(getattr(self, "_livery_grid_cards", []) or [])
+            if runtime:
+                _metrics.record("ui.livery_relayout.total", elapsed, item_count=count)
+            if startup:
+                _metrics.record_startup("startup.livery_relayout.total", elapsed, item_count=count)
+            if outer:
+                phases = dict(getattr(self, "_fh6_perf_livery_relayout_phases", {}) or {})
+                accounted = sum(float(value or 0.0) for value in phases.values())
+                residual = max(0.0, elapsed - accounted)
+                if runtime:
+                    _metrics.record(
+                        "ui.livery_relayout.unaccounted",
+                        residual,
+                        item_count=count,
+                        detail="total minus measured sub-phases",
+                    )
+                self._fh6_perf_livery_relayout_phases = {}
+
+    MainWindow._relayout_livery_grid = wrapped
+
+
+def _install_relayout_internal_probes(MainWindow: Any) -> None:
+    # The relayout implementation calls these module globals directly, so probing
+    # only MainWindow methods misses the expensive internal path.
+    _responsive._responsive_clear_grid_layout = _timed(
+        "ui.livery_relayout.clear_layout",
+        _responsive._responsive_clear_grid_layout,
+        phase_name="clear_layout",
+    )
+    _responsive._responsive_layout_visible_grid_cards = _timed(
+        "ui.livery_relayout.layout_visible",
+        _responsive._responsive_layout_visible_grid_cards,
+        item_count=lambda self, content_type, cards, *a, **k: len(cards) if content_type == "livery" else None,
+        phase_name="layout_visible",
+    )
+    _responsive._livery_visibility_allowed = _timed(
+        "ui.livery_relayout.visibility",
+        _responsive._livery_visibility_allowed,
+        aggregate_only=True,
+        phase_name="visibility",
+    )
+
+    original_yield = _responsive._yield_busy_events
+
+    @wraps(original_yield)
+    def timed_yield(self: Any, *args: Any, **kwargs: Any):
+        active = int(getattr(self, "_fh6_perf_livery_relayout_depth", 0) or 0) > 0
+        if not active and not _metrics.is_enabled():
+            return original_yield(self, *args, **kwargs)
+        started = time.perf_counter_ns()
+        try:
+            return original_yield(self, *args, **kwargs)
+        finally:
+            elapsed = (time.perf_counter_ns() - started) / 1_000_000.0
+            if active:
+                _phase_accumulate(self, "process_events", elapsed)
+            if _metrics.is_enabled():
+                _metrics.add_sample("ui.livery_relayout.process_events", elapsed)
+
+    _responsive._yield_busy_events = timed_yield
+
+    if hasattr(MainWindow, "_livery_filter_matches"):
+        MainWindow._livery_filter_matches = _timed(
+            "ui.livery_relayout.filter_match",
+            MainWindow._livery_filter_matches,
+            aggregate_only=True,
+            phase_name="filter_match",
+        )
+
+    if hasattr(MainWindow, "_sync_livery_grid_card_widths"):
+        MainWindow._sync_livery_grid_card_widths = _timed(
+            "ui.livery_relayout.width_sync",
+            MainWindow._sync_livery_grid_card_widths,
+            item_count=lambda self, *a, **k: len(getattr(self, "_livery_grid_cards", []) or []),
+            startup_name="startup.livery_relayout.width_sync",
+            aggregate_only=True,
+            slow_threshold_ms=_SLOW_WIDTH_SYNC_MS,
+            phase_name="width_sync",
+        )
+
+
+def _install_backup_probes(MainWindow: Any) -> None:
+    _perf._presence_snapshot = _timed("backup.presence_snapshot", _perf._presence_snapshot)
+    _perf._game_index = _timed("backup.match.game_index", _perf._game_index)
+    _import.backup_records = _timed("backup.match.repository_records", _import.backup_records)
+    _import._entry_is_in_game = _timed(
+        "backup.match.entry_compare",
+        _import._entry_is_in_game,
+        aggregate_only=True,
+    )
+    _backup_ui._backup_sort_key = _timed(
+        "backup.sort_key",
+        _backup_ui._backup_sort_key,
+        aggregate_only=True,
+    )
+    _import._backup_items = _timed("backup.build_items", _import._backup_items)
+    _import._rebuild_backup_cards = _timed("backup.rebuild_request", _import._rebuild_backup_cards)
+    _import._configure_backup_card = _timed(
+        "backup.card_configure",
+        _import._configure_backup_card,
+        aggregate_only=True,
+    )
+
+    maker = getattr(MainWindow, "_make_saved_content_card", None)
+    if callable(maker):
+        @wraps(maker)
+        def timed_maker(self: Any, *args: Any, **kwargs: Any):
+            key = ""
+            if len(args) >= 3:
+                key = str(args[2] or "")
+            elif "key" in kwargs:
+                key = str(kwargs.get("key") or "")
+            if not (_metrics.is_enabled() and key.startswith("backup::")):
+                return maker(self, *args, **kwargs)
+            started = time.perf_counter_ns()
+            try:
+                return maker(self, *args, **kwargs)
+            finally:
+                _metrics.add_sample("backup.card_factory", (time.perf_counter_ns() - started) / 1_000_000.0)
+        MainWindow._make_saved_content_card = timed_maker
+
+
 def _install_probes(MainWindow: Any) -> None:
-    # scan_save is called inside the existing @Slot worker; wrapping the function
-    # preserves the Qt slot/thread-affinity contract while measuring the real scan.
     _ui.scan_save = _timed("scan.total", _ui.scan_save, startup_name="startup.scan")
 
     original_populate = MainWindow._populate_all
@@ -262,7 +457,6 @@ def _install_probes(MainWindow: Any) -> None:
 
     MainWindow._populate_all = populate_all
 
-    # Populate-all children expose where the initial ~seconds are actually spent.
     for attr, runtime_name, startup_name in (
         ("_populate_car_table", "ui.populate.car_table", "startup.populate.car_table"),
         ("_populate_creator_table", "ui.populate.creator_table", "startup.populate.creator_table"),
@@ -274,32 +468,9 @@ def _install_probes(MainWindow: Any) -> None:
         if callable(fn):
             setattr(MainWindow, attr, _timed(runtime_name, fn, startup_name=startup_name))
 
-    MainWindow._relayout_livery_grid = _timed(
-        "ui.livery_relayout.total",
-        MainWindow._relayout_livery_grid,
-        item_count=lambda self, *a, **k: len(getattr(self, "_livery_grid_cards", []) or []),
-        startup_name="startup.livery_relayout.total",
-    )
-    if hasattr(MainWindow, "_clear_livery_grid_layout"):
-        MainWindow._clear_livery_grid_layout = _timed(
-            "ui.livery_relayout.clear_layout",
-            MainWindow._clear_livery_grid_layout,
-            startup_name="startup.livery_relayout.clear_layout",
-        )
-    if hasattr(MainWindow, "_layout_visible_grid_cards"):
-        MainWindow._layout_visible_grid_cards = _timed(
-            "ui.livery_relayout.add_widgets",
-            MainWindow._layout_visible_grid_cards,
-            item_count=lambda self, content_type, cards, *a, **k: len(cards) if content_type == "livery" else None,
-            startup_name="startup.livery_relayout.add_widgets",
-        )
-    if hasattr(MainWindow, "_sync_livery_grid_card_widths"):
-        MainWindow._sync_livery_grid_card_widths = _timed(
-            "ui.livery_relayout.width_sync",
-            MainWindow._sync_livery_grid_card_widths,
-            item_count=lambda self, *a, **k: len(getattr(self, "_livery_grid_cards", []) or []),
-            startup_name="startup.livery_relayout.width_sync",
-        )
+    _install_relayout_internal_probes(MainWindow)
+    _wrap_relayout(MainWindow)
+
     if hasattr(MainWindow, "_refresh_visible_livery_thumbnails"):
         MainWindow._refresh_visible_livery_thumbnails = _timed(
             "ui.thumbnail_refresh",
@@ -308,8 +479,7 @@ def _install_probes(MainWindow: Any) -> None:
             startup_name="startup.thumbnail_refresh",
         )
 
-    _perf._presence_snapshot = _timed("backup.presence_snapshot", _perf._presence_snapshot)
-    _import._backup_items = _timed("backup.build_items", _import._backup_items)
+    _install_backup_probes(MainWindow)
     _backup_ui.export_records = _timed(
         "backup.export_total",
         _backup_ui.export_records,
@@ -330,6 +500,8 @@ def apply_v1_3_4_performance_probe_patch(MainWindow: Any) -> None:
     def patched_init(self: Any, *args: Any, **kwargs: Any) -> None:
         original_init(self, *args, **kwargs)
         self._fh6_startup_finish_scheduled = False
+        self._fh6_perf_livery_relayout_depth = 0
+        self._fh6_perf_livery_relayout_phases = {}
         _install_navigation(self)
 
     MainWindow.__init__ = patched_init
