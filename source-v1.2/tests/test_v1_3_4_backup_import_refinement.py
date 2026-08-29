@@ -227,6 +227,18 @@ class BackupExportReliabilityTests(unittest.TestCase):
 
 
 class BackupViewContractTests(unittest.TestCase):
+    def test_backup_sort_reuses_cards_without_repository_rebuild(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        source = (
+            root / "fh6garage" / "v1_3_4_backup_import_refinement_patch.py"
+        ).read_text(encoding="utf-8")
+        body = source[source.index("def _set_backup_sort_cached"):source.index("def _backup_filter_allows")]
+        self.assertIn("window._fh6_backup_cards.sort", body)
+        self.assertIn("_relayout_backup(window)", body)
+        self.assertNotIn("_rebuild_backup_cards", body)
+        self.assertNotIn("backup_records", body)
+        self.assertIn("_backup_ui._set_backup_sort = _set_backup_sort_cached", source)
+
     def test_backup_view_constructs_only_repository_records(self) -> None:
         root = Path(__file__).resolve().parents[1]
         source = (
