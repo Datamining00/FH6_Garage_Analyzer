@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from PySide6.QtCore import QCoreApplication, QEventLoop, QObject, QThread, QTimer, Qt, Signal, Slot
+from PySide6.QtCore import QCoreApplication, QEventLoop, QObject, QThread, QTimer, Signal, Slot
 
 from fh6garage import v1_3_2_responsiveness_sort_patch as responsive
 from fh6garage import v1_3_4_backup_lazy_load_patch as lazy
@@ -45,10 +45,10 @@ class BackupLoadingResilienceTests(unittest.TestCase):
             loop.quit()
 
         thread.started.connect(emitter.run)
-        emitter.finished.connect(
-            bridge.worker_finished,
-            Qt.ConnectionType.QueuedConnection,
-        )
+        # Match production: the emitter-side Python callback may execute in the
+        # worker thread; it is safe because it only stores the payload and uses
+        # QMetaObject.invokeMethod for the actual GUI-thread delivery.
+        emitter.finished.connect(bridge.enqueue_finished)
         thread.finished.connect(thread_done)
 
         def timeout() -> None:
@@ -116,10 +116,11 @@ class BackupLoadingResilienceTests(unittest.TestCase):
         self.assertNotIn("worker.finished.connect(thread.quit)", source)
         self.assertNotIn("worker.cancelled.connect(thread.quit)", source)
         self.assertNotIn("worker.failed.connect(thread.quit)", source)
+        self.assertIn("QMetaObject.invokeMethod", source)
         self.assertIn("Qt.ConnectionType.QueuedConnection", source)
-        self.assertIn("worker.finished.connect(bridge.worker_finished, queued)", source)
-        self.assertIn("worker.cancelled.connect(bridge.worker_cancelled, queued)", source)
-        self.assertIn("worker.failed.connect(bridge.worker_failed, queued)", source)
+        self.assertIn("worker.finished.connect(bridge.enqueue_finished)", source)
+        self.assertIn("worker.cancelled.connect(bridge.enqueue_cancelled)", source)
+        self.assertIn("worker.failed.connect(bridge.enqueue_failed)", source)
         self.assertIn("_lazy._CARD_BUILD_CHUNK = _BACKUP_CARD_BUILD_CHUNK", source)
         self.assertLess(
             wording.index("apply_v1_3_4_backup_lazy_thread_bridge_patch(MainWindow)"),
