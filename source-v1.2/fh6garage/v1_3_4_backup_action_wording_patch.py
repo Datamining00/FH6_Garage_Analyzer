@@ -15,6 +15,9 @@ from .v1_3_4_backup_import_refinement_patch import (
 from .v1_3_4_backup_toolbar_followup_patch import (
     apply_v1_3_4_backup_toolbar_followup_patch,
 )
+from .v1_3_4_livery_backup_filter_patch import (
+    apply_v1_3_4_livery_backup_filter_patch,
+)
 
 
 def _backup_confirm(window: Any, count: int) -> bool:
@@ -106,6 +109,8 @@ def apply_v1_3_4_backup_action_wording_patch(MainWindow: Any) -> None:
     MainWindow._fh6_v134_backup_action_wording_patched = True
 
     # Final v1.3.4 backup layers: verified dual-tree restore first, then the
-    # exclusive source/location filters, compact counts, and backup bulk export.
+    # exclusive source/location filters, compact counts, backup bulk export,
+    # and the livery-tab not-backed-up filter.
     apply_v1_3_4_backup_import_refinement_patch(MainWindow)
     apply_v1_3_4_backup_toolbar_followup_patch(MainWindow)
+    apply_v1_3_4_livery_backup_filter_patch(MainWindow)
