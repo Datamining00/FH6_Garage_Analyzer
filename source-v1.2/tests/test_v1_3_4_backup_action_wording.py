@@ -12,7 +12,9 @@ class BackupActionWordingTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn('"백업하기"', source)
         self.assertIn("게임 쪽 원본", source)
-        self.assertIn("delete.setEnabled(False)", source)
+        self.assertNotIn("delete.setEnabled(False)", source)
+        self.assertIn("_fh6_export_delete_source_requested", source)
+        self.assertIn("폴더 지문", source)
 
     def test_wording_patch_stays_before_final_thread_affinity_fix(self) -> None:
         root = Path(__file__).resolve().parents[1]
