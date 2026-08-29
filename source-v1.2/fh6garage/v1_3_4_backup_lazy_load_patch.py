@@ -451,9 +451,7 @@ def _build_cards_from_result(window: Any, result: _LoadResult, token: _CancelTok
                 )
             )
 
-        if end < len(items):
-            
-            return
+        
 
         _metrics.record(
             "backup.lazy.card_build",
