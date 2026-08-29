@@ -4,7 +4,7 @@ import json
 import os
 import threading
 import time
-from collections import deque
+from collections import defaultdict, deque
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
@@ -14,10 +14,12 @@ from typing import Any
 
 
 _MAX_RECENT = 300
+_MAX_STARTUP_RECENT = 128
 _MAX_BYTES = 5 * 1024 * 1024
 _ROTATIONS = 3
 _enabled = False
 _recent: deque["PerfEvent"] = deque(maxlen=_MAX_RECENT)
+_startup_recent: deque["PerfEvent"] = deque(maxlen=_MAX_STARTUP_RECENT)
 _lock = threading.RLock()
 _startup_started_ns: int | None = None
 _startup_active = False
@@ -85,13 +87,10 @@ def is_enabled() -> bool:
 
 
 def begin_startup(started_ns: int | None = None) -> None:
-    """Start one always-on launch measurement session.
-
-    Startup profiling is intentionally independent of the user-controlled runtime
-    profiler. Every application launch records its startup path even when normal
-    profiling is disabled.
-    """
+    """Start one always-on launch measurement session."""
     global _startup_started_ns, _startup_active, _startup_waiting_for_scan, _startup_finished
+    with _lock:
+        _startup_recent.clear()
     _startup_started_ns = int(started_ns) if started_ns is not None else time.perf_counter_ns()
     _startup_active = True
     _startup_waiting_for_scan = False
@@ -134,6 +133,36 @@ def _rotate(path: Path) -> None:
             pass
 
 
+def _event(
+    name: str,
+    elapsed_ms: float,
+    *,
+    item_count: int | None = None,
+    byte_count: int | None = None,
+    detail: str = "",
+) -> PerfEvent:
+    return PerfEvent(
+        timestamp=datetime.now(timezone.utc).isoformat(timespec="milliseconds"),
+        name=str(name),
+        elapsed_ms=round(float(elapsed_ms), 3),
+        thread=threading.current_thread().name,
+        item_count=item_count,
+        byte_count=byte_count,
+        detail=str(detail or ""),
+    )
+
+
+def _write_event(event: PerfEvent) -> None:
+    path = log_path()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        _rotate(path)
+        with path.open("a", encoding="utf-8", newline="\n") as handle:
+            handle.write(json.dumps(asdict(event), ensure_ascii=False, separators=(",", ":")) + "\n")
+    except OSError:
+        pass
+
+
 def record(
     name: str,
     elapsed_ms: float,
@@ -145,25 +174,16 @@ def record(
 ) -> None:
     if not _enabled and not force:
         return
-    event = PerfEvent(
-        timestamp=datetime.now(timezone.utc).isoformat(timespec="milliseconds"),
-        name=str(name),
-        elapsed_ms=round(float(elapsed_ms), 3),
-        thread=threading.current_thread().name,
+    event = _event(
+        name,
+        elapsed_ms,
         item_count=item_count,
         byte_count=byte_count,
-        detail=str(detail or ""),
+        detail=detail,
     )
     with _lock:
         _recent.append(event)
-        path = log_path()
-        try:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            _rotate(path)
-            with path.open("a", encoding="utf-8", newline="\n") as handle:
-                handle.write(json.dumps(asdict(event), ensure_ascii=False, separators=(",", ":")) + "\n")
-        except OSError:
-            pass
+        _write_event(event)
 
 
 def record_startup(
@@ -174,15 +194,18 @@ def record_startup(
     byte_count: int | None = None,
     detail: str = "",
 ) -> None:
-    """Record a startup event regardless of runtime profiling state."""
-    record(
+    """Record startup independently from the runtime rolling buffer lifetime."""
+    event = _event(
         name,
         elapsed_ms,
         item_count=item_count,
         byte_count=byte_count,
         detail=detail,
-        force=True,
     )
+    with _lock:
+        _startup_recent.append(event)
+        _recent.append(event)
+        _write_event(event)
 
 
 def finish_startup(*, detail: str = "") -> None:
@@ -227,7 +250,6 @@ def measure_startup(
     byte_count: int | None = None,
     detail: str = "",
 ) -> Iterator[None]:
-    """Always measure one startup phase while the startup session is active."""
     if not startup_active():
         yield
         return
@@ -249,24 +271,74 @@ def recent_events(limit: int = 100) -> list[PerfEvent]:
         return list(_recent)[-max(0, int(limit)):]
 
 
-def format_recent(limit: int = 100) -> str:
-    rows: list[str] = []
-    for event in recent_events(limit):
-        meta: list[str] = []
-        if event.item_count is not None:
-            meta.append(f"items={event.item_count}")
-        if event.byte_count is not None:
-            meta.append(f"bytes={event.byte_count}")
-        if event.detail:
-            meta.append(event.detail)
-        suffix = " · " + " · ".join(meta) if meta else ""
-        rows.append(f"{event.elapsed_ms:10.3f} ms  {event.name}{suffix}  [{event.thread}]")
-    return "\n".join(rows)
+def startup_events() -> list[PerfEvent]:
+    with _lock:
+        return list(_startup_recent)
+
+
+def _format_event(event: PerfEvent) -> str:
+    meta: list[str] = []
+    if event.item_count is not None:
+        meta.append(f"items={event.item_count}")
+    if event.byte_count is not None:
+        meta.append(f"bytes={event.byte_count}")
+    if event.detail:
+        meta.append(event.detail)
+    suffix = " · " + " · ".join(meta) if meta else ""
+    return f"{event.elapsed_ms:10.3f} ms  {event.name}{suffix}  [{event.thread}]"
+
+
+def format_recent(limit: int = 100, *, include_startup: bool = False) -> str:
+    events = recent_events(limit)
+    if not include_startup:
+        events = [event for event in events if not event.name.startswith("startup.")]
+    return "\n".join(_format_event(event) for event in events)
+
+
+def format_startup() -> str:
+    return "\n".join(_format_event(event) for event in startup_events())
+
+
+def aggregate_recent(limit: int = 300, *, include_startup: bool = False) -> list[dict[str, Any]]:
+    events = recent_events(limit)
+    if not include_startup:
+        events = [event for event in events if not event.name.startswith("startup.")]
+    grouped: dict[str, list[float]] = defaultdict(list)
+    for event in events:
+        grouped[event.name].append(float(event.elapsed_ms))
+    rows: list[dict[str, Any]] = []
+    for name, values in grouped.items():
+        total = sum(values)
+        rows.append(
+            {
+                "name": name,
+                "count": len(values),
+                "total_ms": round(total, 3),
+                "avg_ms": round(total / len(values), 3),
+                "max_ms": round(max(values), 3),
+            }
+        )
+    rows.sort(key=lambda row: (-float(row["total_ms"]), str(row["name"])))
+    return rows
+
+
+def format_aggregate(limit: int = 300, *, max_rows: int = 40) -> str:
+    rows = aggregate_recent(limit)
+    if not rows:
+        return ""
+    lines = ["count    total ms      avg ms      max ms  event"]
+    for row in rows[: max(1, int(max_rows))]:
+        lines.append(
+            f"{int(row['count']):5d}  {float(row['total_ms']):10.3f}  "
+            f"{float(row['avg_ms']):10.3f}  {float(row['max_ms']):10.3f}  {row['name']}"
+        )
+    return "\n".join(lines)
 
 
 def clear_recent(*, clear_file: bool = False) -> None:
     with _lock:
         _recent.clear()
+        _startup_recent.clear()
         if clear_file:
             for index in range(_ROTATIONS + 1):
                 path = log_path() if index == 0 else log_path().with_suffix(log_path().suffix + f".{index}")
