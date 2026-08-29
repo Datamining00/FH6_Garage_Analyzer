@@ -94,16 +94,19 @@ class BackupExportBackendTests(unittest.TestCase):
 
 
 class BackupExportPatchContractTests(unittest.TestCase):
-    def test_patch_keeps_import_and_game_delete_read_only(self) -> None:
+    def test_base_patch_keeps_game_source_delete_disabled(self) -> None:
         root = Path(__file__).resolve().parents[1]
         source = (root / "fh6garage" / "v1_3_4_backup_export_patch.py").read_text(encoding="utf-8")
+        refinement = (root / "fh6garage" / "v1_3_4_backup_import_refinement_patch.py").read_text(encoding="utf-8")
         self.assertIn('delete.setEnabled(False)', source)
-        self.assertIn('operation="import"', source)
         self.assertIn('"위치: 백업"', source)
         self.assertIn('"위치: 게임 + 백업"', source)
         self.assertIn('card_icon("import"', source)
         self.assertIn('card_icon("export"', source)
         self.assertNotIn("shutil.rmtree(record.container_path", source)
+        self.assertIn("def import_backup_entry(", refinement)
+        self.assertIn('delete_source: bool = False', refinement)
+        self.assertIn('resolve_import_targets(save_root, active_version)', refinement)
 
     def test_backup_patch_runs_before_final_thread_affinity_fix(self) -> None:
         app = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
