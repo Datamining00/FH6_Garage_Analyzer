@@ -411,12 +411,24 @@ def _build_cards_from_result(window: Any, result: _LoadResult, token: _CancelTok
     pending: list[Any] = []
     reused_ids: set[int] = set()
     started = time.perf_counter_ns()
+    state = {"start": 0}
+    timer = QTimer(window)
+    timer.setInterval(1)
+    window._fh6_backup_card_chunk_timer = timer
 
-    def build_chunk(start: int = 0) -> None:
+    def stop_timer() -> None:
+        timer.stop()
+        if getattr(window, "_fh6_backup_card_chunk_timer", None) is timer:
+            window._fh6_backup_card_chunk_timer = None
+        timer.deleteLater()
+
+    def build_chunk() -> None:
         if token is not getattr(window, "_fh6_backup_cancel_token", None) or token.cancelled():
+            stop_timer()
             _dispose_pending_cards(pending, reused_ids)
             _load_cancelled(window)
             return
+        start = state["start"]
         end = min(len(items), start + _CARD_BUILD_CHUNK)
         try:
             for index in range(start, end):
@@ -434,10 +446,12 @@ def _build_cards_from_result(window: Any, result: _LoadResult, token: _CancelTok
                 card.setProperty("backupRecord", record)
                 pending.append(card)
         except BackupLoadCancelled:
+            stop_timer()
             _dispose_pending_cards(pending, reused_ids)
             _load_cancelled(window)
             return
         except Exception as exc:  # noqa: BLE001 - UI build boundary
+            stop_timer()
             _dispose_pending_cards(pending, reused_ids)
             _load_failed(window, f"{type(exc).__name__}: {exc}")
             return
@@ -451,8 +465,11 @@ def _build_cards_from_result(window: Any, result: _LoadResult, token: _CancelTok
                 )
             )
 
-        
+        if end < len(items):
+            state["start"] = end
+            return
 
+        stop_timer()
         _metrics.record(
             "backup.lazy.card_build",
             (time.perf_counter_ns() - started) / 1_000_000.0,
@@ -463,10 +480,12 @@ def _build_cards_from_result(window: Any, result: _LoadResult, token: _CancelTok
         _load_finished(window)
 
     if not items:
+        stop_timer()
         _commit_cards(window, result, [], set())
         _load_finished(window)
         return
-    QTimer.singleShot(0, build_chunk)
+    timer.timeout.connect(build_chunk)
+    timer.start()
 
 
 def _clear_load_thread(window: Any) -> None:
