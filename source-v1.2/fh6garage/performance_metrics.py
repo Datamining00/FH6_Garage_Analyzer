@@ -14,12 +14,11 @@ from typing import Any
 
 
 _MAX_RECENT = 300
-_MAX_STARTUP_RECENT = 128
 _MAX_BYTES = 5 * 1024 * 1024
 _ROTATIONS = 3
 _enabled = False
 _recent: deque["PerfEvent"] = deque(maxlen=_MAX_RECENT)
-_startup_recent: deque["PerfEvent"] = deque(maxlen=_MAX_STARTUP_RECENT)
+_startup_recent: list["PerfEvent"] = []
 _aggregate_samples: dict[str, dict[str, float | int]] = {}
 _lock = threading.RLock()
 _startup_started_ns: int | None = None
