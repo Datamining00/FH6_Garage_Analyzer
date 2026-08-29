@@ -29,6 +29,7 @@ from .backup_export import (
 )
 from .card_icons import icon as card_icon
 from .models import LiveryRecord
+from . import performance_metrics as _metrics
 
 
 _IMPORT_STAGING = ".fh6_assistant_import_staging"
@@ -464,12 +465,53 @@ def _configure_backup_card(
     card._fh6_backup_entry = dict(entry)
 
 
+def _backup_rebuild_controls(window: Any) -> list[Any]:
+    controls = list(getattr(window, "backup_sort_buttons", {}).values())
+    controls.extend(
+        getattr(window, name, None)
+        for name in (
+            "backup_filter_button",
+            "backup_livery_toggle",
+            "backup_auction_toggle",
+            "backup_only_toggle",
+            "backup_both_toggle",
+        )
+    )
+    return [control for control in controls if control is not None]
+
+
+def _begin_backup_rebuild_ui(window: Any, generation: int) -> None:
+    # A superseded asynchronous build must release its busy depth before the
+    # replacement acquires it. This also makes every exit path exception-safe.
+    if getattr(window, "_fh6_backup_busy_generation", None) is not None:
+        _end_backup_rebuild_ui(window)
+    window._fh6_backup_busy_generation = generation
+    for control in _backup_rebuild_controls(window):
+        control.setEnabled(False)
+    begin = getattr(window, "_begin_busy", None)
+    if callable(begin):
+        begin(_txt("백업 목록을 업데이트하는 중...", "Updating backup list..."))
+
+
+def _end_backup_rebuild_ui(window: Any, generation: int | None = None) -> None:
+    active = getattr(window, "_fh6_backup_busy_generation", None)
+    if active is None or (generation is not None and active != generation):
+        return
+    window._fh6_backup_busy_generation = None
+    for control in _backup_rebuild_controls(window):
+        control.setEnabled(True)
+    end = getattr(window, "_end_busy", None)
+    if callable(end):
+        end()
+
+
 def _rebuild_backup_cards(window: Any) -> None:
     if not hasattr(window, "backup_grid_layout"):
         return
 
     generation = int(getattr(window, "_fh6_backup_build_generation", 0)) + 1
     window._fh6_backup_build_generation = generation
+    _begin_backup_rebuild_ui(window, generation)
     _backup_ui._clear_backup_grid(window)
     try:
         items = _backup_items(window)
@@ -482,16 +524,22 @@ def _rebuild_backup_cards(window: Any) -> None:
             _txt("백업 인덱스 오류", "Backup index error"),
             str(exc),
         )
+        _end_backup_rebuild_ui(window, generation)
         return
+    except Exception:
+        _end_backup_rebuild_ui(window, generation)
+        raise
 
     counts = _status_counts(items)
     total = len(items)
     factory = getattr(window, "_fh6_backup_original_make_saved_content_card", None)
     if not callable(factory):
+        _end_backup_rebuild_ui(window, generation)
         return
     if total == 0:
         window.backup_status_label.setText(_final_status(counts))
         _backup_ui._relayout_backup(window)
+        _end_backup_rebuild_ui(window, generation)
         return
 
     window.backup_status_label.setText(
@@ -503,15 +551,20 @@ def _rebuild_backup_cards(window: Any) -> None:
 
     def build_chunk(start: int = 0) -> None:
         if generation != getattr(window, "_fh6_backup_build_generation", 0):
+            _end_backup_rebuild_ui(window, generation)
             return
-        end = min(total, start + _perf._CARD_BUILD_CHUNK)
-        for index in range(start, end):
-            entry, record, location = items[index]
-            key = f"backup::{record.kind}::{record.content_sha256 or record.container_name}::{index}"
-            card = factory("livery", record, key)
-            _configure_backup_card(window, card, record, entry, location)
-            card.setProperty("backupRecord", record)
-            window._fh6_backup_cards.append(card)
+        try:
+            end = min(total, start + _perf._CARD_BUILD_CHUNK)
+            for index in range(start, end):
+                entry, record, location = items[index]
+                key = f"backup::{record.kind}::{record.content_sha256 or record.container_name}::{index}"
+                card = factory("livery", record, key)
+                _configure_backup_card(window, card, record, entry, location)
+                card.setProperty("backupRecord", record)
+                window._fh6_backup_cards.append(card)
+        except Exception:
+            _end_backup_rebuild_ui(window, generation)
+            raise
 
         if end < total:
             window.backup_status_label.setText(
@@ -527,6 +580,7 @@ def _rebuild_backup_cards(window: Any) -> None:
         _backup_ui._relayout_backup(window)
         QTimer.singleShot(0, lambda owner=window: _backup_ui._sync_backup_widths(owner))
         QTimer.singleShot(0, lambda owner=window: _backup_ui._refresh_backup_thumbnails(owner))
+        _end_backup_rebuild_ui(window, generation)
 
     QTimer.singleShot(0, build_chunk)
 
@@ -545,6 +599,12 @@ def _set_backup_sort_cached(window: Any, mode: str) -> None:
 
     window._fh6_backup_cards.sort(key=card_key)
     _backup_ui._relayout_backup(window)
+    card_count = len(window._fh6_backup_cards)
+    _metrics.record("backup.sort.rebuild_triggered", 0.0, item_count=0)
+    _metrics.record("backup.sort.repository_records", 0.0, item_count=0)
+    _metrics.record("backup.sort.card_created", 0.0, item_count=0)
+    _metrics.record("backup.sort.card_reused", 0.0, item_count=card_count)
+    _metrics.record("backup.sort.layout_only", 0.0, item_count=card_count)
 
 
 def _backup_filter_allows(window: Any, card: Any) -> bool:
@@ -943,6 +1003,7 @@ def apply_v1_3_4_backup_import_refinement_patch(MainWindow: Any) -> None:
         self._fh6_import_thread = None
         self._fh6_import_worker = None
         self._fh6_import_bridge = None
+        self._fh6_backup_busy_generation = None
         original_init(self, *args, **kwargs)
         _install_backup_display_row(self)
         _sync_backup_design(self)
