@@ -17,6 +17,7 @@ from .auction_thumbnails import (
     read_thumbnail_manifest,
 )
 from .models import LiveryRecord, TuningRecord
+from . import performance_metrics as _performance_metrics
 from .performance_metrics import write_latest_performance
 from .ui import MainWindow as _UiMainWindow
 
@@ -189,6 +190,7 @@ def apply_v1_3_2_thread_affinity_fix(MainWindow) -> None:
         ui_started = perf_counter()
         result = self.result
         if result is not None:
+            thumbnail_match_started = perf_counter()
             try:
                 cache_getter = getattr(self, "_fh6_v132_current_cache_path", None)
                 cache_path = cache_getter() if callable(cache_getter) else None
@@ -199,8 +201,22 @@ def apply_v1_3_2_thread_affinity_fix(MainWindow) -> None:
             except Exception:  # noqa: BLE001 - optional cache integration
                 # Cache integration is optional and must never block save loading.
                 self._fh6_v132_match_stats = None
+            finally:
+                if _performance_metrics.startup_active():
+                    _performance_metrics.record_startup(
+                        "startup.populate.pre_car.auction_thumbnail_match",
+                        (perf_counter() - thumbnail_match_started) * 1000.0,
+                        item_count=len(result.liveries),
+                    )
 
+        index_started = perf_counter()
         _rebuild_v132_indexes(self)
+        if _performance_metrics.startup_active():
+            _performance_metrics.record_startup(
+                "startup.populate.pre_car.record_indexes",
+                (perf_counter() - index_started) * 1000.0,
+                item_count=(len(result.liveries) + len(result.tunings)) if result is not None else 0,
+            )
 
         # The synchronous initial build must remain identical in scope to 1.3.1:
         # only normal My Designs records are exposed to the existing table/grid.

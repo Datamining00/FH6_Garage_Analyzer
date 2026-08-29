@@ -21,6 +21,7 @@ from .i18n import get_language
 _SETTING_KEY = "performance_profiling_enabled"
 _SLOW_WIDTH_SYNC_MS = 10.0
 _POPULATE_CHILD_PREFIX = "startup.populate."
+_LIVERY_PHASE_PREFIX = "populate.livery.phase."
 
 
 def _txt(ko: str, en: str) -> str:
@@ -71,6 +72,44 @@ def _populate_child_exit(owner: Any, startup_name: str, started_ns: int, ended_n
     state["previous"] = startup_name.removeprefix(_POPULATE_CHILD_PREFIX)
 
 
+def _livery_phase_accumulate(owner: Any, name: str, elapsed_ms: float) -> None:
+    phases = getattr(owner, "_fh6_perf_livery_populate_phases", None)
+    if not isinstance(phases, dict):
+        return
+    row = phases.setdefault(name, {"count": 0, "total_ms": 0.0, "max_ms": 0.0})
+    row["count"] = int(row["count"]) + 1
+    row["total_ms"] = float(row["total_ms"]) + elapsed_ms
+    row["max_ms"] = max(float(row["max_ms"]), elapsed_ms)
+
+
+def _livery_phase(name: str, fn: Callable[..., Any]):
+    @wraps(fn)
+    def wrapped(*args: Any, **kwargs: Any):
+        owner = args[0] if args else None
+        if not isinstance(getattr(owner, "_fh6_perf_livery_populate_phases", None), dict):
+            return fn(*args, **kwargs)
+        started = time.perf_counter_ns()
+        try:
+            return fn(*args, **kwargs)
+        finally:
+            _livery_phase_accumulate(owner, name, (time.perf_counter_ns() - started) / 1_000_000.0)
+    return wrapped
+
+
+def _emit_livery_populate_phases(owner: Any, *, startup: bool, runtime: bool) -> None:
+    phases = getattr(owner, "_fh6_perf_livery_populate_phases", None)
+    if not isinstance(phases, dict):
+        return
+    for name, row in phases.items():
+        count = int(row["count"])
+        total_ms = float(row["total_ms"])
+        detail = f"count={count};avg_ms={total_ms / count if count else 0.0:.3f};max_ms={float(row['max_ms']):.3f}"
+        if startup:
+            _metrics.record_startup(f"startup.{_LIVERY_PHASE_PREFIX}{name}", total_ms, item_count=count, detail=detail)
+        if runtime:
+            _metrics.record(f"ui.{_LIVERY_PHASE_PREFIX}{name}", total_ms, item_count=count, detail=detail)
+
+
 def _timed(
     name: str,
     fn: Callable[..., Any],
@@ -87,11 +126,14 @@ def _timed(
         runtime = _metrics.is_enabled()
         startup = bool(startup_name and _metrics.startup_active())
         owner = args[0] if args else None
+        livery_root = name == "ui.populate.livery"
         relayout_phase = bool(phase_name and int(getattr(owner, "_fh6_perf_livery_relayout_depth", 0) or 0) > 0)
         if not runtime and not startup and not relayout_phase:
             return fn(*args, **kwargs)
         count = _count_items(item_count, args, kwargs)
         started = time.perf_counter_ns()
+        if livery_root:
+            owner._fh6_perf_livery_populate_phases = {}
         populate_child = bool(startup and startup_name and startup_name.startswith(_POPULATE_CHILD_PREFIX))
         if populate_child:
             _populate_child_enter(owner, startup_name, started)
@@ -102,6 +144,9 @@ def _timed(
             elapsed = (ended - started) / 1_000_000.0
             if populate_child:
                 _populate_child_exit(owner, startup_name, started, ended)
+            if livery_root:
+                _emit_livery_populate_phases(owner, startup=startup, runtime=runtime)
+                owner._fh6_perf_livery_populate_phases = None
             if phase_name:
                 _phase_accumulate(owner, phase_name, elapsed)
             if startup and startup_name:
@@ -478,6 +523,11 @@ def _install_backup_probes(MainWindow: Any) -> None:
         _backup_ui._backup_sort_key,
         aggregate_only=True,
     )
+    _backup_ui._set_backup_sort = _timed(
+        "backup.sort.total",
+        _backup_ui._set_backup_sort,
+        item_count=lambda window, *_args, **_kwargs: len(getattr(window, "_fh6_backup_cards", []) or []),
+    )
     _import._backup_items = _timed("backup.build_items", _import._backup_items)
     _import._rebuild_backup_cards = _timed("backup.rebuild_request", _import._rebuild_backup_cards)
     _import._configure_backup_card = _timed(
@@ -551,6 +601,20 @@ def _install_probes(MainWindow: Any) -> None:
             _schedule_startup_ready(self)
 
     MainWindow._populate_all = populate_all
+
+    for attr, phase_name in (
+        ("_populate_saved_content_table", "table_prepare"),
+        ("_populate_livery_grid", "grid_total"),
+        ("_sorted_liveries", "record_prepare"),
+        ("_make_livery_card", "card_create"),
+        ("_annotation_key", "card_lookup_key"),
+        ("_livery_search_text", "search_status_apply"),
+        ("_keep_busy_responsive", "event_yield"),
+        ("_relayout_livery_grid", "final_relayout"),
+    ):
+        fn = getattr(MainWindow, attr, None)
+        if callable(fn):
+            setattr(MainWindow, attr, _livery_phase(phase_name, fn))
 
     for attr, runtime_name, startup_name in (
         ("_populate_car_table", "ui.populate.car_table", "startup.populate.car_table"),
