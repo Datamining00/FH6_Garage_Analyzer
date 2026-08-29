@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from PySide6.QtCore import QCoreApplication, QEventLoop, QObject, QThread, QTimer, Signal, Slot
+from PySide6.QtCore import QCoreApplication, QEventLoop, QObject, QThread, QTimer, Qt, Signal, Slot
 
 from fh6garage import v1_3_2_responsiveness_sort_patch as responsive
 from fh6garage import v1_3_4_backup_lazy_load_patch as lazy
@@ -45,7 +45,10 @@ class BackupLoadingResilienceTests(unittest.TestCase):
             loop.quit()
 
         thread.started.connect(emitter.run)
-        emitter.finished.connect(bridge.worker_finished)
+        emitter.finished.connect(
+            bridge.worker_finished,
+            Qt.ConnectionType.QueuedConnection,
+        )
         thread.finished.connect(thread_done)
 
         def timeout() -> None:
@@ -113,7 +116,10 @@ class BackupLoadingResilienceTests(unittest.TestCase):
         self.assertNotIn("worker.finished.connect(thread.quit)", source)
         self.assertNotIn("worker.cancelled.connect(thread.quit)", source)
         self.assertNotIn("worker.failed.connect(thread.quit)", source)
-        self.assertIn("worker.finished.connect(bridge.worker_finished)", source)
+        self.assertIn("Qt.ConnectionType.QueuedConnection", source)
+        self.assertIn("worker.finished.connect(bridge.worker_finished, queued)", source)
+        self.assertIn("worker.cancelled.connect(bridge.worker_cancelled, queued)", source)
+        self.assertIn("worker.failed.connect(bridge.worker_failed, queued)", source)
         self.assertIn("_lazy._CARD_BUILD_CHUNK = _BACKUP_CARD_BUILD_CHUNK", source)
         self.assertLess(
             wording.index("apply_v1_3_4_backup_lazy_thread_bridge_patch(MainWindow)"),
