@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from fh6garage.backup_export import INDEX_NAME
+from fh6garage.backup_export import INDEX_NAME, SCHEMA
 from fh6garage.models import HeaderInfo, LiveryRecord
 from fh6garage.v1_3_4_backup_lazy_load_patch import (
     BackupLoadCancelled,
@@ -62,7 +62,7 @@ class BackupLazyLoadTests(unittest.TestCase):
                 self._entry("backup-only", str(second.relative_to(root)), "def"),
             ]
             (root / INDEX_NAME).write_text(
-                json.dumps({"entries": entries}),
+                json.dumps({"schema": SCHEMA, "entries": entries}),
                 encoding="utf-8",
             )
             game_same = self._game_record("same", "abc")
