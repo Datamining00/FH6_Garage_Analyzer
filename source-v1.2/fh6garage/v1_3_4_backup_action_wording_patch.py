@@ -5,10 +5,12 @@ from typing import Any
 from PySide6.QtCore import QSize
 from PySide6.QtWidgets import QMessageBox, QToolButton
 
+from . import performance_metrics as _performance_metrics
 from . import v1_3_4_backup_export_patch as _backup_ui
 from . import v1_3_4_backup_export_performance_ui_patch as _perf
 from .card_icons import icon as card_icon
 from .models import LiveryRecord
+from .performance_measurement_guard import install_performance_measurement_guard
 from .v1_3_4_backup_import_refinement_patch import (
     apply_v1_3_4_backup_import_refinement_patch,
 )
@@ -21,6 +23,11 @@ from .v1_3_4_livery_backup_filter_patch import (
 from .v1_3_4_performance_probe_patch import (
     apply_v1_3_4_performance_probe_patch,
 )
+
+# Install the collector guard while app.py imports the release patch stack, before
+# main() starts the always-on startup session. This keeps JSONL I/O outside the
+# measured startup path and makes uncertainty/observer-overhead visible.
+install_performance_measurement_guard(_performance_metrics)
 
 
 def _backup_confirm(window: Any, count: int) -> bool:
