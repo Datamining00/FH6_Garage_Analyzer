@@ -8,6 +8,7 @@ from PySide6.QtCore import QTimer, Qt
 from PySide6.QtWidgets import QGridLayout, QMessageBox, QToolButton, QWidget
 
 from . import v1_3_4_backup_export_patch as _backup_ui
+from . import v1_3_4_backup_import_refinement_patch as _backup_ref
 from . import v1_3_4_card_features_patch as _features
 from .backup_export import ExportSummary, content_sha256, folder_fingerprint, load_index
 from .models import LiveryRecord
@@ -22,39 +23,19 @@ def _normalize_action_spacing(card: Any) -> None:
     grid = getattr(card, "_fh6_action_grid", None)
     if not isinstance(grid, QGridLayout):
         return
-
-    left = [
-        getattr(card, name, None)
-        for name in (
-            "_fh6_game_move_button",
-            "_fh6_zoom_button",
-            "_fh6_memo_button",
-            "_fh6_info_button",
-            "_fh6_folder_button",
-            "_fh6_export_placeholder_button",
-        )
-    ]
-    right = [
-        getattr(card, name, None)
-        for name in (
-            "_fh6_applied_state_button",
-            "_fh6_lock_placeholder_button",
-            "_fh6_hide_button",
-            "_fh6_check_box",
-            "_fh6_triangle_box",
-            "_fh6_excluded_box",
-        )
-    ]
+    left = [getattr(card, name, None) for name in (
+        "_fh6_game_move_button", "_fh6_zoom_button", "_fh6_memo_button",
+        "_fh6_info_button", "_fh6_folder_button", "_fh6_export_placeholder_button",
+    )]
+    right = [getattr(card, name, None) for name in (
+        "_fh6_applied_state_button", "_fh6_lock_placeholder_button", "_fh6_hide_button",
+        "_fh6_check_box", "_fh6_triangle_box", "_fh6_excluded_box",
+    )]
     if not any(isinstance(button, QToolButton) for button in left + right):
         return
-
-    # Six fixed 30 px icon rows are separated by five equally stretched spacer
-    # rows. This makes the center-to-center spacing identical on both sides for
-    # every thumbnail height, including cards with an intentionally empty slot.
     for button in left + right:
         if isinstance(button, QToolButton):
             grid.removeWidget(button)
-
     grid.setContentsMargins(5, 5, 5, 5)
     grid.setHorizontalSpacing(0)
     grid.setVerticalSpacing(0)
@@ -63,24 +44,13 @@ def _normalize_action_spacing(card: Any) -> None:
     for row in range(_ICON_SLOT_COUNT * 2 - 1):
         grid.setRowMinimumHeight(row, _ICON_BUTTON_HEIGHT if row % 2 == 0 else 0)
         grid.setRowStretch(row, 0 if row % 2 == 0 else 1)
-
     for slot, (left_button, right_button) in enumerate(zip(left, right)):
         row = slot * 2
         if isinstance(left_button, QToolButton):
-            grid.addWidget(
-                left_button,
-                row,
-                0,
-                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
-            )
+            grid.addWidget(left_button, row, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
             left_button.show()
         if isinstance(right_button, QToolButton):
-            grid.addWidget(
-                right_button,
-                row,
-                1,
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
-            )
+            grid.addWidget(right_button, row, 1, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             right_button.show()
     grid.invalidate()
 
@@ -92,17 +62,14 @@ def _set_metadata_collapsed_fast(window: Any, collapsed: bool) -> None:
     if callable(setter):
         setter(_features._METADATA_COLLAPSED_PREF, collapsed)
     window._fh6_v134_metadata_collapsed = collapsed
-
     cards = _features._registered_metadata_cards(window)
     sender = window.sender() if hasattr(window, "sender") else None
     active_card = sender.parentWidget() if isinstance(sender, QToolButton) else None
-
     ordered: list[QWidget] = []
     if isinstance(active_card, QWidget) and active_card in cards:
         ordered.append(active_card)
     ordered.extend(card for card in cards if card is not active_card and card.isVisible())
     ordered.extend(card for card in cards if card is not active_card and not card.isVisible())
-
     generation = int(getattr(window, "_fh6_metadata_toggle_generation", 0) or 0) + 1
     window._fh6_metadata_toggle_generation = generation
 
@@ -118,14 +85,12 @@ def _set_metadata_collapsed_fast(window: Any, collapsed: bool) -> None:
                 continue
         if end < len(ordered):
             QTimer.singleShot(0, lambda next_start=end: apply_chunk(next_start))
-
-    # Update the clicked/first visible group immediately; defer the rest so a
-    # single arrow click never performs hundreds of grid mutations synchronously.
     apply_chunk(0)
 
 
 def _verified_backup_path(root: Path, record: LiveryRecord) -> Path | None:
     try:
+        root = root.resolve()
         source = Path(record.container_path).resolve()
         digest = content_sha256(record).casefold()
         source_fingerprint = folder_fingerprint(source)
@@ -175,10 +140,7 @@ def _safe_source_path(window: Any, record: LiveryRecord) -> Path | None:
         relative = source.relative_to(root)
     except (OSError, ValueError):
         return None
-    if not relative.parts or source == root or not source.is_dir():
-        return None
-    livery = source / "C_livery"
-    if not livery.is_file():
+    if not relative.parts or source == root or not source.is_dir() or not (source / "C_livery").is_file():
         return None
     return source
 
@@ -191,7 +153,6 @@ def _delete_verified_sources(window: Any, records: list[LiveryRecord]) -> tuple[
         root = root.resolve()
     except OSError:
         return 0, ["backup repository path cannot be resolved"]
-
     deleted = 0
     failures: list[str] = []
     for record in records:
@@ -229,7 +190,6 @@ def _schedule_rescan(window: Any) -> None:
 def apply_v1_3_4_card_polish_export_delete_patch(MainWindow: Any) -> None:
     if getattr(MainWindow, "_fh6_v134_card_polish_export_delete_patched", False):
         return
-
     original_make_card = MainWindow._make_saved_content_card
 
     def make_card(self: Any, content_type: str, record: Any, key: str):
@@ -237,7 +197,14 @@ def apply_v1_3_4_card_polish_export_delete_patch(MainWindow: Any) -> None:
         _normalize_action_spacing(card)
         return card
 
+    original_backup_configure = _backup_ref._configure_backup_card
+
+    def configure_backup_card(window: Any, card: Any, *args: Any, **kwargs: Any) -> None:
+        original_backup_configure(window, card, *args, **kwargs)
+        _normalize_action_spacing(card)
+
     _features._set_metadata_collapsed = _set_metadata_collapsed_fast
+    _backup_ref._configure_backup_card = configure_backup_card
 
     original_request_export = _backup_ui._request_export
     original_export_finished = _backup_ui._export_finished
@@ -245,7 +212,6 @@ def apply_v1_3_4_card_polish_export_delete_patch(MainWindow: Any) -> None:
 
     def request_export(window: Any, records: list[LiveryRecord]) -> None:
         window._fh6_export_source_candidates = list(records)
-        # The confirmation callback sets this to True only for Delete source.
         window._fh6_export_delete_source_requested = False
         original_request_export(window, records)
         if not bool(getattr(window, "_fh6_export_running", False)):
@@ -264,13 +230,10 @@ def apply_v1_3_4_card_polish_export_delete_patch(MainWindow: Any) -> None:
         original_export_finished(window, result)
         if delete_requested:
             if deleted:
-                window._show_status(
-                    _backup_ui._txt(
-                        f"백업 검증 후 게임 원본 {deleted}개를 삭제했습니다.",
-                        f"Deleted {deleted} game-side source item(s) after backup verification.",
-                    ),
-                    7000,
-                )
+                window._show_status(_backup_ui._txt(
+                    f"백업 검증 후 게임 원본 {deleted}개를 삭제했습니다.",
+                    f"Deleted {deleted} game-side source item(s) after backup verification.",
+                ), 7000)
                 _schedule_rescan(window)
             if failures:
                 QMessageBox.warning(
