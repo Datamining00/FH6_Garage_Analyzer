@@ -88,9 +88,9 @@ def _format_copy_payload() -> str:
     summary = _metrics.format_aggregate(300, max_rows=60) or _txt("집계 기록 없음", "No aggregate measurements")
     recent = _metrics.format_recent(300) or _txt("런타임 측정 기록 없음", "No runtime measurements")
     return (
-        f"[{_txt('최근 시작 결과', 'Latest startup')} ]\n{startup}\n\n"
-        f"[{_txt('런타임 집계', 'Runtime summary')} ]\n{summary}\n\n"
-        f"[{_txt('최근 런타임 이벤트', 'Recent runtime events')} ]\n{recent}"
+        f"[{_txt('최근 시작 결과', 'Latest startup')}]\n{startup}\n\n"
+        f"[{_txt('런타임 집계', 'Runtime summary')}]\n{summary}\n\n"
+        f"[{_txt('최근 런타임 이벤트', 'Recent runtime events')}]\n{recent}"
     )
 
 
@@ -330,25 +330,62 @@ def _wrap_relayout(MainWindow: Any) -> None:
                         item_count=count,
                         detail="total minus measured sub-phases",
                     )
+                if startup:
+                    for phase_name, phase_ms in phases.items():
+                        _metrics.record_startup(
+                            f"startup.livery_relayout.{phase_name}",
+                            float(phase_ms),
+                            item_count=count,
+                        )
+                    _metrics.record_startup(
+                        "startup.livery_relayout.unaccounted",
+                        residual,
+                        item_count=count,
+                        detail="total minus measured sub-phases",
+                    )
                 self._fh6_perf_livery_relayout_phases = {}
 
     MainWindow._relayout_livery_grid = wrapped
 
 
 def _install_relayout_internal_probes(MainWindow: Any) -> None:
-    # The relayout implementation calls these module globals directly, so probing
-    # only MainWindow methods misses the expensive internal path.
-    _responsive._responsive_clear_grid_layout = _timed(
-        "ui.livery_relayout.clear_layout",
-        _responsive._responsive_clear_grid_layout,
-        phase_name="clear_layout",
-    )
-    _responsive._responsive_layout_visible_grid_cards = _timed(
-        "ui.livery_relayout.layout_visible",
-        _responsive._responsive_layout_visible_grid_cards,
-        item_count=lambda self, content_type, cards, *a, **k: len(cards) if content_type == "livery" else None,
-        phase_name="layout_visible",
-    )
+    original_clear = _responsive._responsive_clear_grid_layout
+
+    @wraps(original_clear)
+    def timed_clear(self: Any, content_type: str, *args: Any, **kwargs: Any):
+        active = content_type == "livery" and int(getattr(self, "_fh6_perf_livery_relayout_depth", 0) or 0) > 0
+        if not active and not _metrics.is_enabled():
+            return original_clear(self, content_type, *args, **kwargs)
+        started = time.perf_counter_ns()
+        try:
+            return original_clear(self, content_type, *args, **kwargs)
+        finally:
+            elapsed = (time.perf_counter_ns() - started) / 1_000_000.0
+            if active:
+                _phase_accumulate(self, "clear_layout", elapsed)
+            if _metrics.is_enabled() and content_type == "livery":
+                _metrics.record("ui.livery_relayout.clear_layout", elapsed)
+
+    _responsive._responsive_clear_grid_layout = timed_clear
+
+    original_layout = _responsive._responsive_layout_visible_grid_cards
+
+    @wraps(original_layout)
+    def timed_layout(self: Any, content_type: str, cards: list[Any], *args: Any, **kwargs: Any):
+        active = content_type == "livery" and int(getattr(self, "_fh6_perf_livery_relayout_depth", 0) or 0) > 0
+        if not active and not _metrics.is_enabled():
+            return original_layout(self, content_type, cards, *args, **kwargs)
+        started = time.perf_counter_ns()
+        try:
+            return original_layout(self, content_type, cards, *args, **kwargs)
+        finally:
+            elapsed = (time.perf_counter_ns() - started) / 1_000_000.0
+            if active:
+                _phase_accumulate(self, "layout_visible", elapsed)
+            if _metrics.is_enabled() and content_type == "livery":
+                _metrics.record("ui.livery_relayout.layout_visible", elapsed, item_count=len(cards))
+
+    _responsive._responsive_layout_visible_grid_cards = timed_layout
     _responsive._livery_visibility_allowed = _timed(
         "ui.livery_relayout.visibility",
         _responsive._livery_visibility_allowed,
@@ -370,7 +407,7 @@ def _install_relayout_internal_probes(MainWindow: Any) -> None:
             elapsed = (time.perf_counter_ns() - started) / 1_000_000.0
             if active:
                 _phase_accumulate(self, "process_events", elapsed)
-            if _metrics.is_enabled():
+            if _metrics.is_enabled() and active:
                 _metrics.add_sample("ui.livery_relayout.process_events", elapsed)
 
     _responsive._yield_busy_events = timed_yield
@@ -388,7 +425,6 @@ def _install_relayout_internal_probes(MainWindow: Any) -> None:
             "ui.livery_relayout.width_sync",
             MainWindow._sync_livery_grid_card_widths,
             item_count=lambda self, *a, **k: len(getattr(self, "_livery_grid_cards", []) or []),
-            startup_name="startup.livery_relayout.width_sync",
             aggregate_only=True,
             slow_threshold_ms=_SLOW_WIDTH_SYNC_MS,
             phase_name="width_sync",
