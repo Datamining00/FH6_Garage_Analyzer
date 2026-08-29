@@ -19,6 +19,10 @@ _ROTATIONS = 3
 _enabled = False
 _recent: deque["PerfEvent"] = deque(maxlen=_MAX_RECENT)
 _lock = threading.RLock()
+_startup_started_ns: int | None = None
+_startup_active = False
+_startup_waiting_for_scan = False
+_startup_finished = False
 
 
 @dataclass(slots=True)
@@ -80,6 +84,39 @@ def is_enabled() -> bool:
     return _enabled
 
 
+def begin_startup(started_ns: int | None = None) -> None:
+    """Start one always-on launch measurement session.
+
+    Startup profiling is intentionally independent of the user-controlled runtime
+    profiler. Every application launch records its startup path even when normal
+    profiling is disabled.
+    """
+    global _startup_started_ns, _startup_active, _startup_waiting_for_scan, _startup_finished
+    _startup_started_ns = int(started_ns) if started_ns is not None else time.perf_counter_ns()
+    _startup_active = True
+    _startup_waiting_for_scan = False
+    _startup_finished = False
+
+
+def startup_active() -> bool:
+    return bool(_startup_active and not _startup_finished and _startup_started_ns is not None)
+
+
+def set_startup_waiting_for_scan(value: bool) -> None:
+    global _startup_waiting_for_scan
+    _startup_waiting_for_scan = bool(value)
+
+
+def startup_waiting_for_scan() -> bool:
+    return bool(_startup_waiting_for_scan)
+
+
+def startup_elapsed_ms() -> float:
+    if _startup_started_ns is None:
+        return 0.0
+    return max(0.0, (time.perf_counter_ns() - _startup_started_ns) / 1_000_000.0)
+
+
 def _rotate(path: Path) -> None:
     try:
         if not path.is_file() or path.stat().st_size < _MAX_BYTES:
@@ -104,8 +141,9 @@ def record(
     item_count: int | None = None,
     byte_count: int | None = None,
     detail: str = "",
+    force: bool = False,
 ) -> None:
-    if not _enabled:
+    if not _enabled and not force:
         return
     event = PerfEvent(
         timestamp=datetime.now(timezone.utc).isoformat(timespec="milliseconds"),
@@ -128,6 +166,35 @@ def record(
             pass
 
 
+def record_startup(
+    name: str,
+    elapsed_ms: float,
+    *,
+    item_count: int | None = None,
+    byte_count: int | None = None,
+    detail: str = "",
+) -> None:
+    """Record a startup event regardless of runtime profiling state."""
+    record(
+        name,
+        elapsed_ms,
+        item_count=item_count,
+        byte_count=byte_count,
+        detail=detail,
+        force=True,
+    )
+
+
+def finish_startup(*, detail: str = "") -> None:
+    global _startup_active, _startup_finished, _startup_waiting_for_scan
+    if not startup_active():
+        return
+    record_startup("startup.total", startup_elapsed_ms(), detail=detail)
+    _startup_finished = True
+    _startup_active = False
+    _startup_waiting_for_scan = False
+
+
 @contextmanager
 def measure(
     name: str,
@@ -144,6 +211,31 @@ def measure(
         yield
     finally:
         record(
+            name,
+            (time.perf_counter_ns() - started) / 1_000_000.0,
+            item_count=item_count,
+            byte_count=byte_count,
+            detail=detail,
+        )
+
+
+@contextmanager
+def measure_startup(
+    name: str,
+    *,
+    item_count: int | None = None,
+    byte_count: int | None = None,
+    detail: str = "",
+) -> Iterator[None]:
+    """Always measure one startup phase while the startup session is active."""
+    if not startup_active():
+        yield
+        return
+    started = time.perf_counter_ns()
+    try:
+        yield
+    finally:
+        record_startup(
             name,
             (time.perf_counter_ns() - started) / 1_000_000.0,
             item_count=item_count,
