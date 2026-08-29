@@ -67,6 +67,7 @@ class V134CardActionLayoutTests(unittest.TestCase):
         self.assertIn('grid.addWidget(right_button, row, 1', source)
         self.assertIn('grid = getattr(card, "_fh6_action_grid", None)', source)
         self.assertIn('_legacy_runtime._force_card_action_geometry = lambda _card: None', source)
+        self.assertGreaterEqual(source.count('except RuntimeError:'), 2)
         self.assertNotIn('isinstance(root_layout, QVBoxLayout)', source)
 
     def test_patch_runs_before_thread_affinity_finalizer(self) -> None:
