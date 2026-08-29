@@ -20,6 +20,9 @@ from .v1_3_4_backup_toolbar_followup_patch import (
 from .v1_3_4_backup_lazy_load_patch import (
     apply_v1_3_4_backup_lazy_load_patch,
 )
+from .v1_3_4_backup_lazy_watch_patch import (
+    apply_v1_3_4_backup_lazy_watch_patch,
+)
 from .v1_3_4_livery_backup_filter_patch import (
     apply_v1_3_4_livery_backup_filter_patch,
 )
@@ -121,12 +124,12 @@ def apply_v1_3_4_backup_action_wording_patch(MainWindow: Any) -> None:
     _perf._configure_backup_action_button = configure
     MainWindow._fh6_v134_backup_action_wording_patched = True
 
-    # Final v1.3.4 layers: restore/toolbar behavior first, then the lazy backup
-    # owner that suppresses startup preload, then filtering and profiling so the
-    # profiler observes the final runtime paths. Thread-affinity remains outside
-    # this stack as the final MainWindow patch in app.py.
+    # Final v1.3.4 layers: restore/toolbar behavior first, then lazy loading and
+    # its external-change watcher, followed by filtering/profiling. The separate
+    # thread-affinity patch remains the final MainWindow layer in app.py.
     apply_v1_3_4_backup_import_refinement_patch(MainWindow)
     apply_v1_3_4_backup_toolbar_followup_patch(MainWindow)
     apply_v1_3_4_backup_lazy_load_patch(MainWindow)
+    apply_v1_3_4_backup_lazy_watch_patch(MainWindow)
     apply_v1_3_4_livery_backup_filter_patch(MainWindow)
     apply_v1_3_4_performance_probe_patch(MainWindow)
