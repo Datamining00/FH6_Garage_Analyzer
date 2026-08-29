@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from functools import wraps
 from pathlib import Path
 from typing import Any, Callable
@@ -9,6 +10,7 @@ from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QApplication, QFrame, QHBoxLayout, QLabel, QPlainTextEdit, QPushButton, QVBoxLayout, QWidget
 
 from . import performance_metrics as _metrics
+from . import ui as _ui
 from . import v1_3_4_backup_export_patch as _backup_ui
 from . import v1_3_4_backup_export_performance_ui_patch as _perf
 from . import v1_3_4_backup_import_refinement_patch as _import
@@ -22,19 +24,39 @@ def _txt(ko: str, en: str) -> str:
     return ko if (get_language() or "ko").lower().startswith("ko") else en
 
 
-def _timed(name: str, fn: Callable[..., Any], *, item_count: Callable[..., int | None] | None = None):
+def _count_items(counter: Callable[..., int | None] | None, args: tuple[Any, ...], kwargs: dict[str, Any]) -> int | None:
+    if counter is None:
+        return None
+    try:
+        return counter(*args, **kwargs)
+    except Exception:
+        return None
+
+
+def _timed(
+    name: str,
+    fn: Callable[..., Any],
+    *,
+    item_count: Callable[..., int | None] | None = None,
+    startup_name: str | None = None,
+):
+    """Measure a runtime path and optionally mirror it into always-on startup data."""
     @wraps(fn)
     def wrapped(*args: Any, **kwargs: Any):
-        if not _metrics.is_enabled():
+        runtime = _metrics.is_enabled()
+        startup = bool(startup_name and _metrics.startup_active())
+        if not runtime and not startup:
             return fn(*args, **kwargs)
-        count = None
-        if item_count is not None:
-            try:
-                count = item_count(*args, **kwargs)
-            except Exception:
-                count = None
-        with _metrics.measure(name, item_count=count):
+        count = _count_items(item_count, args, kwargs)
+        started = time.perf_counter_ns()
+        try:
             return fn(*args, **kwargs)
+        finally:
+            elapsed = (time.perf_counter_ns() - started) / 1_000_000.0
+            if startup and startup_name:
+                _metrics.record_startup(startup_name, elapsed, item_count=count)
+            if runtime:
+                _metrics.record(name, elapsed, item_count=count)
     return wrapped
 
 
@@ -62,13 +84,13 @@ def _set_enabled(window: Any, enabled: bool) -> None:
     if isinstance(label, QLabel):
         label.setText(
             _txt(
-                "측정 중 · 최적화 진단용 로그를 기록합니다.",
-                "Recording · diagnostic timing logs are being written.",
+                "런타임 측정 중 · 초기 실행 측정은 ON/OFF와 관계없이 항상 기록됩니다.",
+                "Runtime profiling active · startup is always recorded regardless of this switch.",
             )
             if enabled
             else _txt(
-                "비활성 · 일반 사용 시 측정 오버헤드가 없습니다.",
-                "Disabled · no measurement overhead during normal use.",
+                "런타임 측정 비활성 · 초기 실행 측정은 항상 기록됩니다.",
+                "Runtime profiling disabled · startup is still always recorded.",
             )
         )
     _refresh_text(window)
@@ -105,8 +127,8 @@ def _performance_page(window: Any) -> QWidget:
 
     subtitle = QLabel(
         _txt(
-            "최적화를 위해 주요 작업의 실제 소요시간을 측정합니다. 기본값은 OFF입니다.",
-            "Measures real elapsed time of major operations for optimization. Default is OFF.",
+            "초기 실행은 매번 자동 측정하며, ON/OFF는 실행 후 런타임 측정에만 적용됩니다.",
+            "Startup is measured on every launch. The ON/OFF switch controls runtime measurements only.",
         )
     )
     subtitle.setObjectName("muted")
@@ -143,10 +165,10 @@ def _performance_page(window: Any) -> QWidget:
 
     info = QLabel(
         _txt(
-            "측정 항목: 화면 전체 갱신, 리버리 재배치, 썸네일 갱신, 백업 인덱스 판정, 백업 목록 생성, "
-            "내보내기/들여오기, SHA-256, 폴더 fingerprint, backup_index 저장",
-            "Measured: full population, livery relayout, thumbnail refresh, backup presence/index work, backup list build, "
-            "export/import, SHA-256, folder fingerprint, and backup_index writes.",
+            "항상 측정: 전체 시작, QApplication, 설정, 패치 설치, MainWindow, 스캔, 초기 populate, 최초 화면 준비. "
+            "런타임 측정: 리버리 relayout 세부 구간, 썸네일, 백업 인덱스/목록, 내보내기/들여오기, SHA-256, fingerprint, index 저장.",
+            "Always measured: total startup, QApplication, settings, patch install, MainWindow, scan, initial populate and first ready state. "
+            "Runtime: livery relayout phases, thumbnails, backup index/list work, export/import, SHA-256, fingerprint and index writes.",
         )
     )
     info.setObjectName("muted")
@@ -195,22 +217,95 @@ def _install_navigation(window: Any) -> None:
     window._fh6_performance_refresh_timer = timer
 
 
+def _schedule_startup_ready(window: Any) -> None:
+    if not _metrics.startup_active() or not _metrics.startup_waiting_for_scan():
+        return
+    if bool(getattr(window, "_fh6_startup_finish_scheduled", False)):
+        return
+    window._fh6_startup_finish_scheduled = True
+    started = time.perf_counter_ns()
+
+    def second_turn() -> None:
+        _metrics.record_startup(
+            "startup.ready_after_scan_render",
+            (time.perf_counter_ns() - started) / 1_000_000.0,
+        )
+        _metrics.finish_startup(detail="saved path scan + initial UI ready")
+        window._fh6_startup_finish_scheduled = False
+        _refresh_text(window)
+
+    # Two event-loop turns let the final thread-affinity layer queue SoulBound
+    # append/layout work before the startup-ready timestamp is closed.
+    QTimer.singleShot(0, lambda: QTimer.singleShot(0, second_turn))
+
+
 def _install_probes(MainWindow: Any) -> None:
-    MainWindow._populate_all = _timed(
+    # scan_save is called inside the existing @Slot worker; wrapping the function
+    # preserves the Qt slot/thread-affinity contract while measuring the real scan.
+    _ui.scan_save = _timed("scan.total", _ui.scan_save, startup_name="startup.scan")
+
+    original_populate = MainWindow._populate_all
+    timed_populate = _timed(
         "ui.populate_all",
-        MainWindow._populate_all,
-        item_count=lambda self: len(getattr(getattr(self, "result", None), "liveries", []) or []),
+        original_populate,
+        item_count=lambda self: len(getattr(getattr(self, "result", None), "liveries", []) or [])
+        + len(getattr(getattr(self, "result", None), "tunings", []) or []),
+        startup_name="startup.initial_populate",
     )
+
+    @wraps(original_populate)
+    def populate_all(self: Any, *args: Any, **kwargs: Any):
+        try:
+            return timed_populate(self, *args, **kwargs)
+        finally:
+            _schedule_startup_ready(self)
+
+    MainWindow._populate_all = populate_all
+
+    # Populate-all children expose where the initial ~seconds are actually spent.
+    for attr, runtime_name, startup_name in (
+        ("_populate_car_table", "ui.populate.car_table", "startup.populate.car_table"),
+        ("_populate_creator_table", "ui.populate.creator_table", "startup.populate.creator_table"),
+        ("_populate_livery_table", "ui.populate.livery", "startup.populate.livery"),
+        ("_populate_tuning_table", "ui.populate.tuning", "startup.populate.tuning"),
+        ("_refresh_db_status", "ui.populate.db_status", "startup.populate.db_status"),
+    ):
+        fn = getattr(MainWindow, attr, None)
+        if callable(fn):
+            setattr(MainWindow, attr, _timed(runtime_name, fn, startup_name=startup_name))
+
     MainWindow._relayout_livery_grid = _timed(
-        "ui.livery_relayout",
+        "ui.livery_relayout.total",
         MainWindow._relayout_livery_grid,
         item_count=lambda self, *a, **k: len(getattr(self, "_livery_grid_cards", []) or []),
+        startup_name="startup.livery_relayout.total",
     )
+    if hasattr(MainWindow, "_clear_livery_grid_layout"):
+        MainWindow._clear_livery_grid_layout = _timed(
+            "ui.livery_relayout.clear_layout",
+            MainWindow._clear_livery_grid_layout,
+            startup_name="startup.livery_relayout.clear_layout",
+        )
+    if hasattr(MainWindow, "_layout_visible_grid_cards"):
+        MainWindow._layout_visible_grid_cards = _timed(
+            "ui.livery_relayout.add_widgets",
+            MainWindow._layout_visible_grid_cards,
+            item_count=lambda self, content_type, cards, *a, **k: len(cards) if content_type == "livery" else None,
+            startup_name="startup.livery_relayout.add_widgets",
+        )
+    if hasattr(MainWindow, "_sync_livery_grid_card_widths"):
+        MainWindow._sync_livery_grid_card_widths = _timed(
+            "ui.livery_relayout.width_sync",
+            MainWindow._sync_livery_grid_card_widths,
+            item_count=lambda self, *a, **k: len(getattr(self, "_livery_grid_cards", []) or []),
+            startup_name="startup.livery_relayout.width_sync",
+        )
     if hasattr(MainWindow, "_refresh_visible_livery_thumbnails"):
         MainWindow._refresh_visible_livery_thumbnails = _timed(
             "ui.thumbnail_refresh",
             MainWindow._refresh_visible_livery_thumbnails,
             item_count=lambda self, *a, **k: len(getattr(self, "_livery_grid_cards", []) or []),
+            startup_name="startup.thumbnail_refresh",
         )
 
     _perf._presence_snapshot = _timed("backup.presence_snapshot", _perf._presence_snapshot)
@@ -234,6 +329,7 @@ def apply_v1_3_4_performance_probe_patch(MainWindow: Any) -> None:
 
     def patched_init(self: Any, *args: Any, **kwargs: Any) -> None:
         original_init(self, *args, **kwargs)
+        self._fh6_startup_finish_scheduled = False
         _install_navigation(self)
 
     MainWindow.__init__ = patched_init
