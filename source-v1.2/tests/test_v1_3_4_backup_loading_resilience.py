@@ -7,6 +7,7 @@ from unittest.mock import patch
 from PySide6.QtCore import QCoreApplication, QEventLoop, QObject, QThread, QTimer, Signal, Slot
 
 from fh6garage import v1_3_2_responsiveness_sort_patch as responsive
+from fh6garage import v1_3_4_backup_export_patch as backup_ui
 from fh6garage import v1_3_4_backup_lazy_load_patch as lazy
 from fh6garage import v1_3_4_backup_loading_resilience_patch as resilience
 
@@ -87,7 +88,16 @@ class BackupLoadingResilienceTests(unittest.TestCase):
             thread.quit()
             thread.wait(2000)
 
-    def test_resilience_patch_sets_one_card_chunks_and_busy_cadence(self) -> None:
+    def test_load_finish_waits_for_active_relayout(self) -> None:
+        window = QObject()
+        window._fh6_backup_relayout_active = True
+        window._fh6_backup_finish_after_relayout = False
+        with patch.object(resilience, "_ORIGINAL_LAZY_LOAD_FINISHED") as original:
+            resilience._deferred_load_finished(window)
+            original.assert_not_called()
+            self.assertTrue(window._fh6_backup_finish_after_relayout)
+
+    def test_resilience_patch_sets_chunking_busy_cadence_and_async_relayout(self) -> None:
         class MainWindow:
             pass
 
@@ -95,17 +105,30 @@ class BackupLoadingResilienceTests(unittest.TestCase):
         old_interval = responsive._BUSY_YIELD_INTERVAL_SECONDS
         old_budget = responsive._BUSY_PROCESS_EVENTS_MS
         old_start = lazy._start_full_load
+        old_relayout = backup_ui._relayout_backup
+        old_widths = backup_ui._sync_backup_widths
+        old_thumbnails = backup_ui._refresh_backup_thumbnails
+        old_finished = lazy._load_finished
         try:
             resilience.apply_v1_3_4_backup_loading_resilience_patch(MainWindow)
             self.assertEqual(lazy._CARD_BUILD_CHUNK, 1)
+            self.assertEqual(resilience._BACKUP_RELAYOUT_CHUNK, 8)
             self.assertAlmostEqual(responsive._BUSY_YIELD_INTERVAL_SECONDS, 0.033)
             self.assertEqual(responsive._BUSY_PROCESS_EVENTS_MS, 5)
             self.assertIs(lazy._start_full_load, resilience._stable_start_full_load)
+            self.assertIs(backup_ui._relayout_backup, resilience._smooth_relayout_backup)
+            self.assertIs(backup_ui._sync_backup_widths, resilience._stable_sync_backup_widths)
+            self.assertIs(backup_ui._refresh_backup_thumbnails, resilience._stable_refresh_backup_thumbnails)
+            self.assertIs(lazy._load_finished, resilience._deferred_load_finished)
         finally:
             lazy._CARD_BUILD_CHUNK = old_chunk
             responsive._BUSY_YIELD_INTERVAL_SECONDS = old_interval
             responsive._BUSY_PROCESS_EVENTS_MS = old_budget
             lazy._start_full_load = old_start
+            backup_ui._relayout_backup = old_relayout
+            backup_ui._sync_backup_widths = old_widths
+            backup_ui._refresh_backup_thumbnails = old_thumbnails
+            lazy._load_finished = old_finished
 
     def test_patch_order_keeps_resilience_before_profiler_and_final_thread_fix(self) -> None:
         root = Path(__file__).resolve().parents[1]
@@ -122,6 +145,10 @@ class BackupLoadingResilienceTests(unittest.TestCase):
         self.assertIn("worker.cancelled.connect(bridge.enqueue_cancelled)", source)
         self.assertIn("worker.failed.connect(bridge.enqueue_failed)", source)
         self.assertIn("_lazy._CARD_BUILD_CHUNK = _BACKUP_CARD_BUILD_CHUNK", source)
+        self.assertIn("_backup_ui._relayout_backup = _smooth_relayout_backup", source)
+        self.assertIn("_lazy._load_finished = _deferred_load_finished", source)
+        self.assertIn("backup.relayout.async_total", source)
+        self.assertIn("backup.relayout.chunk", source)
         self.assertLess(
             wording.index("apply_v1_3_4_backup_lazy_thread_bridge_patch(MainWindow)"),
             wording.index("apply_v1_3_4_backup_loading_resilience_patch(MainWindow)"),
