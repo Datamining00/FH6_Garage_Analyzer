@@ -29,6 +29,9 @@ from .v1_3_4_backup_lazy_thread_bridge_patch import (
 from .v1_3_4_backup_loading_resilience_patch import (
     apply_v1_3_4_backup_loading_resilience_patch,
 )
+from .v1_3_4_backup_visual_stability_patch import (
+    apply_v1_3_4_backup_visual_stability_patch,
+)
 from .v1_3_4_livery_backup_filter_patch import (
     apply_v1_3_4_livery_backup_filter_patch,
 )
@@ -131,13 +134,14 @@ def apply_v1_3_4_backup_action_wording_patch(MainWindow: Any) -> None:
     MainWindow._fh6_v134_backup_action_wording_patched = True
 
     # Final v1.3.4 layers: restore/toolbar behavior first, then lazy loading,
-    # external-change watching, worker->GUI handoff and lifecycle resilience.
-    # The separate thread-affinity patch remains the final MainWindow layer in app.py.
+    # external-change watching, worker->GUI handoff, lifecycle resilience and
+    # repaint stability. The separate thread-affinity patch remains final in app.py.
     apply_v1_3_4_backup_import_refinement_patch(MainWindow)
     apply_v1_3_4_backup_toolbar_followup_patch(MainWindow)
     apply_v1_3_4_backup_lazy_load_patch(MainWindow)
     apply_v1_3_4_backup_lazy_watch_patch(MainWindow)
     apply_v1_3_4_backup_lazy_thread_bridge_patch(MainWindow)
     apply_v1_3_4_backup_loading_resilience_patch(MainWindow)
+    apply_v1_3_4_backup_visual_stability_patch(MainWindow)
     apply_v1_3_4_livery_backup_filter_patch(MainWindow)
     apply_v1_3_4_performance_probe_patch(MainWindow)
