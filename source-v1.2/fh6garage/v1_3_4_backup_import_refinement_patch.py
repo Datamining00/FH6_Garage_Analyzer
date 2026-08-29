@@ -531,6 +531,22 @@ def _rebuild_backup_cards(window: Any) -> None:
     QTimer.singleShot(0, build_chunk)
 
 
+def _set_backup_sort_cached(window: Any, mode: str) -> None:
+    """Sort already-built backup cards without rereading the repository."""
+    window._fh6_backup_sort_mode = mode
+    for key, button in window.backup_sort_buttons.items():
+        button.setChecked(key == mode)
+
+    def card_key(card: Any) -> tuple[Any, ...]:
+        record = card.property("backupRecord")
+        entry = getattr(card, "_fh6_backup_entry", None)
+        location = str(card.property("backupLocation") or "")
+        return _backup_ui._backup_sort_key(window, (entry, record, location))
+
+    window._fh6_backup_cards.sort(key=card_key)
+    _backup_ui._relayout_backup(window)
+
+
 def _backup_filter_allows(window: Any, card: Any) -> bool:
     mode = getattr(window, "_fh6_backup_location_filter", "all")
     location = str(card.property("backupLocation") or "")
@@ -918,6 +934,7 @@ def apply_v1_3_4_backup_import_refinement_patch(MainWindow: Any) -> None:
     _backup_ui._rebuild_backup_cards = _rebuild_backup_cards
     _backup_ui._backup_filter_allows = _backup_filter_allows
     _backup_ui._set_backup_location_filter = _set_backup_location_filter
+    _backup_ui._set_backup_sort = _set_backup_sort_cached
 
     original_init = MainWindow.__init__
 
