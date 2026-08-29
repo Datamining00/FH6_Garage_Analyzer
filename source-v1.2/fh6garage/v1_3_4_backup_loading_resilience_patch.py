@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6.QtCore import QObject, QThread, QTimer, Slot
+from PySide6.QtCore import QObject, QThread, QTimer, Qt, Slot
 
 from . import performance_metrics as _metrics
 from . import v1_3_2_responsiveness_sort_patch as _responsive
@@ -19,7 +19,7 @@ _BUSY_PROCESS_EVENTS_MS = 5
 
 
 class _StableBackupLoadGuiBridge(_bridge._BackupLoadGuiBridge):
-    """Terminate the repository thread only after GUI delivery has begun."""
+    """Terminate the repository thread only after queued GUI delivery begins."""
 
     def __init__(self, window: Any, token: _lazy._CancelToken, thread: QThread) -> None:
         super().__init__(window, token)
@@ -132,9 +132,13 @@ def _stable_start_full_load(
     worker.moveToThread(thread)
 
     thread.started.connect(worker.run)
-    worker.finished.connect(bridge.worker_finished)
-    worker.cancelled.connect(bridge.worker_cancelled)
-    worker.failed.connect(bridge.worker_failed)
+    # PySide can invoke a Python @Slot directly in the emitter thread under an
+    # AutoConnection in this runtime. Explicit QueuedConnection is mandatory:
+    # all card/QTimer/UI work must begin only on the MainWindow thread.
+    queued = Qt.ConnectionType.QueuedConnection
+    worker.finished.connect(bridge.worker_finished, queued)
+    worker.cancelled.connect(bridge.worker_cancelled, queued)
+    worker.failed.connect(bridge.worker_failed, queued)
 
     # Do not connect worker terminal signals directly to thread.quit(). The
     # queued GUI bridge must receive the terminal result first. deleteLater is
