@@ -22,6 +22,8 @@ from .v1_3_4_card_polish_export_delete_patch import apply_v1_3_4_card_polish_exp
 from .v1_3_4_livery_backup_filter_patch import apply_v1_3_4_livery_backup_filter_patch
 from .v1_3_4_status_backup_label_patch import apply_v1_3_4_status_backup_label_patch
 from .v1_3_4_performance_probe_patch import apply_v1_3_4_performance_probe_patch
+from .v1_4_backup_repository_patch import apply_v1_4_backup_repository_patch
+from .v1_4_identity_patch import apply_v1_4_identity_patch
 
 install_performance_measurement_guard(_performance_metrics)
 
@@ -100,4 +102,6 @@ def apply_v1_3_4_backup_action_wording_patch(MainWindow: Any) -> None:
     apply_v1_3_4_card_polish_export_delete_patch(MainWindow)
     apply_v1_3_4_livery_backup_filter_patch(MainWindow)
     apply_v1_3_4_status_backup_label_patch(MainWindow)
+    apply_v1_4_backup_repository_patch(MainWindow)
+    apply_v1_4_identity_patch(MainWindow)
     apply_v1_3_4_performance_probe_patch(MainWindow)
