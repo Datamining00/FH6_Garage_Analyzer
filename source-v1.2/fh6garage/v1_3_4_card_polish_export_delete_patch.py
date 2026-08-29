@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 import shutil
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +19,7 @@ from .models import LiveryRecord
 _ICON_SLOT_COUNT = 6
 _ICON_BUTTON_HEIGHT = 30
 _METADATA_CHUNK = 16
+_DELETE_STAGING = ".fh6_assistant_delete_staging"
 
 
 def _normalize_action_spacing(card: Any) -> None:
@@ -126,23 +129,89 @@ def _verified_backup_path(root: Path, record: LiveryRecord) -> Path | None:
     return None
 
 
-def _safe_source_path(window: Any, record: LiveryRecord) -> Path | None:
+def _game_source_targets(window: Any, record: LiveryRecord) -> tuple[list[Path], str]:
+    """Resolve Current + active/latest numbered copies and verify all before delete."""
     if str(record.kind or "") != "Livery":
-        return None
+        return [], "only normal Livery sources can be deleted"
     result = getattr(window, "result", None)
     metadata = getattr(result, "metadata", None)
-    containers_root = getattr(metadata, "containers_root", None)
-    if not isinstance(containers_root, Path):
-        return None
+    save_root = getattr(metadata, "save_root", None)
+    active_version = str(getattr(metadata, "active_version", "") or "")
+    if not isinstance(save_root, Path):
+        return [], "save root is unavailable"
+    source = Path(record.container_path)
+    source_fingerprint = folder_fingerprint(source).casefold() if source.is_dir() else ""
+    if not source_fingerprint or not (source / "C_livery").is_file():
+        return [], "source fingerprint is unavailable"
     try:
-        root = containers_root.resolve()
-        source = Path(record.container_path).resolve()
-        relative = source.relative_to(root)
-    except (OSError, ValueError):
-        return None
-    if not relative.parts or source == root or not source.is_dir() or not (source / "C_livery").is_file():
-        return None
-    return source
+        roots = _backup_ref.resolve_import_targets(save_root, active_version)
+    except Exception as exc:  # noqa: BLE001 - safety boundary
+        return [], f"save target resolution failed: {type(exc).__name__}: {exc}"
+
+    targets: list[Path] = []
+    seen: set[str] = set()
+    for containers_root in roots:
+        try:
+            root = containers_root.resolve()
+            destination = (root / record.container_name).resolve()
+            destination.relative_to(root)
+        except (OSError, ValueError):
+            return [], "source path safety check failed"
+        key = os.path.normcase(str(destination))
+        if key in seen:
+            continue
+        seen.add(key)
+        if not destination.exists():
+            continue
+        if not destination.is_dir() or not (destination / "C_livery").is_file():
+            return [], f"destination conflict: {destination}"
+        peer_fingerprint = folder_fingerprint(destination).casefold()
+        if not peer_fingerprint or peer_fingerprint != source_fingerprint:
+            return [], f"destination content conflict: {destination}"
+        targets.append(destination)
+
+    if not targets:
+        return [], "no matching game-side source exists"
+    try:
+        scanned = source.resolve()
+    except OSError:
+        return [], "scanned source path cannot be resolved"
+    if all(os.path.normcase(str(scanned)) != os.path.normcase(str(path)) for path in targets):
+        return [], "scanned source is not one of the active save targets"
+    return targets, ""
+
+
+def _park_and_delete_targets(targets: list[Path]) -> tuple[bool, str]:
+    """Rename all targets out of the live tree first; roll back if parking fails."""
+    parked: list[tuple[Path, Path, Path]] = []
+    try:
+        for source in targets:
+            staging_root = source.parent / _DELETE_STAGING
+            staging_root.mkdir(parents=True, exist_ok=True)
+            parked_path = staging_root / uuid.uuid4().hex
+            os.replace(source, parked_path)
+            parked.append((source, parked_path, staging_root))
+    except OSError as exc:
+        for source, parked_path, _staging_root in reversed(parked):
+            try:
+                if parked_path.exists() and not source.exists():
+                    os.replace(parked_path, source)
+            except OSError:
+                pass
+        return False, f"source parking failed: {type(exc).__name__}: {exc}"
+
+    failures: list[str] = []
+    for _source, parked_path, staging_root in parked:
+        try:
+            shutil.rmtree(parked_path)
+        except OSError as exc:
+            failures.append(f"{parked_path}: {type(exc).__name__}: {exc}")
+        try:
+            if staging_root.is_dir() and not any(staging_root.iterdir()):
+                staging_root.rmdir()
+        except OSError:
+            pass
+    return not failures, "; ".join(failures)
 
 
 def _delete_verified_sources(window: Any, records: list[LiveryRecord]) -> tuple[int, list[str]]:
@@ -156,21 +225,17 @@ def _delete_verified_sources(window: Any, records: list[LiveryRecord]) -> tuple[
     deleted = 0
     failures: list[str] = []
     for record in records:
-        source = _safe_source_path(window, record)
         label = record.header.name or record.container_name or "(unnamed)"
-        if source is None:
-            failures.append(f"{label}: source path safety check failed")
-            continue
         if _verified_backup_path(root, record) is None:
             failures.append(f"{label}: backup fingerprint verification failed")
             continue
-        try:
-            shutil.rmtree(source)
-        except OSError as exc:
-            failures.append(f"{label}: {type(exc).__name__}: {exc}")
+        targets, reason = _game_source_targets(window, record)
+        if not targets:
+            failures.append(f"{label}: {reason}")
             continue
-        if source.exists():
-            failures.append(f"{label}: source directory still exists")
+        success, delete_error = _park_and_delete_targets(targets)
+        if not success:
+            failures.append(f"{label}: {delete_error}")
             continue
         deleted += 1
     return deleted, failures
