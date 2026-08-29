@@ -13,44 +13,80 @@ from fh6garage.models import HeaderInfo, LiveryRecord
 
 class CardPolishExportDeleteTests(unittest.TestCase):
     def _record(self, container: Path, *, kind: str = "Livery") -> LiveryRecord:
-        livery = container / "C_livery"
         return LiveryRecord(
             container_name=container.name,
             container_path=container,
             kind=kind,
             header=HeaderInfo(name="Unit", creator="Tester", car_id=1),
-            livery_path=livery,
+            livery_path=container / "C_livery",
         )
 
-    def test_source_delete_requires_exact_containers_root_descendant(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            containers = root / "ContainersRoot"
-            source = containers / "Livery_1"
-            source.mkdir(parents=True)
-            (source / "C_livery").write_bytes(b"unit")
-            record = self._record(source)
-            window = SimpleNamespace(result=SimpleNamespace(metadata=SimpleNamespace(containers_root=containers)))
-            self.assertEqual(polish._safe_source_path(window, record), source.resolve())
+    @staticmethod
+    def _write_container(path: Path, payload: bytes = b"unit") -> None:
+        path.mkdir(parents=True)
+        (path / "C_livery").write_bytes(payload)
+        (path / "Thumb.png").write_bytes(b"thumb")
 
-            outside = root / "Outside"
-            outside.mkdir()
-            (outside / "C_livery").write_bytes(b"unit")
-            self.assertIsNone(polish._safe_source_path(window, self._record(outside)))
-            self.assertIsNone(polish._safe_source_path(window, self._record(source, kind="SoulBoundLivery")))
+    def test_source_delete_resolves_current_and_numbered_save_copies(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            save_root = Path(temp) / "save"
+            current = save_root / "current" / "ContainersRoot" / "Livery_1"
+            numbered = save_root / "7" / "ContainersRoot" / "Livery_1"
+            self._write_container(current)
+            self._write_container(numbered)
+            record = self._record(current)
+            window = SimpleNamespace(
+                result=SimpleNamespace(
+                    metadata=SimpleNamespace(save_root=save_root, active_version="7")
+                )
+            )
+            targets, error = polish._game_source_targets(window, record)
+            self.assertEqual(error, "")
+            self.assertEqual({path.resolve() for path in targets}, {current.resolve(), numbered.resolve()})
+
+    def test_source_delete_rejects_conflicting_peer_and_soulbound(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            save_root = Path(temp) / "save"
+            current = save_root / "current" / "ContainersRoot" / "Livery_1"
+            numbered = save_root / "7" / "ContainersRoot" / "Livery_1"
+            self._write_container(current, b"same")
+            self._write_container(numbered, b"different")
+            window = SimpleNamespace(
+                result=SimpleNamespace(
+                    metadata=SimpleNamespace(save_root=save_root, active_version="7")
+                )
+            )
+            targets, error = polish._game_source_targets(window, self._record(current))
+            self.assertEqual(targets, [])
+            self.assertIn("content conflict", error)
+            targets, error = polish._game_source_targets(
+                window, self._record(current, kind="SoulBoundLivery")
+            )
+            self.assertEqual(targets, [])
+            self.assertIn("normal Livery", error)
+
+    def test_parking_failure_rolls_back_already_parked_source(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            first = base / "one" / "Livery_1"
+            second = base / "two" / "Livery_1"
+            self._write_container(first)
+            self._write_container(second)
+            # Make the second staging path unusable by occupying it with a file.
+            (second.parent / polish._DELETE_STAGING).write_bytes(b"block")
+            success, _error = polish._park_and_delete_targets([first, second])
+            self.assertFalse(success)
+            self.assertTrue(first.is_dir())
+            self.assertTrue(second.is_dir())
 
     def test_backup_verification_requires_digest_and_full_folder_fingerprint(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             base = Path(temp)
-            source = base / "save" / "ContainersRoot" / "Livery_1"
+            source = base / "save" / "current" / "ContainersRoot" / "Livery_1"
             backup_root = base / "backup"
             backup = backup_root / "Livery" / "Tester" / "Livery_1"
-            source.mkdir(parents=True)
-            backup.mkdir(parents=True)
-            (source / "C_livery").write_bytes(b"payload")
-            (source / "Thumb.png").write_bytes(b"thumb")
-            (backup / "C_livery").write_bytes(b"payload")
-            (backup / "Thumb.png").write_bytes(b"thumb")
+            self._write_container(source, b"payload")
+            self._write_container(backup, b"payload")
             record = self._record(source)
             digest = content_sha256(record)
             fingerprint = folder_fingerprint(source)
@@ -66,7 +102,6 @@ class CardPolishExportDeleteTests(unittest.TestCase):
             backup_root.mkdir(exist_ok=True)
             (backup_root / "backup_index.json").write_text(json.dumps(payload), encoding="utf-8")
             self.assertEqual(polish._verified_backup_path(backup_root, record), backup.resolve())
-
             (backup / "Thumb.png").write_bytes(b"changed")
             self.assertIsNone(polish._verified_backup_path(backup_root, record))
 
@@ -77,6 +112,8 @@ class CardPolishExportDeleteTests(unittest.TestCase):
         self.assertIn("_METADATA_CHUNK = 16", source)
         self.assertIn("QTimer.singleShot(0", source)
         self.assertIn("_fh6_metadata_toggle_generation", source)
+        self.assertIn("resolve_import_targets", source)
+        self.assertIn("_park_and_delete_targets", source)
 
     def test_action_wording_enables_delete_and_installs_polish_before_profiler(self) -> None:
         root = Path(__file__).resolve().parents[1]
