@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6.QtCore import QObject, QThread, QTimer, Qt, Slot
+from PySide6.QtCore import QMetaObject, QObject, QThread, QTimer, Qt, Slot
 
 from . import performance_metrics as _metrics
 from . import v1_3_2_responsiveness_sort_patch as _responsive
@@ -19,12 +19,14 @@ _BUSY_PROCESS_EVENTS_MS = 5
 
 
 class _StableBackupLoadGuiBridge(_bridge._BackupLoadGuiBridge):
-    """Terminate the repository thread only after queued GUI delivery begins."""
+    """Marshal every repository result through the bridge QObject event queue."""
 
     def __init__(self, window: Any, token: _lazy._CancelToken, thread: QThread) -> None:
         super().__init__(window, token)
         self._thread = thread
         self._quit_requested = False
+        self._pending_result: object | None = None
+        self._pending_failure = ""
 
     def _request_thread_quit(self, signal_name: str) -> None:
         if self._quit_requested:
@@ -38,20 +40,50 @@ class _StableBackupLoadGuiBridge(_bridge._BackupLoadGuiBridge):
         if self._thread.isRunning():
             self._thread.quit()
 
-    @Slot(object)
-    def worker_finished(self, result: object) -> None:
-        self._request_thread_quit("finished")
-        super().worker_finished(result)
+    # These enqueue methods are intentionally safe to execute in the worker
+    # thread. They never touch QWidget/QTimer state. QMetaObject.invokeMethod
+    # performs the actual cross-thread hop using this QObject's thread affinity.
+    def enqueue_finished(self, result: object) -> None:
+        self._pending_result = result
+        QMetaObject.invokeMethod(
+            self,
+            "_deliver_finished",
+            Qt.ConnectionType.QueuedConnection,
+        )
+
+    def enqueue_cancelled(self) -> None:
+        QMetaObject.invokeMethod(
+            self,
+            "_deliver_cancelled",
+            Qt.ConnectionType.QueuedConnection,
+        )
+
+    def enqueue_failed(self, message: str) -> None:
+        self._pending_failure = str(message)
+        QMetaObject.invokeMethod(
+            self,
+            "_deliver_failed",
+            Qt.ConnectionType.QueuedConnection,
+        )
 
     @Slot()
-    def worker_cancelled(self) -> None:
-        self._request_thread_quit("cancelled")
-        super().worker_cancelled()
+    def _deliver_finished(self) -> None:
+        result = self._pending_result
+        self._pending_result = None
+        self._request_thread_quit("finished")
+        _bridge._BackupLoadGuiBridge.worker_finished(self, result)
 
-    @Slot(str)
-    def worker_failed(self, message: str) -> None:
+    @Slot()
+    def _deliver_cancelled(self) -> None:
+        self._request_thread_quit("cancelled")
+        _bridge._BackupLoadGuiBridge.worker_cancelled(self)
+
+    @Slot()
+    def _deliver_failed(self) -> None:
+        message = self._pending_failure
+        self._pending_failure = ""
         self._request_thread_quit("failed")
-        super().worker_failed(message)
+        _bridge._BackupLoadGuiBridge.worker_failed(self, message)
 
 
 def _schedule_retry(
@@ -80,16 +112,13 @@ def _stable_start_full_load(
     if getattr(window, "_fh6_backup_load_running", False):
         return
 
-    # Card construction can finish after the repository worker has emitted its
-    # terminal signal. Never start a second repository QThread until the prior
-    # thread has actually stopped and its deferred cleanup has had a GUI turn.
     previous = getattr(window, "_fh6_backup_load_thread", None)
     if isinstance(previous, QThread) and previous.isRunning():
         _schedule_retry(window, force=force, message=message)
         return
 
-    # The watcher layer wrapped _start_full_load before the thread bridge later
-    # replaced that module global. Restore those pre-load responsibilities here.
+    # Restore the watcher responsibilities that were bypassed when the earlier
+    # bridge replaced the watcher-wrapped _start_full_load module global.
     _watch._capture_scroll(window)
     _watch._configure_watcher(window)
 
@@ -132,17 +161,15 @@ def _stable_start_full_load(
     worker.moveToThread(thread)
 
     thread.started.connect(worker.run)
-    # PySide can invoke a Python @Slot directly in the emitter thread under an
-    # AutoConnection in this runtime. Explicit QueuedConnection is mandatory:
-    # all card/QTimer/UI work must begin only on the MainWindow thread.
-    queued = Qt.ConnectionType.QueuedConnection
-    worker.finished.connect(bridge.worker_finished, queued)
-    worker.cancelled.connect(bridge.worker_cancelled, queued)
-    worker.failed.connect(bridge.worker_failed, queued)
+    # PySide6 can execute a Python slot in the emitter thread even when a
+    # receiver QObject has GUI affinity. Keep these callbacks UI-free and use
+    # QMetaObject.invokeMethod inside the bridge for the guaranteed queued hop.
+    worker.finished.connect(bridge.enqueue_finished)
+    worker.cancelled.connect(bridge.enqueue_cancelled)
+    worker.failed.connect(bridge.enqueue_failed)
 
-    # Do not connect worker terminal signals directly to thread.quit(). The
-    # queued GUI bridge must receive the terminal result first. deleteLater is
-    # posted to the worker thread while its event loop is still alive.
+    # The worker thread is kept alive until the GUI-side delivery slot requests
+    # quit. This removes a race between a terminal worker signal and UI handling.
     worker.finished.connect(worker.deleteLater)
     worker.cancelled.connect(worker.deleteLater)
     worker.failed.connect(worker.deleteLater)
@@ -159,12 +186,12 @@ def apply_v1_3_4_backup_loading_resilience_patch(MainWindow: Any) -> None:
     if getattr(MainWindow, "_fh6_v134_backup_loading_resilience_patched", False):
         return
 
-    # Give the Qt event loop a turn between every newly configured backup card.
-    # This avoids a 12-card GUI burst freezing indeterminate progress animation.
+    # One card per timer tick gives the event loop a natural repaint opportunity
+    # without introducing QApplication.processEvents() into every card build.
     _lazy._CARD_BUILD_CHUNK = _BACKUP_CARD_BUILD_CHUNK
 
-    # Existing livery/tuning busy loops already call _yield_busy_events(). Tighten
-    # their visual cadence without adding per-card processEvents calls.
+    # Existing long livery/tuning loops already use _yield_busy_events(). A
+    # ~30-Hz cadence makes their indeterminate busy indicator less visibly stale.
     _responsive._BUSY_YIELD_INTERVAL_SECONDS = _BUSY_YIELD_INTERVAL_SECONDS
     _responsive._BUSY_PROCESS_EVENTS_MS = _BUSY_PROCESS_EVENTS_MS
 
