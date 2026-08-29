@@ -76,6 +76,8 @@ def assign_auction_thumbnails(
 
     by_identity: dict[tuple[int, str], list[ManifestThumbnailEntry]] = {}
     by_design_token: dict[str, list[ManifestThumbnailEntry]] = {}
+    checked_paths: set[str] = set()
+    existing_paths: set[str] = set()
     for entry in entries:
         if not entry.livery_token:
             continue
@@ -84,6 +86,11 @@ def assign_auction_thumbnails(
             [],
         ).append(entry)
         by_design_token.setdefault(entry.livery_token, []).append(entry)
+        path_key = str(entry.path).casefold()
+        if path_key not in checked_paths:
+            checked_paths.add(path_key)
+            if entry.path.is_file():
+                existing_paths.add(path_key)
 
     matched = 0
     shared_design_matched = 0
@@ -98,7 +105,7 @@ def assign_auction_thumbnails(
 
         candidates = by_identity.get((int(record.car_id), token), [])
         existing_candidates = [
-            entry for entry in candidates if entry.path.is_file()
+            entry for entry in candidates if str(entry.path).casefold() in existing_paths
         ]
 
         if len(existing_candidates) == 1:
@@ -116,7 +123,7 @@ def assign_auction_thumbnails(
         shared_by_path = {
             str(entry.path).casefold(): entry
             for entry in by_design_token.get(token, [])
-            if entry.path.is_file()
+            if str(entry.path).casefold() in existing_paths
         }
         shared_candidates = list(shared_by_path.values())
         if len(shared_candidates) == 1:
