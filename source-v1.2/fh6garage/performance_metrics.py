@@ -2,16 +2,38 @@ from __future__ import annotations
 
 import json
 import os
-import tempfile
+import threading
+import time
+from collections import deque
 from collections.abc import Iterator
 from contextlib import contextmanager
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from time import perf_counter
+from typing import Any
+
+
+_MAX_RECENT = 300
+_MAX_BYTES = 5 * 1024 * 1024
+_ROTATIONS = 3
+_enabled = False
+_recent: deque["PerfEvent"] = deque(maxlen=_MAX_RECENT)
+_lock = threading.RLock()
+
+
+@dataclass(slots=True)
+class PerfEvent:
+    timestamp: str
+    name: str
+    elapsed_ms: float
+    thread: str
+    item_count: int | None = None
+    byte_count: int | None = None
+    detail: str = ""
 
 
 class PerformanceMetrics:
-    """Small timing/counter collector with no Qt dependency."""
+    """Compatibility collector retained for existing callers/tests."""
 
     def __init__(self) -> None:
         self.timings_ms: dict[str, float] = {}
@@ -19,11 +41,11 @@ class PerformanceMetrics:
 
     @contextmanager
     def measure(self, name: str) -> Iterator[None]:
-        started = perf_counter()
+        started = time.perf_counter_ns()
         try:
             yield
         finally:
-            self.timings_ms[name] = round((perf_counter() - started) * 1000.0, 3)
+            self.timings_ms[name] = round((time.perf_counter_ns() - started) / 1_000_000.0, 3)
 
     def set(self, name: str, value: float | str | bool | None) -> None:
         self.counters[name] = value
@@ -33,10 +55,7 @@ class PerformanceMetrics:
         self.counters[name] = int(current) + int(amount)
 
     def snapshot(self) -> dict[str, object]:
-        return {
-            "timings_ms": dict(self.timings_ms),
-            "counters": dict(self.counters),
-        }
+        return {"timings_ms": dict(self.timings_ms), "counters": dict(self.counters)}
 
 
 def app_data_dir() -> Path:
@@ -44,38 +63,138 @@ def app_data_dir() -> Path:
     return base / "FH6GarageAnalyzer"
 
 
-def write_latest_performance(payload: dict[str, object]) -> Path | None:
-    """Atomically write diagnostics outside the FH6 save tree.
+def log_dir() -> Path:
+    return app_data_dir() / "performance"
 
-    Diagnostics are best-effort only. A permission/disk error must never affect
-    save scanning or UI availability.
-    """
 
-    temporary: Path | None = None
+def log_path() -> Path:
+    return log_dir() / "performance.jsonl"
+
+
+def set_enabled(value: bool) -> None:
+    global _enabled
+    _enabled = bool(value)
+
+
+def is_enabled() -> bool:
+    return _enabled
+
+
+def _rotate(path: Path) -> None:
     try:
-        directory = app_data_dir() / "performance"
+        if not path.is_file() or path.stat().st_size < _MAX_BYTES:
+            return
+    except OSError:
+        return
+    for index in range(_ROTATIONS, 0, -1):
+        src = path if index == 1 else path.with_suffix(path.suffix + f".{index - 1}")
+        dst = path.with_suffix(path.suffix + f".{index}")
+        try:
+            if src.exists():
+                dst.unlink(missing_ok=True)
+                src.replace(dst)
+        except OSError:
+            pass
+
+
+def record(
+    name: str,
+    elapsed_ms: float,
+    *,
+    item_count: int | None = None,
+    byte_count: int | None = None,
+    detail: str = "",
+) -> None:
+    if not _enabled:
+        return
+    event = PerfEvent(
+        timestamp=datetime.now(timezone.utc).isoformat(timespec="milliseconds"),
+        name=str(name),
+        elapsed_ms=round(float(elapsed_ms), 3),
+        thread=threading.current_thread().name,
+        item_count=item_count,
+        byte_count=byte_count,
+        detail=str(detail or ""),
+    )
+    with _lock:
+        _recent.append(event)
+        path = log_path()
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            _rotate(path)
+            with path.open("a", encoding="utf-8", newline="\n") as handle:
+                handle.write(json.dumps(asdict(event), ensure_ascii=False, separators=(",", ":")) + "\n")
+        except OSError:
+            pass
+
+
+@contextmanager
+def measure(
+    name: str,
+    *,
+    item_count: int | None = None,
+    byte_count: int | None = None,
+    detail: str = "",
+) -> Iterator[None]:
+    if not _enabled:
+        yield
+        return
+    started = time.perf_counter_ns()
+    try:
+        yield
+    finally:
+        record(
+            name,
+            (time.perf_counter_ns() - started) / 1_000_000.0,
+            item_count=item_count,
+            byte_count=byte_count,
+            detail=detail,
+        )
+
+
+def recent_events(limit: int = 100) -> list[PerfEvent]:
+    with _lock:
+        return list(_recent)[-max(0, int(limit)):]
+
+
+def format_recent(limit: int = 100) -> str:
+    rows: list[str] = []
+    for event in recent_events(limit):
+        meta: list[str] = []
+        if event.item_count is not None:
+            meta.append(f"items={event.item_count}")
+        if event.byte_count is not None:
+            meta.append(f"bytes={event.byte_count}")
+        if event.detail:
+            meta.append(event.detail)
+        suffix = " · " + " · ".join(meta) if meta else ""
+        rows.append(f"{event.elapsed_ms:10.3f} ms  {event.name}{suffix}  [{event.thread}]")
+    return "\n".join(rows)
+
+
+def clear_recent(*, clear_file: bool = False) -> None:
+    with _lock:
+        _recent.clear()
+        if clear_file:
+            for index in range(_ROTATIONS + 1):
+                path = log_path() if index == 0 else log_path().with_suffix(log_path().suffix + f".{index}")
+                try:
+                    path.unlink(missing_ok=True)
+                except OSError:
+                    pass
+
+
+def write_latest_performance(payload: dict[str, object]) -> Path | None:
+    """Compatibility helper for legacy diagnostics callers."""
+    try:
+        directory = log_dir()
         directory.mkdir(parents=True, exist_ok=True)
         path = directory / "latest.json"
         data = dict(payload)
         data["written_at_utc"] = datetime.now(timezone.utc).isoformat()
-        fd, temporary_name = tempfile.mkstemp(
-            prefix="latest.",
-            suffix=".tmp",
-            dir=str(directory),
-        )
-        os.close(fd)
-        temporary = Path(temporary_name)
-        temporary.write_text(
-            json.dumps(data, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        temporary = path.with_suffix(".tmp")
+        temporary.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
         os.replace(temporary, path)
         return path
     except (OSError, TypeError, ValueError):
         return None
-    finally:
-        if temporary is not None and temporary.exists():
-            try:
-                temporary.unlink()
-            except OSError:
-                pass
