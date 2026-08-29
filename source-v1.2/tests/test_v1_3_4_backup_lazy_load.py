@@ -94,6 +94,7 @@ class BackupLazyLoadTests(unittest.TestCase):
     def test_patch_contract_suppresses_eager_rebuild_and_preserves_final_patch_order(self) -> None:
         root = Path(__file__).resolve().parents[1]
         lazy = (root / "fh6garage" / "v1_3_4_backup_lazy_load_patch.py").read_text(encoding="utf-8")
+        watch = (root / "fh6garage" / "v1_3_4_backup_lazy_watch_patch.py").read_text(encoding="utf-8")
         wording = (root / "fh6garage" / "v1_3_4_backup_action_wording_patch.py").read_text(encoding="utf-8")
         app = (root / "app.py").read_text(encoding="utf-8")
 
@@ -105,12 +106,20 @@ class BackupLazyLoadTests(unittest.TestCase):
         self.assertIn("token.check()", lazy)
         self.assertIn("_fh6_backup_items_cache", lazy)
         self.assertIn("repository_read=0 card_create=0", lazy)
+        self.assertIn("QFileSystemWatcher", watch)
+        self.assertIn("backup.lazy.external_dirty", watch)
+        self.assertIn("_capture_scroll", watch)
+        self.assertIn("_restore_scroll", watch)
         self.assertLess(
             wording.index("apply_v1_3_4_backup_toolbar_followup_patch(MainWindow)"),
             wording.index("apply_v1_3_4_backup_lazy_load_patch(MainWindow)"),
         )
         self.assertLess(
             wording.index("apply_v1_3_4_backup_lazy_load_patch(MainWindow)"),
+            wording.index("apply_v1_3_4_backup_lazy_watch_patch(MainWindow)"),
+        )
+        self.assertLess(
+            wording.index("apply_v1_3_4_backup_lazy_watch_patch(MainWindow)"),
             wording.index("apply_v1_3_4_performance_probe_patch(MainWindow)"),
         )
         self.assertLess(
