@@ -20,6 +20,7 @@ _ROTATIONS = 3
 _enabled = False
 _recent: deque["PerfEvent"] = deque(maxlen=_MAX_RECENT)
 _startup_recent: deque["PerfEvent"] = deque(maxlen=_MAX_STARTUP_RECENT)
+_aggregate_samples: dict[str, dict[str, float | int]] = {}
 _lock = threading.RLock()
 _startup_started_ns: int | None = None
 _startup_active = False
@@ -174,16 +175,22 @@ def record(
 ) -> None:
     if not _enabled and not force:
         return
-    event = _event(
-        name,
-        elapsed_ms,
-        item_count=item_count,
-        byte_count=byte_count,
-        detail=detail,
-    )
+    event = _event(name, elapsed_ms, item_count=item_count, byte_count=byte_count, detail=detail)
     with _lock:
         _recent.append(event)
         _write_event(event)
+
+
+def add_sample(name: str, elapsed_ms: float) -> None:
+    """Add a high-frequency timing sample without consuming the rolling event buffer."""
+    if not _enabled:
+        return
+    elapsed = max(0.0, float(elapsed_ms))
+    with _lock:
+        row = _aggregate_samples.setdefault(str(name), {"count": 0, "total_ms": 0.0, "max_ms": 0.0})
+        row["count"] = int(row["count"]) + 1
+        row["total_ms"] = float(row["total_ms"]) + elapsed
+        row["max_ms"] = max(float(row["max_ms"]), elapsed)
 
 
 def record_startup(
@@ -195,13 +202,7 @@ def record_startup(
     detail: str = "",
 ) -> None:
     """Record startup independently from the runtime rolling buffer lifetime."""
-    event = _event(
-        name,
-        elapsed_ms,
-        item_count=item_count,
-        byte_count=byte_count,
-        detail=detail,
-    )
+    event = _event(name, elapsed_ms, item_count=item_count, byte_count=byte_count, detail=detail)
     with _lock:
         _startup_recent.append(event)
         _recent.append(event)
@@ -233,13 +234,7 @@ def measure(
     try:
         yield
     finally:
-        record(
-            name,
-            (time.perf_counter_ns() - started) / 1_000_000.0,
-            item_count=item_count,
-            byte_count=byte_count,
-            detail=detail,
-        )
+        record(name, (time.perf_counter_ns() - started) / 1_000_000.0, item_count=item_count, byte_count=byte_count, detail=detail)
 
 
 @contextmanager
@@ -257,13 +252,7 @@ def measure_startup(
     try:
         yield
     finally:
-        record_startup(
-            name,
-            (time.perf_counter_ns() - started) / 1_000_000.0,
-            item_count=item_count,
-            byte_count=byte_count,
-            detail=detail,
-        )
+        record_startup(name, (time.perf_counter_ns() - started) / 1_000_000.0, item_count=item_count, byte_count=byte_count, detail=detail)
 
 
 def recent_events(limit: int = 100) -> list[PerfEvent]:
@@ -306,18 +295,28 @@ def aggregate_recent(limit: int = 300, *, include_startup: bool = False) -> list
     grouped: dict[str, list[float]] = defaultdict(list)
     for event in events:
         grouped[event.name].append(float(event.elapsed_ms))
-    rows: list[dict[str, Any]] = []
+
+    combined: dict[str, dict[str, float | int]] = {}
     for name, values in grouped.items():
-        total = sum(values)
-        rows.append(
-            {
-                "name": name,
-                "count": len(values),
-                "total_ms": round(total, 3),
-                "avg_ms": round(total / len(values), 3),
-                "max_ms": round(max(values), 3),
-            }
-        )
+        combined[name] = {"count": len(values), "total_ms": sum(values), "max_ms": max(values)}
+    with _lock:
+        for name, row in _aggregate_samples.items():
+            target = combined.setdefault(name, {"count": 0, "total_ms": 0.0, "max_ms": 0.0})
+            target["count"] = int(target["count"]) + int(row["count"])
+            target["total_ms"] = float(target["total_ms"]) + float(row["total_ms"])
+            target["max_ms"] = max(float(target["max_ms"]), float(row["max_ms"]))
+
+    rows: list[dict[str, Any]] = []
+    for name, row in combined.items():
+        count = max(1, int(row["count"]))
+        total = float(row["total_ms"])
+        rows.append({
+            "name": name,
+            "count": count,
+            "total_ms": round(total, 3),
+            "avg_ms": round(total / count, 3),
+            "max_ms": round(float(row["max_ms"]), 3),
+        })
     rows.sort(key=lambda row: (-float(row["total_ms"]), str(row["name"])))
     return rows
 
@@ -339,6 +338,7 @@ def clear_recent(*, clear_file: bool = False) -> None:
     with _lock:
         _recent.clear()
         _startup_recent.clear()
+        _aggregate_samples.clear()
         if clear_file:
             for index in range(_ROTATIONS + 1):
                 path = log_path() if index == 0 else log_path().with_suffix(log_path().suffix + f".{index}")
