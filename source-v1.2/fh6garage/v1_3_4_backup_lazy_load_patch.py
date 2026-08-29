@@ -452,7 +452,7 @@ def _build_cards_from_result(window: Any, result: _LoadResult, token: _CancelTok
             )
 
         if end < len(items):
-            QTimer.singleShot(0, lambda next_start=end: build_chunk(next_start))
+            
             return
 
         _metrics.record(
