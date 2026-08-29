@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from datetime import datetime
 from collections import Counter
+from functools import lru_cache
 import re
 from typing import Optional
 
@@ -114,6 +115,7 @@ QMessageBox QPushButton:disabled { color: #8b8f9c; background: #eceef2; border-c
 """
 
 
+@lru_cache(maxsize=64)
 def _classification_pixmap(kind: str, active: bool, size: int = 24) -> QPixmap:
     """Draw the exact active/inactive glyph shared by cards and filters."""
     pixmap = QPixmap(size, size)
@@ -188,6 +190,7 @@ def _classification_pixmap(kind: str, active: bool, size: int = 24) -> QPixmap:
     return pixmap
 
 
+@lru_cache(maxsize=16)
 def _classification_toggle_icon(kind: str) -> QIcon:
     from .card_icons import toggle_icon as card_toggle_icon
 

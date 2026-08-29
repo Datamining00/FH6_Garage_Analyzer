@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from functools import lru_cache
 from pathlib import Path
 
 from PySide6.QtCore import Qt
@@ -31,7 +32,8 @@ def icon_path(kind: str) -> Path:
     return _icon_root() / ICON_FILES[kind]
 
 
-def pixmap(kind: str, color: QColor | str = "#555a68", size: int = ICON_SIZE) -> QPixmap:
+@lru_cache(maxsize=128)
+def _cached_pixmap(kind: str, color_name: str, size: int) -> QPixmap:
     source = QImage(str(icon_path(kind)))
     if source.isNull():
         return QPixmap()
@@ -40,19 +42,43 @@ def pixmap(kind: str, color: QColor | str = "#555a68", size: int = ICON_SIZE) ->
     result = QPixmap.fromImage(source.convertToFormat(QImage.Format.Format_ARGB32))
     painter = QPainter(result)
     painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
-    painter.fillRect(result.rect(), QColor(color))
+    painter.fillRect(result.rect(), QColor(color_name))
     painter.end()
     return result
 
 
+def pixmap(kind: str, color: QColor | str = "#555a68", size: int = ICON_SIZE) -> QPixmap:
+    """Return an implicitly-shared pixmap without decoding the PNG per card."""
+    normalized = QColor(color).name(QColor.NameFormat.HexArgb)
+    return _cached_pixmap(kind, normalized, int(size))
+
+
+@lru_cache(maxsize=128)
+def _cached_icon(kind: str, color_name: str, size: int) -> QIcon:
+    return QIcon(_cached_pixmap(kind, color_name, size))
+
+
 def icon(kind: str, color: QColor | str = "#555a68", size: int = ICON_SIZE) -> QIcon:
-    return QIcon(pixmap(kind, color, size))
+    normalized = QColor(color).name(QColor.NameFormat.HexArgb)
+    return _cached_icon(kind, normalized, int(size))
+
+
+@lru_cache(maxsize=64)
+def _cached_toggle_icon(off_kind: str, on_kind: str, off_color: str,
+                        on_color: str, size: int) -> QIcon:
+    result = QIcon()
+    result.addPixmap(_cached_pixmap(off_kind, off_color, size), QIcon.Mode.Normal, QIcon.State.Off)
+    result.addPixmap(_cached_pixmap(on_kind, on_color, size), QIcon.Mode.Normal, QIcon.State.On)
+    return result
 
 
 def toggle_icon(off_kind: str, on_kind: str | None = None, *,
                 off_color: QColor | str = "#9ba5b3",
                 on_color: QColor | str = "#6e4bf2", size: int = ICON_SIZE) -> QIcon:
-    result = QIcon()
-    result.addPixmap(pixmap(off_kind, off_color, size), QIcon.Mode.Normal, QIcon.State.Off)
-    result.addPixmap(pixmap(on_kind or off_kind, on_color, size), QIcon.Mode.Normal, QIcon.State.On)
-    return result
+    return _cached_toggle_icon(
+        off_kind,
+        on_kind or off_kind,
+        QColor(off_color).name(QColor.NameFormat.HexArgb),
+        QColor(on_color).name(QColor.NameFormat.HexArgb),
+        int(size),
+    )
