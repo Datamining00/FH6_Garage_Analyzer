@@ -238,6 +238,17 @@ class BackupViewContractTests(unittest.TestCase):
         self.assertNotIn("_rebuild_backup_cards", body)
         self.assertNotIn("backup_records", body)
         self.assertIn("_backup_ui._set_backup_sort = _set_backup_sort_cached", source)
+        self.assertIn('"backup.sort.layout_only"', body)
+        self.assertIn('"backup.sort.card_reused"', body)
+
+    def test_backup_rebuild_has_exception_safe_busy_ui(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        source = (root / "fh6garage" / "v1_3_4_backup_import_refinement_patch.py").read_text(encoding="utf-8")
+        self.assertIn("def _begin_backup_rebuild_ui", source)
+        self.assertIn("def _end_backup_rebuild_ui", source)
+        self.assertIn('begin(_txt("백업 목록을 업데이트하는 중...", "Updating backup list..."))', source)
+        self.assertIn("control.setEnabled(False)", source)
+        self.assertIn("control.setEnabled(True)", source)
 
     def test_backup_view_constructs_only_repository_records(self) -> None:
         root = Path(__file__).resolve().parents[1]

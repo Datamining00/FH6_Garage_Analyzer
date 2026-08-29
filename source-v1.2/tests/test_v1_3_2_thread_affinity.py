@@ -44,6 +44,8 @@ class V132ThreadAffinityContractTests(unittest.TestCase):
         source = (root / "fh6garage" / "v1_3_2_thread_affinity_patch.py").read_text(encoding="utf-8")
         self.assertIn("startup.populate.pre_car.auction_thumbnail_match", source)
         self.assertIn("startup.populate.pre_car.record_indexes", source)
+        self.assertIn("checked_paths", source)
+        self.assertIn("path_key not in checked_paths", source)
 
     def test_base_scan_callback_is_qt_slot(self) -> None:
         root = Path(__file__).resolve().parents[1]
