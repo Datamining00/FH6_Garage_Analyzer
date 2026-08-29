@@ -20,6 +20,7 @@ from .i18n import get_language
 
 _SETTING_KEY = "performance_profiling_enabled"
 _SLOW_WIDTH_SYNC_MS = 10.0
+_POPULATE_CHILD_PREFIX = "startup.populate."
 
 
 def _txt(ko: str, en: str) -> str:
@@ -44,6 +45,32 @@ def _phase_accumulate(owner: Any, name: str, elapsed_ms: float) -> None:
     phases[name] = float(phases.get(name, 0.0) or 0.0) + float(elapsed_ms)
 
 
+def _populate_child_enter(owner: Any, startup_name: str, started_ns: int) -> None:
+    state = getattr(owner, "_fh6_perf_populate_timeline", None)
+    if not isinstance(state, dict):
+        return
+    depth = int(state.get("depth", 0) or 0)
+    state["depth"] = depth + 1
+    if depth:
+        return
+    previous = str(state.get("previous", "start") or "start")
+    gap_ms = max(0.0, (started_ns - int(state["cursor_ns"])) / 1_000_000.0)
+    state["gaps"].append((f"{previous}_to_{startup_name.removeprefix(_POPULATE_CHILD_PREFIX)}", gap_ms))
+
+
+def _populate_child_exit(owner: Any, startup_name: str, started_ns: int, ended_ns: int) -> None:
+    state = getattr(owner, "_fh6_perf_populate_timeline", None)
+    if not isinstance(state, dict):
+        return
+    depth = max(0, int(state.get("depth", 1) or 1) - 1)
+    state["depth"] = depth
+    if depth:
+        return
+    state["child_nonoverlap_ms"] += max(0.0, (ended_ns - started_ns) / 1_000_000.0)
+    state["cursor_ns"] = ended_ns
+    state["previous"] = startup_name.removeprefix(_POPULATE_CHILD_PREFIX)
+
+
 def _timed(
     name: str,
     fn: Callable[..., Any],
@@ -65,10 +92,16 @@ def _timed(
             return fn(*args, **kwargs)
         count = _count_items(item_count, args, kwargs)
         started = time.perf_counter_ns()
+        populate_child = bool(startup and startup_name and startup_name.startswith(_POPULATE_CHILD_PREFIX))
+        if populate_child:
+            _populate_child_enter(owner, startup_name, started)
         try:
             return fn(*args, **kwargs)
         finally:
-            elapsed = (time.perf_counter_ns() - started) / 1_000_000.0
+            ended = time.perf_counter_ns()
+            elapsed = (ended - started) / 1_000_000.0
+            if populate_child:
+                _populate_child_exit(owner, startup_name, started, ended)
             if phase_name:
                 _phase_accumulate(owner, phase_name, elapsed)
             if startup and startup_name:
@@ -486,9 +519,35 @@ def _install_probes(MainWindow: Any) -> None:
 
     @wraps(original_populate)
     def populate_all(self: Any, *args: Any, **kwargs: Any):
+        timeline_started = time.perf_counter_ns()
+        tracking = _metrics.startup_active()
+        if tracking:
+            self._fh6_perf_populate_timeline = {
+                "cursor_ns": timeline_started,
+                "previous": "start",
+                "depth": 0,
+                "gaps": [],
+                "child_nonoverlap_ms": 0.0,
+            }
         try:
             return timed_populate(self, *args, **kwargs)
         finally:
+            if tracking:
+                ended = time.perf_counter_ns()
+                state = getattr(self, "_fh6_perf_populate_timeline", {})
+                tail_ms = max(0.0, (ended - int(state.get("cursor_ns", ended))) / 1_000_000.0)
+                previous = str(state.get("previous", "start") or "start")
+                state.get("gaps", []).append((f"{previous}_to_end", tail_ms))
+                gap_total = 0.0
+                for label, elapsed_ms in state.get("gaps", []):
+                    gap_total += elapsed_ms
+                    _metrics.record_startup(f"startup.populate.gap.{label}", elapsed_ms)
+                _metrics.record_startup(
+                    "startup.populate.child_nonoverlap_sum",
+                    float(state.get("child_nonoverlap_ms", 0.0) or 0.0),
+                )
+                _metrics.record_startup("startup.populate.gap_total", gap_total)
+                self._fh6_perf_populate_timeline = None
             _schedule_startup_ready(self)
 
     MainWindow._populate_all = populate_all

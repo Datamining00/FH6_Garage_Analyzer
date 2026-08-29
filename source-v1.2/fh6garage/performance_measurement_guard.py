@@ -141,7 +141,8 @@ def install_performance_measurement_guard(metrics: Any) -> None:
             "startup.populate.db_status",
         )
         children = [value for name in child_names if (value := _last_elapsed(name)) is not None]
-        child_sum = sum(children)
+        nonoverlap_child_sum = _last_elapsed("startup.populate.child_nonoverlap_sum")
+        child_sum = nonoverlap_child_sum if nonoverlap_child_sum is not None else sum(children)
         populate_gap = None if initial_populate is None else initial_populate - child_sum
 
         with stats_lock:
@@ -162,12 +163,29 @@ def install_performance_measurement_guard(metrics: Any) -> None:
                 }
             )
 
+    def persist_startup_diagnostics() -> None:
+        """Write one self-contained validation row after startup.total is closed."""
+        with stats_lock:
+            snapshot = dict(last_startup_stats)
+        if not snapshot:
+            return
+        event = metrics._event(
+            "startup.measurement_guard",
+            float(snapshot.get("collector_in_path_ms", 0.0) or 0.0),
+            item_count=int(snapshot.get("collector_record_calls", 0) or 0)
+            + int(snapshot.get("collector_sample_calls", 0) or 0),
+            detail=json.dumps(snapshot, ensure_ascii=False, separators=(",", ":")),
+        )
+        buffered_write_event(event)
+        flush_log()
+
     def guarded_finish_startup(*args: Any, **kwargs: Any) -> None:
         original_finish_startup(*args, **kwargs)
         # startup.total closes before disk flush. This means JSON serialization and
         # file I/O cannot inflate the user-visible startup.total measurement.
         flush_ms = flush_log()
         _capture_startup_stats(flush_ms)
+        persist_startup_diagnostics()
 
     def format_validation() -> str:
         with stats_lock:
