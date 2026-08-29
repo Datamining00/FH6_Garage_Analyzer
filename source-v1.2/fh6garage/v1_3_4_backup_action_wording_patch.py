@@ -32,6 +32,9 @@ from .v1_3_4_backup_loading_resilience_patch import (
 from .v1_3_4_backup_visual_stability_patch import (
     apply_v1_3_4_backup_visual_stability_patch,
 )
+from .v1_3_4_card_polish_export_delete_patch import (
+    apply_v1_3_4_card_polish_export_delete_patch,
+)
 from .v1_3_4_livery_backup_filter_patch import (
     apply_v1_3_4_livery_backup_filter_patch,
 )
@@ -51,9 +54,9 @@ def _backup_confirm(window: Any, count: int) -> bool:
     box.setText(
         _backup_ui._txt(
             f"{count}개 항목을 백업한 뒤 게임 쪽 원본을 삭제하시겠습니까?\n\n"
-            "현재 버전에서는 게임 세이브 직접 삭제가 안전 검증 전 비활성화되어 있습니다.",
+            "원본 삭제는 백업 데이터와 폴더 지문을 다시 검증한 항목에만 수행됩니다.",
             f"Delete the game-side source after backing up {count} item(s)?\n\n"
-            "Direct deletion from the game save is disabled until save-layout safety is verified.",
+            "Source deletion is performed only after the backup data and folder fingerprint are verified again.",
         )
     )
     box.setIcon(QMessageBox.Icon.Question)
@@ -65,20 +68,21 @@ def _backup_confirm(window: Any, count: int) -> bool:
         _backup_ui._txt("원본 삭제", "Delete source"),
         QMessageBox.ButtonRole.DestructiveRole,
     )
-    delete.setEnabled(False)
     delete.setToolTip(
         _backup_ui._txt(
-            "저장 구조 검증 후 활성화됩니다.",
-            "Available after save-layout verification.",
+            "백업 검증 성공 후 게임 쪽 원본 컨테이너를 삭제합니다.",
+            "Delete the game-side source container only after backup verification succeeds.",
         )
     )
-    box.addButton(
+    cancel = box.addButton(
         _backup_ui._txt("취소", "Cancel"),
         QMessageBox.ButtonRole.RejectRole,
     )
     box.setDefaultButton(keep)
     box.exec()
-    return box.clickedButton() is keep
+    clicked = box.clickedButton()
+    window._fh6_export_delete_source_requested = clicked is delete
+    return clicked in {keep, delete} and clicked is not cancel
 
 
 def apply_v1_3_4_backup_action_wording_patch(MainWindow: Any) -> None:
@@ -89,9 +93,9 @@ def apply_v1_3_4_backup_action_wording_patch(MainWindow: Any) -> None:
     original_configure = _perf._configure_backup_action_button
 
     def confirm(window: Any, count: int, *, operation: str) -> bool:
-        if operation == "export" and bool(
-            getattr(window, "_fh6_backup_tab_backup_prompt", False)
-        ):
+        # All game->backup export entry points now share the verified-delete
+        # prompt. Import keeps its existing source-retention semantics.
+        if operation == "export":
             return _backup_confirm(window, count)
         return original_confirm(window, count, operation=operation)
 
@@ -134,8 +138,9 @@ def apply_v1_3_4_backup_action_wording_patch(MainWindow: Any) -> None:
     MainWindow._fh6_v134_backup_action_wording_patched = True
 
     # Final v1.3.4 layers: restore/toolbar behavior first, then lazy loading,
-    # external-change watching, worker->GUI handoff, lifecycle resilience and
-    # repaint stability. The separate thread-affinity patch remains final in app.py.
+    # external-change watching, worker->GUI handoff, lifecycle resilience,
+    # repaint stability and card/export polish. The separate thread-affinity
+    # patch remains final in app.py.
     apply_v1_3_4_backup_import_refinement_patch(MainWindow)
     apply_v1_3_4_backup_toolbar_followup_patch(MainWindow)
     apply_v1_3_4_backup_lazy_load_patch(MainWindow)
@@ -143,5 +148,6 @@ def apply_v1_3_4_backup_action_wording_patch(MainWindow: Any) -> None:
     apply_v1_3_4_backup_lazy_thread_bridge_patch(MainWindow)
     apply_v1_3_4_backup_loading_resilience_patch(MainWindow)
     apply_v1_3_4_backup_visual_stability_patch(MainWindow)
+    apply_v1_3_4_card_polish_export_delete_patch(MainWindow)
     apply_v1_3_4_livery_backup_filter_patch(MainWindow)
     apply_v1_3_4_performance_probe_patch(MainWindow)
