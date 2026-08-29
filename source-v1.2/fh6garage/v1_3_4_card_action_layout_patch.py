@@ -247,8 +247,14 @@ def _arrange_card(card: Any) -> None:
             grid.addWidget(right_button, row, 1, Qt.AlignmentFlag.AlignRight | vertical)
 
     def enforce_grid() -> None:
-        grid.invalidate()
-        grid.activate()
+        # Cards can be replaced before the 50/150 ms layout callbacks fire.
+        # Accessing a deleted C++ layout raises RuntimeError in PySide6, so make
+        # already-queued maintenance callbacks explicitly lifetime-safe.
+        try:
+            grid.invalidate()
+            grid.activate()
+        except RuntimeError:
+            return
 
     card._fh6_v134_action_grid = grid
 
@@ -265,10 +271,13 @@ def _arrange_card(card: Any) -> None:
         original_apply = aspect.apply
 
         def apply_with_card_height() -> None:
-            original_apply()
-            host = getattr(aspect, "host", None)
-            host_height = host.height() if host is not None else THUMBNAIL_MIN_HEIGHT
-            card.setMinimumHeight(max(CARD_MIN_HEIGHT, host_height + CARD_METADATA_HEIGHT))
+            try:
+                original_apply()
+                host = getattr(aspect, "host", None)
+                host_height = host.height() if host is not None else THUMBNAIL_MIN_HEIGHT
+                card.setMinimumHeight(max(CARD_MIN_HEIGHT, host_height + CARD_METADATA_HEIGHT))
+            except RuntimeError:
+                return
 
         aspect.apply = apply_with_card_height
         aspect.schedule()
