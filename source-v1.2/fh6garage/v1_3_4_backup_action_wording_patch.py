@@ -42,9 +42,6 @@ from .v1_3_4_performance_probe_patch import (
     apply_v1_3_4_performance_probe_patch,
 )
 
-# Install the collector guard while app.py imports the release patch stack, before
-# main() starts the always-on startup session. This keeps JSONL I/O outside the
-# measured startup path and makes uncertainty/observer-overhead visible.
 install_performance_measurement_guard(_performance_metrics)
 
 
@@ -60,24 +57,15 @@ def _backup_confirm(window: Any, count: int) -> bool:
         )
     )
     box.setIcon(QMessageBox.Icon.Question)
-    keep = box.addButton(
-        _backup_ui._txt("원본 유지", "Keep source"),
-        QMessageBox.ButtonRole.AcceptRole,
-    )
-    delete = box.addButton(
-        _backup_ui._txt("원본 삭제", "Delete source"),
-        QMessageBox.ButtonRole.DestructiveRole,
-    )
+    keep = box.addButton(_backup_ui._txt("원본 유지", "Keep source"), QMessageBox.ButtonRole.AcceptRole)
+    delete = box.addButton(_backup_ui._txt("원본 삭제", "Delete source"), QMessageBox.ButtonRole.DestructiveRole)
     delete.setToolTip(
         _backup_ui._txt(
             "백업 검증 성공 후 게임 쪽 원본 컨테이너를 삭제합니다.",
             "Delete the game-side source container only after backup verification succeeds.",
         )
     )
-    cancel = box.addButton(
-        _backup_ui._txt("취소", "Cancel"),
-        QMessageBox.ButtonRole.RejectRole,
-    )
+    cancel = box.addButton(_backup_ui._txt("취소", "Cancel"), QMessageBox.ButtonRole.RejectRole)
     box.setDefaultButton(keep)
     box.exec()
     clicked = box.clickedButton()
@@ -93,8 +81,6 @@ def apply_v1_3_4_backup_action_wording_patch(MainWindow: Any) -> None:
     original_configure = _perf._configure_backup_action_button
 
     def confirm(window: Any, count: int, *, operation: str) -> bool:
-        # All game->backup export entry points now share the verified-delete
-        # prompt. Import keeps its existing source-retention semantics.
         if operation == "export":
             return _backup_confirm(window, count)
         return original_confirm(window, count, operation=operation)
@@ -106,16 +92,10 @@ def apply_v1_3_4_backup_action_wording_patch(MainWindow: Any) -> None:
         finally:
             window._fh6_backup_tab_backup_prompt = False
 
-    def configure(
-        window: Any,
-        card: Any,
-        record: LiveryRecord,
-        location: str,
-    ) -> None:
+    def configure(window: Any, card: Any, record: LiveryRecord, location: str) -> None:
         if location != "game":
             original_configure(window, card, record, location)
             return
-
         button = getattr(card, "_fh6_export_placeholder_button", None)
         if not isinstance(button, QToolButton):
             return
@@ -128,19 +108,12 @@ def apply_v1_3_4_backup_action_wording_patch(MainWindow: Any) -> None:
         button.setAccessibleName(_backup_ui._txt("백업하기", "Back up"))
         if not bool(button.property("fh6BackupActionInstalled")):
             button.setProperty("fh6BackupActionInstalled", True)
-            button.clicked.connect(
-                lambda _checked=False, owner=window, item=record:
-                request_backup(owner, item)
-            )
+            button.clicked.connect(lambda _checked=False, owner=window, item=record: request_backup(owner, item))
 
     _backup_ui._confirm_keep_source = confirm
     _perf._configure_backup_action_button = configure
     MainWindow._fh6_v134_backup_action_wording_patched = True
 
-    # Final v1.3.4 layers: restore/toolbar behavior first, then lazy loading,
-    # external-change watching, worker->GUI handoff, lifecycle resilience,
-    # repaint stability and card/export polish. The separate thread-affinity
-    # patch remains final in app.py.
     apply_v1_3_4_backup_import_refinement_patch(MainWindow)
     apply_v1_3_4_backup_toolbar_followup_patch(MainWindow)
     apply_v1_3_4_backup_lazy_load_patch(MainWindow)
