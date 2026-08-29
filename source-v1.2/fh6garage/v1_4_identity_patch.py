@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtWidgets import QLabel
+from PySide6.QtWidgets import QApplication, QLabel
 
 
 VERSION_TEXT = "v1.4"
@@ -16,6 +16,9 @@ def apply_v1_4_identity_patch(MainWindow) -> None:
 
     def patched_init(self, *args, **kwargs) -> None:
         original_init(self, *args, **kwargs)
+        app = QApplication.instance()
+        if app is not None:
+            app.setApplicationVersion("1.4")
         self.setWindowTitle(WINDOW_TITLE)
         for label in self.findChildren(QLabel):
             text = label.text()
