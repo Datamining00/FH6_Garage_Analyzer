@@ -136,9 +136,10 @@ class V131BuildMetadataTests(unittest.TestCase):
 
     def test_windows_version_metadata_is_current_release(self) -> None:
         source = (ROOT / "version_info.txt").read_text(encoding="utf-8")
-        self.assertIn("filevers=(1, 3, 3, 0)", source)
-        self.assertIn("prodvers=(1, 3, 3, 0)", source)
-        self.assertIn("FH6 Assistant v1.3.3 Beta.exe", source)
+        self.assertIn("filevers=(1, 4, 0, 0)", source)
+        self.assertIn("prodvers=(1, 4, 0, 0)", source)
+        self.assertIn("FH6 Assistant v1.4.exe", source)
+        self.assertIn("ProductVersion', '1.4'", source)
 
     def test_v131_spec_exists(self) -> None:
         source = (ROOT / "FH6_Assistant_v1.3.1.spec").read_text(encoding="utf-8")
