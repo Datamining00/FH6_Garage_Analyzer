@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from PySide6.QtCore import QEvent, QEventLoop, QObject, QPoint, QRect, Qt, QTimer
 from PySide6.QtWidgets import QApplication, QLabel
 
+from . import performance_metrics as _metrics
 from . import v1_3_4_backup_export_patch as _backup_ui
 from . import v1_3_4_backup_lazy_load_patch as _lazy
 from . import v1_3_4_backup_loading_resilience_patch as _resilience
@@ -16,6 +18,8 @@ from .acquisition_db import AcquisitionDatabase
 _METADATA_BACKGROUND_CHUNK = 32
 _VISIBLE_MARGIN = 220
 _BACKUP_PAINT_PROCESS_MS = 12
+_BACKUP_COMPLETION_POLL_MS = 16
+_BACKUP_COMPLETION_TIMEOUT_MS = 3000
 
 
 def _txt(ko: str, en: str) -> str:
@@ -133,15 +137,17 @@ def _set_metadata_collapsed_visible_first(window: Any, collapsed: bool) -> None:
         QTimer.singleShot(0, apply_chunk)
 
 
-def _finish_cached_layout_busy(window: Any) -> None:
+def _finish_cached_layout_busy(window: Any, generation: int) -> None:
+    if generation != int(getattr(window, "_fh6_backup_cached_layout_generation", 0) or 0):
+        return
     waiting = bool(getattr(window, "_fh6_backup_cached_layout_waiting", False))
     if not waiting:
         return
     window._fh6_backup_cached_layout_waiting = False
 
     # Visible/near-visible thumbnails are the user-perceived completion point.
-    # Load them synchronously, then let Qt process the resulting paint/layout
-    # events before removing the overlay. Off-screen thumbnails remain lazy.
+    # Refresh them once after placement, process the resulting paint events, and
+    # then release the overlay. Off-screen thumbnails remain lazy.
     try:
         _resilience._ORIGINAL_REFRESH_BACKUP_THUMBNAILS(window)
     except RuntimeError:
@@ -171,6 +177,31 @@ def _finish_cached_layout_busy(window: Any) -> None:
     window._fh6_backup_cached_layout_busy_shown = False
 
 
+def _poll_cached_layout_completion(window: Any, generation: int, started_ns: int) -> None:
+    if generation != int(getattr(window, "_fh6_backup_cached_layout_generation", 0) or 0):
+        return
+    if not bool(getattr(window, "_fh6_backup_cached_layout_waiting", False)):
+        return
+
+    active = bool(getattr(window, "_fh6_backup_relayout_active", False))
+    elapsed_ms = (time.perf_counter_ns() - started_ns) / 1_000_000.0
+    if active and elapsed_ms < _BACKUP_COMPLETION_TIMEOUT_MS:
+        QTimer.singleShot(
+            _BACKUP_COMPLETION_POLL_MS,
+            lambda owner=window, gen=generation, started=started_ns: _poll_cached_layout_completion(owner, gen, started),
+        )
+        return
+
+    if active:
+        _metrics.record(
+            "backup.cached_layout.completion_timeout",
+            elapsed_ms,
+            item_count=len(getattr(window, "_fh6_backup_cards", []) or []),
+            detail="busy_released=1 relayout_still_active=1",
+        )
+    _finish_cached_layout_busy(window, generation)
+
+
 def _run_cached_layout_until_visible_paint(window: Any, message: str, operation: Any) -> None:
     if getattr(window, "_fh6_backup_load_running", False):
         return
@@ -180,6 +211,8 @@ def _run_cached_layout_until_visible_paint(window: Any, message: str, operation:
     card_count = len(getattr(window, "_fh6_backup_cards", []) or [])
     show_busy = card_count >= _lazy._BUSY_CARD_THRESHOLD
 
+    generation = int(getattr(window, "_fh6_backup_cached_layout_generation", 0) or 0) + 1
+    window._fh6_backup_cached_layout_generation = generation
     window._fh6_backup_cached_layout_waiting = True
     window._fh6_backup_cached_layout_busy_shown = show_busy
     window._fh6_backup_cached_layout_scroll = scroll_value
@@ -194,16 +227,20 @@ def _run_cached_layout_until_visible_paint(window: Any, message: str, operation:
             5,
         )
 
+    started_ns = time.perf_counter_ns()
     try:
         operation()
     except Exception:
-        _finish_cached_layout_busy(window)
+        _finish_cached_layout_busy(window, generation)
         raise
 
-    # Resilience relayout is asynchronous. Its terminal callback will finish the
-    # overlay. If no asynchronous placement was needed, finish immediately.
-    if not bool(getattr(window, "_fh6_backup_relayout_active", False)):
-        _finish_cached_layout_busy(window)
+    # Do not depend on monkey-patching the async relayout's private finish hook.
+    # Poll its public state instead and always release the busy UI after a bounded
+    # interval, even if a generation is superseded or a terminal callback is lost.
+    QTimer.singleShot(
+        0,
+        lambda owner=window, gen=generation, started=started_ns: _poll_cached_layout_completion(owner, gen, started),
+    )
 
 
 def apply_v1_4_interaction_render_completion_patch(MainWindow: Any) -> None:
@@ -211,20 +248,13 @@ def apply_v1_4_interaction_render_completion_patch(MainWindow: Any) -> None:
         return
 
     original_decorate = _acquisition._decorate_acquisition_label
-    original_finish_relayout = _resilience._finish_relayout
 
     def decorate(window: Any, card: Any, record: Any) -> None:
         original_decorate(window, card, record)
         _install_acquisition_copy(window, card, record)
 
-    def finish_relayout(window: Any, generation: int, started_ns: int, visible_cards: int) -> None:
-        original_finish_relayout(window, generation, started_ns, visible_cards)
-        if generation == int(getattr(window, "_fh6_backup_relayout_generation", 0) or 0):
-            _finish_cached_layout_busy(window)
-
     _acquisition._decorate_acquisition_label = decorate
     _features._set_metadata_collapsed = _set_metadata_collapsed_visible_first
     _lazy._run_cached_layout = _run_cached_layout_until_visible_paint
-    _resilience._finish_relayout = finish_relayout
 
     MainWindow._fh6_v14_interaction_render_completion_patched = True
