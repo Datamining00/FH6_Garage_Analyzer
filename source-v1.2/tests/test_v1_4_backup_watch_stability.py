@@ -24,6 +24,13 @@ class V14BackupWatchStabilityTests(unittest.TestCase):
         self.assertIn("timer.isActive()", self.text)
         self.assertIn('_fh6_backup_load_running', self.text)
 
+    def test_watcher_is_not_reconfigured_when_paths_are_already_correct(self):
+        self.assertIn("def _watcher_matches_desired", self.text)
+        self.assertIn("current == desired", self.text)
+        self.assertIn("def _ensure_watcher_current", self.text)
+        self.assertIn("if not _watcher_matches_desired(window):", self.text)
+        self.assertIn("_watch._configure_watcher(window)", self.text)
+
     def test_successful_commit_updates_watch_signature(self):
         self.assertIn('signature = getattr(window, "_fh6_backup_cache_signature", None)', self.text)
         self.assertIn("window._fh6_backup_last_watch_event_signature = signature", self.text)
