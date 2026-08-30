@@ -3,15 +3,20 @@ from pathlib import Path
 
 project_root = Path(SPECPATH)
 
+datas = [
+    (str(project_root / 'data' / 'car_names.json'), 'data'),
+    (str(project_root / 'icons' / 'FH6_Assistant.ico'), 'icons'),
+    (str(project_root / 'icons' / 'cards'), 'icons/cards'),
+]
+supplemental_data = project_root / 'data' / 'fh6_cars.json.gz'
+if supplemental_data.is_file():
+    datas.append((str(supplemental_data), 'data'))
+
 a = Analysis(
     ['app.py'],
     pathex=[str(project_root)],
     binaries=[],
-    datas=[
-        (str(project_root / 'data' / 'car_names.json'), 'data'),
-        (str(project_root / 'icons' / 'FH6_Assistant.ico'), 'icons'),
-        (str(project_root / 'icons' / 'cards'), 'icons/cards'),
-    ],
+    datas=datas,
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
