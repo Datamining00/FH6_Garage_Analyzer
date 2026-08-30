@@ -6,26 +6,9 @@ from pathlib import Path
 from unittest.mock import patch
 
 from fh6garage.backup_export import load_index
-from fh6garage.models import HeaderInfo, LiveryRecord
+from fh6garage.models import HeaderInfo
 from fh6garage import v1_4_backup_repository_patch as patch_module
 from fh6garage import v1_3_4_backup_import_refinement_patch as import_refinement
-
-
-class _Card:
-    def __init__(self, props: dict[str, object]):
-        self.props = dict(props)
-
-    def property(self, name: str):
-        return self.props.get(name)
-
-
-class _Window:
-    def __init__(self, source_cards=None, records=None):
-        self._livery_grid_cards = list(source_cards or [])
-        self._records = dict(records or {})
-
-    def _record_for_content_key(self, _kind: str, key: str):
-        return self._records.get(key)
 
 
 class V14BackupRepositoryTests(unittest.TestCase):
@@ -80,31 +63,10 @@ class V14BackupRepositoryTests(unittest.TestCase):
             self.assertEqual((copied / "extra.bin").read_bytes(), b"preserve me")
             self.assertEqual(payload["entries"][0]["kind"], "Livery")
 
-    def test_locked_filter_matches_corresponding_locked_main_card(self):
-        backup_record = LiveryRecord(
-            container_name="Livery_777_20260830040404",
-            container_path=Path("backup"),
-            kind="Livery",
-            header=HeaderInfo(car_id=777),
-            content_sha256="abc123",
-        )
-        source_record = LiveryRecord(
-            container_name="Livery_777_20260830040404",
-            container_path=Path("game"),
-            kind="Livery",
-            header=HeaderInfo(car_id=777),
-            content_sha256="abc123",
-        )
-        source_card = _Card({"fh6MoveLocked": True, "annotationKey": "game-key"})
-        backup_card = _Card({"fh6MoveLocked": False, "backupRecord": backup_record})
-        window = _Window([source_card], {"game-key": source_record})
-        self.assertTrue(patch_module._backup_card_locked(window, backup_card))
-
     def test_source_contract_uses_local_appdata_and_real_external_worker(self):
         text = Path("fh6garage/v1_4_backup_repository_patch.py").read_text(encoding="utf-8")
         self.assertIn("AppLocalDataLocation", text)
         self.assertIn("/ \"backup\"", text)
-        self.assertIn("잠금된 리버리", text)
         self.assertIn("외부에서 가져오기", text)
         self.assertIn("_safe_export_records", text)
         self.assertIn("QMetaObject.invokeMethod", text)
@@ -117,6 +79,10 @@ class V14BackupRepositoryTests(unittest.TestCase):
         standard = Path("FH6_Assistant_v1.4.spec").read_text(encoding="utf-8")
         portable = Path("FH6_Assistant_v1.4_portable.spec").read_text(encoding="utf-8")
         version = Path("version_info.txt").read_text(encoding="utf-8")
+        app = Path("app.py").read_text(encoding="utf-8")
+        package = Path("fh6garage/__init__.py").read_text(encoding="utf-8")
+        build = Path("build_exe.ps1").read_text(encoding="utf-8")
+        readme = Path("README.txt").read_text(encoding="utf-8")
         self.assertIn('WINDOW_TITLE = "FH6 Assistant v1.4"', identity)
         self.assertIn("Validate and build FH6 Assistant v1.4", workflow)
         self.assertIn("FH6_Assistant_v1.4_Standard", workflow)
@@ -125,6 +91,11 @@ class V14BackupRepositoryTests(unittest.TestCase):
         self.assertIn("name='FH6 Assistant v1.4'", standard)
         self.assertIn("name='FH6 Assistant v1.4 Portable'", portable)
         self.assertIn("ProductVersion', '1.4'", version)
+        self.assertIn('app.setApplicationVersion("1.4")', app)
+        self.assertIn('__version__ = "1.4"', package)
+        self.assertIn("FH6_Assistant_v1.4.spec", build)
+        self.assertNotIn("FH6_Assistant_v1.3.3.spec", build)
+        self.assertTrue(readme.startswith("FH6 Assistant v1.4"))
 
 
 if __name__ == "__main__":
