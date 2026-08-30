@@ -17,7 +17,7 @@ class V14InteractionRenderCompletionTests(unittest.TestCase):
         self.assertIn("_METADATA_BACKGROUND_CHUNK = 32", self.text)
         self.assertIn("QTimer.singleShot(0, lambda next_start=end: apply_chunk(next_start))", self.text)
         start = self.text.index("def _set_metadata_collapsed_visible_first")
-        body = self.text[start:self.text.index("def _finish_cached_layout_busy", start)]
+        body = self.text[start:self.text.index("def _release_cached_layout_busy_owner", start)]
         self.assertNotIn("for card in _features._registered_metadata_cards(window):", body)
 
     def test_backup_cached_layout_has_bounded_completion_and_paint_before_busy_end(self):
@@ -26,9 +26,9 @@ class V14InteractionRenderCompletionTests(unittest.TestCase):
         finish = self.text[finish_start:finish_end]
         refresh = finish.index("_resilience._ORIGINAL_REFRESH_BACKUP_THUMBNAILS(window)")
         paint = finish.index("QApplication.processEvents(")
-        end_busy = finish.index("end()")
+        release = finish.index("_release_cached_layout_busy_owner(window)")
         self.assertLess(refresh, paint)
-        self.assertLess(paint, end_busy)
+        self.assertLess(paint, release)
 
         self.assertIn("_BACKUP_COMPLETION_POLL_MS = 16", self.text)
         self.assertIn("_BACKUP_COMPLETION_TIMEOUT_MS = 3000", self.text)
@@ -36,6 +36,23 @@ class V14InteractionRenderCompletionTests(unittest.TestCase):
         self.assertIn("_poll_cached_layout_completion", self.text)
         self.assertNotIn("original_finish_relayout", self.text)
         self.assertNotIn("_resilience._finish_relayout = finish_relayout", self.text)
+
+    def test_superseded_cached_layout_releases_previous_busy_depth_before_new_owner(self):
+        self.assertIn("def _release_cached_layout_busy_owner", self.text)
+        self.assertIn("_fh6_backup_cached_layout_busy_shown", self.text)
+        self.assertIn("end()", self.text)
+
+        start = self.text.index("def _run_cached_layout_until_visible_paint")
+        end = self.text.index("def _poll_full_load_finish", start)
+        body = self.text[start:end]
+        supersede = body.index('if bool(getattr(window, "_fh6_backup_cached_layout_waiting", False)):')
+        release = body.index("_release_cached_layout_busy_owner(window)")
+        generation = body.index('generation = int(getattr(window, "_fh6_backup_cached_layout_generation"')
+        begin = body.index("begin(message)")
+        self.assertLess(supersede, release)
+        self.assertLess(release, generation)
+        self.assertLess(generation, begin)
+        self.assertIn("each superseded action leaks +1 busy depth", body)
 
     def test_full_load_relayout_finish_is_also_bounded(self):
         self.assertIn("_BACKUP_FULL_LOAD_FINISH_POLL_MS = 16", self.text)
