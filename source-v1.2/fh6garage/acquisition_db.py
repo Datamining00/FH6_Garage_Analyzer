@@ -9,9 +9,40 @@ from typing import Any
 from .performance_metrics import app_data_dir
 
 
+DATA_DIR_NAME = "fh6_assistant_vehicle_data"
 DATA_FILE_NAME = "fh6_cars.json"
 LEGACY_DATA_FILE_NAME = "fh6_cars.json.gz"
 SCHEMA_VERSION = 1
+
+
+def load_vehicle_data_payload(path: Path) -> dict[str, Any]:
+    """Load the committed directory format or a legacy single-file snapshot."""
+    path = Path(path)
+    if path.is_dir():
+        metadata_path = path / "metadata.json"
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        if not isinstance(metadata, dict):
+            raise ValueError("vehicle metadata root is not an object")
+        rows: list[Any] = []
+        cars_dir = path / "cars"
+        for chunk in sorted(cars_dir.glob("*.json")):
+            payload = json.loads(chunk.read_text(encoding="utf-8"))
+            if not isinstance(payload, dict) or not isinstance(payload.get("rows"), list):
+                raise ValueError(f"invalid vehicle data chunk: {chunk.name}")
+            rows.extend(payload["rows"])
+        result = dict(metadata)
+        result["c"] = rows
+        return result
+
+    if path.suffix.casefold() == ".gz":
+        with gzip.open(path, "rt", encoding="utf-8") as stream:
+            payload = json.load(stream)
+    else:
+        with path.open("r", encoding="utf-8") as stream:
+            payload = json.load(stream)
+    if not isinstance(payload, dict):
+        raise ValueError("vehicle data root is not an object")
+    return payload
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,8 +65,8 @@ class AcquisitionDatabase:
 
     The selected vehicle-name source is handled separately from this metadata
     index. Lookups never perform network access and are O(1) after one startup
-    load. Plain JSON is the v1.4 repository/runtime format; gzip remains readable
-    only for compatibility with an older LocalAppData cache.
+    load. The v1.4 bundled format is an uncompressed directory committed to the
+    main repository. Legacy LocalAppData JSON/gzip snapshots remain readable.
     """
 
     def __init__(self, bundled_path: Path | None = None, cache_path: Path | None = None) -> None:
@@ -57,10 +88,10 @@ class AcquisitionDatabase:
         if self.bundled_path is not None and self.bundled_path not in candidates:
             candidates.append(self.bundled_path)
         for path in candidates:
-            if not path.is_file():
+            if not path.exists():
                 continue
             try:
-                parsed = self._load_file(path)
+                parsed = self._parse_payload(load_vehicle_data_payload(path))
             except (OSError, UnicodeError, ValueError, json.JSONDecodeError) as exc:
                 self.load_warning = f"{path.name}: {exc}"
                 continue
@@ -85,13 +116,7 @@ class AcquisitionDatabase:
 
     @classmethod
     def _load_file(cls, path: Path) -> dict[int, AcquisitionInfo]:
-        if path.suffix.casefold() == ".gz":
-            with gzip.open(path, "rt", encoding="utf-8") as stream:
-                payload = json.load(stream)
-        else:
-            with path.open("r", encoding="utf-8") as stream:
-                payload = json.load(stream)
-        return cls._parse_payload(payload)
+        return cls._parse_payload(load_vehicle_data_payload(path))
 
     @classmethod
     def _parse_payload(cls, payload: Any) -> dict[int, AcquisitionInfo]:
