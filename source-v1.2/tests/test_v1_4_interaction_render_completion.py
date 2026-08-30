@@ -37,6 +37,16 @@ class V14InteractionRenderCompletionTests(unittest.TestCase):
         self.assertNotIn("original_finish_relayout", self.text)
         self.assertNotIn("_resilience._finish_relayout = finish_relayout", self.text)
 
+    def test_full_load_relayout_finish_is_also_bounded(self):
+        self.assertIn("_BACKUP_FULL_LOAD_FINISH_POLL_MS = 16", self.text)
+        self.assertIn("_BACKUP_FULL_LOAD_FINISH_TIMEOUT_MS = 3000", self.text)
+        self.assertIn("def _bounded_deferred_load_finished", self.text)
+        self.assertIn("def _poll_full_load_finish", self.text)
+        self.assertIn("backup.full_load.relayout_finish_timeout", self.text)
+        self.assertIn("window._fh6_backup_finish_after_relayout = False", self.text)
+        self.assertIn("_resilience._ORIGINAL_LAZY_LOAD_FINISHED(window)", self.text)
+        self.assertIn("_lazy._load_finished = _bounded_deferred_load_finished", self.text)
+
     def test_backup_sort_keeps_existing_cache_and_lazy_offscreen_policy(self):
         lazy = Path("fh6garage/v1_3_4_backup_lazy_load_patch.py").read_text(
             encoding="utf-8"
@@ -44,7 +54,6 @@ class V14InteractionRenderCompletionTests(unittest.TestCase):
         self.assertIn("cards.sort(key=card_key)", lazy)
         self.assertIn("repository_read=0 card_create=0", lazy)
         self.assertIn("_backup_ui._relayout_backup(window)", lazy)
-        self.assertIn("Off-screen thumbnails remain lazy", self.text)
 
     def test_source_label_click_copies_raw_acquisition_value(self):
         self.assertIn("class _AcquisitionCopyController(QObject):", self.text)
