@@ -35,6 +35,7 @@ from .v1_4_vehicle_runtime_update_patch import apply_v1_4_vehicle_runtime_update
 from .v1_4_vehicle_update_finish_ui_patch import apply_v1_4_vehicle_update_finish_ui_patch
 from .v1_4_vehicle_update_thread_bridge_patch import apply_v1_4_vehicle_update_thread_bridge_patch
 from .v1_4_interaction_render_completion_patch import apply_v1_4_interaction_render_completion_patch
+from .v1_4_right_control_width_patch import apply_v1_4_right_control_width_patch
 
 install_performance_measurement_guard(_performance_metrics)
 
@@ -126,4 +127,5 @@ def apply_v1_3_4_backup_action_wording_patch(MainWindow: Any) -> None:
     apply_v1_4_vehicle_update_finish_ui_patch(MainWindow)
     apply_v1_4_vehicle_update_thread_bridge_patch(MainWindow)
     apply_v1_4_interaction_render_completion_patch(MainWindow)
+    apply_v1_4_right_control_width_patch(MainWindow)
     apply_v1_3_4_performance_probe_patch(MainWindow)
