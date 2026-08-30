@@ -30,7 +30,10 @@ class V14AcquisitionUiTests(unittest.TestCase):
         text = Path("fh6garage/v1_4_acquisition_ui_patch.py").read_text(encoding="utf-8")
         self.assertIn('findChild(QLabel, "fh6AcquisitionPlaceholder")', text)
         self.assertIn("elidedText", text)
+        self.assertIn('from .acquisition_db import DATA_DIR_NAME, AcquisitionDatabase, AcquisitionInfo', text)
+        self.assertIn('self.project_root / "data" / DATA_DIR_NAME', text)
         self.assertIn("self.acquisition_db = AcquisitionDatabase(bundled)", text)
+        self.assertNotIn('self.project_root / "data" / "fh6_cars.json"', text)
         self.assertIn("dataset_name", text)
         self.assertIn("_install_change_dialog_first_layout_fix", text)
 
