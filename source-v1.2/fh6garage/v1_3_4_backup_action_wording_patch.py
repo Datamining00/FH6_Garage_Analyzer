@@ -24,6 +24,7 @@ from .v1_3_4_status_backup_label_patch import apply_v1_3_4_status_backup_label_p
 from .v1_3_4_performance_probe_patch import apply_v1_3_4_performance_probe_patch
 from .v1_4_backup_repository_patch import apply_v1_4_backup_repository_patch
 from .v1_4_backup_repository_followup_patch import apply_v1_4_backup_repository_followup_patch
+from .v1_4_backup_watch_stability_patch import apply_v1_4_backup_watch_stability_patch
 from .v1_4_identity_patch import apply_v1_4_identity_patch
 from .v1_4_ui_completion_patch import apply_v1_4_ui_completion_patch
 from .v1_4_display_row_geometry_patch import apply_v1_4_display_row_geometry_patch
@@ -114,6 +115,7 @@ def apply_v1_3_4_backup_action_wording_patch(MainWindow: Any) -> None:
     apply_v1_3_4_status_backup_label_patch(MainWindow)
     apply_v1_4_backup_repository_patch(MainWindow)
     apply_v1_4_backup_repository_followup_patch(MainWindow)
+    apply_v1_4_backup_watch_stability_patch(MainWindow)
     apply_v1_4_local_app_data_patch(MainWindow)
     apply_v1_4_identity_patch(MainWindow)
     apply_v1_4_ui_completion_patch(MainWindow)
