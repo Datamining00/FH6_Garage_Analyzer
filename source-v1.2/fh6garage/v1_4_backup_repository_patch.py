@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QMetaObject, QObject, QStandardPaths, Qt, QThread, Slot
+from PySide6.QtCore import QMetaObject, QObject, Qt, QThread, Slot
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QFileDialog, QLineEdit, QMessageBox, QProgressDialog, QPushButton, QToolButton
 
@@ -17,6 +17,7 @@ from . import v1_3_4_backup_lazy_load_patch as _lazy
 from .backup_export import BackupRepositoryError, ExportSummary
 from .models import LiveryRecord
 from .parsers import ParseError, read_header_file
+from .performance_metrics import app_data_dir
 from .scanner import _container_car_id
 
 
@@ -29,10 +30,7 @@ def _txt(ko: str, en: str) -> str:
 
 
 def _default_backup_root() -> Path:
-    base = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppLocalDataLocation)
-    if not base:
-        base = str(Path.home() / "AppData" / "Local" / "FH6 Assistant")
-    return Path(base).expanduser() / "backup"
+    return app_data_dir() / "backup"
 
 
 def _ensure_default_backup_root(window: Any) -> Path:
