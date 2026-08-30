@@ -31,17 +31,12 @@ class _Settings:
 
 class V14VehicleDataSourceTests(unittest.TestCase):
     def _write_dataset(self, path: Path) -> None:
-        payload = {
-            "v": 1,
-            "n": 2,
-            "a": ["Autoshow", "Seasonal"],
-            "d": [],
-            "c": [
-                [100, "Dataset Car A", 0, 0],
-                [200, "Dataset Car B", 1, 0],
-            ],
-        }
-        path.write_text(json.dumps(payload), encoding="utf-8")
+        path.mkdir(parents=True, exist_ok=True)
+        (path / "cars").mkdir()
+        metadata = {"v": 1, "n": 2, "a": ["Autoshow", "Seasonal"], "d": []}
+        rows = [[100, "Dataset Car A", 0, 0], [200, "Dataset Car B", 1, 0]]
+        (path / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
+        (path / "cars" / "cars_01.json").write_text(json.dumps({"rows": rows}), encoding="utf-8")
 
     def test_source_normalization(self):
         self.assertEqual(normalize_vehicle_data_source("HDR"), HDR_SOURCE)
@@ -51,7 +46,7 @@ class V14VehicleDataSourceTests(unittest.TestCase):
     def test_user_database_uses_dataset_name_and_keeps_override_priority(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
-            data = root / "fh6_cars.json"
+            data = root / "vehicle_data"
             app_data = root / "local"
             self._write_dataset(data)
             db = UserVehicleDatabase(data, app_data_dir=app_data)
@@ -64,23 +59,31 @@ class V14VehicleDataSourceTests(unittest.TestCase):
 
     def test_saved_hdr_source_is_reused_without_prompt(self):
         with tempfile.TemporaryDirectory() as td:
-            data = Path(td) / "fh6_cars.json"
+            data = Path(td) / "vehicle_data"
             self._write_dataset(data)
             settings = _Settings(HDR_SOURCE)
             self.assertEqual(resolve_vehicle_data_source(settings, data), HDR_SOURCE)
             self.assertEqual(settings.writes, [])
 
+    def test_saved_user_source_is_reused(self):
+        with tempfile.TemporaryDirectory() as td:
+            data = Path(td) / "vehicle_data"
+            self._write_dataset(data)
+            settings = _Settings(USER_SOURCE)
+            self.assertEqual(resolve_vehicle_data_source(settings, data), USER_SOURCE)
+            self.assertEqual(settings.writes, [])
+
     def test_saved_user_source_falls_back_to_hdr_when_dataset_missing(self):
         with tempfile.TemporaryDirectory() as td:
             settings = _Settings(USER_SOURCE)
-            missing = Path(td) / "missing.json"
+            missing = Path(td) / "missing"
             self.assertEqual(resolve_vehicle_data_source(settings, missing), HDR_SOURCE)
             self.assertEqual(settings.saved, USER_SOURCE)
             self.assertEqual(settings.writes, [])
 
     def test_smoke_test_defaults_to_hdr_without_persisting(self):
         with tempfile.TemporaryDirectory() as td:
-            data = Path(td) / "fh6_cars.json"
+            data = Path(td) / "vehicle_data"
             self._write_dataset(data)
             settings = _Settings()
             with patch.dict(os.environ, {"FH6_ASSISTANT_SMOKE_TEST_MS": "3000"}):
