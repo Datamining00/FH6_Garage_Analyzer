@@ -22,12 +22,15 @@ class V14UiCompletionTests(unittest.TestCase):
         self.assertIn("banner.show()", text)
         self.assertIn("return 0, 0, 0", text)
 
-    def test_recent_change_button_uses_plain_colored_numbers(self):
+    def test_recent_change_button_uses_readable_equal_width_numbers(self):
         text = Path("fh6garage/v1_4_ui_completion_patch.py").read_text(encoding="utf-8")
-        self.assertIn('_RECENT_ADDED_COLOR = "#39e75f"', text)
-        self.assertIn('_RECENT_REMOVED_COLOR = "#ff4d5a"', text)
-        self.assertIn('_RECENT_DUPLICATE_COLOR = "#ffe600"', text)
+        self.assertIn('_RECENT_ADDED_COLOR = "#11863f"', text)
+        self.assertIn('_RECENT_REMOVED_COLOR = "#d62f45"', text)
+        self.assertIn('_RECENT_DUPLICATE_COLOR = "#a66b00"', text)
         self.assertIn('label = QLabel("0", view)', text)
+        self.assertIn("font-weight:800", text)
+        self.assertIn("layout.setSpacing(4)", text)
+        self.assertIn("layout.addWidget(label, 1", text)
         self.assertIn('labels[0].setText(str(added))', text)
         self.assertIn('labels[1].setText(str(removed))', text)
         self.assertIn('labels[2].setText(str(duplicate))', text)
