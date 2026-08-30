@@ -129,13 +129,17 @@ def apply_v1_4_vehicle_data_source_patch(window_cls) -> None:
             else:
                 self.vehicle_data_source = HDR_SOURCE
 
-        # Acquisition/DLC metadata uses the same committed uncompressed snapshot.
-        try:
-            self.acquisition_db = AcquisitionDatabase(user_data_path)
-        except Exception:
-            # Supplemental metadata is optional; scans and HDR names must remain
-            # usable even if this directory is missing or malformed.
-            pass
+        # Acquisition UI is installed immediately before this patch and normally
+        # owns the already-loaded metadata index. Reuse it to avoid reading all
+        # committed vehicle-data chunks twice during startup. Keep this fallback
+        # so the source patch also remains safe when installed independently.
+        if not isinstance(getattr(self, "acquisition_db", None), AcquisitionDatabase):
+            try:
+                self.acquisition_db = AcquisitionDatabase(user_data_path)
+            except Exception:
+                # Supplemental metadata is optional; scans and HDR names must remain
+                # usable even if this directory is missing or malformed.
+                pass
 
         refresh = getattr(self, "_refresh_db_status", None)
         if callable(refresh):
