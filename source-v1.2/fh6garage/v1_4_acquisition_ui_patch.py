@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 
 from . import v1_3_2_change_dialog_folder_patch as _change_dialog
 from . import v1_3_2_dashboard_change_group_patch as _dashboard_changes
-from .acquisition_db import AcquisitionDatabase, AcquisitionInfo
+from .acquisition_db import DATA_DIR_NAME, AcquisitionDatabase, AcquisitionInfo
 from .i18n import get_language
 from .ui import APP_STYLE
 
@@ -286,7 +286,7 @@ def apply_v1_4_acquisition_ui_patch(MainWindow: Any) -> None:
 
     def patched_init(self: Any, *args: Any, **kwargs: Any) -> None:
         original_init(self, *args, **kwargs)
-        bundled = self.project_root / "data" / "fh6_cars.json"
+        bundled = self.project_root / "data" / DATA_DIR_NAME
         self.acquisition_db = AcquisitionDatabase(bundled)
 
     def make_card(self: Any, content_type: str, record: Any, key: str):
