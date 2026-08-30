@@ -1,18 +1,17 @@
 from __future__ import annotations
 
-import json
 import os
 from pathlib import Path
 
 from PySide6.QtWidgets import QMessageBox
 
+from .acquisition_db import DATA_DIR_NAME, AcquisitionDatabase, load_vehicle_data_payload
 from .car_db import CarDatabase
 
 
 HDR_SOURCE = "hdr"
 USER_SOURCE = "user"
 VEHICLE_DATA_SOURCE_KEY = "vehicle_data_source"
-USER_DATA_FILE_NAME = "fh6_cars.json"
 
 
 def normalize_vehicle_data_source(value: object) -> str:
@@ -47,12 +46,9 @@ class UserVehicleDatabase(CarDatabase):
 
     def _load_user_dataset(self, path: Path) -> dict[int, object]:
         try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            payload = load_vehicle_data_payload(path)
+        except (OSError, UnicodeError, ValueError) as exc:
             self._load_warnings.append(f"{path.name}: {exc}")
-            return {}
-        if not isinstance(payload, dict):
-            self._load_warnings.append(f"{path.name}: vehicle dataset root is not an object")
             return {}
         rows = payload.get("c", [])
         if not isinstance(rows, list):
@@ -97,7 +93,7 @@ def resolve_vehicle_data_source(settings, user_data_path: Path, parent=None) -> 
     preference, so a transient packaging/file problem does not rewrite settings.
     """
     stored = normalize_vehicle_data_source(settings.value(VEHICLE_DATA_SOURCE_KEY, "", str))
-    available = Path(user_data_path).is_file()
+    available = Path(user_data_path).is_dir()
     if stored:
         if stored == USER_SOURCE and not available:
             return HDR_SOURCE
@@ -119,7 +115,7 @@ def apply_v1_4_vehicle_data_source_patch(window_cls) -> None:
 
     def patched_init(self, project_root: Path, *args, **kwargs):
         previous_init(self, project_root, *args, **kwargs)
-        user_data_path = self.project_root / "data" / USER_DATA_FILE_NAME
+        user_data_path = self.project_root / "data" / DATA_DIR_NAME
         selected = resolve_vehicle_data_source(self.settings, user_data_path, self)
         self.vehicle_data_source = selected
 
@@ -133,14 +129,12 @@ def apply_v1_4_vehicle_data_source_patch(window_cls) -> None:
             else:
                 self.vehicle_data_source = HDR_SOURCE
 
-        # v1.4 acquisition metadata uses the same committed plain JSON snapshot.
+        # Acquisition/DLC metadata uses the same committed uncompressed snapshot.
         try:
-            from .acquisition_db import AcquisitionDatabase
-
             self.acquisition_db = AcquisitionDatabase(user_data_path)
         except Exception:
             # Supplemental metadata is optional; scans and HDR names must remain
-            # usable even if this file is missing or malformed.
+            # usable even if this directory is missing or malformed.
             pass
 
         refresh = getattr(self, "_refresh_db_status", None)
