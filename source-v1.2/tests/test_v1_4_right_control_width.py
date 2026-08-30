@@ -32,10 +32,22 @@ class V14RightControlWidthTests(unittest.TestCase):
         self.assertIn('banner.setFixedWidth(width)', self.text)
         self.assertIn('_set_fixed_control_width(counter, width)', self.text)
 
+    def test_deferred_ui_completion_cannot_restore_intrinsic_counter_width(self):
+        self.assertIn('def _sync_right_geometry_and_widths', self.text)
+        combined = self.text[self.text.index('def _sync_right_geometry_and_widths'):]
+        self.assertLess(
+            combined.index('_geometry._sync_display_row_geometry(window)'),
+            combined.index('_sync_right_control_widths(window)'),
+        )
+        self.assertIn(
+            '_ui._sync_recent_change_banner_width = _sync_right_geometry_and_widths',
+            self.text,
+        )
+
     def test_patch_reasserts_width_after_existing_geometry_lifecycle(self):
         self.assertIn('def patched_show_event', self.text)
         self.assertIn('def patched_resize_event', self.text)
-        self.assertIn('_sync_right_control_widths(self)', self.text)
+        self.assertIn('_sync_right_geometry_and_widths(self)', self.text)
         chain = Path("fh6garage/v1_3_4_backup_action_wording_patch.py").read_text(encoding="utf-8")
         geometry = chain.rindex('apply_v1_4_display_row_geometry_patch(MainWindow)')
         right_width = chain.rindex('apply_v1_4_right_control_width_patch(MainWindow)')
