@@ -8,7 +8,7 @@ datas = [
     (str(project_root / 'icons' / 'FH6_Assistant.ico'), 'icons'),
     (str(project_root / 'icons' / 'cards'), 'icons/cards'),
 ]
-supplemental_data = project_root / 'data' / 'fh6_cars.json.gz'
+supplemental_data = project_root / 'data' / 'fh6_cars.json'
 if supplemental_data.is_file():
     datas.append((str(supplemental_data), 'data'))
 
