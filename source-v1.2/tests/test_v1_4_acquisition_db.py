@@ -10,8 +10,8 @@ from fh6garage.acquisition_db import AcquisitionDatabase
 
 
 class V14AcquisitionDatabaseTests(unittest.TestCase):
-    def _write(self, path: Path) -> None:
-        payload = {
+    def _payload(self) -> dict[str, object]:
+        return {
             "v": 1,
             "n": 3,
             "a": ["Autoshow, Wheelspin", "Collection Journal", "Autoshow DLC"],
@@ -22,15 +22,16 @@ class V14AcquisitionDatabaseTests(unittest.TestCase):
                 [300, "Car C", 2, 1],
             ],
         }
-        with gzip.open(path, "wt", encoding="utf-8") as stream:
-            json.dump(payload, stream, separators=(",", ":"))
 
-    def test_compact_schema_builds_o1_car_id_index(self):
+    def _write_json(self, path: Path, payload: dict[str, object] | None = None) -> None:
+        path.write_text(json.dumps(payload or self._payload()), encoding="utf-8")
+
+    def test_plain_schema_builds_o1_car_id_index(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
-            bundled = root / "bundled.json.gz"
-            missing_cache = root / "missing" / "fh6_cars.json.gz"
-            self._write(bundled)
+            bundled = root / "bundled.json"
+            missing_cache = root / "missing" / "fh6_cars.json"
+            self._write_json(bundled)
             db = AcquisitionDatabase(bundled, cache_path=missing_cache)
             self.assertEqual(len(db), 3)
             self.assertEqual(db.get(100).acquisition, "Autoshow, Wheelspin")
@@ -41,16 +42,29 @@ class V14AcquisitionDatabaseTests(unittest.TestCase):
     def test_local_cache_takes_precedence_over_bundled_snapshot(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
-            bundled = root / "bundled.json.gz"
-            cache = root / "cache.json.gz"
-            self._write(bundled)
+            bundled = root / "bundled.json"
+            cache = root / "cache.json"
+            self._write_json(bundled)
             payload = {"v": 1, "n": 1, "a": ["Seasonal"], "d": [], "c": [[100, "Cache Car", 0, 0]]}
-            with gzip.open(cache, "wt", encoding="utf-8") as stream:
-                json.dump(payload, stream)
+            self._write_json(cache, payload)
             db = AcquisitionDatabase(bundled, cache_path=cache)
             self.assertEqual(db.get(100).dataset_name, "Cache Car")
             self.assertEqual(db.get(100).acquisition, "Seasonal")
             self.assertEqual(db.loaded_path, cache)
+
+    def test_legacy_gzip_cache_remains_readable(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            bundled = root / "bundled.json"
+            cache = root / "fh6_cars.json"
+            legacy = root / "fh6_cars.json.gz"
+            self._write_json(bundled)
+            payload = {"v": 1, "n": 1, "a": ["Seasonal"], "d": [], "c": [[100, "Legacy Car", 0, 0]]}
+            with gzip.open(legacy, "wt", encoding="utf-8") as stream:
+                json.dump(payload, stream)
+            db = AcquisitionDatabase(bundled, cache_path=cache)
+            self.assertEqual(db.get(100).dataset_name, "Legacy Car")
+            self.assertEqual(db.loaded_path, legacy)
 
 
 if __name__ == "__main__":
