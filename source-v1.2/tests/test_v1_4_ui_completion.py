@@ -40,7 +40,9 @@ class V14UiCompletionTests(unittest.TestCase):
         self.assertIn("livery_export_visible_button", text)
         self.assertIn("export_right - banner_left", text)
         self.assertIn("banner.setFixedWidth(target)", text)
-        self.assertIn("insert immediately before the row's trailing stretch", text)
+        self.assertIn("tail = display_row.itemAt(display_row.count() - 1)", text)
+        self.assertIn("insert_at = display_row.count() - 1", text)
+        self.assertIn("display_row.insertWidget(insert_at, banner", text)
 
     def test_completion_layer_is_before_profiler(self):
         text = Path("fh6garage/v1_3_4_backup_action_wording_patch.py").read_text(encoding="utf-8")
