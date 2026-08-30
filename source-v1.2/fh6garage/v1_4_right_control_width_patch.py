@@ -5,6 +5,8 @@ from typing import Any
 from PySide6.QtWidgets import QFrame, QPushButton, QSizePolicy, QToolButton
 
 from .i18n import tr
+from . import v1_4_display_row_geometry_patch as _geometry
+from . import v1_4_ui_completion_patch as _ui
 
 
 def _global_refresh_button(window: Any) -> QPushButton | None:
@@ -20,8 +22,8 @@ def _reference_width(window: Any) -> int | None:
     export = getattr(window, "livery_export_visible_button", None)
     if not isinstance(export, QPushButton):
         return None
-    # The user-visible Export button is the canonical width. sizeHint is stable
-    # before/after native layout and therefore avoids startup timing differences.
+    # Export is the canonical visible width. Its intrinsic size hint is stable
+    # even after setFixedWidth(), so every tab uses one deterministic reference.
     return max(1, int(export.sizeHint().width()))
 
 
@@ -56,8 +58,8 @@ def _sync_right_control_widths(window: Any) -> None:
     for widget in targets:
         _set_fixed_control_width(widget, width)
 
-    # The recent-change counters have a transparent frame around the visible
-    # button. Fix both layers so 0/10/100 values cannot change outer geometry.
+    # The recent-change control has a transparent wrapper and a visible inner
+    # QPushButton. They must both own exactly the Export reference width.
     banner = getattr(window, "refresh_diff_banner", None)
     counter = getattr(window, "refresh_diff_view_button", None)
     if isinstance(banner, QFrame):
@@ -66,6 +68,19 @@ def _sync_right_control_widths(window: Any) -> None:
         banner.setFixedWidth(width)
         banner.setSizePolicy(QSizePolicy.Policy.Fixed, banner.sizePolicy().verticalPolicy())
     _set_fixed_control_width(counter, width)
+
+
+def _sync_right_geometry_and_widths(window: Any) -> None:
+    """Apply structural right anchoring first, then the shared Export width.
+
+    v1_4_ui_completion_patch schedules deferred calls through
+    _sync_recent_change_banner_width after population/relayout. If those calls
+    target only the geometry patch, its intrinsic 96px counter width overwrites
+    the shared width later. This combined callback makes every deferred path end
+    with the Export-based width instead.
+    """
+    _geometry._sync_display_row_geometry(window)
+    _sync_right_control_widths(window)
 
 
 def apply_v1_4_right_control_width_patch(MainWindow: Any) -> None:
@@ -78,17 +93,20 @@ def apply_v1_4_right_control_width_patch(MainWindow: Any) -> None:
 
     def patched_init(self: Any, *args: Any, **kwargs: Any) -> None:
         original_init(self, *args, **kwargs)
-        _sync_right_control_widths(self)
+        _sync_right_geometry_and_widths(self)
 
     def patched_show_event(self: Any, event: Any) -> None:
         original_show_event(self, event)
-        # Runs after the display-row geometry patch, so its intrinsic counter
-        # width cannot overwrite the shared Export-based width.
-        _sync_right_control_widths(self)
+        _sync_right_geometry_and_widths(self)
 
     def patched_resize_event(self: Any, event: Any) -> None:
         original_resize_event(self, event)
-        _sync_right_control_widths(self)
+        _sync_right_geometry_and_widths(self)
+
+    # Crucial: UI-completion has delayed singleShot callbacks that resolve this
+    # module global at execution time. Own that final callback here so no later
+    # population/relayout can restore the counter's old intrinsic 96px width.
+    _ui._sync_recent_change_banner_width = _sync_right_geometry_and_widths
 
     MainWindow.__init__ = patched_init
     MainWindow.showEvent = patched_show_event
