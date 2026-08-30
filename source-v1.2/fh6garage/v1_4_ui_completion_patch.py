@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6.QtCore import QSize, Qt, QTimer
+from PySide6.QtCore import QPoint, QSize, Qt, QTimer
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QSizePolicy, QWidget, QWidgetAction
 
 from . import v1_3_2_dashboard_change_group_patch as _dashboard
@@ -142,7 +142,7 @@ def _ensure_recent_number_labels(view: QPushButton) -> tuple[QLabel, QLabel, QLa
             widget = item.widget() if item is not None else None
             if widget is not None:
                 widget.deleteLater()
-    layout.setContentsMargins(8, 0, 8, 0)
+    layout.setContentsMargins(10, 0, 10, 0)
     layout.setSpacing(14)
 
     labels: list[QLabel] = []
@@ -154,7 +154,6 @@ def _ensure_recent_number_labels(view: QPushButton) -> tuple[QLabel, QLabel, QLa
         label.setStyleSheet(f"color:{color};background:transparent;font-weight:700;")
         layout.addWidget(label, 0, Qt.AlignmentFlag.AlignCenter)
         labels.append(label)
-    layout.addStretch(1)
     result = (labels[0], labels[1], labels[2])
     view._fh6_recent_number_labels = result
     return result
@@ -182,43 +181,67 @@ def _update_recent_change_banner(window: Any) -> None:
     banner.show()
 
 
-def _move_recent_change_banner_to_display_row(window: Any) -> None:
-    banner = getattr(window, "refresh_diff_banner", None)
+def _recent_display_row(window: Any) -> QHBoxLayout | None:
     pages = getattr(window, "pages", None)
-    if not isinstance(banner, QFrame) or pages is None:
-        return
+    if pages is None:
+        return None
     try:
         page = pages.widget(1)
     except Exception:
-        return
+        return None
     root = page.layout() if isinstance(page, QWidget) else None
     controls_item = root.itemAt(1) if root is not None and root.count() > 1 else None
     controls = controls_item.layout() if controls_item is not None else None
     display_item = controls.itemAt(1) if controls is not None and controls.count() > 1 else None
     display_row = display_item.layout() if display_item is not None else None
-    if not isinstance(display_row, QHBoxLayout):
+    return display_row if isinstance(display_row, QHBoxLayout) else None
+
+
+def _sync_recent_change_banner_width(window: Any) -> None:
+    banner = getattr(window, "refresh_diff_banner", None)
+    export = getattr(window, "livery_export_visible_button", None)
+    pages = getattr(window, "pages", None)
+    if not isinstance(banner, QFrame) or not isinstance(export, QPushButton) or pages is None:
+        return
+    try:
+        page = pages.widget(1)
+    except Exception:
+        return
+    if not isinstance(page, QWidget) or banner.parentWidget() is not page:
+        return
+
+    # Keep the recent-change control's right edge on the same vertical line as
+    # the Export button below. The trailing layout stretch absorbs all remaining
+    # width, so this fixed width never protrudes into the page margin/scrollbar.
+    banner_left = banner.mapTo(page, QPoint(0, 0)).x()
+    export_right = export.mapTo(page, QPoint(export.width(), 0)).x()
+    target = max(86, export_right - banner_left)
+    banner.setFixedWidth(target)
+
+
+def _move_recent_change_banner_to_display_row(window: Any) -> None:
+    banner = getattr(window, "refresh_diff_banner", None)
+    pages = getattr(window, "pages", None)
+    display_row = _recent_display_row(window)
+    if not isinstance(banner, QFrame) or pages is None or display_row is None:
+        return
+    try:
+        page = pages.widget(1)
+    except Exception:
         return
 
     old_parent = banner.parentWidget()
     old_layout = old_parent.layout() if isinstance(old_parent, QWidget) else None
     if old_layout is not None:
         old_layout.removeWidget(banner)
-
-    # The source/status row keeps a trailing stretch. Replace that empty region
-    # with the recent-change control so its right edge follows the same content
-    # boundary as the action row below, where Export is the final visible button.
-    if display_row.count():
-        tail = display_row.itemAt(display_row.count() - 1)
-        if tail is not None and tail.widget() is None and tail.layout() is None:
-            display_row.takeAt(display_row.count() - 1)
+    display_row.removeWidget(banner)
 
     banner.setParent(page)
-    banner.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-    banner.setMinimumWidth(72)
-    banner.setMaximumWidth(16777215)
-    banner.setStyleSheet(
-        "QFrame#refreshDiffBanner { background:#eee9ff; border:1px solid #d8ceff; border-radius:8px; }"
-    )
+    banner.setObjectName("refreshDiffBanner")
+    banner.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
+    banner.setMinimumWidth(86)
+    banner.setStyleSheet("QFrame#refreshDiffBanner { background:transparent; border:0; }")
+
     inner = banner.layout()
     view = getattr(window, "refresh_diff_view_button", None)
     if inner is not None:
@@ -230,17 +253,27 @@ def _move_recent_change_banner_to_display_row(window: Any) -> None:
             view_index = inner.indexOf(view)
             if view_index >= 0:
                 inner.setStretch(view_index, 1)
+
     if isinstance(view, QPushButton):
+        # Reuse the application's normal secondary-button visuals rather than a
+        # standalone purple banner so this control belongs to the surrounding UI.
+        view.setObjectName("secondary")
         view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        view.setMinimumWidth(72)
-        view.setStyleSheet(
-            "QPushButton { background:transparent; border:0; padding:4px 2px; }"
-            "QPushButton:hover { background:#e6ddff; border-radius:6px; }"
-        )
+        view.setMinimumWidth(86)
+        view.setStyleSheet("")
         _ensure_recent_number_labels(view)
 
-    display_row.addWidget(banner, 1, Qt.AlignmentFlag.AlignVCenter)
+    # Insert immediately before the row's trailing stretch. Do not consume that
+    # stretch: it is what keeps the right boundary aligned with the action row.
+    insert_at = display_row.count()
+    if display_row.count():
+        tail = display_row.itemAt(display_row.count() - 1)
+        if tail is not None and tail.widget() is None and tail.layout() is None:
+            insert_at = display_row.count() - 1
+    display_row.insertWidget(insert_at, banner, 0, Qt.AlignmentFlag.AlignVCenter)
     _update_recent_change_banner(window)
+    QTimer.singleShot(0, lambda owner=window: _sync_recent_change_banner_width(owner))
+    QTimer.singleShot(50, lambda owner=window: _sync_recent_change_banner_width(owner))
 
 
 def apply_v1_4_ui_completion_patch(MainWindow: Any) -> None:
@@ -261,6 +294,7 @@ def apply_v1_4_ui_completion_patch(MainWindow: Any) -> None:
     def relayout(self: Any, *args: Any, **kwargs: Any):
         result = original_relayout(self, *args, **kwargs)
         _apply_locked_livery_layout(self)
+        QTimer.singleShot(0, lambda owner=self: _sync_recent_change_banner_width(owner))
         return result
 
     def set_lock(window: Any, card: Any, key: str, locked: bool, *, persist: bool) -> None:
@@ -275,6 +309,7 @@ def apply_v1_4_ui_completion_patch(MainWindow: Any) -> None:
     def populate_all(self: Any) -> None:
         original_populate_all(self)
         _update_recent_change_banner(self)
+        QTimer.singleShot(0, lambda owner=self: _sync_recent_change_banner_width(owner))
 
     _release._compact_change_banner = _update_recent_change_banner
     _dashboard._compact_grouped_change_banner = _update_recent_change_banner
