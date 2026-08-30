@@ -121,7 +121,7 @@ class V131PatchTests(unittest.TestCase):
 class V131BuildMetadataTests(unittest.TestCase):
     def test_app_version_and_patch_order(self) -> None:
         source = (ROOT / "app.py").read_text(encoding="utf-8")
-        self.assertIn('app.setApplicationVersion("1.3.3-beta")', source)
+        self.assertIn('app.setApplicationVersion("1.4")', source)
         self.assertIn("apply_v1_3_ui_patches(MainWindow)", source)
         self.assertIn("apply_v1_3_1_patches(MainWindow)", source)
         self.assertIn("apply_v1_3_2_patches(MainWindow)", source)
