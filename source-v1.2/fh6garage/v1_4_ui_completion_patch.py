@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from PySide6.QtCore import QSize, Qt, QTimer
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QPushButton, QSizePolicy, QWidget, QWidgetAction
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QSizePolicy, QWidget, QWidgetAction
 
 from . import v1_3_2_dashboard_change_group_patch as _dashboard
 from . import v1_3_2_release_layout_patch as _release
@@ -14,6 +14,9 @@ from .card_icons import icon as card_icon
 
 
 _LOCKED_LIVERY_FILTER_MODE = 15
+_RECENT_ADDED_COLOR = "#39e75f"
+_RECENT_REMOVED_COLOR = "#ff4d5a"
+_RECENT_DUPLICATE_COLOR = "#ffe600"
 
 
 def _txt(ko: str, en: str) -> str:
@@ -124,6 +127,39 @@ def _recent_change_counts(window: Any) -> tuple[int, int, int]:
         )
 
 
+def _ensure_recent_number_labels(view: QPushButton) -> tuple[QLabel, QLabel, QLabel]:
+    existing = getattr(view, "_fh6_recent_number_labels", None)
+    if isinstance(existing, tuple) and len(existing) == 3 and all(isinstance(item, QLabel) for item in existing):
+        return existing
+
+    view.setText("")
+    layout = view.layout()
+    if layout is None:
+        layout = QHBoxLayout(view)
+    else:
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget() if item is not None else None
+            if widget is not None:
+                widget.deleteLater()
+    layout.setContentsMargins(8, 0, 8, 0)
+    layout.setSpacing(14)
+
+    labels: list[QLabel] = []
+    for color in (_RECENT_ADDED_COLOR, _RECENT_REMOVED_COLOR, _RECENT_DUPLICATE_COLOR):
+        label = QLabel("0", view)
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label.setMinimumWidth(16)
+        label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        label.setStyleSheet(f"color:{color};background:transparent;font-weight:700;")
+        layout.addWidget(label, 0, Qt.AlignmentFlag.AlignCenter)
+        labels.append(label)
+    layout.addStretch(1)
+    result = (labels[0], labels[1], labels[2])
+    view._fh6_recent_number_labels = result
+    return result
+
+
 def _update_recent_change_banner(window: Any) -> None:
     banner = getattr(window, "refresh_diff_banner", None)
     label = getattr(window, "refresh_diff_banner_label", None)
@@ -133,21 +169,23 @@ def _update_recent_change_banner(window: Any) -> None:
     added, removed, duplicate = _recent_change_counts(window)
     if label is not None:
         label.hide()
-    view.setText(f"+{added}  −{removed}  ▣{duplicate}")
+    labels = _ensure_recent_number_labels(view)
+    labels[0].setText(str(added))
+    labels[1].setText(str(removed))
+    labels[2].setText(str(duplicate))
     view.setToolTip(
         _txt(
-            f"최근 변동 · 추가 {added} · 제거 {removed} · 중복 {duplicate}\n클릭하여 보기",
+            f"최근 변동 · 추가 {added} · 삭제 {removed} · 중복 {duplicate}\n클릭하여 보기",
             f"Recent changes · Added {added} · Removed {removed} · Duplicate {duplicate}\nClick to view",
         )
     )
     banner.show()
 
 
-def _move_recent_change_banner_to_livery_filter(window: Any) -> None:
+def _move_recent_change_banner_to_display_row(window: Any) -> None:
     banner = getattr(window, "refresh_diff_banner", None)
-    filter_button = getattr(window, "livery_check_filter", None)
     pages = getattr(window, "pages", None)
-    if not isinstance(banner, QFrame) or filter_button is None or pages is None:
+    if not isinstance(banner, QFrame) or pages is None:
         return
     try:
         page = pages.widget(1)
@@ -156,36 +194,52 @@ def _move_recent_change_banner_to_livery_filter(window: Any) -> None:
     root = page.layout() if isinstance(page, QWidget) else None
     controls_item = root.itemAt(1) if root is not None and root.count() > 1 else None
     controls = controls_item.layout() if controls_item is not None else None
-    search_item = controls.itemAt(0) if controls is not None and controls.count() else None
-    search_row = search_item.layout() if search_item is not None else None
-    if not isinstance(search_row, QHBoxLayout):
+    display_item = controls.itemAt(1) if controls is not None and controls.count() > 1 else None
+    display_row = display_item.layout() if display_item is not None else None
+    if not isinstance(display_row, QHBoxLayout):
         return
 
     old_parent = banner.parentWidget()
     old_layout = old_parent.layout() if isinstance(old_parent, QWidget) else None
     if old_layout is not None:
         old_layout.removeWidget(banner)
-    search_row.removeWidget(banner)
+
+    # The source/status row keeps a trailing stretch. Replace that empty region
+    # with the recent-change control so its right edge follows the same content
+    # boundary as the action row below, where Export is the final visible button.
+    if display_row.count():
+        tail = display_row.itemAt(display_row.count() - 1)
+        if tail is not None and tail.widget() is None and tail.layout() is None:
+            display_row.takeAt(display_row.count() - 1)
+
     banner.setParent(page)
-    banner.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
-    banner.setMinimumWidth(0)
+    banner.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+    banner.setMinimumWidth(72)
     banner.setMaximumWidth(16777215)
     banner.setStyleSheet(
         "QFrame#refreshDiffBanner { background:#eee9ff; border:1px solid #d8ceff; border-radius:8px; }"
     )
     inner = banner.layout()
-    if inner is not None:
-        inner.setContentsMargins(3, 2, 3, 2)
-        inner.setSpacing(0)
     view = getattr(window, "refresh_diff_view_button", None)
+    if inner is not None:
+        inner.setContentsMargins(0, 0, 0, 0)
+        inner.setSpacing(0)
+        for index in range(inner.count()):
+            inner.setStretch(index, 0)
+        if isinstance(view, QPushButton):
+            view_index = inner.indexOf(view)
+            if view_index >= 0:
+                inner.setStretch(view_index, 1)
     if isinstance(view, QPushButton):
-        view.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
+        view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        view.setMinimumWidth(72)
         view.setStyleSheet(
-            "QPushButton { background:transparent; color:#5538b6; border:0; padding:4px 6px; font-weight:700; }"
+            "QPushButton { background:transparent; border:0; padding:4px 2px; }"
             "QPushButton:hover { background:#e6ddff; border-radius:6px; }"
         )
-    index = search_row.indexOf(filter_button)
-    search_row.insertWidget(index + 1 if index >= 0 else search_row.count(), banner, 0, Qt.AlignmentFlag.AlignVCenter)
+        _ensure_recent_number_labels(view)
+
+    display_row.addWidget(banner, 1, Qt.AlignmentFlag.AlignVCenter)
     _update_recent_change_banner(window)
 
 
@@ -202,7 +256,7 @@ def apply_v1_4_ui_completion_patch(MainWindow: Any) -> None:
         original_init(self, *args, **kwargs)
         _remove_backup_locked_filter(self)
         _install_livery_locked_filter(self)
-        _move_recent_change_banner_to_livery_filter(self)
+        _move_recent_change_banner_to_display_row(self)
 
     def relayout(self: Any, *args: Any, **kwargs: Any):
         result = original_relayout(self, *args, **kwargs)
