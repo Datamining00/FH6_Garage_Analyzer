@@ -93,7 +93,7 @@ def main() -> int:
     # Use a concrete positive base point size before applying application QSS.
     app.setFont(QFont("Segoe UI", 10))
     app.setApplicationName("FH6 Assistant")
-    app.setApplicationVersion("1.3.3-beta")
+    app.setApplicationVersion("1.4")
     app.setOrganizationName("LocalOnly")
     _performance_metrics.record_startup("startup.qapplication", _elapsed_ms(qapp_started))
 
@@ -205,7 +205,7 @@ def main() -> int:
     # and present recent changes as grouped Add / Remove / Duplicate sections.
     apply_v1_3_2_dashboard_change_group_patch(MainWindow)
 
-    # Apply the public v1.3.3 Beta identity without disturbing the verified v1.3.2 feature stack.
+    # Apply the legacy base identity first; the final v1.4 layer replaces all user-visible release identity.
     apply_v1_3_3_beta_identity_patch(MainWindow)
 
     # Finalize the v1.3.4 six-row livery action layout after every feature has
@@ -220,7 +220,7 @@ def main() -> int:
     apply_v1_3_4_metadata_toggle_icon_patch(MainWindow)
 
     # Add the safe external backup repository, visible-item export action, and
-    # read-only backup/import status tab. Actual game-save import/delete remains disabled.
+    # backup/import status tab. Explicit import and verified backup-and-delete actions may modify the game save.
     apply_v1_3_4_backup_export_patch(MainWindow)
 
     # Export hashing/copying runs off the UI thread, while completion and all Qt
