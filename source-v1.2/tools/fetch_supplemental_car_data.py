@@ -4,9 +4,17 @@ import base64
 import gzip
 import json
 import os
+import sys
 import tempfile
 import urllib.request
 from pathlib import Path
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from fh6garage.acquisition_db import AcquisitionDatabase  # noqa: E402
 
 
 API_URL = "https://api.github.com/repos/Datamining00/FH6-Assistant-Data/contents/fh6_cars.json.gz?ref=main"
@@ -19,18 +27,16 @@ def _validate(raw: bytes) -> int:
         payload = json.loads(gzip.decompress(raw).decode("utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise RuntimeError(f"supplemental data is not valid gzip JSON: {exc}") from exc
-    if not isinstance(payload, dict) or int(payload.get("v", 0) or 0) != 1:
-        raise RuntimeError("unsupported supplemental data schema")
-    cars = payload.get("c")
-    declared = payload.get("n")
-    if not isinstance(cars, list) or len(cars) < MIN_CAR_COUNT:
-        raise RuntimeError(f"supplemental car count is too small: {len(cars) if isinstance(cars, list) else 0}")
+
+    # Use the same parser as the application. This prevents a build from
+    # accepting a private-data schema that the shipped runtime cannot decode.
     try:
-        if declared is not None and int(declared) != len(cars):
-            raise RuntimeError(f"supplemental declared count {declared} != rows {len(cars)}")
+        parsed = AcquisitionDatabase._parse_payload(payload)
     except (TypeError, ValueError) as exc:
-        raise RuntimeError("invalid supplemental declared count") from exc
-    return len(cars)
+        raise RuntimeError(f"supplemental data is not runtime-compatible: {exc}") from exc
+    if len(parsed) < MIN_CAR_COUNT:
+        raise RuntimeError(f"supplemental car count is too small: {len(parsed)}")
+    return len(parsed)
 
 
 def fetch(token: str, destination: Path) -> int:
@@ -72,8 +78,7 @@ def main() -> int:
     token = os.environ.get("FH6_ASSISTANT_DATA_TOKEN", "").strip()
     if not token:
         raise SystemExit("FH6_ASSISTANT_DATA_TOKEN is required to stage private supplemental data")
-    project_root = Path(__file__).resolve().parents[1]
-    destination = project_root / "data" / "fh6_cars.json.gz"
+    destination = PROJECT_ROOT / "data" / "fh6_cars.json.gz"
     count = fetch(token, destination)
     print(f"Staged supplemental car data: {count} cars -> {destination}")
     return 0
