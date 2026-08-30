@@ -63,10 +63,10 @@ class V14BackupRepositoryTests(unittest.TestCase):
             self.assertEqual((copied / "extra.bin").read_bytes(), b"preserve me")
             self.assertEqual(payload["entries"][0]["kind"], "Livery")
 
-    def test_source_contract_uses_local_appdata_and_real_external_worker(self):
+    def test_source_contract_uses_shared_local_appdata_and_real_external_worker(self):
         text = Path("fh6garage/v1_4_backup_repository_patch.py").read_text(encoding="utf-8")
-        self.assertIn("AppLocalDataLocation", text)
-        self.assertIn("/ \"backup\"", text)
+        self.assertIn("app_data_dir() / \"backup\"", text)
+        self.assertNotIn("AppLocalDataLocation", text)
         self.assertIn("외부에서 가져오기", text)
         self.assertIn("_safe_export_records", text)
         self.assertIn("QMetaObject.invokeMethod", text)
