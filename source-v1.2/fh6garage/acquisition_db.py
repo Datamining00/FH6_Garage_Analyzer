@@ -9,7 +9,8 @@ from typing import Any
 from .performance_metrics import app_data_dir
 
 
-DATA_FILE_NAME = "fh6_cars.json.gz"
+DATA_FILE_NAME = "fh6_cars.json"
+LEGACY_DATA_FILE_NAME = "fh6_cars.json.gz"
 SCHEMA_VERSION = 1
 
 
@@ -29,13 +30,12 @@ class AcquisitionInfo:
 
 
 class AcquisitionDatabase:
-    """Offline supplemental Car ID -> acquisition/DLC index.
+    """Offline Car ID -> acquisition/DLC index.
 
-    HDR remains the authoritative vehicle-name database.  This loader reads only
-    the compact supplemental dataset and never replaces CarDatabase resolution.
-    A LocalAppData copy, when present, takes precedence over the bundled snapshot
-    so a future updater can refresh the supplemental data without changing the
-    user's vehicle-name overrides.
+    The selected vehicle-name source is handled separately from this metadata
+    index. Lookups never perform network access and are O(1) after one startup
+    load. Plain JSON is the v1.4 repository/runtime format; gzip remains readable
+    only for compatibility with an older LocalAppData cache.
     """
 
     def __init__(self, bundled_path: Path | None = None, cache_path: Path | None = None) -> None:
@@ -50,8 +50,11 @@ class AcquisitionDatabase:
         self._items = {}
         self.loaded_path = None
         self.load_warning = ""
-        candidates = [self.cache_path]
-        if self.bundled_path is not None and self.bundled_path != self.cache_path:
+        candidates: list[Path] = [self.cache_path]
+        legacy_cache = self.cache_path.with_name(LEGACY_DATA_FILE_NAME)
+        if legacy_cache != self.cache_path:
+            candidates.append(legacy_cache)
+        if self.bundled_path is not None and self.bundled_path not in candidates:
             candidates.append(self.bundled_path)
         for path in candidates:
             if not path.is_file():
@@ -82,8 +85,12 @@ class AcquisitionDatabase:
 
     @classmethod
     def _load_file(cls, path: Path) -> dict[int, AcquisitionInfo]:
-        with gzip.open(path, "rt", encoding="utf-8") as stream:
-            payload = json.load(stream)
+        if path.suffix.casefold() == ".gz":
+            with gzip.open(path, "rt", encoding="utf-8") as stream:
+                payload = json.load(stream)
+        else:
+            with path.open("r", encoding="utf-8") as stream:
+                payload = json.load(stream)
         return cls._parse_payload(payload)
 
     @classmethod
@@ -113,7 +120,6 @@ class AcquisitionDatabase:
                 continue
             dataset_name = str(row[1] or "").strip()
             acquisition = str(acquisitions[acquisition_index] or "-").strip() or "-"
-            # The compact dataset uses 0 for no DLC and 1-based indices for d[].
             dlc_name = ""
             if dlc_code > 0 and dlc_code <= len(dlcs):
                 dlc_name = str(dlcs[dlc_code - 1] or "").strip()
