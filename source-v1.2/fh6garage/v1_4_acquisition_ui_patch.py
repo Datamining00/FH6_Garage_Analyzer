@@ -103,8 +103,8 @@ def _open_override_dialog(window: Any) -> None:
 
     info_label = QLabel(
         _txt(
-            "차량명은 HDR 기반 기본값을 유지하며, 획득처/DLC는 FH6-Assistant-Data 보조 정보입니다. 차량명 열만 편집됩니다.",
-            "Vehicle names keep the HDR baseline; acquisition/DLC columns are supplemental FH6-Assistant-Data information. Only the vehicle-name column is editable.",
+            "차량명은 현재 선택한 차량 데이터 소스를 기준으로 하며 사용자 오버라이드가 항상 우선합니다. 획득처/DLC는 FH6 Assistant 데이터입니다. 차량명 열만 편집됩니다.",
+            "Vehicle names use the currently selected vehicle-data source and user overrides always win. Acquisition/DLC come from FH6 Assistant data. Only the vehicle-name column is editable.",
         )
     )
     info_label.setWordWrap(True)
@@ -121,6 +121,7 @@ def _open_override_dialog(window: Any) -> None:
             "DLC",
         ]
     )
+    table.setColumnHidden(2, str(getattr(window, "vehicle_data_source", "hdr")) == "user")
     table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
     table.setAlternatingRowColors(True)
     header = table.horizontalHeader()
@@ -285,7 +286,7 @@ def apply_v1_4_acquisition_ui_patch(MainWindow: Any) -> None:
 
     def patched_init(self: Any, *args: Any, **kwargs: Any) -> None:
         original_init(self, *args, **kwargs)
-        bundled = self.project_root / "data" / "fh6_cars.json.gz"
+        bundled = self.project_root / "data" / "fh6_cars.json"
         self.acquisition_db = AcquisitionDatabase(bundled)
 
     def make_card(self: Any, content_type: str, record: Any, key: str):
