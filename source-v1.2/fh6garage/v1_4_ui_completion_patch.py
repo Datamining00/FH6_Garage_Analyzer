@@ -14,9 +14,9 @@ from .card_icons import icon as card_icon
 
 
 _LOCKED_LIVERY_FILTER_MODE = 15
-_RECENT_ADDED_COLOR = "#39e75f"
-_RECENT_REMOVED_COLOR = "#ff4d5a"
-_RECENT_DUPLICATE_COLOR = "#ffe600"
+_RECENT_ADDED_COLOR = "#11863f"
+_RECENT_REMOVED_COLOR = "#d62f45"
+_RECENT_DUPLICATE_COLOR = "#a66b00"
 
 
 def _txt(ko: str, en: str) -> str:
@@ -142,17 +142,22 @@ def _ensure_recent_number_labels(view: QPushButton) -> tuple[QLabel, QLabel, QLa
             widget = item.widget() if item is not None else None
             if widget is not None:
                 widget.deleteLater()
-    layout.setContentsMargins(10, 0, 10, 0)
-    layout.setSpacing(14)
+    # The outer button width is synchronized independently with Export. Keep the
+    # three counters equal-width so changing 0 -> 10 -> 100 never moves the edge.
+    layout.setContentsMargins(8, 0, 8, 0)
+    layout.setSpacing(4)
 
     labels: list[QLabel] = []
     for color in (_RECENT_ADDED_COLOR, _RECENT_REMOVED_COLOR, _RECENT_DUPLICATE_COLOR):
         label = QLabel("0", view)
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        label.setMinimumWidth(16)
+        label.setMinimumWidth(18)
+        label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        label.setStyleSheet(f"color:{color};background:transparent;font-weight:700;")
-        layout.addWidget(label, 0, Qt.AlignmentFlag.AlignCenter)
+        label.setStyleSheet(
+            f"color:{color};background:transparent;font-weight:800;font-size:9.5pt;"
+        )
+        layout.addWidget(label, 1, Qt.AlignmentFlag.AlignCenter)
         labels.append(label)
     result = (labels[0], labels[1], labels[2])
     view._fh6_recent_number_labels = result
@@ -210,12 +215,9 @@ def _sync_recent_change_banner_width(window: Any) -> None:
     if not isinstance(page, QWidget) or banner.parentWidget() is not page:
         return
 
-    # Keep the recent-change control's right edge on the same vertical line as
-    # the Export button below. The trailing layout stretch absorbs all remaining
-    # width, so this fixed width never protrudes into the page margin/scrollbar.
     banner_left = banner.mapTo(page, QPoint(0, 0)).x()
     export_right = export.mapTo(page, QPoint(export.width(), 0)).x()
-    target = max(86, export_right - banner_left)
+    target = max(96, export_right - banner_left)
     banner.setFixedWidth(target)
 
 
@@ -239,7 +241,7 @@ def _move_recent_change_banner_to_display_row(window: Any) -> None:
     banner.setParent(page)
     banner.setObjectName("refreshDiffBanner")
     banner.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
-    banner.setMinimumWidth(86)
+    banner.setMinimumWidth(96)
     banner.setStyleSheet("QFrame#refreshDiffBanner { background:transparent; border:0; }")
 
     inner = banner.layout()
@@ -255,16 +257,12 @@ def _move_recent_change_banner_to_display_row(window: Any) -> None:
                 inner.setStretch(view_index, 1)
 
     if isinstance(view, QPushButton):
-        # Reuse the application's normal secondary-button visuals rather than a
-        # standalone purple banner so this control belongs to the surrounding UI.
         view.setObjectName("secondary")
         view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        view.setMinimumWidth(86)
+        view.setMinimumWidth(96)
         view.setStyleSheet("")
         _ensure_recent_number_labels(view)
 
-    # Insert immediately before the row's trailing stretch. Do not consume that
-    # stretch: it is what keeps the right boundary aligned with the action row.
     insert_at = display_row.count()
     if display_row.count():
         tail = display_row.itemAt(display_row.count() - 1)
