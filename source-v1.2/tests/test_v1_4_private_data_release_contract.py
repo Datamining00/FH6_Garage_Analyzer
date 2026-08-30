@@ -5,8 +5,9 @@ from pathlib import Path
 
 
 class V14PrivateDataReleaseContractTests(unittest.TestCase):
-    def test_private_dataset_is_not_committed_to_public_source(self):
-        self.assertFalse(Path("data/fh6_cars.json.gz").exists())
+    def test_private_dataset_staging_path_is_gitignored(self):
+        ignore = Path("../.gitignore").read_text(encoding="utf-8")
+        self.assertIn("source-v1.2/data/fh6_cars.json.gz", ignore.splitlines())
 
     def test_build_fetcher_requires_authorized_private_repo_access(self):
         text = Path("tools/fetch_supplemental_car_data.py").read_text(encoding="utf-8")
