@@ -20,9 +20,9 @@ class V14InteractionRenderCompletionTests(unittest.TestCase):
         body = self.text[start:self.text.index("def _finish_cached_layout_busy", start)]
         self.assertNotIn("for card in _features._registered_metadata_cards(window):", body)
 
-    def test_backup_cached_layout_busy_finishes_after_visible_thumbnail_refresh(self):
+    def test_backup_cached_layout_has_bounded_completion_and_paint_before_busy_end(self):
         finish_start = self.text.index("def _finish_cached_layout_busy")
-        finish_end = self.text.index("def _run_cached_layout_until_visible_paint", finish_start)
+        finish_end = self.text.index("def _poll_cached_layout_completion", finish_start)
         finish = self.text[finish_start:finish_end]
         refresh = finish.index("_resilience._ORIGINAL_REFRESH_BACKUP_THUMBNAILS(window)")
         paint = finish.index("QApplication.processEvents(")
@@ -30,12 +30,12 @@ class V14InteractionRenderCompletionTests(unittest.TestCase):
         self.assertLess(refresh, paint)
         self.assertLess(paint, end_busy)
 
-        run_start = self.text.index("def _run_cached_layout_until_visible_paint")
-        run_end = self.text.index("def apply_v1_4_interaction_render_completion_patch", run_start)
-        run = self.text[run_start:run_end]
-        self.assertIn('window._fh6_backup_cached_layout_waiting = True', run)
-        self.assertIn('if not bool(getattr(window, "_fh6_backup_relayout_active", False)):', run)
-        self.assertNotIn("finally:\n        if scroll is not None", run)
+        self.assertIn("_BACKUP_COMPLETION_POLL_MS = 16", self.text)
+        self.assertIn("_BACKUP_COMPLETION_TIMEOUT_MS = 3000", self.text)
+        self.assertIn("backup.cached_layout.completion_timeout", self.text)
+        self.assertIn("_poll_cached_layout_completion", self.text)
+        self.assertNotIn("original_finish_relayout", self.text)
+        self.assertNotIn("_resilience._finish_relayout = finish_relayout", self.text)
 
     def test_backup_sort_keeps_existing_cache_and_lazy_offscreen_policy(self):
         lazy = Path("fh6garage/v1_3_4_backup_lazy_load_patch.py").read_text(
