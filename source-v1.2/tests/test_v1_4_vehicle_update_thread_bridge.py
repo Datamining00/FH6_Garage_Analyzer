@@ -1,7 +1,31 @@
 from __future__ import annotations
 
+import time
 import unittest
 from pathlib import Path
+
+from PySide6.QtCore import QCoreApplication, QObject, QThread, Qt, Signal, Slot
+
+from fh6garage.v1_4_vehicle_update_thread_bridge_patch import _VehicleUpdateGuiBridge
+
+
+class _ProbeWindow(QObject):
+    def __init__(self) -> None:
+        super().__init__()
+        self.callback_thread = None
+        self.value = None
+
+    def _car_db_update_finished(self, value) -> None:
+        self.callback_thread = QThread.currentThread()
+        self.value = value
+
+
+class _ProbeEmitter(QObject):
+    finished = Signal(object)
+
+    @Slot()
+    def run(self) -> None:
+        self.finished.emit({"ok": True})
 
 
 class V14VehicleUpdateThreadBridgeTests(unittest.TestCase):
@@ -40,6 +64,32 @@ class V14VehicleUpdateThreadBridgeTests(unittest.TestCase):
         )
         self.assertIn("QThread.currentThread() is window.thread()", text)
         self.assertIn("_fh6_vehicle_update_callback_on_gui_thread", text)
+
+    def test_real_qt_signal_returns_to_gui_thread(self):
+        app = QCoreApplication.instance() or QCoreApplication([])
+        window = _ProbeWindow()
+        bridge = _VehicleUpdateGuiBridge(window)
+        worker = _ProbeEmitter()
+        thread = QThread()
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.finished.connect(thread.quit, Qt.ConnectionType.DirectConnection)
+        worker.finished.connect(
+            bridge.update_finished,
+            Qt.ConnectionType.QueuedConnection,
+        )
+        thread.start()
+
+        deadline = time.monotonic() + 3.0
+        while window.callback_thread is None and time.monotonic() < deadline:
+            app.processEvents()
+            time.sleep(0.005)
+        thread.wait(3000)
+        app.processEvents()
+
+        self.assertEqual(window.value, {"ok": True})
+        self.assertIs(window.callback_thread, window.thread())
+        self.assertFalse(thread.isRunning())
 
     def test_bridge_patch_order_preserves_final_affinity_patch(self):
         chain = Path("fh6garage/v1_3_4_backup_action_wording_patch.py").read_text(
