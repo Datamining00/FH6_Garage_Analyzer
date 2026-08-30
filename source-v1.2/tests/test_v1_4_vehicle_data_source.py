@@ -90,10 +90,17 @@ class V14VehicleDataSourceTests(unittest.TestCase):
                 self.assertEqual(resolve_vehicle_data_source(settings, data), HDR_SOURCE)
             self.assertEqual(settings.writes, [])
 
-    def test_patch_order_places_vehicle_source_before_performance_probe(self):
+    def test_vehicle_source_reuses_acquisition_ui_index_when_present(self):
+        text = Path("fh6garage/v1_4_vehicle_data_source_patch.py").read_text(encoding="utf-8")
+        self.assertIn('if not isinstance(getattr(self, "acquisition_db", None), AcquisitionDatabase):', text)
+        self.assertIn("self.acquisition_db = AcquisitionDatabase(user_data_path)", text)
+
+    def test_patch_order_places_vehicle_source_after_acquisition_and_before_performance_probe(self):
         text = Path("fh6garage/v1_3_4_backup_action_wording_patch.py").read_text(encoding="utf-8")
+        acquisition = text.rindex("apply_v1_4_acquisition_ui_patch(MainWindow)")
         vehicle = text.rindex("apply_v1_4_vehicle_data_source_patch(MainWindow)")
         profiler = text.rindex("apply_v1_3_4_performance_probe_patch(MainWindow)")
+        self.assertLess(acquisition, vehicle)
         self.assertLess(vehicle, profiler)
 
         app = Path("app.py").read_text(encoding="utf-8")
