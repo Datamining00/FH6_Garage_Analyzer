@@ -139,6 +139,17 @@ def _set_metadata_collapsed_visible_first(window: Any, collapsed: bool) -> None:
         QTimer.singleShot(0, apply_chunk)
 
 
+def _release_cached_layout_busy_owner(window: Any) -> None:
+    """Release exactly one busy-depth owner from a superseded cached layout."""
+    if not bool(getattr(window, "_fh6_backup_cached_layout_busy_shown", False)):
+        return
+    window._fh6_backup_cached_layout_busy_shown = False
+    end = getattr(window, "_end_busy", None)
+    if callable(end):
+        end()
+    _lazy._set_controls_enabled(window, True)
+
+
 def _finish_cached_layout_busy(window: Any, generation: int) -> None:
     if generation != int(getattr(window, "_fh6_backup_cached_layout_generation", 0) or 0):
         return
@@ -167,13 +178,7 @@ def _finish_cached_layout_busy(window: Any, generation: int) -> None:
     if scroll is not None and isinstance(saved, int):
         scroll.setValue(min(saved, scroll.maximum()))
     window._fh6_backup_cached_layout_scroll = None
-
-    if bool(getattr(window, "_fh6_backup_cached_layout_busy_shown", False)):
-        end = getattr(window, "_end_busy", None)
-        if callable(end):
-            end()
-        _lazy._set_controls_enabled(window, True)
-    window._fh6_backup_cached_layout_busy_shown = False
+    _release_cached_layout_busy_owner(window)
 
 
 def _poll_cached_layout_completion(window: Any, generation: int, started_ns: int) -> None:
@@ -209,6 +214,16 @@ def _run_cached_layout_until_visible_paint(window: Any, message: str, operation:
     scroll_value = scroll.value() if scroll is not None else 0
     card_count = len(getattr(window, "_fh6_backup_cards", []) or [])
     show_busy = card_count >= _lazy._BUSY_CARD_THRESHOLD
+
+    # A second filter/source/sort action can supersede the async relayout before
+    # its previous completion poll runs. That old poll exits on generation
+    # mismatch, so explicitly release its one busy-depth owner before acquiring
+    # the replacement. Without this, each superseded action leaks +1 busy depth
+    # and the final overlay remains forever even though every card is painted.
+    if bool(getattr(window, "_fh6_backup_cached_layout_waiting", False)):
+        window._fh6_backup_cached_layout_waiting = False
+        window._fh6_backup_cached_layout_scroll = None
+        _release_cached_layout_busy_owner(window)
 
     generation = int(getattr(window, "_fh6_backup_cached_layout_generation", 0) or 0) + 1
     window._fh6_backup_cached_layout_generation = generation
@@ -262,9 +277,6 @@ def _poll_full_load_finish(window: Any, finish_generation: int, started_ns: int)
             detail="load_ui_released=1 relayout_still_active=1",
         )
 
-    # A superseded relayout generation must never strand the full-load state.
-    # Clear the deferred flag before calling the original terminal UI cleanup so
-    # a later relayout finish cannot invoke it a second time.
     window._fh6_backup_finish_after_relayout = False
     _resilience._ORIGINAL_LAZY_LOAD_FINISHED(window)
 
