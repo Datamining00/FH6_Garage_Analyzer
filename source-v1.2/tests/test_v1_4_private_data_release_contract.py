@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 class V14PrivateDataReleaseContractTests(unittest.TestCase):
-    def test_private_dataset_staging_path_is_gitignored(self):
+    def test_legacy_private_gzip_staging_path_remains_gitignored(self):
         ignore = Path("../.gitignore").read_text(encoding="utf-8")
         self.assertIn("source-v1.2/data/fh6_cars.json.gz", ignore.splitlines())
 
@@ -14,13 +14,15 @@ class V14PrivateDataReleaseContractTests(unittest.TestCase):
         self.assertIn("Datamining00/FH6-Assistant-Data", text)
         self.assertIn("FH6_ASSISTANT_DATA_TOKEN", text)
         self.assertIn("AcquisitionDatabase._parse_payload(payload)", text)
+        self.assertIn('PROJECT_ROOT / "data" / "fh6_cars.json"', text)
         self.assertNotIn("github_pat_", text)
         self.assertNotIn("ghp_", text)
 
-    def test_v14_specs_bundle_supplemental_data_only_when_staged(self):
+    def test_v14_specs_bundle_plain_supplemental_data_when_available(self):
         for name in ("FH6_Assistant_v1.4.spec", "FH6_Assistant_v1.4_portable.spec"):
             text = Path(name).read_text(encoding="utf-8")
-            self.assertIn("fh6_cars.json.gz", text)
+            self.assertIn("fh6_cars.json", text)
+            self.assertNotIn("fh6_cars.json.gz", text)
             self.assertIn("supplemental_data.is_file()", text)
             self.assertIn("datas.append((str(supplemental_data), 'data'))", text)
 
@@ -31,12 +33,11 @@ class V14PrivateDataReleaseContractTests(unittest.TestCase):
         self.assertIn("fetch_supplemental_car_data.py", workflow)
         self.assertIn("Supplemental acquisition data not staged", workflow)
 
-    def test_runtime_uses_bundled_snapshot_without_replacing_hdr_names(self):
-        ui = Path("fh6garage/v1_4_acquisition_ui_patch.py").read_text(encoding="utf-8")
+    def test_runtime_loader_supports_plain_repository_snapshot(self):
         db = Path("fh6garage/acquisition_db.py").read_text(encoding="utf-8")
-        self.assertIn('self.project_root / "data" / "fh6_cars.json.gz"', ui)
-        self.assertIn("self.acquisition_db = AcquisitionDatabase(bundled)", ui)
-        self.assertIn("HDR remains the authoritative vehicle-name database", db)
+        self.assertIn('DATA_FILE_NAME = "fh6_cars.json"', db)
+        self.assertIn('LEGACY_DATA_FILE_NAME = "fh6_cars.json.gz"', db)
+        self.assertIn('with path.open("r", encoding="utf-8")', db)
 
 
 if __name__ == "__main__":
