@@ -93,10 +93,10 @@ jobs:
       - name: Report supplemental data status
         shell: pwsh
         run: |
-          $path = "source-v1.2\data\fh6_cars.json.gz"
+          $path = "source-v1.2\data\fh6_cars.json"
           if (Test-Path $path) {
             $size = (Get-Item $path).Length
-            Write-Host "Supplemental acquisition data staged ($size bytes)."
+            Write-Host "Plain supplemental vehicle data staged ($size bytes)."
           } else {
             Write-Host "Supplemental acquisition data not staged; build remains offline-safe and HDR-only."
           }
