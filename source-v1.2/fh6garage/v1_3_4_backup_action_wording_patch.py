@@ -28,6 +28,7 @@ from .v1_4_identity_patch import apply_v1_4_identity_patch
 from .v1_4_ui_completion_patch import apply_v1_4_ui_completion_patch
 from .v1_4_local_app_data_patch import apply_v1_4_local_app_data_patch
 from .v1_4_acquisition_ui_patch import apply_v1_4_acquisition_ui_patch
+from .v1_4_vehicle_data_source_patch import apply_v1_4_vehicle_data_source_patch
 
 install_performance_measurement_guard(_performance_metrics)
 
@@ -112,4 +113,5 @@ def apply_v1_3_4_backup_action_wording_patch(MainWindow: Any) -> None:
     apply_v1_4_identity_patch(MainWindow)
     apply_v1_4_ui_completion_patch(MainWindow)
     apply_v1_4_acquisition_ui_patch(MainWindow)
+    apply_v1_4_vehicle_data_source_patch(MainWindow)
     apply_v1_3_4_performance_probe_patch(MainWindow)
