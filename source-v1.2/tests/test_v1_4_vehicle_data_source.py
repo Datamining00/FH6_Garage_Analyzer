@@ -1,16 +1,21 @@
 from __future__ import annotations
 
 import json
-import os
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from fh6garage.acquisition_db import AcquisitionDatabase
+from fh6garage.car_db import CarDatabase
 from fh6garage.v1_4_vehicle_data_source_patch import (
     HDR_SOURCE,
     USER_SOURCE,
-    UserVehicleDatabase,
+    USER_DATA_ACQUISITION_URL,
+    USER_DATA_DLC_URL,
+    USER_DATA_MANIFEST_URL,
+    USER_DATA_NAMES_URL,
+    _fetch_user_vehicle_update,
     normalize_vehicle_data_source,
     resolve_vehicle_data_source,
 )
@@ -30,73 +35,131 @@ class _Settings:
 
 
 class V14VehicleDataSourceTests(unittest.TestCase):
-    def _write_dataset(self, path: Path) -> None:
-        path.mkdir(parents=True, exist_ok=True)
-        (path / "cars").mkdir()
-        metadata = {"v": 1, "n": 2, "a": ["Autoshow", "Seasonal"], "d": []}
-        rows = [[100, "Dataset Car A", 0, 0], [200, "Dataset Car B", 1, 0]]
-        (path / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
-        (path / "cars" / "cars_01.json").write_text(json.dumps({"rows": rows}), encoding="utf-8")
-
     def test_source_normalization(self):
         self.assertEqual(normalize_vehicle_data_source("HDR"), HDR_SOURCE)
         self.assertEqual(normalize_vehicle_data_source("user"), USER_SOURCE)
         self.assertEqual(normalize_vehicle_data_source("unknown"), "")
 
-    def test_user_database_uses_dataset_name_and_keeps_override_priority(self):
+    def test_fresh_start_defaults_to_hdr_without_persisting_or_prompting(self):
         with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            data = root / "vehicle_data"
-            app_data = root / "local"
-            self._write_dataset(data)
-            db = UserVehicleDatabase(data, app_data_dir=app_data)
-            self.assertEqual(db.base_label(100), "Dataset Car A")
-            self.assertEqual(db.get(100).label, "Dataset Car A")
-            db.set_user_override(100, "My Override")
-            self.assertEqual(db.base_label(100), "Dataset Car A")
-            self.assertEqual(db.get(100).label, "My Override")
-            self.assertEqual(db.status.cached_count, 0)
+            settings = _Settings()
+            self.assertEqual(
+                resolve_vehicle_data_source(
+                    settings,
+                    Path(td) / "missing",
+                    parent=object(),
+                ),
+                HDR_SOURCE,
+            )
+            self.assertEqual(settings.writes, [])
 
     def test_saved_hdr_source_is_reused_without_prompt(self):
-        with tempfile.TemporaryDirectory() as td:
-            data = Path(td) / "vehicle_data"
-            self._write_dataset(data)
-            settings = _Settings(HDR_SOURCE)
-            self.assertEqual(resolve_vehicle_data_source(settings, data), HDR_SOURCE)
-            self.assertEqual(settings.writes, [])
+        settings = _Settings(HDR_SOURCE)
+        self.assertEqual(
+            resolve_vehicle_data_source(settings, Path("unused")),
+            HDR_SOURCE,
+        )
+        self.assertEqual(settings.writes, [])
 
-    def test_saved_user_source_is_reused(self):
-        with tempfile.TemporaryDirectory() as td:
-            data = Path(td) / "vehicle_data"
-            self._write_dataset(data)
-            settings = _Settings(USER_SOURCE)
-            self.assertEqual(resolve_vehicle_data_source(settings, data), USER_SOURCE)
-            self.assertEqual(settings.writes, [])
+    def test_saved_user_source_is_reused_even_when_bundled_dataset_missing(self):
+        settings = _Settings(USER_SOURCE)
+        self.assertEqual(
+            resolve_vehicle_data_source(settings, Path("missing")),
+            USER_SOURCE,
+        )
+        self.assertEqual(settings.writes, [])
 
-    def test_saved_user_source_falls_back_to_hdr_when_dataset_missing(self):
-        with tempfile.TemporaryDirectory() as td:
-            settings = _Settings(USER_SOURCE)
-            missing = Path(td) / "missing"
-            self.assertEqual(resolve_vehicle_data_source(settings, missing), HDR_SOURCE)
-            self.assertEqual(settings.saved, USER_SOURCE)
-            self.assertEqual(settings.writes, [])
+    def test_public_user_data_urls_target_readable_main_snapshot(self):
+        for url in (
+            USER_DATA_MANIFEST_URL,
+            USER_DATA_NAMES_URL,
+            USER_DATA_ACQUISITION_URL,
+            USER_DATA_DLC_URL,
+        ):
+            self.assertIn("Datamining00/FH6-Assistant-Data/main/vehicle_data/", url)
 
-    def test_smoke_test_defaults_to_hdr_without_persisting(self):
+    def test_user_update_writes_common_car_cache_and_supplemental_cache(self):
+        manifest = {
+            "version": 1,
+            "vehicle_count": 500,
+            "format": "fh6-assistant-readable-v1",
+        }
+        names = {f"Car {car_id}": str(car_id) for car_id in range(1, 501)}
+        acquisition = {str(car_id): "Autoshow" for car_id in range(1, 501)}
+        dlc = {"500": "Car Pass"}
+        responses = [
+            (manifest, "manifest-date"),
+            (names, "names-date"),
+            (acquisition, ""),
+            (dlc, ""),
+        ]
+
         with tempfile.TemporaryDirectory() as td:
-            data = Path(td) / "vehicle_data"
-            self._write_dataset(data)
-            settings = _Settings()
-            with patch.dict(os.environ, {"FH6_ASSISTANT_SMOKE_TEST_MS": "3000"}):
-                self.assertEqual(resolve_vehicle_data_source(settings, data), HDR_SOURCE)
-            self.assertEqual(settings.writes, [])
+            root = Path(td)
+            car_cache = root / "fh6_car_ordinals.json"
+            supplemental_cache = root / "fh6_cars.json"
+            with patch(
+                "fh6garage.v1_4_vehicle_data_source_patch._download_json",
+                side_effect=responses,
+            ):
+                result = _fetch_user_vehicle_update(
+                    car_cache,
+                    supplemental_cache,
+                )
+
+            self.assertEqual(result.source, USER_SOURCE)
+            self.assertEqual(result.count, 500)
+            car_payload = json.loads(car_cache.read_text(encoding="utf-8"))
+            self.assertEqual(car_payload["source_kind"], USER_SOURCE)
+            self.assertEqual(car_payload["count"], 500)
+            self.assertEqual(car_payload["cars"]["1"], "Car 1")
+
+            supplemental = json.loads(
+                supplemental_cache.read_text(encoding="utf-8")
+            )
+            self.assertEqual(supplemental["n"], 500)
+            self.assertEqual(len(supplemental["c"]), 500)
+            self.assertEqual(
+                AcquisitionDatabase(supplemental_cache).get(500).dlc_name,
+                "Car Pass",
+            )
+
+    def test_update_source_patch_does_not_replace_car_database_at_startup(self):
+        text = Path("fh6garage/v1_4_vehicle_data_source_patch.py").read_text(
+            encoding="utf-8"
+        )
+        patched_init = text.split("def patched_init", 1)[1].split(
+            "@Slot()\n    def start_car_db_update", 1
+        )[0]
+        self.assertNotIn("UserVehicleDatabase", patched_init)
+        self.assertNotIn("self.car_db =", patched_init)
+        self.assertIn("resolve_vehicle_data_source", patched_init)
+
+    def test_source_choice_occurs_only_in_explicit_update_action(self):
+        text = Path("fh6garage/v1_4_vehicle_data_source_patch.py").read_text(
+            encoding="utf-8"
+        )
+        resolver = text.split("def resolve_vehicle_data_source", 1)[1].split(
+            "def _utc_now", 1
+        )[0]
+        update_action = text.split("def start_car_db_update", 1)[1].split(
+            "@Slot(object)", 1
+        )[0]
+        self.assertNotIn("QMessageBox", resolver)
+        self.assertNotIn("_choose_update_source", resolver)
+        self.assertIn("_choose_update_source(self)", update_action)
 
     def test_vehicle_source_reuses_acquisition_ui_index_when_present(self):
-        text = Path("fh6garage/v1_4_vehicle_data_source_patch.py").read_text(encoding="utf-8")
-        self.assertIn('if not isinstance(getattr(self, "acquisition_db", None), AcquisitionDatabase):', text)
-        self.assertIn("self.acquisition_db = AcquisitionDatabase(user_data_path)", text)
+        text = Path("fh6garage/v1_4_vehicle_data_source_patch.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("AcquisitionDatabase", text)
+        self.assertIn("self.acquisition_db.reload()", text)
 
     def test_patch_order_places_vehicle_source_after_acquisition_and_before_performance_probe(self):
-        text = Path("fh6garage/v1_3_4_backup_action_wording_patch.py").read_text(encoding="utf-8")
+        text = Path("fh6garage/v1_3_4_backup_action_wording_patch.py").read_text(
+            encoding="utf-8"
+        )
         acquisition = text.rindex("apply_v1_4_acquisition_ui_patch(MainWindow)")
         vehicle = text.rindex("apply_v1_4_vehicle_data_source_patch(MainWindow)")
         profiler = text.rindex("apply_v1_3_4_performance_probe_patch(MainWindow)")
@@ -104,8 +167,12 @@ class V14VehicleDataSourceTests(unittest.TestCase):
         self.assertLess(vehicle, profiler)
 
         app = Path("app.py").read_text(encoding="utf-8")
-        wording = app.rindex("apply_v1_3_4_backup_action_wording_patch(MainWindow)")
-        final_affinity = app.rindex("apply_v1_3_2_thread_affinity_fix(MainWindow)")
+        wording = app.rindex(
+            "apply_v1_3_4_backup_action_wording_patch(MainWindow)"
+        )
+        final_affinity = app.rindex(
+            "apply_v1_3_2_thread_affinity_fix(MainWindow)"
+        )
         self.assertLess(wording, final_affinity)
 
 
