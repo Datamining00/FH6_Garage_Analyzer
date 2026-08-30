@@ -17,7 +17,7 @@ class V14UiCompletionTests(unittest.TestCase):
     def test_recent_changes_move_to_display_row_and_stay_visible(self):
         text = Path("fh6garage/v1_4_ui_completion_patch.py").read_text(encoding="utf-8")
         self.assertIn("controls.itemAt(1)", text)
-        self.assertIn("display_row.addWidget(banner, 1", text)
+        self.assertIn("display_row.insertWidget(insert_at, banner", text)
         self.assertNotIn("search_row.indexOf(filter_button)", text)
         self.assertIn("banner.show()", text)
         self.assertIn("return 0, 0, 0", text)
@@ -32,6 +32,15 @@ class V14UiCompletionTests(unittest.TestCase):
         self.assertIn('labels[1].setText(str(removed))', text)
         self.assertIn('labels[2].setText(str(duplicate))', text)
         self.assertNotIn('view.setText(f"+{added}', text)
+
+    def test_recent_change_control_matches_secondary_ui_and_export_right_edge(self):
+        text = Path("fh6garage/v1_4_ui_completion_patch.py").read_text(encoding="utf-8")
+        self.assertIn('view.setObjectName("secondary")', text)
+        self.assertIn('banner.setStyleSheet("QFrame#refreshDiffBanner { background:transparent; border:0; }")', text)
+        self.assertIn("livery_export_visible_button", text)
+        self.assertIn("export_right - banner_left", text)
+        self.assertIn("banner.setFixedWidth(target)", text)
+        self.assertIn("insert immediately before the row's trailing stretch", text)
 
     def test_completion_layer_is_before_profiler(self):
         text = Path("fh6garage/v1_3_4_backup_action_wording_patch.py").read_text(encoding="utf-8")
