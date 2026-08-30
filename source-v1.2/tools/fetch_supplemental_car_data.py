@@ -22,21 +22,34 @@ MAX_RESPONSE_BYTES = 256 * 1024
 MIN_CAR_COUNT = 500
 
 
-def _validate(raw: bytes) -> int:
+def _decode_and_validate(raw: bytes) -> tuple[dict[str, object], int]:
     try:
         payload = json.loads(gzip.decompress(raw).decode("utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise RuntimeError(f"supplemental data is not valid gzip JSON: {exc}") from exc
 
-    # Use the same parser as the application. This prevents a build from
-    # accepting a private-data schema that the shipped runtime cannot decode.
     try:
         parsed = AcquisitionDatabase._parse_payload(payload)
     except (TypeError, ValueError) as exc:
         raise RuntimeError(f"supplemental data is not runtime-compatible: {exc}") from exc
     if len(parsed) < MIN_CAR_COUNT:
         raise RuntimeError(f"supplemental car count is too small: {len(parsed)}")
-    return len(parsed)
+    return payload, len(parsed)
+
+
+def _write_json_atomic(destination: Path, payload: dict[str, object]) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary_name = tempfile.mkstemp(prefix="fh6_cars_", suffix=".tmp", dir=str(destination.parent))
+    os.close(fd)
+    temporary = Path(temporary_name)
+    try:
+        with temporary.open("w", encoding="utf-8", newline="\n") as stream:
+            json.dump(payload, stream, ensure_ascii=False, indent=2)
+            stream.write("\n")
+        os.replace(temporary, destination)
+    finally:
+        if temporary.exists():
+            temporary.unlink(missing_ok=True)
 
 
 def fetch(token: str, destination: Path) -> int:
@@ -59,18 +72,8 @@ def fetch(token: str, destination: Path) -> int:
         raise RuntimeError("GitHub contents response did not contain base64 file content")
     encoded = str(envelope.get("content") or "").replace("\n", "")
     raw = base64.b64decode(encoded, validate=True)
-    count = _validate(raw)
-
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    fd, temporary_name = tempfile.mkstemp(prefix="fh6_cars_", suffix=".tmp", dir=str(destination.parent))
-    os.close(fd)
-    temporary = Path(temporary_name)
-    try:
-        temporary.write_bytes(raw)
-        os.replace(temporary, destination)
-    finally:
-        if temporary.exists():
-            temporary.unlink(missing_ok=True)
+    payload, count = _decode_and_validate(raw)
+    _write_json_atomic(destination, payload)
     return count
 
 
@@ -78,7 +81,7 @@ def main() -> int:
     token = os.environ.get("FH6_ASSISTANT_DATA_TOKEN", "").strip()
     if not token:
         raise SystemExit("FH6_ASSISTANT_DATA_TOKEN is required to stage private supplemental data")
-    destination = PROJECT_ROOT / "data" / "fh6_cars.json.gz"
+    destination = PROJECT_ROOT / "data" / "fh6_cars.json"
     count = fetch(token, destination)
     print(f"Staged supplemental car data: {count} cars -> {destination}")
     return 0
