@@ -16,7 +16,7 @@ class ParseError(ValueError):
 
 
 _LIVERY_KINDS = {"Livery", "BaseLivery", "SoulBoundLivery"}
-_LIVERY_SECTION_MARKER = b"\x01\x02"
+_CREATOR_RELATIVE_PADDING = b"\x00" * 7
 
 
 def _u16(data: bytes, offset: int) -> int:
@@ -52,18 +52,37 @@ def _uuid_text(raw: bytes) -> str:
         return ""
 
 
+def _has_creator_relative_tail(data: bytes, creator_end: int, tail_size: int) -> bool:
+    """Validate the stable v7 creator-relative envelope without trusting marker bytes.
+
+    The two bytes at creator_end+0x1C vary in real FH6 liveries (01 00, 01 01,
+    01 02, and potentially other values).  They are therefore diagnostic data,
+    not a parser gate.  Across the verified corpus the following seven bytes are
+    zero padding and the kind-specific tail has a stable minimum size.
+    """
+    return (
+        creator_end + tail_size <= len(data)
+        and data[creator_end + 0x1E:creator_end + 0x25]
+        == _CREATOR_RELATIVE_PADDING
+    )
+
+
 def parse_forza_header(data: bytes, kind: str) -> HeaderInfo:
     """Parse FH6 livery/tuning header fields without breaking legacy identities.
 
     The title/description/date/creator preamble is common to the sampled v7
-    headers. Livery/BaseLivery/SoulBoundLivery additionally expose a verified
-    creator-relative section identified by the 0x01 0x02 marker. When that
-    structural marker is absent, the historical tail-based parser remains the
-    compatibility fallback (notably for older/synthetic fixtures).
+    headers.  Current v7 livery and tuning tails are parsed relative to the end
+    of the creator string.  The two bytes at +0x1C are intentionally ignored as
+    a structural condition because real FH6 Livery files use multiple values
+    while keeping the same CarOrdinal/GUID layout.
+
+    When the verified creator-relative envelope is absent, the historical
+    tail-based parser remains the compatibility fallback for older/synthetic
+    fixtures and unknown layouts.
 
     ``guid``, ``decal_count`` and ``platform_code`` deliberately retain their
     historical values because existing local annotations/history/backups may
-    already depend on them. Verified creator-relative values are exposed
+    already depend on them.  Verified creator-relative values are exposed
     separately as ``asset_guid`` and ``type_value``.
     """
     if len(data) < 48:
@@ -103,8 +122,9 @@ def parse_forza_header(data: bytes, kind: str) -> HeaderInfo:
         )
 
     # Historical tail values are intentionally preserved as compatibility
-    # identities. In real livery samples the final 16 bytes are not the Asset
-    # GUID, but existing annotations/history/backups may already key on them.
+    # identities. In real livery samples the final 16 bytes are not always the
+    # Asset GUID, but existing annotations/history/backups may already key on
+    # these values.
     car_id = _u32(data, len(data) - 20) if len(data) >= 20 else None
     guid = _uuid_text(data[-16:] if len(data) >= 16 else b"")
 
@@ -115,23 +135,37 @@ def parse_forza_header(data: bytes, kind: str) -> HeaderInfo:
     asset_guid = ""
     type_value: Optional[int] = None
 
-    # Verified livery section, relative to the end of the creator string:
-    # +0x1C marker 01 02
-    # +0x25 u32 type_value (exact semantic meaning still unconfirmed)
-    # +0x29 u32 target CarOrdinal
-    # +0x2D byte[16] Asset GUID
-    # Tuning is intentionally excluded until its distinct tail is independently
-    # verified. The marker check also keeps older/synthetic headers compatible.
-    livery_section_end = creator_end + 0x3D
+    # Verified v7 creator-relative layouts:
+    # Livery/BaseLivery/SoulBoundLivery
+    #   +0x1C byte[2] variable marker/state bytes (not a parser gate)
+    #   +0x1E byte[7] zero padding
+    #   +0x25 u32 type_value (exact semantic meaning still unconfirmed)
+    #   +0x29 u32 target CarOrdinal
+    #   +0x2D byte[16] Asset GUID
+    # Tuning
+    #   +0x1C byte[2] variable marker/state bytes (not a parser gate)
+    #   +0x1E byte[7] zero padding
+    #   +0x25 u32 target CarOrdinal
+    #   +0x29 byte[16] GUID
     if (
-        kind in _LIVERY_KINDS
-        and livery_section_end <= len(data)
-        and data[creator_end + 0x1C:creator_end + 0x1E]
-        == _LIVERY_SECTION_MARKER
+        version >= 7
+        and kind in _LIVERY_KINDS
+        and _has_creator_relative_tail(data, creator_end, 0x3D)
     ):
         type_value = _u32(data, creator_end + 0x25)
-        car_id = _u32(data, creator_end + 0x29)
-        asset_guid = _uuid_text(data[creator_end + 0x2D:creator_end + 0x3D])
+        structural_car_id = _u32(data, creator_end + 0x29)
+        if structural_car_id > 0:
+            car_id = structural_car_id
+            asset_guid = _uuid_text(data[creator_end + 0x2D:creator_end + 0x3D])
+    elif (
+        version >= 7
+        and kind == "Tuning"
+        and _has_creator_relative_tail(data, creator_end, 0x39)
+    ):
+        structural_car_id = _u32(data, creator_end + 0x25)
+        if structural_car_id > 0:
+            car_id = structural_car_id
+            asset_guid = _uuid_text(data[creator_end + 0x29:creator_end + 0x39])
 
     return HeaderInfo(
         version=version,

@@ -20,7 +20,7 @@ _CACHE_SCHEMA = 1
 # Bump this whenever parse_forza_header semantics change, even if the on-disk
 # cache layout itself is unchanged. This prevents stale parsed metadata from
 # surviving an application/parser upgrade.
-_HEADER_PARSER_REVISION = 2
+_HEADER_PARSER_REVISION = 3
 
 
 def _fingerprint(path: Path) -> tuple[int, int, int] | None:
@@ -169,9 +169,9 @@ class FileAnalysisCache:
 
     def put_sha256(self, path: Path, digest: str) -> None:
         fp = _fingerprint(path)
+        key = self._key("sha256", path)
         if fp is None or len(digest) != 64:
             return
-        key = self._key("sha256", path)
         with self._lock:
             self._entries[key] = {
                 "fingerprint": list(fp),
