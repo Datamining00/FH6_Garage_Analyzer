@@ -229,38 +229,22 @@ def _arrange_card(card: Any) -> None:
     # a competing overlay, event filter, or absolute-position owner. Missing
     # SoulBound move/lock controls leave their normal row slots empty so every
     # remaining icon keeps the same spacing as a standard livery card.
-    # Own the final main-card spacing here. Older follow-up code used to
-    # relayout these same controls a second time after card construction. Keep
-    # six 30 px button rows separated by five stretchable spacer rows so the
-    # final geometry is produced once by the primary action-layout owner.
-    grid.setContentsMargins(EDGE_MARGIN, EDGE_MARGIN, EDGE_MARGIN, EDGE_MARGIN)
+    grid.setContentsMargins(0, 0, 0, 0)
     grid.setHorizontalSpacing(0)
-    grid.setVerticalSpacing(0)
+    grid.setVerticalSpacing(BUTTON_GAP)
     grid.setColumnStretch(0, 1)
     grid.setColumnStretch(1, 1)
-    for row in range(len(left) * 2 - 1):
-        grid.setRowMinimumHeight(row, 30 if row % 2 == 0 else 0)
-        grid.setRowStretch(row, 0 if row % 2 == 0 else 1)
-    for slot, (left_button, right_button) in enumerate(zip(left, right)):
-        row = slot * 2
+    for row, (left_button, right_button) in enumerate(zip(left, right)):
         for button in (left_button, right_button):
             if isinstance(button, QToolButton):
                 button.setIconSize(QSize(ICON_SIZE, ICON_SIZE))
                 button.show()
+        grid.setRowMinimumHeight(row, ROW_HEIGHT)
+        vertical = Qt.AlignmentFlag.AlignTop if row == 0 else Qt.AlignmentFlag.AlignBottom if row == 5 else Qt.AlignmentFlag.AlignVCenter
         if isinstance(left_button, QToolButton):
-            grid.addWidget(
-                left_button,
-                row,
-                0,
-                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
-            )
+            grid.addWidget(left_button, row, 0, Qt.AlignmentFlag.AlignLeft | vertical)
         if isinstance(right_button, QToolButton):
-            grid.addWidget(
-                right_button,
-                row,
-                1,
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
-            )
+            grid.addWidget(right_button, row, 1, Qt.AlignmentFlag.AlignRight | vertical)
 
     def enforce_grid() -> None:
         # Cards can be replaced before the 50/150 ms layout callbacks fire.
@@ -308,7 +292,7 @@ def _arrange_card(card: Any) -> None:
 
 def _run_busy(owner: Any, action: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
     begin = getattr(owner, "_begin_busy", None)
-    end = getatr(owner, "_end_busy", None)
+    end = getattr(owner, "_end_busy", None)
     began = callable(begin)
     if began:
         begin(_txt("처리 중", "Processing"))
@@ -354,7 +338,7 @@ def apply_v1_3_4_card_action_layout_patch(MainWindow: Any) -> None:
     def set_status_filter(window: Any, mode: str) -> Any:
         return _run_busy(window, original_status_filter, window, mode)
 
-    # v1.3.2 archive cleanup only walked child QFrames, while the grouped
+    # The v1.3.2 archive cleanup only walked child QFrames, while the grouped
     # recent view passes its archive QFrame as the root widget. Keep all legacy
     # cleanup and additionally remove the root card's historical strip.
     original_archive_cleanup = _alias_fix._remove_deleted_heading_and_match_main_frame
