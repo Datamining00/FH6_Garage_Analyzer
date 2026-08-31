@@ -8,9 +8,10 @@ class V14VehicleRuntimeUpdateTests(unittest.TestCase):
     def test_user_update_uses_single_gist_snapshot(self):
         text = Path("fh6garage/v1_4_vehicle_runtime_update_patch.py").read_text(encoding="utf-8")
         self.assertIn('USER_DATA_GIST_ID = "30fe44689fad7ba5e99e2381927b7730"', text)
-        self.assertIn('USER_DATA_GIST_FILENAME = "FH6 Vehicle Data.json"', text)
         self.assertIn('https://gist.githubusercontent.com/Datamining00/', text)
-        self.assertIn('quote(USER_DATA_GIST_FILENAME)', text)
+        self.assertIn('/raw/', text)
+        self.assertNotIn('USER_DATA_GIST_FILENAME', text)
+        self.assertNotIn('quote(USER_DATA_GIST_FILENAME)', text)
         self.assertEqual(text.count("_source._download_json("), 1)
         self.assertNotIn("USER_DATA_MANIFEST_URL", text)
         self.assertNotIn("USER_DATA_NAMES_URL", text)
