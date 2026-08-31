@@ -34,30 +34,8 @@ def _livery_control_rows(window: Any) -> tuple[QHBoxLayout | None, QHBoxLayout |
     )
 
 
-def _pin_pair_after_trailing_stretch(
-    layout: QHBoxLayout,
-    left_widget: Any,
-    right_widget: Any,
-) -> None:
-    """Place two terminal widgets after the row's existing stretch item.
-
-    Search has an expanding field followed by Filter. The display row is made
-    geometrically equivalent by keeping No-applied immediately before the recent
-    counter, with both widgets after the flexible stretch. When Filter and the
-    recent counter share one width, the search-field right edge and the
-    No-applied right edge therefore share the same X coordinate.
-    """
-    if left_widget is None or right_widget is None:
-        return
-    if layout.indexOf(left_widget) < 0 or layout.indexOf(right_widget) < 0:
-        return
-    layout.removeWidget(left_widget)
-    layout.removeWidget(right_widget)
-    layout.addWidget(left_widget)
-    layout.addWidget(right_widget)
-
-
 def _pin_widget_after_trailing_stretch(layout: QHBoxLayout, widget: Any) -> None:
+    """Keep one terminal control after the row's trailing stretch."""
     if widget is None or layout.indexOf(widget) < 0:
         return
     if layout.indexOf(widget) == layout.count() - 1:
@@ -67,11 +45,12 @@ def _pin_widget_after_trailing_stretch(layout: QHBoxLayout, widget: Any) -> None
 
 
 def _sync_display_row_geometry(window: Any) -> None:
-    """Own only structural placement; width is owned by the shared-width patch.
+    """Own structural placement only; shared-width patch owns control widths.
 
-    The recent counter deliberately has no intrinsic/fallback width here. It is
-    laid out exactly like Export: terminal control after a flexible stretch, and
-    v1_4_right_control_width_patch applies the single Export-derived width.
+    Keep the native status-filter order intact. In particular,
+    ``적용된 리버리 없음`` remains directly after ``미적용 리버리`` as installed
+    by the status-filter patch. Only the recent counter is treated as the
+    right-terminal control, matching Export's placement rule.
     """
     if bool(getattr(window, "_fh6_syncing_recent_geometry", False)):
         return
@@ -79,28 +58,25 @@ def _sync_display_row_geometry(window: Any) -> None:
     try:
         banner = getattr(window, "refresh_diff_banner", None)
         export = getattr(window, "livery_export_visible_button", None)
-        no_applied = getattr(window, "livery_no_applied_toggle", None)
         search_row, display_row, action_row = _livery_control_rows(window)
         if (
             not isinstance(banner, QFrame)
             or not isinstance(export, QPushButton)
-            or not isinstance(no_applied, QPushButton)
             or not isinstance(search_row, QHBoxLayout)
             or not isinstance(display_row, QHBoxLayout)
             or not isinstance(action_row, QHBoxLayout)
         ):
             return
 
-        # Use one inter-control gap for the right-hand column across all three
-        # livery toolbar rows. This makes the expanding search field naturally
-        # consume the small residual width needed to align with No-applied.
+        # Keep a consistent toolbar gap, but do not reposition native filter
+        # buttons. The search field therefore keeps its normal expanding policy.
         search_row.setSpacing(_RIGHT_COLUMN_GAP)
         display_row.setSpacing(_RIGHT_COLUMN_GAP)
         action_row.setSpacing(_RIGHT_COLUMN_GAP)
 
-        # Display row: ... stretch | No applied | recent counts
-        _pin_pair_after_trailing_stretch(display_row, no_applied, banner)
-        # Action row: ... stretch | Export
+        # Display row: native filters ... | stretch | recent counts
+        # Action row:  native actions  ... | stretch | Export
+        _pin_widget_after_trailing_stretch(display_row, banner)
         _pin_widget_after_trailing_stretch(action_row, export)
 
         search_row.invalidate()
