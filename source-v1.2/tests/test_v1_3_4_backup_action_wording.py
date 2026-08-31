@@ -1,7 +1,26 @@
 from __future__ import annotations
 
+import ast
 import unittest
 from pathlib import Path
+
+
+def _runtime_patch_names(root: Path) -> list[str]:
+    source = (root / "fh6garage" / "runtime_composition.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    for node in tree.body:
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            if node.target.id != "RUNTIME_PATCH_SEQUENCE" or not isinstance(node.value, ast.Tuple):
+                continue
+            names: list[str] = []
+            for item in node.value.elts:
+                if not isinstance(item, ast.Call) or not item.args:
+                    continue
+                first = item.args[0]
+                if isinstance(first, ast.Constant) and isinstance(first.value, str):
+                    names.append(first.value)
+            return names
+    raise AssertionError("RUNTIME_PATCH_SEQUENCE not found")
 
 
 class BackupActionWordingTests(unittest.TestCase):
@@ -18,14 +37,21 @@ class BackupActionWordingTests(unittest.TestCase):
 
     def test_wording_patch_stays_before_final_thread_affinity_fix(self) -> None:
         root = Path(__file__).resolve().parents[1]
-        app = (root / "app.py").read_text(encoding="utf-8")
-        performance = app.index(
-            "apply_v1_3_4_backup_export_performance_ui_patch(MainWindow)"
-        )
-        wording = app.index("apply_v1_3_4_backup_action_wording_patch(MainWindow)")
-        affinity = app.index("apply_v1_3_2_thread_affinity_fix(MainWindow)")
+        names = _runtime_patch_names(root)
+        performance = names.index("v1_3_4_backup_export_performance_ui")
+        wording = names.index("v1_3_4_backup_action_wording")
+        affinity = names.index("v1_3_2_thread_affinity_fix")
         self.assertLess(performance, wording)
         self.assertLess(wording, affinity)
+
+    def test_wording_patch_no_longer_installs_unrelated_followups(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        source = (
+            root / "fh6garage" / "v1_3_4_backup_action_wording_patch.py"
+        ).read_text(encoding="utf-8")
+        self.assertNotIn("apply_v1_3_4_backup_import_refinement_patch", source)
+        self.assertNotIn("apply_v1_4_identity_patch", source)
+        self.assertIn("runtime_composition", source)
 
 
 if __name__ == "__main__":

@@ -11,31 +11,6 @@ from . import v1_3_4_backup_export_performance_ui_patch as _perf
 from .card_icons import icon as card_icon
 from .models import LiveryRecord
 from .performance_measurement_guard import install_performance_measurement_guard
-from .v1_3_4_backup_import_refinement_patch import apply_v1_3_4_backup_import_refinement_patch
-from .v1_3_4_backup_toolbar_followup_patch import apply_v1_3_4_backup_toolbar_followup_patch
-from .v1_3_4_backup_lazy_load_patch import apply_v1_3_4_backup_lazy_load_patch
-from .v1_3_4_backup_lazy_watch_patch import apply_v1_3_4_backup_lazy_watch_patch
-from .v1_3_4_backup_lazy_thread_bridge_patch import apply_v1_3_4_backup_lazy_thread_bridge_patch
-from .v1_3_4_backup_loading_resilience_patch import apply_v1_3_4_backup_loading_resilience_patch
-from .v1_3_4_backup_visual_stability_patch import apply_v1_3_4_backup_visual_stability_patch
-from .v1_3_4_card_polish_export_delete_patch import apply_v1_3_4_card_polish_export_delete_patch
-from .v1_3_4_livery_backup_filter_patch import apply_v1_3_4_livery_backup_filter_patch
-from .v1_3_4_status_backup_label_patch import apply_v1_3_4_status_backup_label_patch
-from .v1_3_4_performance_probe_patch import apply_v1_3_4_performance_probe_patch
-from .v1_4_backup_repository_patch import apply_v1_4_backup_repository_patch
-from .v1_4_backup_repository_followup_patch import apply_v1_4_backup_repository_followup_patch
-from .v1_4_backup_watch_stability_patch import apply_v1_4_backup_watch_stability_patch
-from .v1_4_identity_patch import apply_v1_4_identity_patch
-from .v1_4_ui_completion_patch import apply_v1_4_ui_completion_patch
-from .v1_4_display_row_geometry_patch import apply_v1_4_display_row_geometry_patch
-from .v1_4_local_app_data_patch import apply_v1_4_local_app_data_patch
-from .v1_4_acquisition_ui_patch import apply_v1_4_acquisition_ui_patch
-from .v1_4_vehicle_data_source_patch import apply_v1_4_vehicle_data_source_patch
-from .v1_4_vehicle_runtime_update_patch import apply_v1_4_vehicle_runtime_update_patch
-from .v1_4_vehicle_update_finish_ui_patch import apply_v1_4_vehicle_update_finish_ui_patch
-from .v1_4_vehicle_update_thread_bridge_patch import apply_v1_4_vehicle_update_thread_bridge_patch
-from .v1_4_interaction_render_completion_patch import apply_v1_4_interaction_render_completion_patch
-from .v1_4_right_control_width_patch import apply_v1_4_right_control_width_patch
 
 install_performance_measurement_guard(_performance_metrics)
 
@@ -65,6 +40,11 @@ def _backup_confirm(window: Any, count: int) -> bool:
 
 
 def apply_v1_3_4_backup_action_wording_patch(MainWindow: Any) -> None:
+    """Patch only backup wording/action semantics.
+
+    Runtime composition is owned by fh6garage.runtime_composition; this function
+    must not install unrelated follow-up patches transitively.
+    """
     if getattr(MainWindow, "_fh6_v134_backup_action_wording_patched", False):
         return
     original_confirm = _backup_ui._confirm_keep_source
@@ -98,34 +78,10 @@ def apply_v1_3_4_backup_action_wording_patch(MainWindow: Any) -> None:
         button.setAccessibleName(_backup_ui._txt("백업하기", "Back up"))
         if not bool(button.property("fh6BackupActionInstalled")):
             button.setProperty("fh6BackupActionInstalled", True)
-            button.clicked.connect(lambda _checked=False, owner=window, item=record: request_backup(owner, item))
+            button.clicked.connect(
+                lambda _checked=False, owner=window, item=record: request_backup(owner, item)
+            )
 
     _backup_ui._confirm_keep_source = confirm
     _perf._configure_backup_action_button = configure
     MainWindow._fh6_v134_backup_action_wording_patched = True
-
-    apply_v1_3_4_backup_import_refinement_patch(MainWindow)
-    apply_v1_3_4_backup_toolbar_followup_patch(MainWindow)
-    apply_v1_3_4_backup_lazy_load_patch(MainWindow)
-    apply_v1_3_4_backup_lazy_watch_patch(MainWindow)
-    apply_v1_3_4_backup_lazy_thread_bridge_patch(MainWindow)
-    apply_v1_3_4_backup_loading_resilience_patch(MainWindow)
-    apply_v1_3_4_backup_visual_stability_patch(MainWindow)
-    apply_v1_3_4_card_polish_export_delete_patch(MainWindow)
-    apply_v1_3_4_livery_backup_filter_patch(MainWindow)
-    apply_v1_3_4_status_backup_label_patch(MainWindow)
-    apply_v1_4_backup_repository_patch(MainWindow)
-    apply_v1_4_backup_repository_followup_patch(MainWindow)
-    apply_v1_4_backup_watch_stability_patch(MainWindow)
-    apply_v1_4_local_app_data_patch(MainWindow)
-    apply_v1_4_identity_patch(MainWindow)
-    apply_v1_4_ui_completion_patch(MainWindow)
-    apply_v1_4_display_row_geometry_patch(MainWindow)
-    apply_v1_4_acquisition_ui_patch(MainWindow)
-    apply_v1_4_vehicle_data_source_patch(MainWindow)
-    apply_v1_4_vehicle_runtime_update_patch(MainWindow)
-    apply_v1_4_vehicle_update_finish_ui_patch(MainWindow)
-    apply_v1_4_vehicle_update_thread_bridge_patch(MainWindow)
-    apply_v1_4_interaction_render_completion_patch(MainWindow)
-    apply_v1_4_right_control_width_patch(MainWindow)
-    apply_v1_3_4_performance_probe_patch(MainWindow)
