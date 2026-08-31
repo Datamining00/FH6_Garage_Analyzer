@@ -62,6 +62,21 @@ class V14AcquisitionDatabaseTests(unittest.TestCase):
             self.assertEqual(db.get(100).acquisition, "Seasonal")
             self.assertEqual(db.loaded_path, cache)
 
+    def test_disabled_local_cache_blocks_bundled_supplemental_fallback(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            bundled = root / "bundled"
+            cache = root / "cache.json"
+            self._write_directory(bundled)
+            self._write_json(
+                cache,
+                {"v": 1, "n": 0, "a": [], "d": [], "c": [], "disabled": True},
+            )
+            db = AcquisitionDatabase(bundled, cache_path=cache)
+            self.assertEqual(len(db), 0)
+            self.assertIsNone(db.get(100))
+            self.assertEqual(db.loaded_path, cache)
+
     def test_legacy_gzip_cache_remains_readable(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
