@@ -96,6 +96,22 @@ def _confirm_suspicious_snapshot_drop(
     return answer == QMessageBox.StandardButton.Yes
 
 
+def _guard_memory_result(window: Any, result: object) -> bool:
+    diagnostic = _snapshot_drop_diagnostic(window, result)
+    if diagnostic is None or _confirm_suspicious_snapshot_drop(window, diagnostic):
+        return True
+    _memory_state._finish_scan_ui(window)
+    window.memory_scan_detail.setText(
+        _memory_state._txt(
+            "비정상적인 적용 리버리 수 감소가 감지되어 새 결과를 적용하지 않았습니다. "
+            "마지막 정상 적용 결과를 유지합니다.",
+            "An unusual applied-livery count drop was detected, so the new result was not applied. "
+            "The last valid applied result is retained.",
+        )
+    )
+    return False
+
+
 def _clear_legacy_auction_state_filter(window: Any) -> None:
     if getattr(window, "_fh6_memory_livery_filter_mode", FILTER_DEFAULT) == FILTER_DEFAULT:
         return
@@ -143,24 +159,10 @@ def apply_v1_3_2_memory_filter_coordination_patch(MainWindow: Any) -> None:
     # applied/unapplied state. Cache/manifest evidence remains auxiliary only.
     _memory_state._classify_soulbound = _classify_soulbound_from_memory
 
-    original_memory_finished = _memory_state._on_memory_finished
-
-    def guarded_memory_finished(window: Any, result: object) -> None:
-        diagnostic = _snapshot_drop_diagnostic(window, result)
-        if diagnostic is not None and not _confirm_suspicious_snapshot_drop(window, diagnostic):
-            _memory_state._finish_scan_ui(window)
-            window.memory_scan_detail.setText(
-                _memory_state._txt(
-                    "비정상적인 적용 리버리 수 감소가 감지되어 새 결과를 적용하지 않았습니다. "
-                    "마지막 정상 적용 결과를 유지합니다.",
-                    "An unusual applied-livery count drop was detected, so the new result was not applied. "
-                    "The last valid applied result is retained.",
-                )
-            )
-            return
-        original_memory_finished(window, result)
-
-    _memory_state._on_memory_finished = guarded_memory_finished
+    # The GUI thread bridge consults this explicit MainWindow hook before handing
+    # the result to the existing memory-state completion function. This avoids
+    # replacing _memory_state._on_memory_finished as a module-global callable.
+    MainWindow._fh6_memory_result_guard = _guard_memory_result
 
     original_init = MainWindow.__init__
 

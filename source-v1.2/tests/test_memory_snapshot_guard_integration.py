@@ -77,7 +77,13 @@ class MemorySnapshotGuardIntegrationTests(unittest.TestCase):
         source = (
             ROOT / "fh6garage" / "v1_3_2_memory_filter_coordination_patch.py"
         ).read_text(encoding="utf-8")
-        self.assertIn("_memory_state._on_memory_finished = guarded_memory_finished", source)
+        bridge_source = (
+            ROOT / "fh6garage" / "v1_3_2_memory_thread_safety_patch.py"
+        ).read_text(encoding="utf-8")
+        self.assertNotIn("_memory_state._on_memory_finished =", source)
+        self.assertIn("MainWindow._fh6_memory_result_guard = _guard_memory_result", source)
+        self.assertIn('getattr(self.window, "_fh6_memory_result_guard", None)', bridge_source)
+        self.assertIn("_memory_ui._on_memory_finished(self.window, result)", bridge_source)
         self.assertIn("QMessageBox.StandardButton.No", source)
 
 

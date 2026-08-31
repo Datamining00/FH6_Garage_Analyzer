@@ -35,6 +35,9 @@ class _MemoryGuiBridge(QObject):
 
     @Slot(object)
     def on_finished(self, result: object) -> None:
+        guard = getattr(self.window, "_fh6_memory_result_guard", None)
+        if callable(guard) and not guard(result):
+            return
         _memory_ui._on_memory_finished(self.window, result)
 
     @Slot(str)
