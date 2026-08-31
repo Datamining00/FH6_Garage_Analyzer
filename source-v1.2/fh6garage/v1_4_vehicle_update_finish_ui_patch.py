@@ -18,8 +18,8 @@ def _choose_update_source(parent: Any) -> str:
     box.setWindowTitle("차량 데이터 업데이트")
     box.setText("업데이트할 차량 데이터 소스를 선택하십시오.")
     box.setInformativeText("선택한 소스의 최신 데이터를 내려받아 로컬 캐시를 교체합니다. 프로그램 시작 시에는 다시 묻지 않습니다.")
-    hdr_button = box.addButton("HDR", QMessageBox.ButtonRole.AcceptRole)
-    user_button = box.addButton("Datamining00", QMessageBox.ButtonRole.AcceptRole)
+    hdr_button = box.addButton("저장소1(HDR)", QMessageBox.ButtonRole.AcceptRole)
+    user_button = box.addButton("저장소2", QMessageBox.ButtonRole.AcceptRole)
     cancel_button = box.addButton("취소", QMessageBox.ButtonRole.RejectRole)
     box.setDefaultButton(hdr_button); box.exec(); clicked = box.clickedButton()
     if clicked is user_button: return _vehicle_source.USER_SOURCE
@@ -70,9 +70,6 @@ def apply_v1_4_vehicle_update_finish_ui_patch(MainWindow: Any) -> None:
         except Exception:
             pass
 
-        # Cards are cached/reused, so refresh only their source metadata. This
-        # makes HDR immediately show '-' and Datamining00 immediately show the
-        # newly downloaded acquisition/DLC data without recreating thumbnails.
         refresh_acquisition = getattr(self, "_refresh_cached_acquisition_labels", None)
         if callable(refresh_acquisition): refresh_acquisition()
 
@@ -83,7 +80,7 @@ def apply_v1_4_vehicle_update_finish_ui_patch(MainWindow: Any) -> None:
         populate = getattr(self, "_populate_all", None)
         if getattr(self, "result", None) is not None and callable(populate): populate()
 
-        source_label = "Datamining00" if source == _vehicle_source.USER_SOURCE else "HDR"
+        source_label = "저장소2" if source == _vehicle_source.USER_SOURCE else "저장소1(HDR)"
         self._show_status(f"{source_label} 업데이트 완료: {update.count}대", 8000)
         QMessageBox.information(self, "차량 데이터 업데이트 완료", f"{source_label}를 {update.count}대 기준으로 업데이트했습니다.\n\n저장 위치: {update.cache_path}")
 
