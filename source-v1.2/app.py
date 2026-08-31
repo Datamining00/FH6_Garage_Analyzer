@@ -226,14 +226,6 @@ def _apply_release_patch_stack() -> None:
     apply_v1_3_4_v1_4_followup_patches(MainWindow)
 
 
-def _apply_finalizer_patch_stack() -> None:
-    """Install invariant-repair patches that must remain last in composition."""
-    # This must be the final MainWindow patch. It restores the original
-    # class-defined @Slot(object) scan callback so all UI rebuilding runs on the
-    # GUI thread, then moves v1.3.2 post-processing into _populate_all().
-    apply_v1_3_2_thread_affinity_fix(MainWindow)
-
-
 def _apply_runtime_patch_stack() -> None:
     """Install the verified runtime composition through explicit domain stages.
 
@@ -246,6 +238,14 @@ def _apply_runtime_patch_stack() -> None:
     _apply_state_patch_stack()
     _apply_release_patch_stack()
     _apply_finalizer_patch_stack()
+
+
+def _apply_finalizer_patch_stack() -> None:
+    """Install invariant-repair patches that must remain last in composition."""
+    # This must be the final MainWindow patch. It restores the original
+    # class-defined @Slot(object) scan callback so all UI rebuilding runs on the
+    # GUI thread, then moves v1.3.2 post-processing into _populate_all().
+    apply_v1_3_2_thread_affinity_fix(MainWindow)
 
 
 def main() -> int:
