@@ -14,6 +14,18 @@ class V14VehicleUpdateFinishUITests(unittest.TestCase):
         self.assertIn('box.addButton("취소"', text)
         self.assertNotIn('box.addButton("내 차량 데이터"', text)
 
+    def test_hdr_disables_supplemental_data_but_vehicle_data2_keeps_it(self):
+        text = Path("fh6garage/v1_4_vehicle_update_finish_ui_patch.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("def _disable_supplemental_cache", text)
+        self.assertIn('SUPPLEMENTAL_DISABLED_KEY: True', text)
+        self.assertIn('"source": _vehicle_source.HDR_SOURCE', text)
+        self.assertIn("if source == _vehicle_source.HDR_SOURCE:", text)
+        self.assertIn("_disable_supplemental_cache(self.acquisition_db)", text)
+        self.assertIn("self.acquisition_db.reload()", text)
+        self.assertNotIn("if source == _vehicle_source.USER_SOURCE:\n                _disable_supplemental_cache", text)
+
     def test_success_finishes_update_without_full_save_rescan(self):
         text = Path("fh6garage/v1_4_vehicle_update_finish_ui_patch.py").read_text(
             encoding="utf-8"
