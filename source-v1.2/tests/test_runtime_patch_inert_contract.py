@@ -8,10 +8,10 @@ class RuntimePatchInertContractTests(unittest.TestCase):
     PRESERVED_INERT_PATCH_MODULES = (
         "v1_3_2_card_parent_patch",
         "v1_3_2_card_alignment_patch",
-        "v1_3_3_beta_identity_patch",
     )
     RETIRED_PATCH_MODULES = (
         "v1_3_2_diagnostic_patch",
+        "v1_3_3_beta_identity_patch",
     )
 
     def test_preserved_legacy_patch_modules_exist_but_are_not_installed(self) -> None:
