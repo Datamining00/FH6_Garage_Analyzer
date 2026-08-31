@@ -82,9 +82,10 @@ def _repair_card_actions(card: Any, record: Any) -> None:
     if bool(card.property("fh6ArchiveCard")):
         return
 
-    # The preceding feature patch normally creates both the folder button and
-    # four-row aligner. Repeat the idempotent installer here so cached cards and
-    # cards created through alternate paths receive the same final controls.
+    # Retained for compatibility with older partial patch stacks. The current
+    # v1.4 runtime no longer installs this as a card-construction wrapper;
+    # folder/action creation is owned by the preceding folder patch and final
+    # geometry is owned by v1.3.4 card_action_layout.
     _feature._install_four_left_actions(card, record)
     if getattr(card, "_fh6_action_grid", None) is not None:
         return
@@ -92,29 +93,19 @@ def _repair_card_actions(card: Any, record: Any) -> None:
 
     _force_card_action_geometry(card)
     QTimer.singleShot(0, lambda c=card: _force_card_action_geometry(c))
-    # Native Windows style/layout polish can enqueue one more legacy reposition.
-    # Reassert the same agreed geometry after that pass as a final safety net.
     QTimer.singleShot(50, lambda c=card: _force_card_action_geometry(c))
 
 
 def apply_v1_3_2_change_dialog_runtime_fix(MainWindow) -> None:
-    """Final runtime correction for the change button and four left card rows."""
+    """Keep only the still-active compact change-button runtime correction."""
     if getattr(MainWindow, "_fh6_v132_change_dialog_runtime_fixed", False):
         return
 
     original_init = MainWindow.__init__
-    original_make_card = MainWindow._make_saved_content_card
 
     def patched_init(self, *args, **kwargs) -> None:
         original_init(self, *args, **kwargs)
         _repair_change_button(self)
 
-    def patched_make_card(self, content_type: str, record: Any, key: str):
-        card = original_make_card(self, content_type, record, key)
-        if content_type == "livery":
-            _repair_card_actions(card, record)
-        return card
-
     MainWindow.__init__ = patched_init
-    MainWindow._make_saved_content_card = patched_make_card
     MainWindow._fh6_v132_change_dialog_runtime_fixed = True
