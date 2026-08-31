@@ -32,10 +32,18 @@ class V14AcquisitionUiTests(unittest.TestCase):
         self.assertIn("elidedText", text)
         self.assertIn('from .acquisition_db import DATA_DIR_NAME, AcquisitionDatabase, AcquisitionInfo', text)
         self.assertIn('self.project_root / "data" / DATA_DIR_NAME', text)
-        self.assertIn("self.acquisition_db = AcquisitionDatabase(bundled)", text)
+        self.assertIn("AcquisitionDatabase(self.project_root / \"data\" / DATA_DIR_NAME)", text)
         self.assertNotIn('self.project_root / "data" / "fh6_cars.json"', text)
         self.assertIn("dataset_name", text)
         self.assertIn("_install_change_dialog_first_layout_fix", text)
+
+    def test_cached_card_source_metadata_can_be_refreshed_without_recreating_cards(self):
+        text = Path("fh6garage/v1_4_acquisition_ui_patch.py").read_text(encoding="utf-8")
+        self.assertIn("def _refresh_cached_acquisition_labels(window: Any)", text)
+        self.assertIn('window.findChildren(QLabel, "fh6AcquisitionPlaceholder")', text)
+        self.assertIn('label.property("fh6AcquisitionCarId")', text)
+        self.assertIn("_apply_acquisition_label(window, label", text)
+        self.assertIn("MainWindow._refresh_cached_acquisition_labels = _refresh_cached_acquisition_labels", text)
 
 
 if __name__ == "__main__":
