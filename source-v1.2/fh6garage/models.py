@@ -45,6 +45,11 @@ class HeaderInfo:
     asset_guid: str = ""
     type_value: Optional[int] = None
 
+    # CarOrdinal exactly as produced by the header parser before scanner-level
+    # container-name recovery. ``car_id`` remains the compatibility/public
+    # resolved value used by existing UI, annotations and summaries.
+    parsed_car_id: Optional[int] = None
+
 
 @dataclass(slots=True)
 class LiveryRecord:

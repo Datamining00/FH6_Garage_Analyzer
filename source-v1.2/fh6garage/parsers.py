@@ -179,6 +179,7 @@ def parse_forza_header(data: bytes, kind: str) -> HeaderInfo:
         platform_code=platform_code,
         asset_guid=asset_guid,
         type_value=type_value,
+        parsed_car_id=car_id,
     )
 
 

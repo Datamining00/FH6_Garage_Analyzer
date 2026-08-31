@@ -411,7 +411,14 @@ def _aggregate_container_analyses(
             if header is None:
                 continue
 
-            parsed_car_id = header.car_id
+            parsed_car_id = (
+                header.parsed_car_id
+                if header.parsed_car_id is not None
+                else header.car_id
+            )
+            # Preserve the parser result before compatibility recovery mutates
+            # the public/resolved ``car_id`` used by existing callers.
+            header.parsed_car_id = parsed_car_id
             resolved_car_id = _resolve_car_id(
                 container.name,
                 kind,

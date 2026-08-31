@@ -91,6 +91,7 @@ class CarIdResolutionTests(unittest.TestCase):
         header = parse_forza_header(FURAI_HEADER_1, "Livery")
 
         self.assertEqual(header.car_id, 1229)
+        self.assertEqual(header.parsed_car_id, 1229)
         self.assertEqual(header.type_value, 319)
         self.assertEqual(
             header.asset_guid,
@@ -110,6 +111,7 @@ class CarIdResolutionTests(unittest.TestCase):
         header = parse_forza_header(FURAI_HEADER_2, "Livery")
 
         self.assertEqual(header.car_id, 1229)
+        self.assertEqual(header.parsed_car_id, 1229)
         self.assertEqual(header.type_value, 319)
         self.assertEqual(
             header.asset_guid,
@@ -126,6 +128,7 @@ class CarIdResolutionTests(unittest.TestCase):
         header = parse_forza_header(data, "Livery")
 
         self.assertEqual(header.car_id, 343)
+        self.assertEqual(header.parsed_car_id, 343)
         self.assertEqual(
             header.guid,
             "00000000-0000-0000-0000-00000000002a",
@@ -140,6 +143,7 @@ class CarIdResolutionTests(unittest.TestCase):
         header = parse_forza_header(data, "Tuning")
 
         self.assertEqual(header.car_id, 343)
+        self.assertEqual(header.parsed_car_id, 343)
         self.assertEqual(
             header.guid,
             "00000000-0000-0000-0000-00000000002b",
@@ -195,6 +199,31 @@ class CarIdResolutionTests(unittest.TestCase):
             self.assertEqual(result.car_summaries[0].livery_count, 2)
             self.assertFalse(any("1091571919" in warning for warning in result.warnings))
             self.assertFalse(any("2547241910" in warning for warning in result.warnings))
+
+    def test_scanner_preserves_parsed_car_id_across_fallback_and_warm_cache(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            save_root = root / "save"
+            containers = save_root / "current" / "ContainersRoot"
+            folder = containers / "Livery_1229_20260816092247"
+            folder.mkdir(parents=True)
+            (folder / "header").write_bytes(_legacy_fixture_header("Livery", 343, 44))
+            (folder / "C_livery").write_bytes(b"sample")
+            cache_dir = root / "cache"
+
+            cold = scan_save(save_root, self.db, cache_base_dir=cache_dir)
+            self.assertEqual(len(cold.liveries), 1)
+            self.assertEqual(cold.liveries[0].header.parsed_car_id, 343)
+            self.assertEqual(cold.liveries[0].car_id, 1229)
+            cold_counters = cold.diagnostics["scan"]["counters"]
+            self.assertGreater(cold_counters.get("header_cache_misses", 0), 0)
+
+            warm = scan_save(save_root, self.db, cache_base_dir=cache_dir)
+            self.assertEqual(len(warm.liveries), 1)
+            self.assertEqual(warm.liveries[0].header.parsed_car_id, 343)
+            self.assertEqual(warm.liveries[0].car_id, 1229)
+            warm_counters = warm.diagnostics["scan"]["counters"]
+            self.assertGreater(warm_counters.get("header_cache_hits", 0), 0)
 
     def test_legacy_result_is_unchanged_when_container_name_has_no_ordinal(self) -> None:
         self.assertEqual(
