@@ -32,8 +32,8 @@ class StatusBackupLabelPatchTests(unittest.TestCase):
         self.assertIn('_hide_layout_tree', source)
         self.assertNotIn('backup_nav_button', source)
 
-    def test_patch_is_installed_by_final_backup_chain(self) -> None:
-        source = inspect.getsource(action_patch.apply_v1_3_4_backup_action_wording_patch)
+    def test_patch_is_installed_by_explicit_followup_chain(self) -> None:
+        source = inspect.getsource(action_patch.apply_v1_3_4_v1_4_followup_patches)
         self.assertIn('apply_v1_3_4_status_backup_label_patch(MainWindow)', source)
         self.assertLess(
             source.index('apply_v1_3_4_livery_backup_filter_patch(MainWindow)'),
