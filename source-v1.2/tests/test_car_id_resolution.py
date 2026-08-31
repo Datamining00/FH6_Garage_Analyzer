@@ -7,8 +7,17 @@ import uuid
 from pathlib import Path
 from types import SimpleNamespace
 
+from fh6garage.models import HeaderInfo
 from fh6garage.parsers import parse_forza_header
-from fh6garage.scanner import _container_car_id, _resolve_car_id, scan_save
+from fh6garage.performance_metrics import PerformanceMetrics
+from fh6garage.scan_backend import ScanJob
+from fh6garage.scanner import (
+    _ContainerAnalysis,
+    _aggregate_container_analyses,
+    _container_car_id,
+    _resolve_car_id,
+    scan_save,
+)
 
 
 FURAI_HEADER_1 = bytes.fromhex(
@@ -224,6 +233,33 @@ class CarIdResolutionTests(unittest.TestCase):
             self.assertEqual(warm.liveries[0].car_id, 1229)
             warm_counters = warm.diagnostics["scan"]["counters"]
             self.assertGreater(warm_counters.get("header_cache_hits", 0), 0)
+
+    def test_aggregate_resolution_does_not_mutate_parser_header(self) -> None:
+        parser_header = HeaderInfo(car_id=343, parsed_car_id=343)
+        analysis = _ContainerAnalysis(
+            job=ScanJob(
+                container=Path("Livery_1229_20260816092247"),
+                kind="Livery",
+                estimated_bytes=0,
+            ),
+            header=parser_header,
+        )
+
+        liveries, tunings, warnings = _aggregate_container_analyses(
+            [analysis],
+            self.db,
+            PerformanceMetrics(),
+        )
+
+        self.assertEqual(len(liveries), 1)
+        self.assertFalse(tunings)
+        self.assertTrue(warnings)
+        self.assertIs(analysis.header, parser_header)
+        self.assertEqual(parser_header.car_id, 343)
+        self.assertEqual(parser_header.parsed_car_id, 343)
+        self.assertIsNot(liveries[0].header, parser_header)
+        self.assertEqual(liveries[0].car_id, 1229)
+        self.assertEqual(liveries[0].header.parsed_car_id, 343)
 
     def test_legacy_result_is_unchanged_when_container_name_has_no_ordinal(self) -> None:
         self.assertEqual(
