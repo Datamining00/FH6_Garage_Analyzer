@@ -13,6 +13,7 @@ DATA_DIR_NAME = "fh6_assistant_vehicle_data"
 DATA_FILE_NAME = "fh6_cars.json"
 LEGACY_DATA_FILE_NAME = "fh6_cars.json.gz"
 SCHEMA_VERSION = 1
+SUPPLEMENTAL_DISABLED_KEY = "disabled"
 
 
 def load_vehicle_data_payload(path: Path) -> dict[str, Any]:
@@ -91,7 +92,13 @@ class AcquisitionDatabase:
             if not path.exists():
                 continue
             try:
-                parsed = self._parse_payload(load_vehicle_data_payload(path))
+                payload = load_vehicle_data_payload(path)
+                if path == self.cache_path and bool(payload.get(SUPPLEMENTAL_DISABLED_KEY, False)):
+                    if int(payload.get("v", 0) or 0) != SCHEMA_VERSION:
+                        raise ValueError("unsupported supplemental schema")
+                    self.loaded_path = path
+                    return
+                parsed = self._parse_payload(payload)
             except (OSError, UnicodeError, ValueError, json.JSONDecodeError) as exc:
                 self.load_warning = f"{path.name}: {exc}"
                 continue
