@@ -137,7 +137,6 @@ def apply_v1_3_2_visibility_patches(MainWindow) -> None:
 
     original_filter_init = MultiStatusFilterButton.__init__
     original_row_toggled = MultiStatusFilterButton._row_toggled
-    original_layout_visible_grid_cards = MainWindow._layout_visible_grid_cards
     original_filter_saved_content_table = MainWindow._filter_saved_content_table
     original_reset_game_navigation_sessions = MainWindow._reset_game_navigation_sessions
     original_saved_content_records = MainWindow._saved_content_records
@@ -211,35 +210,6 @@ def apply_v1_3_2_visibility_patches(MainWindow) -> None:
             return bool(path is not None and path.is_file())
         except OSError:
             return False
-
-    def card_allowed(self, card) -> bool:
-        key = str(card.property("annotationKey") or "")
-        hidden = is_hidden(self, key) if key else False
-        modes = self.livery_check_filter.selected_modes()
-        if _HIDDEN_MODE in modes:
-            if not hidden:
-                return False
-        elif hidden:
-            return False
-
-        applied_filter = _AUCTION_APPLIED_MODE in modes
-        unapplied_filter = _AUCTION_UNAPPLIED_MODE in modes
-        if applied_filter or unapplied_filter:
-            record = self._record_for_content_key("livery", key) if key else None
-            if not isinstance(record, LiveryRecord) or record.kind != "SoulBoundLivery":
-                return False
-            applied = is_auction_applied(record)
-            if applied_filter and not applied:
-                return False
-            if unapplied_filter and applied:
-                return False
-        return True
-
-    def layout_visible_grid_cards(self, content_type: str, cards) -> None:
-        if content_type != "livery":
-            return original_layout_visible_grid_cards(self, content_type, cards)
-        filtered = [card for card in cards if card_allowed(self, card)]
-        original_layout_visible_grid_cards(self, content_type, filtered)
 
     def filter_saved_content_table(self, content_type: str, text: str) -> None:
         original_filter_saved_content_table(self, content_type, text)
@@ -373,7 +343,6 @@ def apply_v1_3_2_visibility_patches(MainWindow) -> None:
         self._apply_pointing_cursors(dialog)
         dialog.exec()
 
-    MainWindow._layout_visible_grid_cards = layout_visible_grid_cards
     MainWindow._filter_saved_content_table = filter_saved_content_table
     MainWindow._saved_content_records = saved_content_records
     MainWindow._reset_game_navigation_sessions = reset_game_navigation_sessions
