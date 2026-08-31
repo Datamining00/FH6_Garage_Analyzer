@@ -602,7 +602,6 @@ def apply_v1_3_2_change_view_alias_patch(MainWindow) -> None:
         return
 
     original_init = MainWindow.__init__
-    original_populate_all = MainWindow._populate_all
     original_make_card = MainWindow._make_saved_content_card
     original_sorted_saved_content = MainWindow._sorted_saved_content
     original_filter_dashboard = MainWindow._filter_dashboard_table
@@ -676,10 +675,6 @@ def apply_v1_3_2_change_view_alias_patch(MainWindow) -> None:
             )
         )
         banner.show()
-
-    def patched_populate_all(self) -> None:
-        original_populate_all(self)
-        update_change_banner(self)
 
     def patched_make_card(self, content_type: str, record: Any, key: str):
         card = original_make_card(self, content_type, record, key)
@@ -831,7 +826,6 @@ def apply_v1_3_2_change_view_alias_patch(MainWindow) -> None:
         original_relayout_tuning(self, text)
 
     MainWindow.__init__ = patched_init
-    MainWindow._populate_all = patched_populate_all
     MainWindow._make_saved_content_card = patched_make_card
     MainWindow._sorted_saved_content = patched_sorted_saved_content
     MainWindow._creator_content_stats = alias_creator_stats
