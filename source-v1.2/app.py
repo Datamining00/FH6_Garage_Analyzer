@@ -62,7 +62,6 @@ from fh6garage.v1_3_2_memory_filter_coordination_patch import apply_v1_3_2_memor
 from fh6garage.v1_3_2_memory_thread_safety_patch import apply_v1_3_2_memory_thread_safety_patch
 from fh6garage.v1_3_2_filter_alias_quality_patch import apply_v1_3_2_filter_alias_quality_patch
 from fh6garage.v1_3_2_dashboard_change_group_patch import apply_v1_3_2_dashboard_change_group_patch
-from fh6garage.v1_3_3_beta_identity_patch import apply_v1_3_3_beta_identity_patch
 from fh6garage.v1_3_4_card_action_layout_patch import apply_v1_3_4_card_action_layout_patch
 from fh6garage.v1_3_4_card_features_patch import apply_v1_3_4_card_features_patch
 from fh6garage.v1_3_4_metadata_toggle_icon_patch import apply_v1_3_4_metadata_toggle_icon_patch
@@ -195,10 +194,7 @@ def _apply_state_patch_stack() -> None:
 
 
 def _apply_release_patch_stack() -> None:
-    """Install v1.3.3/v1.3.4 features and the explicit v1.4 follow-up stack."""
-    # Apply the legacy base identity first; the final v1.4 layer replaces all user-visible release identity.
-    apply_v1_3_3_beta_identity_patch(MainWindow)
-
+    """Install v1.3.4 features and the explicit v1.4 follow-up stack."""
     # Finalize the v1.3.4 six-row livery action layout after every feature has
     # installed its card buttons. New lock/export controls are placeholders.
     apply_v1_3_4_card_action_layout_patch(MainWindow)
