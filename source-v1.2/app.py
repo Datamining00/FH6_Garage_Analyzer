@@ -87,15 +87,8 @@ def _elapsed_ms(started_ns: int) -> float:
     return (time.perf_counter_ns() - started_ns) / 1_000_000.0
 
 
-def _apply_runtime_patch_stack() -> None:
-    """Install the verified runtime patch composition in release order.
-
-    The current application still relies on ordered compatibility layers. Keep
-    this function as the single composition boundary while those layers are
-    audited and consolidated. In particular, the thread-affinity repair must
-    remain the final MainWindow mutation until scan completion is migrated to a
-    stable class-defined Qt slot/controller architecture.
-    """
+def _apply_foundation_patch_stack() -> None:
+    """Install the base UI, card-lifetime and responsive-layout layers."""
     # Apply patches in release order so every maintenance release layers only its
     # own behavior on top of the already-verified previous version.
     apply_v1_3_ui_patches(MainWindow)
@@ -137,6 +130,9 @@ def _apply_runtime_patch_stack() -> None:
     # its cooperative event-yield and newest-first date sorting behavior.
     apply_v1_3_2_responsive_columns_fix(MainWindow)
 
+
+def _apply_state_patch_stack() -> None:
+    """Install refresh, change-view, memory-state and dashboard layers."""
     # Snapshot visible livery instances and cache only thumbnail copies under
     # LocalAppData so the latest add/remove/change diff can retain deleted images.
     apply_v1_3_2_refresh_diff_patch(MainWindow)
@@ -197,6 +193,9 @@ def _apply_runtime_patch_stack() -> None:
     # and present recent changes as grouped Add / Remove / Duplicate sections.
     apply_v1_3_2_dashboard_change_group_patch(MainWindow)
 
+
+def _apply_release_patch_stack() -> None:
+    """Install v1.3.3/v1.3.4 features and the explicit v1.4 follow-up stack."""
     # Apply the legacy base identity first; the final v1.4 layer replaces all user-visible release identity.
     apply_v1_3_3_beta_identity_patch(MainWindow)
 
@@ -231,6 +230,19 @@ def _apply_runtime_patch_stack() -> None:
     # order inside this compatibility bridge is unchanged from the verified
     # release chain; only the ownership boundary is now visible from app.py.
     apply_v1_3_4_v1_4_followup_patches(MainWindow)
+
+
+def _apply_runtime_patch_stack() -> None:
+    """Install the verified runtime composition through explicit domain stages.
+
+    The application still relies on ordered compatibility layers. These helpers
+    expose stable ownership boundaries without changing patch order. The
+    thread-affinity repair remains the final MainWindow mutation until scan
+    completion is migrated to a class-defined Qt slot/controller architecture.
+    """
+    _apply_foundation_patch_stack()
+    _apply_state_patch_stack()
+    _apply_release_patch_stack()
 
     # This must be the final MainWindow patch. It restores the original
     # class-defined @Slot(object) scan callback so all UI rebuilding runs on the
