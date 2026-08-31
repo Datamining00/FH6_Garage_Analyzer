@@ -2,17 +2,26 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from . import v1_4_vehicle_data_source_patch as _source
 from .car_db import CarDatabase, CarDatabaseError
 
 
 USER_DATA_GIST_ID = "30fe44689fad7ba5e99e2381927b7730"
+USER_DATA_GIST_FILENAME = "FH6 Vehicle Data.json"
 USER_DATA_GIST_PAGE = f"https://gist.github.com/Datamining00/{USER_DATA_GIST_ID}"
 USER_DATA_GIST_RAW_URL = (
     f"https://gist.githubusercontent.com/Datamining00/{USER_DATA_GIST_ID}/raw/"
+    f"{quote(USER_DATA_GIST_FILENAME)}"
 )
 USER_DATA_RUNTIME_TIMEOUT = 20
+
+
+def _latest_gist_raw_url() -> str:
+    # Force every explicit update request to bypass intermediary caches while
+    # still following the Gist's latest revision for the named file.
+    return f"{USER_DATA_GIST_RAW_URL}?ts={_source._utc_now()}"
 
 
 def _fetch_runtime_vehicle_update(
@@ -20,7 +29,8 @@ def _fetch_runtime_vehicle_update(
     acquisition_cache_path: Path,
     timeout: int = USER_DATA_RUNTIME_TIMEOUT,
 ):
-    payload, last_modified = _source._download_json(USER_DATA_GIST_RAW_URL, timeout)
+    request_url = _latest_gist_raw_url()
+    payload, last_modified = _source._download_json(request_url, timeout)
     if not isinstance(payload, dict):
         raise CarDatabaseError("FH6 Assistant Gist vehicle data root is invalid")
 
