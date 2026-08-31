@@ -41,7 +41,6 @@ from fh6garage.v1_3_2_visibility_patch import apply_v1_3_2_visibility_patches
 from fh6garage.v1_3_2_ui_cleanup_patch import apply_v1_3_2_ui_cleanup_patch
 from fh6garage.v1_3_2_ui_followup_patch import apply_v1_3_2_ui_followup_patch
 from fh6garage.v1_3_2_manifest_registry_patch import apply_v1_3_2_manifest_registry_patch
-from fh6garage.v1_3_2_card_alignment_patch import apply_v1_3_2_card_alignment_patch
 from fh6garage.v1_3_2_ui_performance_patch import apply_v1_3_2_ui_performance_patches
 from fh6garage.v1_3_2_global_ui_patch import apply_v1_3_2_global_ui_patch
 from fh6garage.v1_3_2_icon_overlay_fix import apply_v1_3_2_icon_overlay_fix
@@ -100,7 +99,6 @@ def _apply_foundation_patch_stack() -> None:
     apply_v1_3_2_ui_cleanup_patch(MainWindow)
     apply_v1_3_2_ui_followup_patch(MainWindow)
     apply_v1_3_2_manifest_registry_patch(MainWindow)
-    apply_v1_3_2_card_alignment_patch(MainWindow)
 
     # Performance/card-lifetime optimization stays below all feature patches so
     # it reuses the final v1.3.2 card behavior.
@@ -153,8 +151,8 @@ def _apply_state_patch_stack() -> None:
     # Add the folder action and base standalone change-view card implementation.
     apply_v1_3_2_change_dialog_folder_patch(MainWindow)
 
-    # Make the compact change button clickable and make all historical card
-    # aligners agree with move/hide/info/folder = check/triangle/excluded/zoom.
+    # Make the compact change button clickable after it is reparented into the
+    # reserved toolbar slot.
     apply_v1_3_2_change_dialog_runtime_fix(MainWindow)
 
     # The standalone change window must calculate card geometry from its own
