@@ -71,7 +71,10 @@ from fh6garage.v1_3_4_backup_action_wording_patch import (
     apply_v1_3_4_backup_action_wording_patch,
     apply_v1_3_4_v1_4_followup_patches,
 )
-from fh6garage.v1_3_2_thread_affinity_patch import apply_v1_3_2_thread_affinity_fix
+from fh6garage.v1_3_2_thread_affinity_patch import (
+    apply_v1_3_2_scan_postprocessing,
+    apply_v1_3_2_thread_affinity_fix,
+)
 
 
 def resource_root() -> Path:
@@ -241,10 +244,13 @@ def _apply_runtime_patch_stack() -> None:
 
 
 def _apply_finalizer_patch_stack() -> None:
-    """Install invariant-repair patches that must remain last in composition."""
-    # This must be the final MainWindow patch. It restores the original
-    # class-defined @Slot(object) scan callback so all UI rebuilding runs on the
-    # GUI thread, then moves v1.3.2 post-processing into _populate_all().
+    """Install final scan-result preparation, then restore the invariant Qt slot."""
+    # Post-processing still has to capture the fully composed _populate_all(), so
+    # it remains in this final stage even though it is not itself an affinity fix.
+    apply_v1_3_2_scan_postprocessing(MainWindow)
+
+    # This must remain the final MainWindow mutation. Restoring the original
+    # class-defined @Slot(object) keeps ScanWorker completion on the GUI thread.
     apply_v1_3_2_thread_affinity_fix(MainWindow)
 
 

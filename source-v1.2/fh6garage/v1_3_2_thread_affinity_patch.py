@@ -141,18 +141,9 @@ def assign_auction_thumbnails(
     )
 
 
-def apply_v1_3_2_thread_affinity_fix(MainWindow) -> None:
-    """Restore GUI-thread scan completion and move v1.3.2 work into _populate_all.
-
-    The original ui.MainWindow._scan_finished method is decorated with
-    @Slot(object), so Qt queues ScanWorker.finished to the MainWindow thread.
-    Replacing that slot with ordinary Python callables breaks that guarantee.
-
-    Restore the exact original slot and perform the v1.3.2 thumbnail/index/list
-    preparation from _populate_all(), which is called by that original slot after
-    self.result has already been assigned on the GUI thread.
-    """
-    if getattr(MainWindow, "_fh6_v132_thread_affinity_fixed", False):
+def apply_v1_3_2_scan_postprocessing(MainWindow) -> None:
+    """Install scan-result preparation that must run after all feature patches."""
+    if getattr(MainWindow, "_fh6_v132_scan_postprocessing_installed", False):
         return
 
     current_populate_all = MainWindow._populate_all
@@ -298,6 +289,13 @@ def apply_v1_3_2_thread_affinity_fix(MainWindow) -> None:
         )
 
     MainWindow._populate_all = patched_populate_all
+    MainWindow._fh6_v132_scan_postprocessing_installed = True
+
+
+def apply_v1_3_2_thread_affinity_fix(MainWindow) -> None:
+    """Restore the original Qt-decorated scan completion slot as the final patch."""
+    if getattr(MainWindow, "_fh6_v132_thread_affinity_fixed", False):
+        return
 
     # Critical fix: restore the exact class-defined @Slot(object) method.
     # Do not wrap or redecorate it dynamically; preserving the original slot
