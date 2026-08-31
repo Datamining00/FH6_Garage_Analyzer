@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import re
 from collections import Counter, defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from time import perf_counter
 from typing import Literal
@@ -416,17 +416,21 @@ def _aggregate_container_analyses(
                 if header.parsed_car_id is not None
                 else header.car_id
             )
-            # Preserve the parser result before compatibility recovery mutates
-            # the public/resolved ``car_id`` used by existing callers.
-            header.parsed_car_id = parsed_car_id
             resolved_car_id = _resolve_car_id(
                 container.name,
                 kind,
                 parsed_car_id,
                 car_db,
             )
+            # Keep the parser/cache object as parser-owned data. The ScanResult
+            # receives a distinct resolved header so compatibility recovery no
+            # longer mutates analysis-layer metadata in place.
+            header = replace(
+                header,
+                car_id=resolved_car_id,
+                parsed_car_id=parsed_car_id,
+            )
             if resolved_car_id != parsed_car_id:
-                header.car_id = resolved_car_id
                 warnings.append(
                     tr(
                         "scanner.car_id_fallback",
