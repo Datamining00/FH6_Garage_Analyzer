@@ -87,26 +87,15 @@ def _elapsed_ms(started_ns: int) -> float:
     return (time.perf_counter_ns() - started_ns) / 1_000_000.0
 
 
-def main() -> int:
-    # Startup profiling is independent of the user-controlled runtime switch.
-    _performance_metrics.begin_startup(_APP_ENTRY_NS)
+def _apply_runtime_patch_stack() -> None:
+    """Install the verified runtime patch composition in release order.
 
-    qapp_started = time.perf_counter_ns()
-    app = QApplication(sys.argv)
-    # Use a concrete positive base point size before applying application QSS.
-    app.setFont(QFont("Segoe UI", 10))
-    app.setApplicationName("FH6 Assistant")
-    app.setApplicationVersion("1.4")
-    app.setOrganizationName("LocalOnly")
-    _performance_metrics.record_startup("startup.qapplication", _elapsed_ms(qapp_started))
-
-    # Resolve the persisted UI language before constructing any translated widgets.
-    settings_started = time.perf_counter_ns()
-    settings = QSettings()
-    set_language(settings.value("language", DEFAULT_LANGUAGE, str))
-    _performance_metrics.record_startup("startup.settings", _elapsed_ms(settings_started))
-
-    patch_started = time.perf_counter_ns()
+    The current application still relies on ordered compatibility layers. Keep
+    this function as the single composition boundary while those layers are
+    audited and consolidated. In particular, the thread-affinity repair must
+    remain the final MainWindow mutation until scan completion is migrated to a
+    stable class-defined Qt slot/controller architecture.
+    """
     # Apply patches in release order so every maintenance release layers only its
     # own behavior on top of the already-verified previous version.
     apply_v1_3_ui_patches(MainWindow)
@@ -247,6 +236,29 @@ def main() -> int:
     # class-defined @Slot(object) scan callback so all UI rebuilding runs on the
     # GUI thread, then moves v1.3.2 post-processing into _populate_all().
     apply_v1_3_2_thread_affinity_fix(MainWindow)
+
+
+def main() -> int:
+    # Startup profiling is independent of the user-controlled runtime switch.
+    _performance_metrics.begin_startup(_APP_ENTRY_NS)
+
+    qapp_started = time.perf_counter_ns()
+    app = QApplication(sys.argv)
+    # Use a concrete positive base point size before applying application QSS.
+    app.setFont(QFont("Segoe UI", 10))
+    app.setApplicationName("FH6 Assistant")
+    app.setApplicationVersion("1.4")
+    app.setOrganizationName("LocalOnly")
+    _performance_metrics.record_startup("startup.qapplication", _elapsed_ms(qapp_started))
+
+    # Resolve the persisted UI language before constructing any translated widgets.
+    settings_started = time.perf_counter_ns()
+    settings = QSettings()
+    set_language(settings.value("language", DEFAULT_LANGUAGE, str))
+    _performance_metrics.record_startup("startup.settings", _elapsed_ms(settings_started))
+
+    patch_started = time.perf_counter_ns()
+    _apply_runtime_patch_stack()
     _performance_metrics.record_startup("startup.patch_install", _elapsed_ms(patch_started))
 
     root = resource_root()
