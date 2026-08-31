@@ -7,10 +7,10 @@ from pathlib import Path
 class RuntimePatchInertContractTests(unittest.TestCase):
     PRESERVED_INERT_PATCH_MODULES = (
         "v1_3_2_card_parent_patch",
-        "v1_3_2_card_alignment_patch",
     )
     RETIRED_PATCH_MODULES = (
         "v1_3_2_diagnostic_patch",
+        "v1_3_2_card_alignment_patch",
         "v1_3_3_beta_identity_patch",
     )
 
