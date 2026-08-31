@@ -8,7 +8,11 @@ from PySide6.QtWidgets import QLabel, QMessageBox, QSizePolicy
 
 from . import v1_3_2_change_dialog_folder_patch as _change_dialog
 from . import v1_4_vehicle_data_source_patch as _vehicle_source
-from .acquisition_db import AcquisitionDatabase, DATA_DIR_NAME
+from .acquisition_db import (
+    AcquisitionDatabase,
+    DATA_DIR_NAME,
+    SUPPLEMENTAL_DISABLED_KEY,
+)
 from .car_db import CarDatabase
 from .i18n import tr
 
@@ -57,6 +61,23 @@ def _normalize_added_card_geometry(window: Any, entry: Any, card_width: int):
     return card
 
 
+def _disable_supplemental_cache(acquisition_db: AcquisitionDatabase) -> None:
+    payload = {
+        "v": 1,
+        "n": 0,
+        "a": [],
+        "d": [],
+        "c": [],
+        SUPPLEMENTAL_DISABLED_KEY: True,
+        "source": _vehicle_source.HDR_SOURCE,
+    }
+    _vehicle_source._atomic_write_json(
+        acquisition_db.cache_path,
+        payload,
+        "fh6_vehicle_data_disabled_",
+    )
+
+
 def apply_v1_4_vehicle_update_finish_ui_patch(MainWindow: Any) -> None:
     if getattr(MainWindow, "_fh6_v14_vehicle_update_finish_ui_patched", False):
         return
@@ -87,10 +108,13 @@ def apply_v1_4_vehicle_update_finish_ui_patch(MainWindow: Any) -> None:
 
         user_data_path = self.project_root / "data" / DATA_DIR_NAME
         try:
-            if isinstance(getattr(self, "acquisition_db", None), AcquisitionDatabase):
-                self.acquisition_db.reload()
-            else:
+            if not isinstance(getattr(self, "acquisition_db", None), AcquisitionDatabase):
                 self.acquisition_db = AcquisitionDatabase(user_data_path)
+
+            if source == _vehicle_source.HDR_SOURCE:
+                _disable_supplemental_cache(self.acquisition_db)
+
+            self.acquisition_db.reload()
         except Exception:
             pass
 
