@@ -8,12 +8,21 @@ class V14VehicleRuntimeUpdateTests(unittest.TestCase):
     def test_user_update_uses_single_gist_snapshot(self):
         text = Path("fh6garage/v1_4_vehicle_runtime_update_patch.py").read_text(encoding="utf-8")
         self.assertIn('USER_DATA_GIST_ID = "30fe44689fad7ba5e99e2381927b7730"', text)
+        self.assertIn('USER_DATA_GIST_FILENAME = "FH6 Vehicle Data.json"', text)
         self.assertIn('https://gist.githubusercontent.com/Datamining00/', text)
+        self.assertIn('quote(USER_DATA_GIST_FILENAME)', text)
         self.assertEqual(text.count("_source._download_json("), 1)
         self.assertNotIn("USER_DATA_MANIFEST_URL", text)
         self.assertNotIn("USER_DATA_NAMES_URL", text)
         self.assertNotIn("USER_DATA_ACQUISITION_URL", text)
         self.assertNotIn("USER_DATA_DLC_URL", text)
+
+    def test_gist_request_bypasses_intermediary_cache(self):
+        text = Path("fh6garage/v1_4_vehicle_runtime_update_patch.py").read_text(encoding="utf-8")
+        self.assertIn("def _latest_gist_raw_url()", text)
+        self.assertIn('?ts={_source._utc_now()}', text)
+        self.assertIn("request_url = _latest_gist_raw_url()", text)
+        self.assertIn("_source._download_json(request_url, timeout)", text)
 
     def test_gist_snapshot_validates_vehicle_and_supplemental_fields(self):
         text = Path("fh6garage/v1_4_vehicle_runtime_update_patch.py").read_text(encoding="utf-8")
