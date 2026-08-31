@@ -5,23 +5,24 @@ from pathlib import Path
 
 
 class V14VehicleRuntimeUpdateTests(unittest.TestCase):
-    def test_user_update_uses_single_runtime_snapshot(self):
+    def test_user_update_uses_single_gist_snapshot(self):
         text = Path("fh6garage/v1_4_vehicle_runtime_update_patch.py").read_text(encoding="utf-8")
-        self.assertIn('USER_DATA_RUNTIME_URL = f"{_source.USER_DATA_BASE_URL}/runtime.json"', text)
-        self.assertIn('USER_DATA_RUNTIME_FORMAT = "fh6-assistant-runtime-v1"', text)
+        self.assertIn('USER_DATA_GIST_ID = "30fe44689fad7ba5e99e2381927b7730"', text)
+        self.assertIn('https://gist.githubusercontent.com/Datamining00/', text)
         self.assertEqual(text.count("_source._download_json("), 1)
         self.assertNotIn("USER_DATA_MANIFEST_URL", text)
         self.assertNotIn("USER_DATA_NAMES_URL", text)
         self.assertNotIn("USER_DATA_ACQUISITION_URL", text)
         self.assertNotIn("USER_DATA_DLC_URL", text)
 
-    def test_runtime_snapshot_validates_all_three_tables(self):
+    def test_gist_snapshot_validates_vehicle_and_supplemental_fields(self):
         text = Path("fh6garage/v1_4_vehicle_runtime_update_patch.py").read_text(encoding="utf-8")
-        self.assertIn('payload.get("car_names")', text)
-        self.assertIn('payload.get("acquisition")', text)
-        self.assertIn('payload.get("dlc")', text)
-        self.assertIn("acquisition coverage mismatch", text)
-        self.assertIn("DLC contains unknown Car IDs", text)
+        self.assertIn('raw_info.get("id")', text)
+        self.assertIn('raw_info.get("acquisition")', text)
+        self.assertIn('raw_info.get("dlc", False)', text)
+        self.assertIn('raw_info.get("dlc_name")', text)
+        self.assertIn("duplicate Car ID in Gist data", text)
+        self.assertIn("DLC name missing for Car ID", text)
         self.assertIn("_source._atomic_write_json", text)
 
     def test_runtime_patch_replaces_worker_fetch_before_finish_patch(self):
