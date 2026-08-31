@@ -2,25 +2,25 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote
 
 from . import v1_4_vehicle_data_source_patch as _source
-from .car_db import CarDatabase, CarDatabaseError
+from .car_db import CarDatabaseError
 
 
 USER_DATA_GIST_ID = "30fe44689fad7ba5e99e2381927b7730"
-USER_DATA_GIST_FILENAME = "FH6 Vehicle Data.json"
 USER_DATA_GIST_PAGE = f"https://gist.github.com/Datamining00/{USER_DATA_GIST_ID}"
+# A Gist containing one data file can be fetched through /raw/ without knowing
+# or freezing the filename. This keeps updates working if the Gist file is
+# renamed later.
 USER_DATA_GIST_RAW_URL = (
     f"https://gist.githubusercontent.com/Datamining00/{USER_DATA_GIST_ID}/raw/"
-    f"{quote(USER_DATA_GIST_FILENAME)}"
 )
 USER_DATA_RUNTIME_TIMEOUT = 20
 
 
 def _latest_gist_raw_url() -> str:
-    # Force every explicit update request to bypass intermediary caches while
-    # still following the Gist's latest revision for the named file.
+    # Explicit refreshes bypass intermediary caches while /raw/ follows the
+    # latest Gist revision and does not depend on a hard-coded filename.
     return f"{USER_DATA_GIST_RAW_URL}?ts={_source._utc_now()}"
 
 
@@ -32,7 +32,7 @@ def _fetch_runtime_vehicle_update(
     request_url = _latest_gist_raw_url()
     payload, last_modified = _source._download_json(request_url, timeout)
     if not isinstance(payload, dict):
-        raise CarDatabaseError("FH6 Assistant Gist vehicle data root is invalid")
+        raise CarDatabaseError("Datamining00 Gist vehicle data root is invalid")
 
     id_to_name: dict[int, str] = {}
     acquisition_by_id: dict[int, str] = {}
@@ -41,7 +41,7 @@ def _fetch_runtime_vehicle_update(
     for raw_name, raw_info in payload.items():
         name = str(raw_name or "").strip()
         if not name or not isinstance(raw_info, dict):
-            raise CarDatabaseError("invalid FH6 Assistant Gist vehicle entry")
+            raise CarDatabaseError("invalid Datamining00 Gist vehicle entry")
 
         try:
             car_id = int(raw_info.get("id"))
@@ -66,7 +66,7 @@ def _fetch_runtime_vehicle_update(
 
     if len(id_to_name) < 500:
         raise CarDatabaseError(
-            f"FH6 Assistant Gist vehicle count is too small: {len(id_to_name)}"
+            f"Datamining00 Gist vehicle count is too small: {len(id_to_name)}"
         )
 
     acquisition_values: list[str] = []
@@ -140,8 +140,6 @@ def apply_v1_4_vehicle_runtime_update_patch(MainWindow: Any) -> None:
     if getattr(MainWindow, "_fh6_v14_vehicle_runtime_update_patched", False):
         return
 
-    # Keep the data-source UI on the public Gist as well, so "open source"
-    # points to the exact payload used by Vehicle Data 2.
     _source.USER_DATA_SOURCE_PAGE = USER_DATA_GIST_PAGE
     _source._fetch_user_vehicle_update = _fetch_runtime_vehicle_update
     MainWindow._fh6_v14_vehicle_runtime_update_patched = True
