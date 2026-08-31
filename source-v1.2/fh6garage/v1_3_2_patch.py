@@ -322,7 +322,6 @@ def apply_v1_3_2_patches(MainWindow) -> None:
     original_dashboard_page = MainWindow._dashboard_page
     original_livery_page = MainWindow._livery_page
     original_build_controls = MainWindow._build_saved_content_controls
-    original_populate_all = MainWindow._populate_all
     original_scan_finished = MainWindow._scan_finished
     original_sorted_saved_content = MainWindow._sorted_saved_content
     original_record_for_content_key = MainWindow._record_for_content_key
@@ -396,18 +395,6 @@ def apply_v1_3_2_patches(MainWindow) -> None:
         self._fh6_v132_match_stats = stats
         original_scan_finished(self, result)
 
-    def patched_populate_all(self) -> None:
-        original_populate_all(self)
-        if self.result is None:
-            return
-        self.card_livery.title.setText(_t("my_designs"))
-        if hasattr(self, "card_auction"):
-            count = sum(
-                record.kind == "SoulBoundLivery"
-                for record in self.result.liveries
-            )
-            self.card_auction.value.setText(str(count))
-
     def patched_sorted_saved_content(self, content_type: str):
         if content_type != "livery":
             return original_sorted_saved_content(self, content_type)
@@ -451,7 +438,6 @@ def apply_v1_3_2_patches(MainWindow) -> None:
     MainWindow._livery_page = patched_livery_page
     MainWindow._build_saved_content_controls = patched_build_controls
     MainWindow._scan_finished = patched_scan_finished
-    MainWindow._populate_all = patched_populate_all
     MainWindow._sorted_saved_content = patched_sorted_saved_content
     MainWindow._record_for_content_key = patched_record_for_content_key
     MainWindow._make_saved_content_card = patched_make_card
