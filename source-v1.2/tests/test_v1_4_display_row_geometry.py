@@ -9,28 +9,32 @@ class V14DisplayRowGeometryTests(unittest.TestCase):
         self.text = Path("fh6garage/v1_4_display_row_geometry_patch.py").read_text(encoding="utf-8")
 
     def test_recent_counts_and_export_share_structural_right_anchor(self):
-        self.assertIn("def _pin_pair_after_trailing_stretch", self.text)
         self.assertIn("def _pin_widget_after_trailing_stretch", self.text)
-        self.assertIn("_pin_pair_after_trailing_stretch(display_row, no_applied, banner)", self.text)
+        self.assertIn("_pin_widget_after_trailing_stretch(display_row, banner)", self.text)
         self.assertIn("_pin_widget_after_trailing_stretch(action_row, export)", self.text)
         self.assertIn('getattr(window, "_saved_content_action_rows", {}).get("livery")', self.text)
-        self.assertIn("layout.removeWidget(left_widget)", self.text)
-        self.assertIn("layout.addWidget(right_widget)", self.text)
+        self.assertIn("layout.removeWidget(widget)", self.text)
+        self.assertIn("layout.addWidget(widget)", self.text)
         self.assertNotIn("export_right - banner_left", self.text)
         self.assertNotIn("mapTo(", self.text)
+
+    def test_no_applied_filter_keeps_native_position(self):
+        self.assertNotIn("_pin_pair_after_trailing_stretch", self.text)
+        self.assertNotIn('getattr(window, "livery_no_applied_toggle", None)', self.text)
+        self.assertIn("Keep the native status-filter order intact", self.text)
+        self.assertIn("remains directly after", self.text)
 
     def test_recent_counter_has_no_independent_width_policy(self):
         self.assertNotIn("_intrinsic_recent_width", self.text)
         self.assertNotIn("banner.setFixedWidth", self.text)
         self.assertNotIn("view.setFixedWidth", self.text)
-        self.assertIn("width is owned by the shared-width patch", self.text)
+        self.assertIn("shared-width patch owns control widths", self.text)
 
-    def test_search_and_no_applied_use_same_terminal_gap_geometry(self):
+    def test_toolbar_rows_keep_common_spacing_without_moving_native_filters(self):
         self.assertIn("_RIGHT_COLUMN_GAP = 7", self.text)
         self.assertIn("search_row.setSpacing(_RIGHT_COLUMN_GAP)", self.text)
         self.assertIn("display_row.setSpacing(_RIGHT_COLUMN_GAP)", self.text)
         self.assertIn("action_row.setSpacing(_RIGHT_COLUMN_GAP)", self.text)
-        self.assertIn('getattr(window, "livery_no_applied_toggle", None)', self.text)
 
     def test_geometry_uses_widget_lifecycle_without_timer_or_coordinate_observer(self):
         self.assertIn("def patched_show_event", self.text)
