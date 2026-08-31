@@ -280,7 +280,6 @@ def apply_v1_3_2_ui_cleanup_patch(MainWindow) -> None:
     original_filter_init = MultiStatusFilterButton.__init__
     original_build_ui = MainWindow._build_ui
     original_make_card = MainWindow._make_saved_content_card
-    original_layout_visible_grid_cards = MainWindow._layout_visible_grid_cards
     original_filter_saved_content_table = MainWindow._filter_saved_content_table
 
     def filter_init(self, include_duplicate: bool, parent=None) -> None:
@@ -305,25 +304,6 @@ def apply_v1_3_2_ui_cleanup_patch(MainWindow) -> None:
         if content_type == "livery":
             _install_card_hide_button(self, card, key)
         return card
-
-    def normal_view_allows(self, card: Any) -> bool:
-        modes = self.livery_check_filter.selected_modes()
-        if _AUCTION_UNAPPLIED_MODE in modes:
-            return True
-        key = str(card.property("annotationKey") or "")
-        record = self._record_for_content_key("livery", key) if key else None
-        if not isinstance(record, LiveryRecord) or record.kind != "SoulBoundLivery":
-            return True
-        return bool(self._fh6_v132_is_auction_applied(record))
-
-    def patched_layout_visible_grid_cards(
-        self,
-        content_type: str,
-        cards,
-    ) -> None:
-        if content_type == "livery":
-            cards = [card for card in cards if normal_view_allows(self, card)]
-        original_layout_visible_grid_cards(self, content_type, cards)
 
     def patched_filter_saved_content_table(
         self,
@@ -362,6 +342,5 @@ def apply_v1_3_2_ui_cleanup_patch(MainWindow) -> None:
     MainWindow._fh6_v132_refresh_all = refresh_all
     MainWindow._build_ui = patched_build_ui
     MainWindow._make_saved_content_card = patched_make_card
-    MainWindow._layout_visible_grid_cards = patched_layout_visible_grid_cards
     MainWindow._filter_saved_content_table = patched_filter_saved_content_table
     MainWindow._fh6_v132_ui_cleanup_patched = True
