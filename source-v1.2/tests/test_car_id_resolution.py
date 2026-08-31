@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import struct
 import tempfile
 import unittest
+import uuid
 from pathlib import Path
 from types import SimpleNamespace
 
+from fh6garage.parsers import parse_forza_header
 from fh6garage.scanner import _container_car_id, _resolve_car_id, scan_save
 
 
@@ -33,6 +36,34 @@ FURAI_HEADER_2 = bytes.fromhex(
 )
 
 
+def _utf16(value: str) -> bytes:
+    return struct.pack("<I", len(value)) + value.encode("utf-16le")
+
+
+def _legacy_fixture_header(kind: str, car_id: int, identity: int) -> bytes:
+    common = (
+        struct.pack("<HIHHHHH", 2026, 8, 25, 10, 20, 30, 40)
+        + (b"\0" * 10)
+        + struct.pack("<H", 3)
+    )
+    tail = (
+        b"\0" * 8,
+        struct.pack("<I", 2),
+        struct.pack("<I", car_id),
+        uuid.UUID(int=identity).bytes,
+    )
+    return b"".join(
+        (
+            struct.pack("<I", 7),
+            _utf16(f"{kind} item"),
+            _utf16("description"),
+            common,
+            _utf16("creator"),
+            *tail,
+        )
+    )
+
+
 class _FakeCarDatabase:
     def __init__(self, known: set[int]):
         self.known = known
@@ -56,7 +87,68 @@ class CarIdResolutionTests(unittest.TestCase):
             1229,
         )
 
-    def test_furai_sample_one_recovers_from_invalid_header_tail(self) -> None:
+    def test_furai_sample_one_parses_verified_creator_relative_fields(self) -> None:
+        header = parse_forza_header(FURAI_HEADER_1, "Livery")
+
+        self.assertEqual(header.car_id, 1229)
+        self.assertEqual(header.type_value, 319)
+        self.assertEqual(
+            header.asset_guid,
+            "373bb492-8fc7-954f-bb38-cf101041a8bc",
+        )
+        self.assertEqual(header.created, "2026-08-16 09:22:47.265")
+
+        # Historical values stay byte-for-byte compatible for local identities.
+        self.assertEqual(
+            header.guid,
+            "a8bce7e3-3d99-4e40-b855-6b1efa02b0f5",
+        )
+        self.assertEqual(header.decal_count, 951799701)
+        self.assertEqual(header.platform_code, 9)
+
+    def test_furai_sample_two_parses_verified_creator_relative_fields(self) -> None:
+        header = parse_forza_header(FURAI_HEADER_2, "Livery")
+
+        self.assertEqual(header.car_id, 1229)
+        self.assertEqual(header.type_value, 319)
+        self.assertEqual(
+            header.asset_guid,
+            "b3ab5ca5-29da-bf48-b6d3-d39774de638d",
+        )
+        self.assertEqual(header.created, "2026-08-16 09:22:57.699")
+        self.assertEqual(
+            header.guid,
+            "74de638d-3d99-4e40-b855-6b1efa02b0f5",
+        )
+
+    def test_legacy_livery_fixture_keeps_tail_parser_compatibility(self) -> None:
+        data = _legacy_fixture_header("Livery", 343, 42)
+        header = parse_forza_header(data, "Livery")
+
+        self.assertEqual(header.car_id, 343)
+        self.assertEqual(
+            header.guid,
+            "00000000-0000-0000-0000-00000000002a",
+        )
+        self.assertEqual(header.decal_count, 2)
+        self.assertEqual(header.platform_code, 3)
+        self.assertEqual(header.asset_guid, "")
+        self.assertIsNone(header.type_value)
+
+    def test_tuning_fixture_remains_on_legacy_tail_parser(self) -> None:
+        data = _legacy_fixture_header("Tuning", 343, 43)
+        header = parse_forza_header(data, "Tuning")
+
+        self.assertEqual(header.car_id, 343)
+        self.assertEqual(
+            header.guid,
+            "00000000-0000-0000-0000-00000000002b",
+        )
+        self.assertIsNone(header.decal_count)
+        self.assertEqual(header.asset_guid, "")
+        self.assertIsNone(header.type_value)
+
+    def test_container_fallback_still_recovers_invalid_header_id(self) -> None:
         self.assertEqual(
             _resolve_car_id(
                 "Livery_1229_20260816092247",
@@ -67,7 +159,7 @@ class CarIdResolutionTests(unittest.TestCase):
             1229,
         )
 
-    def test_furai_sample_two_recovers_from_invalid_header_tail(self) -> None:
+    def test_container_fallback_still_handles_second_invalid_header_id(self) -> None:
         self.assertEqual(
             _resolve_car_id(
                 "Livery_1229_20260816092257",
@@ -78,7 +170,7 @@ class CarIdResolutionTests(unittest.TestCase):
             1229,
         )
 
-    def test_scan_save_recovers_both_supplied_furai_samples(self) -> None:
+    def test_scan_save_reads_both_supplied_furai_samples_without_fallback(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             save_root = Path(tmp) / "save"
             containers = save_root / "current" / "ContainersRoot"
@@ -101,8 +193,8 @@ class CarIdResolutionTests(unittest.TestCase):
             self.assertEqual(result.car_summaries[0].car_id, 1229)
             self.assertEqual(result.car_summaries[0].label, "2008 Mazda Furai")
             self.assertEqual(result.car_summaries[0].livery_count, 2)
-            self.assertTrue(any("1091571919" in warning for warning in result.warnings))
-            self.assertTrue(any("2547241910" in warning for warning in result.warnings))
+            self.assertFalse(any("1091571919" in warning for warning in result.warnings))
+            self.assertFalse(any("2547241910" in warning for warning in result.warnings))
 
     def test_legacy_result_is_unchanged_when_container_name_has_no_ordinal(self) -> None:
         self.assertEqual(

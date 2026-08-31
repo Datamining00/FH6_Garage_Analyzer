@@ -32,9 +32,18 @@ class HeaderInfo:
     creator: str = ""
     created: str = ""
     car_id: Optional[int] = None
+
+    # Historical header-tail fields. These values are retained because existing
+    # annotations, refresh history and backup metadata may use them as stable
+    # local identities even where their original semantic labels were inferred.
     guid: str = ""
     decal_count: Optional[int] = None
     platform_code: Optional[int] = None
+
+    # Structurally verified fields from the creator-relative FH6 livery section.
+    # They are additive so existing local state keyed by ``guid`` remains valid.
+    asset_guid: str = ""
+    type_value: Optional[int] = None
 
 
 @dataclass(slots=True)
