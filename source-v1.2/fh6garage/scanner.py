@@ -300,57 +300,29 @@ def _select_scan_backend(
     return ThreadedScanBackend[_ContainerAnalysis](policy.scan_workers)
 
 
-def scan_save(
-    selected_path: Path,
-    car_db: CarDatabase,
-    *,
-    runtime_policy: RuntimePolicy | None = None,
-    cache_base_dir: Path | None = None,
-    backend: Literal["auto", "sequential", "threaded"] = "auto",
-) -> ScanResult:
-    """Scan one FH6 save with a compatibility-first adaptive I/O backend.
+def _enumerate_scan_jobs(
+    containers_root: Path,
+    metrics: PerformanceMetrics,
+) -> tuple[list[ScanJob], set[Path], Counter[str]]:
+    """Enumerate supported content containers and cache-tracked source paths."""
 
-    ``backend`` and ``cache_base_dir`` are primarily diagnostic/test controls.
-    Normal callers use automatic policy selection.  Any unexpected threaded
-    backend failure is retried through the original sequential semantics.
-    """
-
-    if backend not in {"auto", "sequential", "threaded"}:
-        raise ValueError(f"unsupported scan backend: {backend}")
-
-    started = perf_counter()
-    metrics = PerformanceMetrics()
-    policy = runtime_policy or detect_runtime_policy()
-
-    with metrics.measure("scan.resolve_layout"):
-        save_root, containers_root, active_version = resolve_layout(selected_path)
-    with metrics.measure("scan.metadata"):
-        metadata = parse_save_metadata(
-            selected_path.resolve(),
-            save_root,
-            containers_root,
-            active_version,
-        )
-
-    warnings: list[str] = []
-    liveries: list[LiveryRecord] = []
-    tunings: list[TuningRecord] = []
-    counts: Counter[str] = Counter()
-
-    cache = FileAnalysisCache(save_root, base_dir=cache_base_dir)
     jobs: list[ScanJob] = []
     active_cache_paths: set[Path] = set()
+    counts: Counter[str] = Counter()
+
     with metrics.measure("scan.enumerate"):
         containers = sorted(
             (path for path in containers_root.iterdir() if path.is_dir()),
             key=lambda path: path.name.casefold(),
         )
+
     for container in containers:
         prefix = container.name.split("_", 1)[0]
         counts[prefix] += 1
         match = _CONTAINER_RE.match(container.name)
         if not match:
             continue
+
         kind = _canonical_kind(match.group("kind"))
         jobs.append(
             ScanJob(
@@ -359,6 +331,7 @@ def scan_save(
                 estimated_bytes=_job_estimated_bytes(container, kind),
             )
         )
+
         header_path = container / "header"
         if header_path.is_file():
             active_cache_paths.add(header_path)
@@ -367,7 +340,19 @@ def scan_save(
             if livery_path.is_file():
                 active_cache_paths.add(livery_path)
 
-    selected_backend = _select_scan_backend(policy, jobs, backend)
+    return jobs, active_cache_paths, counts
+
+
+def _run_container_analyses(
+    jobs: list[ScanJob],
+    policy: RuntimePolicy,
+    requested_backend: Literal["auto", "sequential", "threaded"],
+    cache: FileAnalysisCache,
+    metrics: PerformanceMetrics,
+) -> list[_ContainerAnalysis]:
+    """Run the selected scan backend and preserve the legacy fallback contract."""
+
+    selected_backend = _select_scan_backend(policy, jobs, requested_backend)
     metrics.set("scan_backend", selected_backend.name)
     metrics.set("scan_workers", selected_backend.workers)
     metrics.set("scan_jobs", len(jobs))
@@ -379,17 +364,29 @@ def scan_save(
     analyze = lambda job: _analyze_container(job, cache)
     try:
         with metrics.measure("scan.analyze"):
-            analyses = selected_backend.run(jobs, analyze)
+            return selected_backend.run(jobs, analyze)
     except Exception as exc:  # noqa: BLE001 - backend failures require fallback
         # A backend implementation or executor failure must not make FH6 saves
         # unreadable on an otherwise supported machine.
         metrics.set("scan_fallback_used", True)
         metrics.set("scan_fallback_error", type(exc).__name__)
-        selected_backend = SequentialScanBackend[_ContainerAnalysis]()
-        metrics.set("scan_backend", selected_backend.name)
+        fallback = SequentialScanBackend[_ContainerAnalysis]()
+        metrics.set("scan_backend", fallback.name)
         metrics.set("scan_workers", 1)
         with metrics.measure("scan.fallback_analyze"):
-            analyses = selected_backend.run(jobs, _analyze_container_legacy)
+            return fallback.run(jobs, _analyze_container_legacy)
+
+
+def _aggregate_container_analyses(
+    analyses: list[_ContainerAnalysis],
+    car_db: CarDatabase,
+    metrics: PerformanceMetrics,
+) -> tuple[list[LiveryRecord], list[TuningRecord], list[str]]:
+    """Resolve identities and convert low-level analyses into public records."""
+
+    warnings: list[str] = []
+    liveries: list[LiveryRecord] = []
+    tunings: list[TuningRecord] = []
 
     with metrics.measure("scan.aggregate"):
         for analysis in analyses:
@@ -409,6 +406,7 @@ def scan_save(
                     )
                 )
                 continue
+
             header = analysis.header
             if header is None:
                 continue
@@ -457,9 +455,15 @@ def scan_save(
                     )
                 )
 
-    with metrics.measure("scan.cache_save"):
-        cache.prune_to_paths(active_cache_paths)
-        cache.save()
+    return liveries, tunings, warnings
+
+
+def _build_car_summaries(
+    liveries: list[LiveryRecord],
+    tunings: list[TuningRecord],
+    car_db: CarDatabase,
+) -> list[CarContentSummary]:
+    """Build the dashboard-visible per-car saved-content summary."""
 
     by_car: dict[int, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     for record in liveries:
@@ -493,6 +497,68 @@ def scan_save(
                 soulbound_count=item.get("soul", 0),
             )
         )
+    return summaries
+
+
+def scan_save(
+    selected_path: Path,
+    car_db: CarDatabase,
+    *,
+    runtime_policy: RuntimePolicy | None = None,
+    cache_base_dir: Path | None = None,
+    backend: Literal["auto", "sequential", "threaded"] = "auto",
+) -> ScanResult:
+    """Scan one FH6 save with a compatibility-first adaptive I/O backend.
+
+    ``backend`` and ``cache_base_dir`` are primarily diagnostic/test controls.
+    Normal callers use automatic policy selection. Any unexpected threaded
+    backend failure is retried through the original sequential semantics.
+
+    The public orchestration order is intentionally explicit:
+    layout/metadata -> enumerate -> analyze -> resolve/aggregate -> cache ->
+    dashboard summary. Helper extraction does not change the scan contract.
+    """
+
+    if backend not in {"auto", "sequential", "threaded"}:
+        raise ValueError(f"unsupported scan backend: {backend}")
+
+    started = perf_counter()
+    metrics = PerformanceMetrics()
+    policy = runtime_policy or detect_runtime_policy()
+
+    with metrics.measure("scan.resolve_layout"):
+        save_root, containers_root, active_version = resolve_layout(selected_path)
+    with metrics.measure("scan.metadata"):
+        metadata = parse_save_metadata(
+            selected_path.resolve(),
+            save_root,
+            containers_root,
+            active_version,
+        )
+
+    cache = FileAnalysisCache(save_root, base_dir=cache_base_dir)
+    jobs, active_cache_paths, counts = _enumerate_scan_jobs(
+        containers_root,
+        metrics,
+    )
+    analyses = _run_container_analyses(
+        jobs,
+        policy,
+        backend,
+        cache,
+        metrics,
+    )
+    liveries, tunings, warnings = _aggregate_container_analyses(
+        analyses,
+        car_db,
+        metrics,
+    )
+
+    with metrics.measure("scan.cache_save"):
+        cache.prune_to_paths(active_cache_paths)
+        cache.save()
+
+    summaries = _build_car_summaries(liveries, tunings, car_db)
 
     metrics.timings_ms["scan.total"] = round(
         (perf_counter() - started) * 1000.0,
