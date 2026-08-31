@@ -62,7 +62,6 @@ from fh6garage.v1_3_2_memory_filter_coordination_patch import apply_v1_3_2_memor
 from fh6garage.v1_3_2_memory_thread_safety_patch import apply_v1_3_2_memory_thread_safety_patch
 from fh6garage.v1_3_2_filter_alias_quality_patch import apply_v1_3_2_filter_alias_quality_patch
 from fh6garage.v1_3_2_dashboard_change_group_patch import apply_v1_3_2_dashboard_change_group_patch
-from fh6garage.v1_3_3_beta_identity_patch import apply_v1_3_3_beta_identity_patch
 from fh6garage.v1_3_4_card_action_layout_patch import apply_v1_3_4_card_action_layout_patch
 from fh6garage.v1_3_4_card_features_patch import apply_v1_3_4_card_features_patch
 from fh6garage.v1_3_4_metadata_toggle_icon_patch import apply_v1_3_4_metadata_toggle_icon_patch
@@ -136,96 +135,73 @@ def _apply_state_patch_stack() -> None:
     # Snapshot visible livery instances and cache only thumbnail copies under
     # LocalAppData so the latest add/remove/change diff can retain deleted images.
     apply_v1_3_2_refresh_diff_patch(MainWindow)
-
     # Present latest refresh changes as cards and resolve user-managed creator
     # aliases across display/search/sort/group/statistics. This stays before the
     # final thread-affinity patch and never writes FH6 content.
     apply_v1_3_2_change_view_alias_patch(MainWindow)
-
     # Current cards opened from the change viewer are separate widgets from the
     # main-grid cache. Mirror their annotation/hide actions back to that cache so
     # both views remain visually consistent immediately.
     apply_v1_3_2_change_view_alias_sync_patch(MainWindow)
-
     # Put the compact refresh-change notice below Full Refresh and keep the legacy
     # hide/info left actions on the triangle/excluded rows.
     apply_v1_3_2_release_layout_patch(MainWindow)
-
     # Add the folder action and base standalone change-view card implementation.
     apply_v1_3_2_change_dialog_folder_patch(MainWindow)
-
     # Make the compact change button clickable and make all historical card
     # aligners agree with move/hide/info/folder = check/triangle/excluded/zoom.
     apply_v1_3_2_change_dialog_runtime_fix(MainWindow)
-
     # The standalone change window must calculate card geometry from its own
     # viewport, not from a hidden/main-grid width. Reuse the main 2/3/4-column
     # formula on every resize and force the same light application theme.
     apply_v1_3_2_change_dialog_responsive_ui_fix(MainWindow)
-
     # Preserve the default behavior of hiding only unapplied auction liveries.
     # Once a valid memory snapshot exists, the same rule uses the verified
     # memory/SoulBound state instead of relying on cache presence alone.
     apply_v1_3_2_auction_unapplied_recent_frame_fix(MainWindow)
-
     # Finalize deleted recent cards and creator-name manager interaction. Deleted
     # cards keep the normal card UI but no actions, and the alias manager remains
     # non-modal so the main window can still be used while it is open.
     apply_v1_3_2_alias_manager_change_card_fix(MainWindow)
-
     # Add the optional read-only memory scan page, persisted applied-state
     # snapshot, top applied/unapplied selector, and paint-bucket card indicator.
     apply_v1_3_2_memory_state_patch(MainWindow)
-
     # Keep the legacy auction-only filter and the new all-livery state selector
     # mutually exclusive so one state axis cannot contradict the other.
     apply_v1_3_2_memory_filter_coordination_patch(MainWindow)
-
     # Route worker progress/completion through an explicit QObject bridge so no
     # memory-scan callback can update Qt widgets from the worker thread.
     apply_v1_3_2_memory_thread_safety_patch(MainWindow)
-
     # Add live per-filter counts, stronger active-state styling, and collapse
     # creator-name unlink operations to a single persistence write.
     apply_v1_3_2_filter_alias_quality_patch(MainWindow)
-
     # Finalize dashboard applied/total ratios, remove legacy Saved page headings,
     # and present recent changes as grouped Add / Remove / Duplicate sections.
     apply_v1_3_2_dashboard_change_group_patch(MainWindow)
 
 
 def _apply_release_patch_stack() -> None:
-    """Install v1.3.3/v1.3.4 features and the explicit v1.4 follow-up stack."""
-    # Apply the legacy base identity first; the final v1.4 layer replaces all user-visible release identity.
-    apply_v1_3_3_beta_identity_patch(MainWindow)
-
+    """Install v1.3.4 features and the explicit v1.4 follow-up stack."""
     # Finalize the v1.3.4 six-row livery action layout after every feature has
     # installed its card buttons. New lock/export controls are placeholders.
     apply_v1_3_4_card_action_layout_patch(MainWindow)
-
     # Add the v1.3.4 card-wide metadata collapse, functional soft lock, and
     # duplicate-content grouping after the final card geometry is installed.
     apply_v1_3_4_card_features_patch(MainWindow)
-
     # Replace the metadata toggle glyph with packaged 20 px transparent PNG arrows.
     apply_v1_3_4_metadata_toggle_icon_patch(MainWindow)
-
     # Add the safe external backup repository, visible-item export action, and
     # backup/import status tab. Explicit import and verified backup-and-delete actions may modify the game save.
     apply_v1_3_4_backup_export_patch(MainWindow)
-
     # Export hashing/copying runs off the UI thread, while completion and all Qt
     # updates are explicitly marshalled back to the MainWindow thread.
     apply_v1_3_4_backup_export_thread_fix_patch(MainWindow)
-
     # Avoid repeated backup-index reads/hashes, build large backup card sets in
     # event-loop chunks, and mirror the livery search/filter/button styling.
     apply_v1_3_4_backup_export_performance_ui_patch(MainWindow)
-
     # Keep backup-tab terminology as Backup/Back up instead of Export while
     # preserving the same verified external-copy implementation underneath.
     apply_v1_3_4_backup_action_wording_patch(MainWindow)
-
     # Install the formerly hidden v1.3.4/v1.4 follow-up stack explicitly. The
     # order inside this compatibility bridge is unchanged from the verified
     # release chain; only the ownership boundary is now visible from app.py.
@@ -243,7 +219,6 @@ def _apply_runtime_patch_stack() -> None:
     _apply_foundation_patch_stack()
     _apply_state_patch_stack()
     _apply_release_patch_stack()
-
     # This must be the final MainWindow patch. It restores the original
     # class-defined @Slot(object) scan callback so all UI rebuilding runs on the
     # GUI thread, then moves v1.3.2 post-processing into _populate_all().
@@ -253,7 +228,6 @@ def _apply_runtime_patch_stack() -> None:
 def main() -> int:
     # Startup profiling is independent of the user-controlled runtime switch.
     _performance_metrics.begin_startup(_APP_ENTRY_NS)
-
     qapp_started = time.perf_counter_ns()
     app = QApplication(sys.argv)
     # Use a concrete positive base point size before applying application QSS.
@@ -262,17 +236,13 @@ def main() -> int:
     app.setApplicationVersion("1.4")
     app.setOrganizationName("LocalOnly")
     _performance_metrics.record_startup("startup.qapplication", _elapsed_ms(qapp_started))
-
-    # Resolve the persisted UI language before constructing any translated widgets.
     settings_started = time.perf_counter_ns()
     settings = QSettings()
     set_language(settings.value("language", DEFAULT_LANGUAGE, str))
     _performance_metrics.record_startup("startup.settings", _elapsed_ms(settings_started))
-
     patch_started = time.perf_counter_ns()
     _apply_runtime_patch_stack()
     _performance_metrics.record_startup("startup.patch_install", _elapsed_ms(patch_started))
-
     root = resource_root()
     icon_path = root / "icons" / "FH6_Assistant.ico"
     if icon_path.is_file():
@@ -280,29 +250,21 @@ def main() -> int:
         app.setWindowIcon(app_icon)
     else:
         app_icon = QIcon()
-
     mainwindow_started = time.perf_counter_ns()
     window = MainWindow(project_root=root)
     _performance_metrics.record_startup("startup.mainwindow_init", _elapsed_ms(mainwindow_started))
     if not app_icon.isNull():
         window.setWindowIcon(app_icon)
-
-    # MainWindow schedules an automatic scan with QTimer(0) when a persisted save
-    # path exists. Mark that before entering the event loop so startup.total closes
-    # only after the initial scan/populate path has completed.
     saved_path = ""
     path_edit = getattr(window, "path_edit", None)
     if path_edit is not None and hasattr(path_edit, "text"):
         saved_path = str(path_edit.text() or "").strip()
     wait_for_scan = bool(saved_path and Path(saved_path).is_dir())
     _performance_metrics.set_startup_waiting_for_scan(wait_for_scan)
-
     show_started = time.perf_counter_ns()
     window.show()
     _performance_metrics.record_startup("startup.window_show", _elapsed_ms(show_started))
-
     first_render_started = time.perf_counter_ns()
-
     def record_first_window_render() -> None:
         _performance_metrics.record_startup(
             "startup.first_window_render",
@@ -310,12 +272,7 @@ def main() -> int:
         )
         if not _performance_metrics.startup_waiting_for_scan():
             _performance_metrics.finish_startup(detail="window ready; no saved path scan")
-
     QTimer.singleShot(0, record_first_window_render)
-
-    # CI/distribution smoke tests use the real application entry point and then
-    # request an ordinary window close. Avoiding force-termination also lets a
-    # PyInstaller OneFile process remove its temporary extraction directory.
     smoke_delay = os.environ.get("FH6_ASSISTANT_SMOKE_TEST_MS", "").strip()
     if smoke_delay:
         try:
@@ -325,7 +282,6 @@ def main() -> int:
         if delay_ms:
             QTimer.singleShot(delay_ms, window.close)
     return app.exec()
-
 
 if __name__ == "__main__":
     raise SystemExit(main())
