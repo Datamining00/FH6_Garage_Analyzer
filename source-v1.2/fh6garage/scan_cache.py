@@ -169,9 +169,9 @@ class FileAnalysisCache:
 
     def put_sha256(self, path: Path, digest: str) -> None:
         fp = _fingerprint(path)
-        key = self._key("sha256", path)
         if fp is None or len(digest) != 64:
             return
+        key = self._key("sha256", path)
         with self._lock:
             self._entries[key] = {
                 "fingerprint": list(fp),
