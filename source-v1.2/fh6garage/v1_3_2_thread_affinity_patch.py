@@ -207,6 +207,16 @@ def _rebuild_v132_indexes(self) -> None:
     }
 
 
+def _rebuild_v132_indexes_with_metrics(self, result) -> None:
+    index_started = perf_counter()
+    _rebuild_v132_indexes(self)
+    if _performance_metrics.startup_active():
+        _performance_metrics.record_startup(
+            "startup.populate.pre_car.record_indexes",
+            (perf_counter() - index_started) * 1000.0,
+            item_count=(len(result.liveries) + len(result.tunings)) if result is not None else 0,
+        )
+
 def apply_v1_3_2_scan_postprocessing(MainWindow) -> None:
     """Install scan-result preparation that must run after all feature patches."""
     if getattr(MainWindow, "_fh6_v132_scan_postprocessing_installed", False):
@@ -218,14 +228,7 @@ def apply_v1_3_2_scan_postprocessing(MainWindow) -> None:
         ui_started = perf_counter()
         result = self.result
         _prepare_v132_auction_thumbnails(self, result)
-        index_started = perf_counter()
-        _rebuild_v132_indexes(self)
-        if _performance_metrics.startup_active():
-            _performance_metrics.record_startup(
-                "startup.populate.pre_car.record_indexes",
-                (perf_counter() - index_started) * 1000.0,
-                item_count=(len(result.liveries) + len(result.tunings)) if result is not None else 0,
-            )
+        _rebuild_v132_indexes_with_metrics(self, result)
 
         # The synchronous initial build must remain identical in scope to 1.3.1:
         # only normal My Designs records are exposed to the existing table/grid.

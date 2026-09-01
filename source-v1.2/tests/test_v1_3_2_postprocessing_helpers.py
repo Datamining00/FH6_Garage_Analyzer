@@ -24,16 +24,24 @@ class V132PostprocessingHelperContractTests(unittest.TestCase):
         self.assertIn("QTimer.singleShot(0, scheduler)", self.source)
         self.assertLess(self.source.index(helper), self.source.index(populate))
 
+    def test_index_rebuild_metrics_are_isolated(self) -> None:
+        source = self.source
+        helper_start = source.index("def _rebuild_v132_indexes_with_metrics")
+        helper_end = source.index("def apply_v1_3_2_scan_postprocessing", helper_start)
+        helper = source[helper_start:helper_end]
+        self.assertIn("_rebuild_v132_indexes(self)", helper)
+        self.assertIn("startup.populate.pre_car.record_indexes", helper)
+
     def test_populate_orchestration_keeps_phase_order(self) -> None:
         start = self.source.index("def patched_populate_all(self) -> None:")
         end = self.source.index("MainWindow._populate_all = patched_populate_all", start)
         body = self.source[start:end]
         self.assertLess(
             body.index("_prepare_v132_auction_thumbnails(self, result)"),
-            body.index("_rebuild_v132_indexes(self)"),
+            body.index("_rebuild_v132_indexes_with_metrics(self, result)"),
         )
         self.assertLess(
-            body.index("_rebuild_v132_indexes(self)"),
+            body.index("_rebuild_v132_indexes_with_metrics(self, result)"),
             body.index("current_populate_all(self)"),
         )
         self.assertLess(
