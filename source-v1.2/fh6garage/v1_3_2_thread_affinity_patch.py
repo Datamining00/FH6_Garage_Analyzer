@@ -141,6 +141,30 @@ def assign_auction_thumbnails(
     )
 
 
+def _prepare_v132_auction_thumbnails(self, result) -> None:
+    if result is None:
+        return
+
+    thumbnail_match_started = perf_counter()
+    try:
+        cache_getter = getattr(self, "_fh6_v132_current_cache_path", None)
+        cache_path = cache_getter() if callable(cache_getter) else None
+        self._fh6_v132_match_stats = assign_auction_thumbnails(
+            result.liveries,
+            cache_path,
+        )
+    except Exception:  # noqa: BLE001 - optional cache integration
+        # Cache integration is optional and must never block save loading.
+        self._fh6_v132_match_stats = None
+    finally:
+        if _performance_metrics.startup_active():
+            _performance_metrics.record_startup(
+                "startup.populate.pre_car.auction_thumbnail_match",
+                (perf_counter() - thumbnail_match_started) * 1000.0,
+                item_count=len(result.liveries),
+            )
+
+
 def _rebuild_v132_indexes(self) -> None:
     result = self.result
     if result is None:
@@ -188,26 +212,7 @@ def apply_v1_3_2_scan_postprocessing(MainWindow) -> None:
     def patched_populate_all(self) -> None:
         ui_started = perf_counter()
         result = self.result
-        if result is not None:
-            thumbnail_match_started = perf_counter()
-            try:
-                cache_getter = getattr(self, "_fh6_v132_current_cache_path", None)
-                cache_path = cache_getter() if callable(cache_getter) else None
-                self._fh6_v132_match_stats = assign_auction_thumbnails(
-                    result.liveries,
-                    cache_path,
-                )
-            except Exception:  # noqa: BLE001 - optional cache integration
-                # Cache integration is optional and must never block save loading.
-                self._fh6_v132_match_stats = None
-            finally:
-                if _performance_metrics.startup_active():
-                    _performance_metrics.record_startup(
-                        "startup.populate.pre_car.auction_thumbnail_match",
-                        (perf_counter() - thumbnail_match_started) * 1000.0,
-                        item_count=len(result.liveries),
-                    )
-
+        _prepare_v132_auction_thumbnails(self, result)
         index_started = perf_counter()
         _rebuild_v132_indexes(self)
         if _performance_metrics.startup_active():
