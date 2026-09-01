@@ -21,9 +21,12 @@ class V132ScanPostprocessingModuleContractTests(unittest.TestCase):
         self.assertIn("def apply_v1_3_2_scan_postprocessing", self.scan)
         self.assertIn("def assign_auction_thumbnails", self.scan)
 
-    def test_affinity_module_keeps_only_final_slot_restore_responsibility(self) -> None:
-        self.assertIn("_ORIGINAL_SCAN_FINISHED = _UiMainWindow._scan_finished", self.compat)
-        self.assertIn("MainWindow._scan_finished = _ORIGINAL_SCAN_FINISHED", self.compat)
+    def test_compatibility_module_reexports_affinity_fix(self) -> None:
+        self.assertIn(
+            "from .v1_3_2_thread_affinity_fix import apply_v1_3_2_thread_affinity_fix",
+            self.compat,
+        )
+        self.assertNotIn("_ORIGINAL_SCAN_FINISHED = _UiMainWindow._scan_finished", self.compat)
 
 
 if __name__ == "__main__":

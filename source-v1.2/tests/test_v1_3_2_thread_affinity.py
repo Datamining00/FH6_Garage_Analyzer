@@ -18,7 +18,7 @@ class V132ThreadAffinityContractTests(unittest.TestCase):
 
     def test_original_qt_slot_is_restored(self) -> None:
         root = Path(__file__).resolve().parents[1]
-        source = (root / "fh6garage" / "v1_3_2_thread_affinity_patch.py").read_text(encoding="utf-8")
+        source = (root / "fh6garage" / "v1_3_2_thread_affinity_fix.py").read_text(encoding="utf-8")
         self.assertIn("_ORIGINAL_SCAN_FINISHED = _UiMainWindow._scan_finished", source)
         self.assertIn("MainWindow._scan_finished = _ORIGINAL_SCAN_FINISHED", source)
         self.assertNotIn("def patched_scan_finished", source)
