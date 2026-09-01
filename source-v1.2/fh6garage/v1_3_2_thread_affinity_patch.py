@@ -231,6 +231,20 @@ def apply_v1_3_2_scan_postprocessing(MainWindow) -> None:
         if callable(scheduler):
             QTimer.singleShot(0, scheduler)
 
+        profiler = getattr(self, "_fh6_v132_write_population_performance", None)
+        if callable(profiler):
+            profiler(result, ui_started)
+
+    MainWindow._populate_all = patched_populate_all
+    MainWindow._fh6_v132_scan_postprocessing_installed = True
+
+
+def apply_v1_3_2_performance_profiler(MainWindow) -> None:
+    """Install the final population-performance writer after feature post-processing."""
+    if getattr(MainWindow, "_fh6_v132_performance_profiler_installed", False):
+        return
+
+    def _write_population_performance(self, result, ui_started: float) -> None:
         ui_timings = {
             "ui.scan_result_to_initial_paint": round(
                 (perf_counter() - ui_started) * 1000.0,
@@ -288,8 +302,8 @@ def apply_v1_3_2_scan_postprocessing(MainWindow) -> None:
             }
         )
 
-    MainWindow._populate_all = patched_populate_all
-    MainWindow._fh6_v132_scan_postprocessing_installed = True
+    MainWindow._fh6_v132_write_population_performance = _write_population_performance
+    MainWindow._fh6_v132_performance_profiler_installed = True
 
 
 def apply_v1_3_2_thread_affinity_fix(MainWindow) -> None:
