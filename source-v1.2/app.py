@@ -73,6 +73,7 @@ from fh6garage.v1_3_4_backup_action_wording_patch import (
 )
 from fh6garage.v1_3_2_thread_affinity_patch import (
     apply_v1_3_2_scan_postprocessing,
+    apply_v1_3_2_performance_profiler,
     apply_v1_3_2_thread_affinity_fix,
 )
 
@@ -248,6 +249,10 @@ def _apply_finalizer_patch_stack() -> None:
     # Post-processing still has to capture the fully composed _populate_all(), so
     # it remains in this final stage even though it is not itself an affinity fix.
     apply_v1_3_2_scan_postprocessing(MainWindow)
+
+    # Install performance reporting after functional post-processing so metrics
+    # observe the final indexes/card counters without owning feature behavior.
+    apply_v1_3_2_performance_profiler(MainWindow)
 
     # This must remain the final MainWindow mutation. Restoring the original
     # class-defined @Slot(object) keeps ScanWorker completion on the GUI thread.
