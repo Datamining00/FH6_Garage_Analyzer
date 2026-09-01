@@ -83,7 +83,7 @@ class V14BackupRepositoryTests(unittest.TestCase):
         package = Path("fh6garage/__init__.py").read_text(encoding="utf-8")
         build = Path("build_exe.ps1").read_text(encoding="utf-8")
         readme = Path("README.txt").read_text(encoding="utf-8")
-        self.assertIn('WINDOW_TITLE = "FH6 Assistant v1.4"', identity)
+        self.assertIn('WINDOW_TITLE = "FH6 Assistant v1.4 RC1"', identity)
         self.assertIn("Validate and build FH6 Assistant v1.4", workflow)
         self.assertIn("FH6_Assistant_v1.4_Standard", workflow)
         self.assertIn("FH6_Assistant_v1.4_Portable", workflow)
