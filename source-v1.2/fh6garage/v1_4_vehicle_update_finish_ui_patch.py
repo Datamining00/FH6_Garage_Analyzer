@@ -9,7 +9,7 @@ from PySide6.QtWidgets import QLabel, QMessageBox, QSizePolicy
 from . import v1_3_2_change_dialog_folder_patch as _change_dialog
 from . import v1_4_vehicle_data_source_patch as _vehicle_source
 from .acquisition_db import AcquisitionDatabase, DATA_DIR_NAME, SUPPLEMENTAL_DISABLED_KEY
-from .car_db import CarDatabase
+from .v1_4_vehicle_source_database import SourceAwareCarDatabase
 from .i18n import tr
 
 
@@ -59,8 +59,13 @@ def apply_v1_4_vehicle_update_finish_ui_patch(MainWindow: Any) -> None:
             previous_finished(self, update); return
         self._end_busy(); self.vehicle_data_source = source
         self.settings.setValue(_vehicle_source.VEHICLE_DATA_SOURCE_KEY, source)
-        self.car_db = CarDatabase(self.project_root / "data" / "car_names.json")
         user_data_path = self.project_root / "data" / DATA_DIR_NAME
+        self.car_db = SourceAwareCarDatabase(
+            self.project_root / "data" / "car_names.json",
+            source=source,
+            user_data_path=user_data_path,
+            app_data_dir=getattr(getattr(self, "car_db", None), "app_data_dir", None),
+        )
         try:
             if not isinstance(getattr(self, "acquisition_db", None), AcquisitionDatabase):
                 self.acquisition_db = AcquisitionDatabase(user_data_path)

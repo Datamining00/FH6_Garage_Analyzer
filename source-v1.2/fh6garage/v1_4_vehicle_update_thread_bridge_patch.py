@@ -9,6 +9,7 @@ from PySide6.QtCore import QObject, QThread, Qt, Slot
 from . import v1_4_vehicle_data_source_patch as _source
 from .acquisition_db import DATA_FILE_NAME
 from .car_db import CarDatabase
+from .v1_4_initial_vehicle_source_patch import apply_v1_4_initial_vehicle_source_patch
 
 
 class _VehicleUpdateGuiBridge(QObject):
@@ -132,3 +133,4 @@ def apply_v1_4_vehicle_update_thread_bridge_patch(MainWindow: Any) -> None:
 
     MainWindow.start_car_db_update = start_car_db_update
     MainWindow._fh6_v14_vehicle_update_thread_bridge_patched = True
+    apply_v1_4_initial_vehicle_source_patch(MainWindow)
