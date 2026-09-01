@@ -61,7 +61,7 @@ def apply_v1_3_2_performance_profiler(MainWindow) -> None:
             )
         write_latest_performance(
             {
-                "app_version": "1.3.2",
+                "app_version": "1.4-rc1",
                 "scan": getattr(result, "diagnostics", {}),
                 "ui": {
                     "timings_ms": ui_timings,

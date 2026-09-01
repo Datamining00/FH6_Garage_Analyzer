@@ -3,12 +3,13 @@ from __future__ import annotations
 from PySide6.QtWidgets import QApplication, QLabel
 
 
-VERSION_TEXT = "v1.4"
-WINDOW_TITLE = "FH6 Assistant v1.4"
+VERSION_TEXT = "v1.4 RC1"
+APP_VERSION = "1.4-rc1"
+WINDOW_TITLE = "FH6 Assistant v1.4 RC1"
 
 
 def apply_v1_4_identity_patch(MainWindow) -> None:
-    """Apply the v1.4 identity on top of the Actions #133 baseline."""
+    """Apply the v1.4 RC1 identity on top of the verified v1.4 stack."""
     if getattr(MainWindow, "_fh6_v14_identity_patched", False):
         return
 
@@ -18,7 +19,7 @@ def apply_v1_4_identity_patch(MainWindow) -> None:
         original_init(self, *args, **kwargs)
         app = QApplication.instance()
         if app is not None:
-            app.setApplicationVersion("1.4")
+            app.setApplicationVersion(APP_VERSION)
         self.setWindowTitle(WINDOW_TITLE)
         for label in self.findChildren(QLabel):
             text = label.text()
