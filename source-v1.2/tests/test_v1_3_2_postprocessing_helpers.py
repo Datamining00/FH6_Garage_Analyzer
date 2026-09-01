@@ -8,7 +8,7 @@ class V132PostprocessingHelperContractTests(unittest.TestCase):
     def setUp(self) -> None:
         root = Path(__file__).resolve().parents[1]
         self.source = (
-            root / "fh6garage" / "v1_3_2_thread_affinity_patch.py"
+            root / "fh6garage" / "v1_3_2_scan_postprocessing.py"
         ).read_text(encoding="utf-8")
 
     def test_thumbnail_preparation_is_a_module_level_helper(self) -> None:
