@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -49,8 +50,11 @@ def apply_v1_4_initial_vehicle_source_patch(MainWindow: Any) -> None:
         )
         selected = stored
         if not selected:
-            selected = _choose_initial_source(self)
-            self.settings.setValue(_source.VEHICLE_DATA_SOURCE_KEY, selected)
+            if os.environ.get("FH6_ASSISTANT_SMOKE_TEST_MS", "").strip():
+                selected = _source.HDR_SOURCE
+            else:
+                selected = _choose_initial_source(self)
+                self.settings.setValue(_source.VEHICLE_DATA_SOURCE_KEY, selected)
 
         self.vehicle_data_source = selected
         self.car_db = _selected_database(self, selected, user_data_path)

@@ -12,6 +12,13 @@ class V14InitialVehicleSourceContractTests(unittest.TestCase):
         self.assertIn("_choose_initial_source(self)", text)
         self.assertIn("self.settings.setValue(_source.VEHICLE_DATA_SOURCE_KEY, selected)", text)
 
+    def test_smoke_test_bypasses_modal_without_persisting_choice(self):
+        text = Path("fh6garage/v1_4_initial_vehicle_source_patch.py").read_text(encoding="utf-8")
+        self.assertIn('os.environ.get("FH6_ASSISTANT_SMOKE_TEST_MS", "").strip()', text)
+        smoke_branch = text.split('if os.environ.get("FH6_ASSISTANT_SMOKE_TEST_MS", "").strip():', 1)[1].split('else:', 1)[0]
+        self.assertIn("selected = _source.HDR_SOURCE", smoke_branch)
+        self.assertNotIn("settings.setValue", smoke_branch)
+
     def test_saved_choice_bypasses_first_run_prompt(self):
         text = Path("fh6garage/v1_4_initial_vehicle_source_patch.py").read_text(encoding="utf-8")
         body = text.split("def patched_init", 1)[1]
