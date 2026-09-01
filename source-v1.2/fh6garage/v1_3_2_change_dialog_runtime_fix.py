@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from typing import Any
 
 from PySide6.QtCore import Qt, QTimer
@@ -32,7 +33,12 @@ def _repair_change_button(window: Any) -> None:
     view.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
     view.setEnabled(True)
     try:
-        view.clicked.disconnect()
+        # PySide emits a RuntimeWarning before raising when disconnect() has no
+        # matching connection. That condition is harmless here: the goal is to
+        # clear any legacy handler before installing the current one.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            view.clicked.disconnect()
     except (RuntimeError, TypeError):
         pass
     view.clicked.connect(
