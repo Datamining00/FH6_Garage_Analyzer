@@ -165,6 +165,11 @@ def _prepare_v132_auction_thumbnails(self, result) -> None:
             )
 
 
+def _schedule_v132_auction_cards(self) -> None:
+    scheduler = getattr(self, "_fh6_v132_schedule_auction_cards", None)
+    if callable(scheduler):
+        QTimer.singleShot(0, scheduler)
+
 def _rebuild_v132_indexes(self) -> None:
     result = self.result
     if result is None:
@@ -233,9 +238,7 @@ def apply_v1_3_2_scan_postprocessing(MainWindow) -> None:
         # _populate_all() is running inside the original Qt slot on the GUI
         # thread. Queue SoulBound card append until the original _scan_finished
         # completes its busy-overlay cleanup and returns to the event loop.
-        scheduler = getattr(self, "_fh6_v132_schedule_auction_cards", None)
-        if callable(scheduler):
-            QTimer.singleShot(0, scheduler)
+        _schedule_v132_auction_cards(self)
 
         profiler = getattr(self, "_fh6_v132_write_population_performance", None)
         if callable(profiler):
