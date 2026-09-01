@@ -170,6 +170,11 @@ def _schedule_v132_auction_cards(self) -> None:
     if callable(scheduler):
         QTimer.singleShot(0, scheduler)
 
+def _write_v132_population_performance(self, result, ui_started: float) -> None:
+    profiler = getattr(self, "_fh6_v132_write_population_performance", None)
+    if callable(profiler):
+        profiler(result, ui_started)
+
 def _rebuild_v132_indexes(self) -> None:
     result = self.result
     if result is None:
@@ -217,6 +222,7 @@ def _rebuild_v132_indexes_with_metrics(self, result) -> None:
             item_count=(len(result.liveries) + len(result.tunings)) if result is not None else 0,
         )
 
+
 def apply_v1_3_2_scan_postprocessing(MainWindow) -> None:
     """Install scan-result preparation that must run after all feature patches."""
     if getattr(MainWindow, "_fh6_v132_scan_postprocessing_installed", False):
@@ -243,9 +249,7 @@ def apply_v1_3_2_scan_postprocessing(MainWindow) -> None:
         # completes its busy-overlay cleanup and returns to the event loop.
         _schedule_v132_auction_cards(self)
 
-        profiler = getattr(self, "_fh6_v132_write_population_performance", None)
-        if callable(profiler):
-            profiler(result, ui_started)
+        _write_v132_population_performance(self, result, ui_started)
 
     MainWindow._populate_all = patched_populate_all
     MainWindow._fh6_v132_scan_postprocessing_installed = True

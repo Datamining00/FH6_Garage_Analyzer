@@ -32,6 +32,14 @@ class V132PostprocessingHelperContractTests(unittest.TestCase):
         self.assertIn("_rebuild_v132_indexes(self)", helper)
         self.assertIn("startup.populate.pre_car.record_indexes", helper)
 
+    def test_population_performance_callback_is_isolated(self) -> None:
+        source = self.source
+        helper_start = source.index("def _write_v132_population_performance")
+        helper_end = source.index("def _rebuild_v132_indexes", helper_start)
+        helper = source[helper_start:helper_end]
+        self.assertIn("_fh6_v132_write_population_performance", helper)
+        self.assertIn("profiler(result, ui_started)", helper)
+
     def test_populate_orchestration_keeps_phase_order(self) -> None:
         start = self.source.index("def patched_populate_all(self) -> None:")
         end = self.source.index("MainWindow._populate_all = patched_populate_all", start)
@@ -47,6 +55,10 @@ class V132PostprocessingHelperContractTests(unittest.TestCase):
         self.assertLess(
             body.index("current_populate_all(self)"),
             body.index("_schedule_v132_auction_cards(self)"),
+        )
+        self.assertLess(
+            body.index("_schedule_v132_auction_cards(self)"),
+            body.index("_write_v132_population_performance(self, result, ui_started)"),
         )
 
 
