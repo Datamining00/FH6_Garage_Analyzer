@@ -30,6 +30,13 @@ class V14PreviewModePatchTests(unittest.TestCase):
         self.assertIn('except Exception as exc', text)
         self.assertIn('backend failures must not break image modes', text)
 
+    def test_legacy_is_default_3d_eligibility(self):
+        text = Path("fh6garage/v1_4_preview_mode_patch.py").read_text(encoding="utf-8")
+        legacy = text.index('eligibility.addItem("Legacy", "legacy")')
+        strict = text.index('eligibility.addItem("Strict", "strict")')
+        self.assertLess(legacy, strict)
+        self.assertIn("eligibility.setCurrentIndex(0)", text)
+
     def test_patch_is_wired_before_performance_probe(self):
         stack = Path("fh6garage/v1_3_4_backup_action_wording_patch.py").read_text(encoding="utf-8")
         preview = stack.index("apply_v1_4_preview_mode_patch(MainWindow)")
