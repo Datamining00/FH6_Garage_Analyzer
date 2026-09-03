@@ -1,63 +1,87 @@
 from __future__ import annotations
 
-import os
 import unittest
 
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+from PySide6.QtCore import QCoreApplication, QEventLoop, QObject, QThread, QTimer, Signal, Slot
 
-from PySide6.QtCore import QObject, QEventLoop, QThread, QTimer, Slot
-from PySide6.QtWidgets import QApplication
-
-from fh6garage.preview3d.integration import _SceneReloadThread
+from fh6garage.preview3d.integration import _start_worker
 
 
-class _ProbeReloadThread(_SceneReloadThread):
-    """Use the production signal/QThread class without touching FH6 files."""
+class _ProbeWorker(QObject):
+    progress = Signal(str)
+    finished = Signal(object)
+    failed = Signal(str)
 
-    def __init__(self, parent=None) -> None:
-        QThread.__init__(self, parent)
-
+    @Slot()
     def run(self) -> None:
-        self.completed.emit({"probe": True})
+        self.progress.emit("probe-progress")
+        self.finished.emit({"probe": True})
 
 
 class _GuiReceiver(QObject):
-    def __init__(self, loop: QEventLoop) -> None:
-        super().__init__()
+    def __init__(self, owner: QObject, loop: QEventLoop) -> None:
+        super().__init__(owner)
+        self.owner = owner
         self.loop = loop
         self.called = False
-        self.on_gui_thread = False
+        self.progress_called = False
+        self.on_owner_thread = False
         self.payload = None
+        self.error = None
+
+    @Slot(str)
+    def progress(self, text: str) -> None:
+        if text == "probe-progress":
+            self.progress_called = True
 
     @Slot(object)
     def receive(self, payload: object) -> None:
-        app = QApplication.instance()
         self.called = True
         self.payload = payload
-        self.on_gui_thread = bool(app is not None and QThread.currentThread() == app.thread())
+        self.on_owner_thread = QThread.currentThread() is self.owner.thread()
+        self.loop.quit()
+
+    @Slot(str)
+    def failed(self, text: str) -> None:
+        self.error = text
         self.loop.quit()
 
 
 class Preview3DThreadRuntimeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.app = QApplication.instance() or QApplication([])
+        cls.app = QCoreApplication.instance() or QCoreApplication([])
 
-    def test_production_qthread_signal_reaches_gui_qobject_slot(self):
+    def test_production_worker_bridge_delivers_on_owner_thread(self) -> None:
+        owner = QObject()
         loop = QEventLoop()
-        receiver = _GuiReceiver(loop)
-        worker = _ProbeReloadThread()
-        worker.completed.connect(receiver.receive)
-        worker.start()
-        QTimer.singleShot(5000, loop.quit)
-        loop.exec()
-        worker.wait(5000)
+        receiver = _GuiReceiver(owner, loop)
+        worker = _ProbeWorker()
+        thread = _start_worker(
+            owner,
+            worker,
+            finished_slot=receiver.receive,
+            failed_slot=receiver.failed,
+            progress_slot=receiver.progress,
+        )
+        timed_out = {"value": False}
 
-        self.assertTrue(receiver.called, "3D worker result never reached the GUI receiver")
-        self.assertTrue(receiver.on_gui_thread, "3D worker callback ran outside QApplication GUI thread")
+        def timeout() -> None:
+            timed_out["value"] = True
+            loop.quit()
+
+        QTimer.singleShot(2000, timeout)
+        loop.exec()
+        thread.quit()
+        thread.wait(2000)
+
+        self.assertFalse(timed_out["value"], "3D worker bridge timed out")
+        self.assertIsNone(receiver.error)
+        self.assertTrue(receiver.progress_called)
+        self.assertTrue(receiver.called)
+        self.assertTrue(receiver.on_owner_thread)
         self.assertEqual(receiver.payload, {"probe": True})
-        self.assertFalse(worker.isRunning())
-        worker.deleteLater()
+        self.assertFalse(thread.isRunning())
 
 
 if __name__ == "__main__":
