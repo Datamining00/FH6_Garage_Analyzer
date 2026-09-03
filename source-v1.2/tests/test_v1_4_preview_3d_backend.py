@@ -107,19 +107,23 @@ class Preview3DBackendContractTests(unittest.TestCase):
         for vehicle_literal in ("FXX", "2000GT", "JCWGP", "Toyota", "Ferrari", "MINI"):
             self.assertNotIn(vehicle_literal, neutral)
 
-    def test_worker_architecture_matches_finalverify1_qthread_pattern(self):
+    def test_worker_architecture_matches_proven_repository_bridge_pattern(self):
         integration = self.read("integration.py")
-        self.assertIn("class _InitialPreviewThread(QThread)", integration)
-        self.assertIn("class _SceneReloadThread(QThread)", integration)
+        self.assertIn("class _InitialPreviewWorker(QObject)", integration)
+        self.assertIn("class _SceneReloadWorker(QObject)", integration)
         self.assertIn("class _Preview3DController(QObject)", integration)
-        self.assertIn("worker.completed.connect(self.initial_completed)", integration)
-        self.assertIn("worker.completed.connect(self.reload_completed)", integration)
-        self.assertIn("worker.message.connect(self.on_message)", integration)
+        self.assertIn("class _Preview3DJobLifecycle(QObject)", integration)
+        self.assertIn("worker.moveToThread(thread)", integration)
+        self.assertIn("thread.started.connect(worker.run)", integration)
+        self.assertIn("worker.finished.connect(finished_slot)", integration)
+        self.assertIn("worker.failed.connect(failed_slot)", integration)
+        self.assertIn("worker.finished.connect(thread.quit)", integration)
+        self.assertIn("worker.failed.connect(thread.quit)", integration)
+        self.assertIn("thread.finished.connect(worker.deleteLater)", integration)
+        self.assertIn("thread.finished.connect(thread.deleteLater)", integration)
         self.assertIn("@Slot(object)", integration)
-        self.assertIn("QApplication.instance()", integration)
-        self.assertIn("QThread.currentThread() != app.thread()", integration)
-        self.assertNotIn("QThread.currentThread() is not app.thread()", integration)
-        self.assertNotIn("moveToThread", integration)
+        self.assertNotIn("class _InitialPreviewThread(QThread)", integration)
+        self.assertNotIn("class _SceneReloadThread(QThread)", integration)
         self.assertNotIn("_GuiJobRelay", integration)
 
     def test_dialog_lifecycle_preserves_reusable_status_widget(self):
