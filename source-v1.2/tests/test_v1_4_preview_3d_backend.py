@@ -28,7 +28,12 @@ class Preview3DBackendContractTests(unittest.TestCase):
             "licenses/KFPS_LICENSE.txt",
             "licenses/FORZATECHSTUDIO_LICENSE.txt",
         }
-        self.assertTrue(required.issubset({str(path.relative_to(ROOT)).replace("\\", "/") for path in ROOT.rglob("*") if path.is_file()}))
+        present = {
+            str(path.relative_to(ROOT)).replace("\\", "/")
+            for path in ROOT.rglob("*")
+            if path.is_file()
+        }
+        self.assertTrue(required.issubset(present))
 
     def test_abandoned_tire_gamedb_and_wheel_validator_are_not_migrated(self):
         names = {path.name.casefold() for path in ROOT.rglob("*.py")}
@@ -68,8 +73,17 @@ class Preview3DBackendContractTests(unittest.TestCase):
         self.assertIn("vec3 L=normalize(vec3(0.45,0.85,0.55))", viewer)
         self.assertIn("0.34+0.66*d", viewer)
         self.assertIn("float rim=pow", viewer)
-        self.assertIn("GL.glClearColor(0.5294118, 0.8078431, 0.9215686, 1.0)", viewer)
-        for rejected in ("Omni studio", "uKeyLightDir", "uFillLightDir", "shadow map", "PCF"):
+        self.assertIn(
+            "GL.glClearColor(0.5294118, 0.8078431, 0.9215686, 1.0)",
+            viewer,
+        )
+        for rejected in (
+            "Omni studio",
+            "uKeyLightDir",
+            "uFillLightDir",
+            "shadow map",
+            "PCF",
+        ):
             self.assertNotIn(rejected, viewer)
 
     def test_glb_parser_uses_uv3_and_two_eligibility_modes(self):
@@ -93,6 +107,25 @@ class Preview3DBackendContractTests(unittest.TestCase):
         self.assertIn("WHEEL_STYLE_PART_TYPE = 44", neutral)
         for vehicle_literal in ("FXX", "2000GT", "JCWGP", "Toyota", "Ferrari", "MINI"):
             self.assertNotIn(vehicle_literal, neutral)
+
+    def test_qt_worker_and_dialog_lifecycle_are_fail_safe(self):
+        integration = self.read("integration.py")
+        self.assertIn('dialog.destroyed.connect', integration)
+        self.assertIn('"alive": True', integration)
+        self.assertIn('worker.finished.connect(worker.deleteLater)', integration)
+        self.assertIn('worker.failed.connect(worker.deleteLater)', integration)
+        self.assertIn('child is not message', integration)
+        self.assertNotIn('def _clear_layout', integration)
+        self.assertIn('QTimer.singleShot', integration)
+
+    def test_opengl_format_is_requested_per_lazy_widget(self):
+        integration = self.read("integration.py")
+        self.assertIn("QSurfaceFormat", integration)
+        self.assertIn("fmt.setVersion(3, 3)", integration)
+        self.assertIn("fmt.setProfile(QSurfaceFormat.CoreProfile)", integration)
+        self.assertIn("viewer.setFormat(fmt)", integration)
+        self.assertNotIn("QSurfaceFormat.setDefaultFormat", integration)
+        self.assertNotIn("configure_default_opengl_format", integration)
 
     def test_third_party_notices_pin_the_audited_revisions(self):
         notices = self.read("THIRD_PARTY_NOTICES.md")
