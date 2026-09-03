@@ -152,7 +152,7 @@ class _Preview3DController(QObject):
     def __init__(self, *, window: Any, dialog: Any, record: Any, page: Any, layout: Any, message: QLabel, controls: dict[str, Any]) -> None:
         super().__init__(page)
         app = QApplication.instance()
-        if app is not None and QThread.currentThread() is not app.thread():
+        if app is not None and QThread.currentThread() != app.thread():
             raise RuntimeError("3D preview controller must be constructed on QApplication's GUI thread.")
 
         self.window = window
@@ -253,7 +253,7 @@ class _Preview3DController(QObject):
         if not self.alive:
             return
         app = QApplication.instance()
-        if app is not None and QThread.currentThread() is not app.thread():
+        if app is not None and QThread.currentThread() != app.thread():
             self.on_failed("Unsafe OpenGL viewer creation outside the GUI thread was blocked.")
             return
 
