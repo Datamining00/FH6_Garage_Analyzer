@@ -117,7 +117,8 @@ class Preview3DBackendContractTests(unittest.TestCase):
         self.assertIn("worker.message.connect(self.on_message)", integration)
         self.assertIn("@Slot(object)", integration)
         self.assertIn("QApplication.instance()", integration)
-        self.assertIn("QThread.currentThread() is not app.thread()", integration)
+        self.assertIn("QThread.currentThread() != app.thread()", integration)
+        self.assertNotIn("QThread.currentThread() is not app.thread()", integration)
         self.assertNotIn("moveToThread", integration)
         self.assertNotIn("_GuiJobRelay", integration)
 
