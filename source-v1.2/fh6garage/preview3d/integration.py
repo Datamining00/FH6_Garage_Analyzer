@@ -190,6 +190,7 @@ def _prepare_preview_3d(
     state: dict[str, Any] = {
         "alive": True,
         "viewer": None,
+        "retired_viewers": [],
         "glb_path": "",
         "textures": None,
         "loading": True,
@@ -212,35 +213,41 @@ def _prepare_preview_3d(
         cleanup_c.setEnabled(enabled)
         reset.setEnabled(enabled and state.get("viewer") is not None)
 
-    def detach_viewer() -> None:
+    def retire_viewer() -> None:
+        """Hide the current GL widget without destroying its native context mid-switch.
+
+        Destroying a visible QOpenGLWidget while a mode-change reload is in flight can
+        terminate the Windows process inside Qt/driver teardown. Retired widgets remain
+        children of the preview page and are reclaimed with the dialog.
+        """
         viewer = state.get("viewer")
         state["viewer"] = None
         if viewer is None:
             return
         try:
             layout.removeWidget(viewer)
-            viewer.close()
-            viewer.setParent(None)
-            viewer.deleteLater()
+            viewer.hide()
+            state["retired_viewers"].append(viewer)
         except RuntimeError:
             pass
 
     def rebuild_layout_with(widget: Any) -> None:
-        """Drop stretch items while preserving the reusable status QLabel."""
+        """Drop stretch/items while preserving the reusable status QLabel."""
         while layout.count():
             item = layout.takeAt(0)
             child = item.widget()
             if child is not None and child is not message and child is not widget:
                 child.hide()
-                child.setParent(None)
-                child.deleteLater()
+                if child not in state["retired_viewers"]:
+                    child.setParent(None)
+                    child.deleteLater()
         if widget is not None:
             layout.addWidget(widget, 1)
 
     def show_message(text: str) -> None:
         if not is_alive():
             return
-        detach_viewer()
+        retire_viewer()
         rebuild_layout_with(message)
         message.setText(text)
         message.show()
@@ -265,7 +272,10 @@ def _prepare_preview_3d(
             return
         from .viewer import CarOpenGLWidget
 
-        detach_viewer()
+        # Never close/delete a live GL widget during an eligibility switch. Keep it
+        # hidden until the dialog is destroyed, then install and explicitly show the
+        # new widget. This avoids native context teardown crashes on Windows.
+        retire_viewer()
         message.hide()
         viewer = CarOpenGLWidget(scene, state["textures"], parent=page)
         fmt = QSurfaceFormat()
@@ -286,6 +296,12 @@ def _prepare_preview_3d(
         state["viewer"] = viewer
         state["loading"] = False
         set_options_enabled(True)
+        # The page is already visible when the lazy widget is created. Explicitly show
+        # the new child so QOpenGLWidget creates its context and initializeGL runs.
+        viewer.show()
+        viewer.raise_()
+        viewer.update()
+        QTimer.singleShot(0, viewer.update)
 
     set_options_enabled(False)
 
@@ -306,7 +322,7 @@ def _prepare_preview_3d(
     initial = _InitialPreviewWorker(
         int(car_id),
         str(livery_path),
-        str(eligibility.currentData() or "strict"),
+        str(eligibility.currentData() or "legacy"),
         bool(cleanup_c.isChecked()),
     )
     _start_job(
@@ -347,7 +363,7 @@ def _prepare_preview_3d(
         worker = _SceneReloadWorker(
             str(state["glb_path"]),
             state["textures"],
-            str(eligibility.currentData() or "strict"),
+            str(eligibility.currentData() or "legacy"),
             bool(cleanup_c.isChecked()),
         )
         _start_job(window, worker, finished=reloaded, failed=show_error)
