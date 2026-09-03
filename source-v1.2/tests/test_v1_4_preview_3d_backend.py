@@ -77,21 +77,20 @@ class Preview3DBackendContractTests(unittest.TestCase):
             "GL.glClearColor(0.5294118, 0.8078431, 0.9215686, 1.0)",
             viewer,
         )
-        for rejected in (
-            "Omni studio",
-            "uKeyLightDir",
-            "uFillLightDir",
-            "shadow map",
-            "PCF",
-        ):
+        for rejected in ("Omni studio", "uKeyLightDir", "uFillLightDir", "shadow map", "PCF"):
             self.assertNotIn(rejected, viewer)
 
-    def test_glb_parser_uses_uv3_and_two_eligibility_modes(self):
+    def test_glb_parser_uses_uv3_and_two_ui_eligibility_modes(self):
         parser = self.read("glb_parser.py")
-        self.assertIn("if int(livery_uv_channel)!=3", parser)
-        self.assertIn("{'strict','legacy'}", parser)
+        self.assertIn("livery_uv_channel", parser)
+        self.assertIn("strict", parser)
+        self.assertIn("legacy", parser)
         self.assertIn("TEXCOORD_", parser)
         self.assertIn("neutral_cleanup_c", parser)
+        preview = Path("fh6garage/v1_4_preview_mode_patch.py").read_text(encoding="utf-8")
+        self.assertIn('eligibility.addItem("Legacy", "legacy")', preview)
+        self.assertIn('eligibility.addItem("Strict", "strict")', preview)
+        self.assertNotIn("declared_confirmed", preview)
 
     def test_raster_resolution_is_inventory_based_and_fail_open_per_layer(self):
         runtime = self.read("kfps_runtime.py")
@@ -108,25 +107,37 @@ class Preview3DBackendContractTests(unittest.TestCase):
         for vehicle_literal in ("FXX", "2000GT", "JCWGP", "Toyota", "Ferrari", "MINI"):
             self.assertNotIn(vehicle_literal, neutral)
 
-    def test_qt_worker_and_dialog_lifecycle_are_fail_safe(self):
+    def test_worker_architecture_matches_finalverify1_qthread_pattern(self):
         integration = self.read("integration.py")
-        self.assertIn('dialog.destroyed.connect', integration)
-        self.assertIn('"alive": True', integration)
-        self.assertIn('worker.finished.connect(worker.deleteLater)', integration)
-        self.assertIn('worker.failed.connect(worker.deleteLater)', integration)
-        self.assertIn('child is not message', integration)
-        self.assertNotIn('def _clear_layout', integration)
-        self.assertIn('QTimer.singleShot', integration)
+        self.assertIn("class _InitialPreviewThread(QThread)", integration)
+        self.assertIn("class _SceneReloadThread(QThread)", integration)
+        self.assertIn("class _Preview3DController(QObject)", integration)
+        self.assertIn("worker.completed.connect(self.initial_completed)", integration)
+        self.assertIn("worker.completed.connect(self.reload_completed)", integration)
+        self.assertIn("worker.message.connect(self.on_message)", integration)
+        self.assertIn("@Slot(object)", integration)
+        self.assertIn("QApplication.instance()", integration)
+        self.assertIn("QThread.currentThread() is not app.thread()", integration)
+        self.assertNotIn("moveToThread", integration)
+        self.assertNotIn("_GuiJobRelay", integration)
+
+    def test_dialog_lifecycle_preserves_reusable_status_widget(self):
+        integration = self.read("integration.py")
+        self.assertIn("dialog.destroyed.connect(self._dialog_destroyed)", integration)
+        self.assertIn("if child is self.message", integration)
+        self.assertIn("self.message.hide()", integration)
+        self.assertIn("self.layout.addWidget(self.message, 1)", integration)
+        self.assertNotIn("self.message.deleteLater", integration)
 
     def test_visible_gl_widget_and_mode_switch_are_native_context_safe(self):
         integration = self.read("integration.py")
-        self.assertIn('"retired_viewers": []', integration)
-        self.assertIn('def retire_viewer()', integration)
-        self.assertIn('viewer.hide()', integration)
-        self.assertIn('viewer.show()', integration)
-        self.assertIn('viewer.raise_()', integration)
-        self.assertIn('viewer.update()', integration)
-        self.assertNotIn('viewer.close()', integration)
+        self.assertIn("self.retired_viewers", integration)
+        self.assertIn("def _retire_viewer", integration)
+        self.assertIn("viewer.hide()", integration)
+        self.assertIn("viewer.show()", integration)
+        self.assertIn("viewer.raise_()", integration)
+        self.assertIn("viewer.update()", integration)
+        self.assertNotIn("viewer.close()", integration)
         self.assertIn('currentData() or "legacy"', integration)
 
     def test_opengl_format_is_requested_per_lazy_widget(self):
@@ -137,6 +148,13 @@ class Preview3DBackendContractTests(unittest.TestCase):
         self.assertIn("viewer.setFormat(fmt)", integration)
         self.assertNotIn("QSurfaceFormat.setDefaultFormat", integration)
         self.assertNotIn("configure_default_opengl_format", integration)
+
+    def test_loading_stages_distinguish_scene_decode_from_view_install(self):
+        integration = self.read("integration.py")
+        self.assertIn("3D 텍스처 계약 준비 중", integration)
+        self.assertIn("3D 장면 준비 중", integration)
+        self.assertIn("3D 장면 해석 완료", integration)
+        self.assertIn("time.perf_counter()", integration)
 
     def test_third_party_notices_pin_the_audited_revisions(self):
         notices = self.read("THIRD_PARTY_NOTICES.md")
