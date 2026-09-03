@@ -11,7 +11,7 @@ PACKAGE = ROOT / "fh6garage"
 class PreviewModeShellContractTests(unittest.TestCase):
     def test_shell_is_ui_only_and_has_no_3d_backend_dependency(self) -> None:
         source = (PACKAGE / "v1_4_preview_mode_shell_patch.py").read_text(encoding="utf-8")
-        self.assertIn("class", source if False else "class")  # keep unittest discovery simple
+        self.assertIn("def _show_livery_preview_shell", source)
         self.assertIn("QStackedWidget", source)
         self.assertIn('QPushButton("3D")', source)
         self.assertIn("ZoomableImageView", source)
