@@ -191,6 +191,7 @@ def _show_preview_modes(window: Any, record: LiveryRecord | TuningRecord) -> Non
                 return
         three_d_message.setText(_txt("3D 모델 준비 중...", "Preparing 3D model..."))
         def invoke_backend() -> None:
+            # backend failures must not break image modes
             try:
                 callback(dialog=dialog, record=record, page=three_d_page, layout=three_d_layout, message=three_d_message, controls=three_d_controls)
             except Exception as exc:
