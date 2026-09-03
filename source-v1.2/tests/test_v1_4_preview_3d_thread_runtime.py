@@ -25,6 +25,7 @@ class _GuiReceiver(QObject):
         self.loop = loop
         self.called = False
         self.progress_called = False
+        self.thread_finished = False
         self.on_owner_thread = False
         self.payload = None
         self.error = None
@@ -39,11 +40,14 @@ class _GuiReceiver(QObject):
         self.called = True
         self.payload = payload
         self.on_owner_thread = QThread.currentThread() is self.owner.thread()
-        self.loop.quit()
 
     @Slot(str)
     def failed(self, text: str) -> None:
         self.error = text
+
+    @Slot()
+    def thread_done(self) -> None:
+        self.thread_finished = True
         self.loop.quit()
 
 
@@ -64,6 +68,7 @@ class Preview3DThreadRuntimeTests(unittest.TestCase):
             failed_slot=receiver.failed,
             progress_slot=receiver.progress,
         )
+        thread.finished.connect(receiver.thread_done)
         timed_out = {"value": False}
 
         def timeout() -> None:
@@ -72,16 +77,14 @@ class Preview3DThreadRuntimeTests(unittest.TestCase):
 
         QTimer.singleShot(2000, timeout)
         loop.exec()
-        thread.quit()
-        thread.wait(2000)
 
         self.assertFalse(timed_out["value"], "3D worker bridge timed out")
+        self.assertTrue(receiver.thread_finished)
         self.assertIsNone(receiver.error)
         self.assertTrue(receiver.progress_called)
         self.assertTrue(receiver.called)
         self.assertTrue(receiver.on_owner_thread)
         self.assertEqual(receiver.payload, {"probe": True})
-        self.assertFalse(thread.isRunning())
 
 
 if __name__ == "__main__":
