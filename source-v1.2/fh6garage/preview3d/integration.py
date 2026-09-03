@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from pathlib import Path
 from typing import Any
 
@@ -15,25 +16,20 @@ def _txt(ko: str, en: str) -> str:
 
 
 class _InitialPreviewThread(QThread):
-    """FinalVerify1-style worker: heavy preparation runs in QThread.run()."""
-
     message = Signal(str)
     completed = Signal(object)
     failed = Signal(str)
 
-    def __init__(
-        self,
-        car_id: int,
-        livery_path: str,
-        eligibility: str,
-        cleanup_c: bool,
-        parent: QObject | None = None,
-    ) -> None:
+    def __init__(self, car_id: int, livery_path: str, eligibility: str, cleanup_c: bool, parent=None) -> None:
         super().__init__(parent)
         self.car_id = int(car_id)
         self.livery_path = str(livery_path)
         self.eligibility = str(eligibility or "legacy")
         self.cleanup_c = bool(cleanup_c)
+
+    def _stage(self, text: str) -> float:
+        self.message.emit(text)
+        return time.perf_counter()
 
     def run(self) -> None:
         try:
@@ -41,22 +37,15 @@ class _InitialPreviewThread(QThread):
             from .direct_livery import build_direct_livery_textures
             from .glb_parser import load_kfps_glb
             from .kfps_runtime import render_clivery_sections
-            from .vehicle_assets import (
-                detect_fh6_installation,
-                find_vehicle_asset,
-                preferred_carbin_entry,
-            )
+            from .vehicle_assets import detect_fh6_installation, find_vehicle_asset, preferred_carbin_entry
 
-            self.message.emit(
-                _txt("FH6 차량 데이터 확인 중...", "Locating FH6 vehicle data...")
-            )
+            self._stage(_txt("FH6 차량 데이터 확인 중...", "Locating FH6 vehicle data..."))
             game_root = detect_fh6_installation()
             if game_root is None:
                 raise RuntimeError(
                     "FH6 installation could not be located. Set FH6_GAME_DIR or "
                     "FORZA_HORIZON_6_DIR if the game is installed in an unusual location."
                 )
-
             asset = find_vehicle_asset(game_root, self.car_id)
             carbin_entry = preferred_carbin_entry(asset)
             if carbin_entry is None:
@@ -65,15 +54,10 @@ class _InitialPreviewThread(QThread):
                     "automatic 3D preview was not attempted."
                 )
 
-            conversion = convert_vehicle(
-                asset,
-                progress=self.message.emit,
-                carbin_entry=carbin_entry,
-            )
+            self._stage(_txt("3D 차량 모델 준비 중...", "Preparing 3D vehicle model..."))
+            conversion = convert_vehicle(asset, progress=self.message.emit, carbin_entry=carbin_entry)
 
-            self.message.emit(
-                _txt("리버리 레이어 렌더링 중...", "Rendering livery layers...")
-            )
+            self._stage(_txt("리버리 레이어 렌더링 중...", "Rendering livery layers..."))
             render_result = render_clivery_sections(
                 self.livery_path,
                 game_folder=game_root,
@@ -81,12 +65,16 @@ class _InitialPreviewThread(QThread):
                 log=self.message.emit,
             )
 
-            self.message.emit(
-                _txt("3D 텍스처 계약 준비 중...", "Preparing 3D texture contract...")
-            )
+            started = self._stage(_txt("3D 텍스처 계약 준비 중...", "Preparing 3D texture contract..."))
             textures = build_direct_livery_textures(render_result, asset)
+            self.message.emit(
+                _txt(
+                    f"3D 장면 준비 중... (텍스처 {time.perf_counter() - started:.1f}초)",
+                    f"Preparing 3D scene... (textures {time.perf_counter() - started:.1f}s)",
+                )
+            )
 
-            self.message.emit(_txt("3D 장면 준비 중...", "Preparing 3D scene..."))
+            started = time.perf_counter()
             scene = load_kfps_glb(
                 conversion.output_path,
                 textures,
@@ -94,13 +82,17 @@ class _InitialPreviewThread(QThread):
                 livery_eligibility=self.eligibility,
                 neutral_cleanup_c=self.cleanup_c,
             )
-            self.completed.emit(
-                {
-                    "scene": scene,
-                    "textures": textures,
-                    "glb_path": str(conversion.output_path),
-                }
+            self.message.emit(
+                _txt(
+                    f"3D 장면 해석 완료 ({time.perf_counter() - started:.1f}초), 화면 준비 중...",
+                    f"3D scene decoded ({time.perf_counter() - started:.1f}s), preparing view...",
+                )
             )
+            self.completed.emit({
+                "scene": scene,
+                "textures": textures,
+                "glb_path": str(conversion.output_path),
+            })
         except Exception as exc:
             self.failed.emit(f"{type(exc).__name__}: {exc}")
 
@@ -109,14 +101,7 @@ class _SceneReloadThread(QThread):
     completed = Signal(object)
     failed = Signal(str)
 
-    def __init__(
-        self,
-        glb_path: str,
-        textures: object,
-        eligibility: str,
-        cleanup_c: bool,
-        parent: QObject | None = None,
-    ) -> None:
+    def __init__(self, glb_path: str, textures: object, eligibility: str, cleanup_c: bool, parent=None) -> None:
         super().__init__(parent)
         self.glb_path = str(glb_path)
         self.textures = textures
@@ -126,7 +111,6 @@ class _SceneReloadThread(QThread):
     def run(self) -> None:
         try:
             from .glb_parser import load_kfps_glb
-
             scene = load_kfps_glb(
                 self.glb_path,
                 self.textures,
@@ -139,23 +123,22 @@ class _SceneReloadThread(QThread):
             self.failed.emit(f"{type(exc).__name__}: {exc}")
 
 
-def _worker_store(window: Any) -> list[QThread]:
-    workers = getattr(window, "_fh6_preview3d_workers", None)
-    if not isinstance(workers, list):
-        workers = []
-        window._fh6_preview3d_workers = workers
-    return workers
+def _workers(window: Any) -> list[QThread]:
+    items = getattr(window, "_fh6_preview3d_workers", None)
+    if not isinstance(items, list):
+        items = []
+        window._fh6_preview3d_workers = items
+    return items
 
 
 def _retain_worker(window: Any, worker: QThread) -> None:
-    """Keep QThread alive even when the preview dialog closes mid-operation."""
+    items = _workers(window)
+    items.append(worker)
 
-    workers = _worker_store(window)
-    workers.append(worker)
-
+    @Slot()
     def release() -> None:
         try:
-            workers.remove(worker)
+            items.remove(worker)
         except ValueError:
             pass
         worker.deleteLater()
@@ -164,28 +147,13 @@ def _retain_worker(window: Any, worker: QThread) -> None:
 
 
 class _Preview3DController(QObject):
-    """GUI-thread controller for one embedded preview page.
+    """GUI-thread owner of all preview widgets and OpenGL lifecycle."""
 
-    This deliberately mirrors FinalVerify1: QThread subclasses do the expensive work,
-    while every QWidget/QOpenGLWidget operation is performed by QObject slots whose
-    affinity is QApplication's GUI thread.
-    """
-
-    def __init__(
-        self,
-        *,
-        window: Any,
-        dialog: Any,
-        record: Any,
-        page: Any,
-        layout: Any,
-        message: QLabel,
-        controls: dict[str, Any],
-    ) -> None:
+    def __init__(self, *, window: Any, dialog: Any, record: Any, page: Any, layout: Any, message: QLabel, controls: dict[str, Any]) -> None:
         super().__init__(page)
         app = QApplication.instance()
-        if app is not None and self.thread() is not app.thread():
-            raise RuntimeError("3D preview controller was not created on the GUI thread.")
+        if app is not None and QThread.currentThread() is not app.thread():
+            raise RuntimeError("3D preview controller must be constructed on QApplication's GUI thread.")
 
         self.window = window
         self.dialog = dialog
@@ -201,16 +169,14 @@ class _Preview3DController(QObject):
         self.textures = None
         self.loading = False
         self.pending_reload = False
-        self.initial_worker: _InitialPreviewThread | None = None
-        self.reload_worker: _SceneReloadThread | None = None
 
-        dialog.destroyed.connect(self._on_dialog_destroyed)
+        dialog.destroyed.connect(self._dialog_destroyed)
         controls["reset"].clicked.connect(self.reset_camera)
         controls["eligibility"].currentIndexChanged.connect(self.request_reload)
         controls["cleanup_c"].toggled.connect(self.request_reload)
 
     @Slot()
-    def _on_dialog_destroyed(self) -> None:
+    def _dialog_destroyed(self) -> None:
         self.alive = False
 
     def _eligibility(self) -> str:
@@ -238,24 +204,30 @@ class _Preview3DController(QObject):
         except RuntimeError:
             pass
 
-    def _clear_layout_except(self, keep: Any) -> None:
+    def _drain_layout(self) -> None:
+        """Remove layout items but never destroy the reusable status QLabel."""
         while self.layout.count():
             item = self.layout.takeAt(0)
             child = item.widget()
-            if child is None or child is keep:
+            if child is None:
+                continue
+            if child is self.message:
+                child.hide()
+                continue
+            if child in self.retired_viewers:
+                child.hide()
                 continue
             child.hide()
-            if child not in self.retired_viewers:
-                child.setParent(None)
-                child.deleteLater()
+            child.setParent(None)
+            child.deleteLater()
 
     def _show_message(self, text: str) -> None:
         if not self.alive:
             return
         self._retire_viewer()
-        self._clear_layout_except(self.message)
-        self.layout.addWidget(self.message, 1)
+        self._drain_layout()
         self.message.setText(text)
+        self.layout.addWidget(self.message, 1)
         self.message.show()
 
     @Slot(str)
@@ -269,10 +241,13 @@ class _Preview3DController(QObject):
             return
         self.loading = False
         self._show_message(
-            _txt("3D 모델을 표시할 수 없습니다.\n", "Unable to display the 3D model.\n")
-            + text
+            _txt("3D 모델을 표시할 수 없습니다.\n", "Unable to display the 3D model.\n") + text
         )
         self._set_options_enabled(bool(self.glb_path and self.textures is not None))
+
+    @Slot(str)
+    def _viewer_failed(self, text: str) -> None:
+        QTimer.singleShot(0, lambda error=text: self.on_failed(error))
 
     def _install_scene(self, scene: object) -> None:
         if not self.alive:
@@ -285,7 +260,7 @@ class _Preview3DController(QObject):
         from .viewer import CarOpenGLWidget
 
         self._retire_viewer()
-        self._clear_layout_except(None)
+        self._drain_layout()
         self.message.hide()
 
         viewer = CarOpenGLWidget(scene, self.textures, parent=self.page)
@@ -297,7 +272,7 @@ class _Preview3DController(QObject):
         fmt.setSamples(4)
         viewer.setFormat(fmt)
         viewer.setMinimumSize(320, 240)
-        viewer.load_failed.connect(self._defer_viewer_error)
+        viewer.load_failed.connect(self._viewer_failed)
 
         self.layout.addWidget(viewer, 1)
         self.viewer = viewer
@@ -308,12 +283,8 @@ class _Preview3DController(QObject):
         viewer.update()
         QTimer.singleShot(0, viewer.update)
 
-    @Slot(str)
-    def _defer_viewer_error(self, text: str) -> None:
-        QTimer.singleShot(0, lambda error=text: self.on_failed(error))
-
     @Slot(object)
-    def on_initial_completed(self, payload: object) -> None:
+    def initial_completed(self, payload: object) -> None:
         if not self.alive:
             return
         if not isinstance(payload, dict):
@@ -333,7 +304,7 @@ class _Preview3DController(QObject):
             self.request_reload()
 
     @Slot(object)
-    def on_reload_completed(self, scene: object) -> None:
+    def reload_completed(self, scene: object) -> None:
         if not self.alive:
             return
         self._install_scene(scene)
@@ -366,9 +337,8 @@ class _Preview3DController(QObject):
             self._cleanup_c(),
             parent=self.window,
         )
-        self.reload_worker = worker
         _retain_worker(self.window, worker)
-        worker.completed.connect(self.on_reload_completed)
+        worker.completed.connect(self.reload_completed)
         worker.failed.connect(self.on_failed)
         worker.start()
 
@@ -393,24 +363,14 @@ class _Preview3DController(QObject):
             self._cleanup_c(),
             parent=self.window,
         )
-        self.initial_worker = worker
         _retain_worker(self.window, worker)
         worker.message.connect(self.on_message)
-        worker.completed.connect(self.on_initial_completed)
+        worker.completed.connect(self.initial_completed)
         worker.failed.connect(self.on_failed)
         worker.start()
 
 
-def _prepare_preview_3d(
-    window: Any,
-    *,
-    dialog: Any,
-    record: Any,
-    page: Any,
-    layout: Any,
-    message: QLabel,
-    controls: dict[str, Any],
-) -> None:
+def _prepare_preview_3d(window: Any, *, dialog: Any, record: Any, page: Any, layout: Any, message: QLabel, controls: dict[str, Any]) -> None:
     controller = _Preview3DController(
         window=window,
         dialog=dialog,
