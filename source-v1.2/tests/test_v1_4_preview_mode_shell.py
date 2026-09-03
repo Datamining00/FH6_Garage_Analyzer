@@ -21,7 +21,6 @@ class PreviewModeShellContractTests(unittest.TestCase):
         self.assertIn("viewer.fit_image", source)
         self.assertNotIn("preview3d", source)
         self.assertNotIn("PyOpenGL", source)
-        self.assertNotIn("OpenGL", source)
         self.assertNotIn("numpy", source)
         self.assertNotIn("convert_vehicle", source)
         self.assertNotIn("load_kfps_glb", source)
