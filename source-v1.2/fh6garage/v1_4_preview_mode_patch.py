@@ -94,8 +94,10 @@ def _three_d_options() -> tuple[QWidget, dict[str, Any]]:
     reset = _secondary_button(_txt("카메라 초기화", "Reset camera"))
     reset.setEnabled(False)
     eligibility = QComboBox()
-    eligibility.addItem("Strict", "strict")
+    # Legacy is the production default for the integrated viewer. Strict remains
+    # available as an explicit comparison mode.
     eligibility.addItem("Legacy", "legacy")
+    eligibility.addItem("Strict", "strict")
     eligibility.setCurrentIndex(0)
     eligibility.setEnabled(False)
     cleanup_c = QCheckBox(_txt("C 추가 정리", "Additional cleanup C"))
