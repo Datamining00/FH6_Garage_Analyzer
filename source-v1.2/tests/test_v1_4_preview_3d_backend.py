@@ -118,6 +118,17 @@ class Preview3DBackendContractTests(unittest.TestCase):
         self.assertNotIn('def _clear_layout', integration)
         self.assertIn('QTimer.singleShot', integration)
 
+    def test_visible_gl_widget_and_mode_switch_are_native_context_safe(self):
+        integration = self.read("integration.py")
+        self.assertIn('"retired_viewers": []', integration)
+        self.assertIn('def retire_viewer()', integration)
+        self.assertIn('viewer.hide()', integration)
+        self.assertIn('viewer.show()', integration)
+        self.assertIn('viewer.raise_()', integration)
+        self.assertIn('viewer.update()', integration)
+        self.assertNotIn('viewer.close()', integration)
+        self.assertIn('currentData() or "legacy"', integration)
+
     def test_opengl_format_is_requested_per_lazy_widget(self):
         integration = self.read("integration.py")
         self.assertIn("QSurfaceFormat", integration)
