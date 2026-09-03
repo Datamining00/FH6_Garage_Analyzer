@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from PySide6.QtCore import QObject, QThread, QTimer, Signal, Slot
 from PySide6.QtGui import QSurfaceFormat
-from PySide6.QtWidgets import QLabel
+from PySide6.QtWidgets import QApplication, QLabel
 
 from ..i18n import get_language
 
@@ -14,19 +14,27 @@ def _txt(ko: str, en: str) -> str:
     return ko if get_language().casefold().startswith("ko") else en
 
 
-class _InitialPreviewWorker(QObject):
-    progress = Signal(str)
-    finished = Signal(object)
+class _InitialPreviewThread(QThread):
+    """FinalVerify1-style worker: heavy preparation runs in QThread.run()."""
+
+    message = Signal(str)
+    completed = Signal(object)
     failed = Signal(str)
 
-    def __init__(self, car_id: int, livery_path: str, eligibility: str, cleanup_c: bool):
-        super().__init__()
+    def __init__(
+        self,
+        car_id: int,
+        livery_path: str,
+        eligibility: str,
+        cleanup_c: bool,
+        parent: QObject | None = None,
+    ) -> None:
+        super().__init__(parent)
         self.car_id = int(car_id)
         self.livery_path = str(livery_path)
-        self.eligibility = str(eligibility)
+        self.eligibility = str(eligibility or "legacy")
         self.cleanup_c = bool(cleanup_c)
 
-    @Slot()
     def run(self) -> None:
         try:
             from .converter import convert_vehicle
@@ -39,15 +47,16 @@ class _InitialPreviewWorker(QObject):
                 preferred_carbin_entry,
             )
 
+            self.message.emit(
+                _txt("FH6 차량 데이터 확인 중...", "Locating FH6 vehicle data...")
+            )
             game_root = detect_fh6_installation()
             if game_root is None:
                 raise RuntimeError(
                     "FH6 installation could not be located. Set FH6_GAME_DIR or "
                     "FORZA_HORIZON_6_DIR if the game is installed in an unusual location."
                 )
-            self.progress.emit(
-                _txt("FH6 차량 데이터 확인 중...", "Locating FH6 vehicle data...")
-            )
+
             asset = find_vehicle_asset(game_root, self.car_id)
             carbin_entry = preferred_carbin_entry(asset)
             if carbin_entry is None:
@@ -55,22 +64,29 @@ class _InitialPreviewWorker(QObject):
                     f"Car ID {self.car_id} has multiple ambiguous carbin scenes; "
                     "automatic 3D preview was not attempted."
                 )
+
             conversion = convert_vehicle(
                 asset,
-                progress=self.progress.emit,
+                progress=self.message.emit,
                 carbin_entry=carbin_entry,
             )
-            self.progress.emit(
+
+            self.message.emit(
                 _txt("리버리 레이어 렌더링 중...", "Rendering livery layers...")
             )
             render_result = render_clivery_sections(
                 self.livery_path,
                 game_folder=game_root,
                 resolution="normal",
-                log=self.progress.emit,
+                log=self.message.emit,
+            )
+
+            self.message.emit(
+                _txt("3D 텍스처 계약 준비 중...", "Preparing 3D texture contract...")
             )
             textures = build_direct_livery_textures(render_result, asset)
-            self.progress.emit(_txt("3D 장면 준비 중...", "Preparing 3D scene..."))
+
+            self.message.emit(_txt("3D 장면 준비 중...", "Preparing 3D scene..."))
             scene = load_kfps_glb(
                 conversion.output_path,
                 textures,
@@ -78,19 +94,19 @@ class _InitialPreviewWorker(QObject):
                 livery_eligibility=self.eligibility,
                 neutral_cleanup_c=self.cleanup_c,
             )
-            self.finished.emit(
+            self.completed.emit(
                 {
                     "scene": scene,
                     "textures": textures,
-                    "glb_path": conversion.output_path,
+                    "glb_path": str(conversion.output_path),
                 }
             )
         except Exception as exc:
             self.failed.emit(f"{type(exc).__name__}: {exc}")
 
 
-class _SceneReloadWorker(QObject):
-    finished = Signal(object)
+class _SceneReloadThread(QThread):
+    completed = Signal(object)
     failed = Signal(str)
 
     def __init__(
@@ -99,14 +115,14 @@ class _SceneReloadWorker(QObject):
         textures: object,
         eligibility: str,
         cleanup_c: bool,
+        parent: QObject | None = None,
     ) -> None:
-        super().__init__()
+        super().__init__(parent)
         self.glb_path = str(glb_path)
         self.textures = textures
-        self.eligibility = str(eligibility)
+        self.eligibility = str(eligibility or "legacy")
         self.cleanup_c = bool(cleanup_c)
 
-    @Slot()
     def run(self) -> None:
         try:
             from .glb_parser import load_kfps_glb
@@ -118,52 +134,271 @@ class _SceneReloadWorker(QObject):
                 livery_eligibility=self.eligibility,
                 neutral_cleanup_c=self.cleanup_c,
             )
-            self.finished.emit(scene)
+            self.completed.emit(scene)
         except Exception as exc:
             self.failed.emit(f"{type(exc).__name__}: {exc}")
 
 
-def _job_store(window: Any) -> list[tuple[QThread, QObject]]:
-    jobs = getattr(window, "_fh6_preview3d_jobs", None)
-    if not isinstance(jobs, list):
-        jobs = []
-        window._fh6_preview3d_jobs = jobs
-    return jobs
+def _worker_store(window: Any) -> list[QThread]:
+    workers = getattr(window, "_fh6_preview3d_workers", None)
+    if not isinstance(workers, list):
+        workers = []
+        window._fh6_preview3d_workers = workers
+    return workers
 
 
-def _start_job(
-    window: Any,
-    worker: QObject,
-    *,
-    finished: Callable[[object], None],
-    failed: Callable[[str], None],
-    progress: Callable[[str], None] | None = None,
-) -> None:
-    """Run one preview worker without allowing QThread/worker premature deletion."""
-    thread = QThread(window)
-    worker.moveToThread(thread)
-    jobs = _job_store(window)
-    jobs.append((thread, worker))
+def _retain_worker(window: Any, worker: QThread) -> None:
+    """Keep QThread alive even when the preview dialog closes mid-operation."""
 
-    def release_refs() -> None:
+    workers = _worker_store(window)
+    workers.append(worker)
+
+    def release() -> None:
         try:
-            jobs.remove((thread, worker))
+            workers.remove(worker)
         except ValueError:
             pass
-        thread.deleteLater()
+        worker.deleteLater()
 
-    thread.started.connect(worker.run)
-    if progress is not None and hasattr(worker, "progress"):
-        worker.progress.connect(progress)
-    worker.finished.connect(finished)
-    worker.failed.connect(failed)
-    worker.finished.connect(thread.quit)
-    worker.failed.connect(thread.quit)
-    # Schedule worker deletion while its owning event loop still exists.
-    worker.finished.connect(worker.deleteLater)
-    worker.failed.connect(worker.deleteLater)
-    thread.finished.connect(release_refs)
-    thread.start()
+    worker.finished.connect(release)
+
+
+class _Preview3DController(QObject):
+    """GUI-thread controller for one embedded preview page.
+
+    This deliberately mirrors FinalVerify1: QThread subclasses do the expensive work,
+    while every QWidget/QOpenGLWidget operation is performed by QObject slots whose
+    affinity is QApplication's GUI thread.
+    """
+
+    def __init__(
+        self,
+        *,
+        window: Any,
+        dialog: Any,
+        record: Any,
+        page: Any,
+        layout: Any,
+        message: QLabel,
+        controls: dict[str, Any],
+    ) -> None:
+        super().__init__(page)
+        app = QApplication.instance()
+        if app is not None and self.thread() is not app.thread():
+            raise RuntimeError("3D preview controller was not created on the GUI thread.")
+
+        self.window = window
+        self.dialog = dialog
+        self.record = record
+        self.page = page
+        self.layout = layout
+        self.message = message
+        self.controls = controls
+        self.alive = True
+        self.viewer = None
+        self.retired_viewers: list[Any] = []
+        self.glb_path = ""
+        self.textures = None
+        self.loading = False
+        self.pending_reload = False
+        self.initial_worker: _InitialPreviewThread | None = None
+        self.reload_worker: _SceneReloadThread | None = None
+
+        dialog.destroyed.connect(self._on_dialog_destroyed)
+        controls["reset"].clicked.connect(self.reset_camera)
+        controls["eligibility"].currentIndexChanged.connect(self.request_reload)
+        controls["cleanup_c"].toggled.connect(self.request_reload)
+
+    @Slot()
+    def _on_dialog_destroyed(self) -> None:
+        self.alive = False
+
+    def _eligibility(self) -> str:
+        return str(self.controls["eligibility"].currentData() or "legacy")
+
+    def _cleanup_c(self) -> bool:
+        return bool(self.controls["cleanup_c"].isChecked())
+
+    def _set_options_enabled(self, enabled: bool) -> None:
+        if not self.alive:
+            return
+        self.controls["eligibility"].setEnabled(enabled)
+        self.controls["cleanup_c"].setEnabled(enabled)
+        self.controls["reset"].setEnabled(enabled and self.viewer is not None)
+
+    def _retire_viewer(self) -> None:
+        viewer = self.viewer
+        self.viewer = None
+        if viewer is None:
+            return
+        try:
+            self.layout.removeWidget(viewer)
+            viewer.hide()
+            self.retired_viewers.append(viewer)
+        except RuntimeError:
+            pass
+
+    def _clear_layout_except(self, keep: Any) -> None:
+        while self.layout.count():
+            item = self.layout.takeAt(0)
+            child = item.widget()
+            if child is None or child is keep:
+                continue
+            child.hide()
+            if child not in self.retired_viewers:
+                child.setParent(None)
+                child.deleteLater()
+
+    def _show_message(self, text: str) -> None:
+        if not self.alive:
+            return
+        self._retire_viewer()
+        self._clear_layout_except(self.message)
+        self.layout.addWidget(self.message, 1)
+        self.message.setText(text)
+        self.message.show()
+
+    @Slot(str)
+    def on_message(self, text: str) -> None:
+        if self.alive:
+            self.message.setText(text)
+
+    @Slot(str)
+    def on_failed(self, text: str) -> None:
+        if not self.alive:
+            return
+        self.loading = False
+        self._show_message(
+            _txt("3D 모델을 표시할 수 없습니다.\n", "Unable to display the 3D model.\n")
+            + text
+        )
+        self._set_options_enabled(bool(self.glb_path and self.textures is not None))
+
+    def _install_scene(self, scene: object) -> None:
+        if not self.alive:
+            return
+        app = QApplication.instance()
+        if app is not None and QThread.currentThread() is not app.thread():
+            self.on_failed("Unsafe OpenGL viewer creation outside the GUI thread was blocked.")
+            return
+
+        from .viewer import CarOpenGLWidget
+
+        self._retire_viewer()
+        self._clear_layout_except(None)
+        self.message.hide()
+
+        viewer = CarOpenGLWidget(scene, self.textures, parent=self.page)
+        fmt = QSurfaceFormat()
+        fmt.setRenderableType(QSurfaceFormat.OpenGL)
+        fmt.setVersion(3, 3)
+        fmt.setProfile(QSurfaceFormat.CoreProfile)
+        fmt.setDepthBufferSize(24)
+        fmt.setSamples(4)
+        viewer.setFormat(fmt)
+        viewer.setMinimumSize(320, 240)
+        viewer.load_failed.connect(self._defer_viewer_error)
+
+        self.layout.addWidget(viewer, 1)
+        self.viewer = viewer
+        self.loading = False
+        self._set_options_enabled(True)
+        viewer.show()
+        viewer.raise_()
+        viewer.update()
+        QTimer.singleShot(0, viewer.update)
+
+    @Slot(str)
+    def _defer_viewer_error(self, text: str) -> None:
+        QTimer.singleShot(0, lambda error=text: self.on_failed(error))
+
+    @Slot(object)
+    def on_initial_completed(self, payload: object) -> None:
+        if not self.alive:
+            return
+        if not isinstance(payload, dict):
+            self.on_failed("Invalid 3D worker result")
+            return
+        glb_path = str(payload.get("glb_path") or "")
+        textures = payload.get("textures")
+        scene = payload.get("scene")
+        if not glb_path or textures is None or scene is None:
+            self.on_failed("Incomplete 3D worker result")
+            return
+        self.glb_path = glb_path
+        self.textures = textures
+        self._install_scene(scene)
+        if self.pending_reload:
+            self.pending_reload = False
+            self.request_reload()
+
+    @Slot(object)
+    def on_reload_completed(self, scene: object) -> None:
+        if not self.alive:
+            return
+        self._install_scene(scene)
+        if self.pending_reload:
+            self.pending_reload = False
+            self.request_reload()
+
+    @Slot()
+    def reset_camera(self) -> None:
+        if self.alive and self.viewer is not None:
+            self.viewer.reset_camera()
+
+    @Slot()
+    def request_reload(self, *_args: object) -> None:
+        if not self.alive:
+            return
+        if self.loading or not self.glb_path or self.textures is None:
+            self.pending_reload = True
+            return
+
+        self.loading = True
+        self.pending_reload = False
+        self._set_options_enabled(False)
+        self._show_message(_txt("3D 표시 옵션 적용 중...", "Applying 3D display options..."))
+
+        worker = _SceneReloadThread(
+            self.glb_path,
+            self.textures,
+            self._eligibility(),
+            self._cleanup_c(),
+            parent=self.window,
+        )
+        self.reload_worker = worker
+        _retain_worker(self.window, worker)
+        worker.completed.connect(self.on_reload_completed)
+        worker.failed.connect(self.on_failed)
+        worker.start()
+
+    def start(self) -> None:
+        livery_path = getattr(self.record, "livery_path", None)
+        car_id = getattr(self.record, "car_id", None)
+        if not livery_path or not Path(livery_path).is_file() or car_id is None:
+            self._show_message(
+                _txt(
+                    "3D에 필요한 C_livery 또는 Car ID가 없습니다.",
+                    "C_livery or Car ID required for 3D preview is unavailable.",
+                )
+            )
+            return
+
+        self.loading = True
+        self._set_options_enabled(False)
+        worker = _InitialPreviewThread(
+            int(car_id),
+            str(livery_path),
+            self._eligibility(),
+            self._cleanup_c(),
+            parent=self.window,
+        )
+        self.initial_worker = worker
+        _retain_worker(self.window, worker)
+        worker.message.connect(self.on_message)
+        worker.completed.connect(self.on_initial_completed)
+        worker.failed.connect(self.on_failed)
+        worker.start()
 
 
 def _prepare_preview_3d(
@@ -176,197 +411,14 @@ def _prepare_preview_3d(
     message: QLabel,
     controls: dict[str, Any],
 ) -> None:
-    livery_path = getattr(record, "livery_path", None)
-    car_id = getattr(record, "car_id", None)
-    if not livery_path or not Path(livery_path).is_file() or car_id is None:
-        message.setText(
-            _txt(
-                "3D에 필요한 C_livery 또는 Car ID가 없습니다.",
-                "C_livery or Car ID required for 3D preview is unavailable.",
-            )
-        )
-        return
-
-    state: dict[str, Any] = {
-        "alive": True,
-        "viewer": None,
-        "retired_viewers": [],
-        "glb_path": "",
-        "textures": None,
-        "loading": True,
-        "pending_reload": False,
-    }
-    page._fh6_preview3d_state = state
-    dialog.destroyed.connect(lambda *_args: state.__setitem__("alive", False))
-
-    eligibility = controls["eligibility"]
-    cleanup_c = controls["cleanup_c"]
-    reset = controls["reset"]
-
-    def is_alive() -> bool:
-        return bool(state.get("alive"))
-
-    def set_options_enabled(enabled: bool) -> None:
-        if not is_alive():
-            return
-        eligibility.setEnabled(enabled)
-        cleanup_c.setEnabled(enabled)
-        reset.setEnabled(enabled and state.get("viewer") is not None)
-
-    def retire_viewer() -> None:
-        """Hide the current GL widget without destroying its native context mid-switch.
-
-        Destroying a visible QOpenGLWidget while a mode-change reload is in flight can
-        terminate the Windows process inside Qt/driver teardown. Retired widgets remain
-        children of the preview page and are reclaimed with the dialog.
-        """
-        viewer = state.get("viewer")
-        state["viewer"] = None
-        if viewer is None:
-            return
-        try:
-            layout.removeWidget(viewer)
-            viewer.hide()
-            state["retired_viewers"].append(viewer)
-        except RuntimeError:
-            pass
-
-    def rebuild_layout_with(widget: Any) -> None:
-        """Drop stretch/items while preserving the reusable status QLabel."""
-        while layout.count():
-            item = layout.takeAt(0)
-            child = item.widget()
-            if child is not None and child is not message and child is not widget:
-                child.hide()
-                if child not in state["retired_viewers"]:
-                    child.setParent(None)
-                    child.deleteLater()
-        if widget is not None:
-            layout.addWidget(widget, 1)
-
-    def show_message(text: str) -> None:
-        if not is_alive():
-            return
-        retire_viewer()
-        rebuild_layout_with(message)
-        message.setText(text)
-        message.show()
-
-    def show_error(text: str) -> None:
-        if not is_alive():
-            return
-        state["loading"] = False
-        show_message(
-            _txt(
-                "3D 모델을 표시할 수 없습니다.\n",
-                "Unable to display the 3D model.\n",
-            )
-            + text
-        )
-        # Allow another option change to retry an already-built GLB.
-        can_retry = bool(state.get("glb_path") and state.get("textures") is not None)
-        set_options_enabled(can_retry)
-
-    def install_scene(scene: object) -> None:
-        if not is_alive():
-            return
-        from .viewer import CarOpenGLWidget
-
-        # Never close/delete a live GL widget during an eligibility switch. Keep it
-        # hidden until the dialog is destroyed, then install and explicitly show the
-        # new widget. This avoids native context teardown crashes on Windows.
-        retire_viewer()
-        message.hide()
-        viewer = CarOpenGLWidget(scene, state["textures"], parent=page)
-        fmt = QSurfaceFormat()
-        fmt.setRenderableType(QSurfaceFormat.OpenGL)
-        fmt.setVersion(3, 3)
-        fmt.setProfile(QSurfaceFormat.CoreProfile)
-        fmt.setDepthBufferSize(24)
-        fmt.setSamples(4)
-        # QApplication already exists when lazy 3D mode is imported. Request the
-        # context on this widget instead of mutating the process-wide default format.
-        viewer.setFormat(fmt)
-        viewer.setMinimumSize(320, 240)
-        # Defer teardown until initializeGL has returned if context creation fails.
-        viewer.load_failed.connect(
-            lambda text: QTimer.singleShot(0, lambda error=text: show_error(error))
-        )
-        rebuild_layout_with(viewer)
-        state["viewer"] = viewer
-        state["loading"] = False
-        set_options_enabled(True)
-        # The page is already visible when the lazy widget is created. Explicitly show
-        # the new child so QOpenGLWidget creates its context and initializeGL runs.
-        viewer.show()
-        viewer.raise_()
-        viewer.update()
-        QTimer.singleShot(0, viewer.update)
-
-    set_options_enabled(False)
-
-    def initial_finished(payload: object) -> None:
-        if not is_alive():
-            return
-        if not isinstance(payload, dict):
-            show_error("Invalid 3D worker result")
-            return
-        state["glb_path"] = str(payload.get("glb_path") or "")
-        state["textures"] = payload.get("textures")
-        scene = payload.get("scene")
-        if not state["glb_path"] or state["textures"] is None or scene is None:
-            show_error("Incomplete 3D worker result")
-            return
-        install_scene(scene)
-
-    initial = _InitialPreviewWorker(
-        int(car_id),
-        str(livery_path),
-        str(eligibility.currentData() or "legacy"),
-        bool(cleanup_c.isChecked()),
+    controller = _Preview3DController(
+        window=window,
+        dialog=dialog,
+        record=record,
+        page=page,
+        layout=layout,
+        message=message,
+        controls=controls,
     )
-    _start_job(
-        window,
-        initial,
-        finished=initial_finished,
-        failed=show_error,
-        progress=message.setText,
-    )
-
-    def reset_camera() -> None:
-        if not is_alive():
-            return
-        viewer = state.get("viewer")
-        if viewer is not None:
-            viewer.reset_camera()
-
-    reset.clicked.connect(reset_camera)
-
-    def reload_scene() -> None:
-        if not is_alive():
-            return
-        if state.get("loading") or not state.get("glb_path") or state.get("textures") is None:
-            state["pending_reload"] = True
-            return
-        state["loading"] = True
-        state["pending_reload"] = False
-        set_options_enabled(False)
-        show_message(_txt("3D 표시 옵션 적용 중...", "Applying 3D display options..."))
-
-        def reloaded(scene: object) -> None:
-            if not is_alive():
-                return
-            install_scene(scene)
-            if state.pop("pending_reload", False):
-                reload_scene()
-
-        worker = _SceneReloadWorker(
-            str(state["glb_path"]),
-            state["textures"],
-            str(eligibility.currentData() or "legacy"),
-            bool(cleanup_c.isChecked()),
-        )
-        _start_job(window, worker, finished=reloaded, failed=show_error)
-
-    eligibility.currentIndexChanged.connect(lambda _index: reload_scene())
-    cleanup_c.toggled.connect(lambda _checked: reload_scene())
+    page._fh6_preview3d_controller = controller
+    controller.start()
