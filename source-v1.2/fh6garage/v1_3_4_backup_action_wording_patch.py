@@ -36,6 +36,7 @@ from .v1_4_vehicle_update_finish_ui_patch import apply_v1_4_vehicle_update_finis
 from .v1_4_vehicle_update_thread_bridge_patch import apply_v1_4_vehicle_update_thread_bridge_patch
 from .v1_4_interaction_render_completion_patch import apply_v1_4_interaction_render_completion_patch
 from .v1_4_right_control_width_patch import apply_v1_4_right_control_width_patch
+from .v1_4_preview_mode_shell_patch import apply_v1_4_preview_mode_shell_patch
 
 install_performance_measurement_guard(_performance_metrics)
 
@@ -136,4 +137,5 @@ def apply_v1_3_4_v1_4_followup_patches(MainWindow: Any) -> None:
     apply_v1_4_vehicle_update_thread_bridge_patch(MainWindow)
     apply_v1_4_interaction_render_completion_patch(MainWindow)
     apply_v1_4_right_control_width_patch(MainWindow)
+    apply_v1_4_preview_mode_shell_patch(MainWindow)
     apply_v1_3_4_performance_probe_patch(MainWindow)
