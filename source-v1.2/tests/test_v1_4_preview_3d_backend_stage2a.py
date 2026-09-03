@@ -76,10 +76,13 @@ class Preview3DBackendStage2AContractTests(unittest.TestCase):
         for rejected in ("FER_FXX", "TOY_2000GT", "MIN_JCWGP"):
             self.assertNotIn(rejected, wheel)
 
-    def test_stage2a_backend_remains_disconnected_from_stage1_shell(self):
-        shell = Path("fh6garage/v1_4_preview_mode_shell_patch.py").read_text(encoding="utf-8")
-        self.assertNotIn("from .preview3d", shell)
-        self.assertIn("3D backend 연결 전 UI 검증 단계입니다.", shell)
+    def test_stage1_shell_is_preserved_below_the_stage2b_lazy_wrapper(self):
+        base = Path("fh6garage/v1_4_preview_mode_shell_base.py").read_text(encoding="utf-8")
+        wrapper = Path("fh6garage/v1_4_preview_mode_shell_patch.py").read_text(encoding="utf-8")
+        self.assertNotIn("from .preview3d", base)
+        self.assertIn("3D backend 연결 전 UI 검증 단계입니다.", base)
+        self.assertIn("from .preview3d.integration import _prepare_preview_3d", wrapper)
+        self.assertIn("QTimer.singleShot(0, invoke_backend)", wrapper)
 
     def test_localappdata_and_readonly_cache_contract_is_preserved(self):
         base = self.read("converter_base.py")
