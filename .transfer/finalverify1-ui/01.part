@@ -1,0 +1,26 @@
+ import KfpsRenderError, render_clivery_sections
++from .kfps_render_backend import KfpsRenderError, SECTION_NAMES, render_clivery_sections
+ from .livery_resolution import resolve_livery_resolution
+ from .vehicle_index import (
+     VehicleAsset,
+@@ -308,6 +309,10 @@ class Preview3DController(QObject):
+         self.viewer_layout = viewer_layout
+         self.status_label = status_label
+         self.controls = controls
++        self.progress_bar = controls.get("progress")
++        self.progress_title = controls.get("progress_title")
++        self._progress_resolution = "ultra4x"
++        self._progress_section_index = -1
+         self.alive = True
+         self.loading = False
+         self.viewer: CarOpenGLWidget | None = None
+@@ -338,9 +343,108 @@ class Preview3DController(QObject):
+             self.controls[key].setEnabled(bool(enabled))
+         self.controls["reset"].setEnabled(bool(enabled and self.viewer is not None))
+ 
++    def _set_progress(self, value: int, title: str | None = None, detail: str | None = None) -> None:
++        if not self.alive:
++            return
++        value = max(0, min(100, int(value)))
++        if self.progress_bar is not None:
++            self.

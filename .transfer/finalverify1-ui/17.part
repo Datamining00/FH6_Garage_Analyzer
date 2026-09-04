@@ -1,0 +1,16 @@
+Bar", patch)
++        self.assertIn('progress.setRange(0, 100)', patch)
++        self.assertIn('"progress": progress', patch)
++        self.assertIn('"progress_title": progress_title', patch)
++        self.assertIn('QFrame#controlBar', patch)
++        self.assertIn('QPushButton#primary3d', patch)
++        self.assertIn('3D 모델과 리버리를 준비하고 있습니다', patch)
++        self.assertNotIn('controls["viewer_layout"].removeWidget(placeholder)\n            placeholder.hide()', patch)
++        self.assertIn('SECTION_NAMES', integration)
++        self.assertIn('re.match(r"strip (\\d+):(\\d+)"', integration)
++        self.assertIn('strips_per_section = max(1, (canvas_h + 1023) // 1024)', integration)
++        self.assertIn('"3D 렌더링 완료"', integration)
++
+     def test_runtime_dependencies_are_declared(self) -> None:
+         requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8")
+         self.assertIn("PySide6>=6.7,<7", requirements)

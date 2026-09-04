@@ -1,0 +1,29 @@
+/ Legacy / cleanup 옵션을 적용하는 중...")
++            self._set_progress(65, "3D 옵션 적용 중", "UV / 정책 / cleanup 옵션을 장면에 적용하고 있습니다.")
+             worker = _SceneReloadWorker(
+                 glb_path=self.glb_path,
+                 textures=self.textures,
+@@ -436,7 +542,7 @@ class Preview3DController(QObject):
+     def _failed(self, message: str) -> None:
+         self.loading = False
+         self._set_controls_enabled(True)
+-        self._set_status("3D 리버리를 표시할 수 없습니다.\n" + str(message))
++        self._set_progress(0, "3D 렌더링 실패", "3D 리버리를 표시할 수 없습니다.\n" + str(message))
+ 
+     @Slot(object)
+     def _initial_completed(self, payload: object) -> None:
+@@ -466,6 +572,16 @@ class Preview3DController(QObject):
+     def _install_scene(self, scene: object) -> None:
+         if not self.alive or scene is None:
+             return
++        placeholder = self.controls.get("placeholder")
++        if placeholder is not None:
++            try:
++                self.viewer_layout.removeWidget(placeholder)
++                placeholder.hide()
++                placeholder.deleteLater()
++            except RuntimeError:
++                pass
++            self.controls["placeholder"] = None
++
+         ol

@@ -1,0 +1,25 @@
+progress_bar.setRange(0, 100)
++            self.progress_bar.setValue(value)
++            self.progress_bar.setFormat(f"{value}%")
++        if title is not None and self.progress_title is not None:
++            self.progress_title.setText(str(title))
++        if detail is not None:
++            self.status_label.setText(str(detail))
++
++    def _render_progress_from_message(self, text: str) -> bool:
++        message = str(text).strip()
++        spec = resolve_livery_resolution(self._progress_resolution)
++        canvas_h = int(spec.canvas_size[1])
++        section_count = max(1, len(SECTION_NAMES))
++
++        if message.startswith("M6.23 stage 1/4"):
++            self._set_progress(22, "리버리 렌더링 준비 중", "렌더러를 준비하고 있습니다.")
++            return True
++        if message.startswith("M6.23 stage 2/4"):
++            self._set_progress(24, "리버리 렌더링 준비 중", "렌더링 백엔드를 불러오고 있습니다.")
++            return True
++        if message.startswith("M6.23 stage 3/4"):
++            self._set_progress(27, "리버리 디코딩 중", "C_livery 레이어를 읽고 있습니다.")
++            return True
++        if "stage 4/4: rendering 11 sections" in message:
++            self._set_progress(30, "3D 리버리 렌더링 중", f"전체 {section_count}개 영역 렌더링을 시작합

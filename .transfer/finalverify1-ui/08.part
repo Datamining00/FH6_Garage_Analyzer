@@ -1,0 +1,30 @@
+d = self.viewer
+         if old is not None:
+             try:
+@@ -492,9 +608,11 @@ class Preview3DController(QObject):
+ 
+         resolution, uv_channel, eligibility, cleanup_ab, cleanup_c = self._selected()
+         spec = resolve_livery_resolution(resolution)
+-        self._set_status(
++        self._set_progress(
++            100,
++            "3D 렌더링 완료",
+             f"{spec.scale}x · TEXCOORD_{uv_channel} · {eligibility} · "
+-            f"A+B {'ON' if cleanup_ab else 'OFF'} · C {'ON' if cleanup_c else 'OFF'}"
++            f"A+B {'ON' if cleanup_ab else 'OFF'} · C {'ON' if cleanup_c else 'OFF'}",
+         )
+         viewer.show()
+         viewer.raise_()
+@@ -503,7 +621,7 @@ class Preview3DController(QObject):
+ 
+     @Slot(str)
+     def _viewer_failed(self, message: str) -> None:
+-        self._set_status("OpenGL 초기화 실패: " + str(message))
++        self._set_progress(0, "OpenGL 초기화 실패", str(message))
+ 
+     @Slot()
+     def reset_camera(self) -> None:
+diff --git a/fh6garage/v1_4_finalverify1_preview_patch.py b/fh6garage/v1_4_finalverify1_preview_patch.py
+index 9f997ac..6b44912 100644
+--- a/fh6garage/v1_4_finalverify1_preview_patch.py
++++ b/fh6garage/v1_4_finalverify1_preview_p

@@ -1,0 +1,31 @@
+er_section = max(1, (canvas_h + 1023) // 1024)
++            strip_number = min(strips_per_section, (max(0, y0) // 1024) + 1)
++            section = SECTION_NAMES[self._progress_section_index]
++            self._set_progress(
++                value,
++                "3D 리버리 렌더링 중",
++                f"{section} · {strip_number} / {strips_per_section} strip · "
++                f"영역 {self._progress_section_index + 1} / {section_count}",
++            )
++            return True
++
++        rendered = re.match(r"Rendered ([^ ]+) in ", message)
++        if rendered:
++            section = rendered.group(1)
++            try:
++                index = SECTION_NAMES.index(section)
++            except ValueError:
++                index = -1
++            if index >= 0:
++                total_fraction = (index + 1) / section_count
++                value = 30 + round(62 * total_fraction)
++                self._set_progress(
++                    value,
++                    "3D 리버리 렌더링 중",
++                    f"{section} 완료 · {index + 1} / {section_count} 영역",
++                )
++                return True
++        return False
++
+     def _set_status(self, text: str) -> None:
+-        if self.aliv

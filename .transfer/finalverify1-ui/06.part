@@ -1,0 +1,27 @@
+:
+             return
+ 
+         self.loading = True
++        self._progress_resolution = resolution
++        self._progress_section_index = -1
+         self._set_controls_enabled(False)
+         if not self.glb_path:
+-            self._set_status("3D 모델과 선택한 리버리를 준비하는 중...")
++            self._set_progress(2, "3D 모델 준비 중", "차량 형상과 선택한 리버리를 준비합니다.")
+             worker: QThread = _InitialPipelineWorker(
+                 car_id=int(car_id),
+                 livery_path=str(livery_path),
+@@ -397,7 +503,7 @@ class Preview3DController(QObject):
+             worker.progress.connect(self._set_status)
+             worker.completed.connect(self._initial_completed)
+         elif resolution != self.rendered_resolution:
+-            self._set_status("새 배율로 리버리를 다시 렌더링하는 중...")
++            self._set_progress(20, "리버리 다시 렌더링 중", "선택한 배율로 전체 리버리를 다시 렌더링합니다.")
+             worker = _RerenderWorker(
+                 asset=self.asset,
+                 game_root=self.game_root,
+@@ -414,7 +520,7 @@ class Preview3DController(QObject):
+             worker.progress.connect(self._set_status)
+             worker.completed.connect(self._rerender_completed)
+         else:
+-            self._set_status("UV 

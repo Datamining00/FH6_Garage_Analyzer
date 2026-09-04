@@ -1,0 +1,30 @@
+cy)
+     controls.addWidget(eligibility)
+-    controls.addWidget(QLabel("UV"))
++    controls.addSpacing(4)
++    controls.addWidget(label_uv)
+     controls.addWidget(uv)
++    controls.addSpacing(8)
+     controls.addWidget(cleanup_ab)
+     controls.addWidget(cleanup_c)
+     controls.addStretch(1)
+     controls.addWidget(reset_button)
+     controls.addWidget(apply_button)
+-    root.addLayout(controls)
++    root.addWidget(toolbar)
++
++    page.setStyleSheet(
++        """
++        QWidget#finalverify3dPage { background: #20242a; }
++        QFrame#progressPanel {
++            background: #292e35; border: 1px solid #3a4049; border-radius: 8px;
++        }
++        QLabel#progressTitle { color: #f2f4f7; font-weight: 600; font-size: 10.5pt; }
++        QLabel#progressDetail { color: #aeb5c0; font-size: 9pt; }
++        QProgressBar {
++            background: #3a4049; color: #f7f7fa; border: 0; border-radius: 7px;
++            text-align: center; font-size: 8.5pt; font-weight: 600;
++        }
++        QProgressBar::chunk { background: #8c74ee; border-radius: 7px; }
++        QWidget#renderHost { background: #4a5058; border: 1px solid #343941; border-radius: 6px; }
++        QFrame#loadingPlacehold

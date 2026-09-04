@@ -1,0 +1,35 @@
+
++    eligibility.setMinimumWidth(170)
+ 
+     uv = QComboBox()
+     for channel in (0, 1, 2, 3):
+         uv.addItem(f"UV{channel}", channel)
+     uv.setCurrentIndex(uv.findData(3))
+     uv.setToolTip("리버리 렌더링에 사용할 TEXCOORD 채널")
++    uv.setMinimumWidth(78)
+ 
+     cleanup_ab = QCheckBox("A+B 정리")
+     cleanup_ab.setChecked(True)
+@@ -145,26 +184,82 @@ def _build_3d_page() -> tuple[QWidget, dict[str, Any]]:
+     cleanup_c.setToolTip("additional alternate-presentation cleanup")
+ 
+     apply_button = QPushButton("3D 렌더링 / 적용")
+-    apply_button.setObjectName("secondary")
++    apply_button.setObjectName("primary3d")
+     reset_button = QPushButton("카메라 초기화")
+-    reset_button.setObjectName("secondary")
++    reset_button.setObjectName("secondary3d")
+     reset_button.setEnabled(False)
+ 
+-    controls.addWidget(QLabel("배율"))
++    label_scale = QLabel("배율")
++    label_policy = QLabel("정책")
++    label_uv = QLabel("UV")
++    for label in (label_scale, label_policy, label_uv):
++        label.setObjectName("controlLabel")
++
++    controls.addWidget(label_scale)
+     controls.addWidget(resolution)
+-    controls.addWidget(QLabel("정책"))
++    controls.addSpacing(4)
++    controls.addWidget(label_poli

@@ -1,0 +1,30 @@
+tton#primary3d:hover { background: #8c74ee; }
++        QPushButton#primary3d:disabled, QPushButton#secondary3d:disabled {
++            background: #30353c; color: #7f8792; border-color: #3b4149;
++        }
++        """
++    )
+ 
+     return page, {
+         "status": status,
++        "progress": progress,
++        "progress_title": progress_title,
+         "viewer_layout": host_layout,
+         "placeholder": placeholder,
+         "resolution": resolution,
+@@ -246,12 +341,6 @@ def _show_livery_preview(window: Any, record: LiveryRecord) -> None:
+             return
+         controller_holder["controller"] = controller
+         dialog._fh6_finalverify1_3d_controller = controller
+-        placeholder = controls.get("placeholder")
+-        if placeholder is not None:
+-            controls["viewer_layout"].removeWidget(placeholder)
+-            placeholder.hide()
+-            placeholder.deleteLater()
+-            controls["placeholder"] = None
+         controller.start()
+ 
+     tabs.currentChanged.connect(ensure_3d)
+diff --git a/tests/test_v1_4_finalverify1_preview_port.py b/tests/test_v1_4_finalverify1_preview_port.py
+index bece99f..75a9fde 100644
+--- a/tests/test_v1_4_finalverify1_pre

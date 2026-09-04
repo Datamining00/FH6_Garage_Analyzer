@@ -1,0 +1,64 @@
+name: Apply FinalVerify1 3D UI polish
+
+on:
+  push:
+    branches:
+      - v1.4-rc1-finalverify1-ui-transfer
+
+permissions:
+  contents: write
+
+jobs:
+  apply-ui-patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout transfer payload
+        uses: actions/checkout@v4
+
+      - name: Rebuild and verify UI patch
+        shell: bash
+        run: |
+          cat .transfer/finalverify1-ui/*.part > "$RUNNER_TEMP/finalverify1-ui.patch"
+          echo "890a3f863263f0875b85290883882dff7b2f465f01b3a3f2186ee3281817609b  $RUNNER_TEMP/finalverify1-ui.patch" | sha256sum -c -
+
+      - name: Checkout validated target branch
+        uses: actions/checkout@v4
+        with:
+          ref: v1.4-rc1-finalverify1-port
+          path: target
+          fetch-depth: 0
+
+      - name: Apply UI-only patch and verify scope
+        shell: bash
+        run: |
+          cd target
+          test "$(git rev-parse HEAD)" = "6ce69ef7254ff927b1115fc5b6d3dafb4cf80478"
+          cd source-v1.2
+          git apply --check "$RUNNER_TEMP/finalverify1-ui.patch"
+          git apply "$RUNNER_TEMP/finalverify1-ui.patch"
+          python -m py_compile \
+            fh6garage/v1_4_finalverify1_preview_patch.py \
+            fh6garage/preview3d/integration.py \
+            fh6garage/preview3d/glb_viewer.py
+          python -m unittest tests.test_v1_4_finalverify1_preview_port -v
+          cd ..
+          mapfile -t changed < <(git diff --name-only)
+          printf '%s\n' "${changed[@]}"
+          test "${#changed[@]}" -eq 4
+          printf '%s\n' "${changed[@]}" | grep -qx 'source-v1.2/fh6garage/preview3d/glb_viewer.py'
+          printf '%s\n' "${changed[@]}" | grep -qx 'source-v1.2/fh6garage/preview3d/integration.py'
+          printf '%s\n' "${changed[@]}" | grep -qx 'source-v1.2/fh6garage/v1_4_finalverify1_preview_patch.py'
+          printf '%s\n' "${changed[@]}" | grep -qx 'source-v1.2/tests/test_v1_4_finalverify1_preview_port.py'
+
+      - name: Commit clean UI update to target branch
+        shell: bash
+        run: |
+          cd target
+          git config user.name "FH6 RC1 UI Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add source-v1.2/fh6garage/preview3d/glb_viewer.py \
+                  source-v1.2/fh6garage/preview3d/integration.py \
+                  source-v1.2/fh6garage/v1_4_finalverify1_preview_patch.py \
+                  source-v1.2/tests/test_v1_4_finalverify1_preview_port.py
+          git commit -m "Polish FinalVerify1 3D loading UI and progress"
+          git push origin HEAD:v1.4-rc1-finalverify1-port

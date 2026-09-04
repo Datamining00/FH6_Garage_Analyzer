@@ -1,0 +1,30 @@
+btitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
++    placeholder_layout.addWidget(placeholder_title)
++    placeholder_layout.addWidget(placeholder_subtitle)
++    placeholder_layout.addStretch(1)
+     host_layout.addWidget(placeholder, 1)
+     root.addWidget(host, 1)
+ 
+-    controls = QHBoxLayout()
+-    controls.setContentsMargins(0, 0, 0, 0)
+-    controls.setSpacing(6)
++    toolbar = QFrame()
++    toolbar.setObjectName("controlBar")
++    controls = QHBoxLayout(toolbar)
++    controls.setContentsMargins(12, 8, 12, 8)
++    controls.setSpacing(8)
+ 
+     resolution = QComboBox()
+     for key, label in (
+@@ -122,6 +158,7 @@ def _build_3d_page() -> tuple[QWidget, dict[str, Any]]:
+         resolution.addItem(label, key)
+     resolution.setCurrentIndex(resolution.findData("ultra4x"))
+     resolution.setToolTip("리버리 렌더링 배율")
++    resolution.setMinimumWidth(76)
+ 
+     eligibility = QComboBox()
+     eligibility.addItem("Legacy", "legacy")
+@@ -129,12 +166,14 @@ def _build_3d_page() -> tuple[QWidget, dict[str, Any]]:
+     eligibility.addItem("Declared + confirmed", "declared_confirmed")
+     eligibility.setCurrentIndex(eligibility.findData("legacy"))
+     eligibility.setToolTip("리버리 적용 대상 정책")

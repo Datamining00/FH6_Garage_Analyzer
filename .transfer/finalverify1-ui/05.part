@@ -1,0 +1,23 @@
+e:
+-            self.status_label.setText(str(text))
++        if not self.alive:
++            return
++        message = str(text)
++        if self._render_progress_from_message(message):
++            return
++        if message.startswith("FH6 차량 3D 데이터를 찾는 중"):
++            self._set_progress(4, "3D 모델 준비 중", "FH6 차량 데이터를 찾고 있습니다.")
++        elif message.startswith("FinalVerify1 차량 형상을 준비하는 중"):
++            self._set_progress(10, "3D 모델 준비 중", "FinalVerify1 차량 형상을 준비하고 있습니다.")
++        elif message.startswith("선택한 리버리를 렌더링하는 중") or message.startswith("선택한 배율로 리버리를 다시 렌더링하는 중"):
++            self._set_progress(20, "리버리 렌더링 준비 중", "선택한 리버리의 렌더링 작업을 시작합니다.")
++        elif message.startswith("3D 리버리 텍스처를 준비하는 중"):
++            self._set_progress(94, "3D 텍스처 준비 중", "렌더링된 영역을 3D 텍스처로 결합하고 있습니다.")
++        elif message.startswith("TEXCOORD_"):
++            self._set_progress(98, "3D 장면 구성 중", message.replace("장면을 준비하는 중...", "장면을 구성하고 있습니다."))
++        else:
++            self.status_label.setText(message)
+ 
+     def _confirm_high_resolution(self, resolution_key: str) -> bool:
+         spec = resolve_livery_resolution(resolution_key)
+@@ -380,9 +484,11 @@ class Preview3DController(QObject)

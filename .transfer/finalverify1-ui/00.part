@@ -1,0 +1,29 @@
+diff --git a/fh6garage/preview3d/glb_viewer.py b/fh6garage/preview3d/glb_viewer.py
+index 71aea96..5688f0a 100644
+--- a/fh6garage/preview3d/glb_viewer.py
++++ b/fh6garage/preview3d/glb_viewer.py
+@@ -132,7 +132,7 @@ class CarOpenGLWidget(QOpenGLWidget):
+             else:
+                 GL.glEnable(GL.GL_CULL_FACE)
+                 GL.glCullFace(GL.GL_BACK)
+-            GL.glClearColor(0.5294118, 0.8078431, 0.9215686, 1.0)
++            GL.glClearColor(0.2901961, 0.3137255, 0.3450980, 1.0)
+             vertex = """
+             #version 330 core
+             layout(location=0) in vec3 inPosition;
+diff --git a/fh6garage/preview3d/integration.py b/fh6garage/preview3d/integration.py
+index 2ade284..c919113 100644
+--- a/fh6garage/preview3d/integration.py
++++ b/fh6garage/preview3d/integration.py
+@@ -1,5 +1,6 @@
+ from __future__ import annotations
+ 
++import re
+ import shutil
+ import tempfile
+ import traceback
+@@ -15,7 +16,7 @@ from .chassis_converter import ChassisConverterError, convert_vehicle
+ from .direct_livery import DirectLiveryError, build_direct_livery_textures
+ from .glb_parser import GlbViewerError, load_kfps_glb
+ from .glb_viewer import CarOpenGLWidget
+-from .kfps_render_backend

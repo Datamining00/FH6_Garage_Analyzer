@@ -1,0 +1,27 @@
+니다.")
++            return True
++
++        rendering = re.match(r"Rendering ([^:]+):", message)
++        if rendering:
++            section = rendering.group(1)
++            try:
++                self._progress_section_index = SECTION_NAMES.index(section)
++            except ValueError:
++                self._progress_section_index = -1
++            if self._progress_section_index >= 0:
++                base_fraction = self._progress_section_index / section_count
++                value = 30 + round(62 * base_fraction)
++                self._set_progress(
++                    value,
++                    "3D 리버리 렌더링 중",
++                    f"{section} · {self._progress_section_index + 1} / {section_count} 영역",
++                )
++                return True
++
++        strip = re.match(r"strip (\d+):(\d+)", message)
++        if strip and self._progress_section_index >= 0 and canvas_h > 0:
++            y0, y1 = (int(strip.group(1)), int(strip.group(2)))
++            section_fraction = max(0.0, min(1.0, y1 / canvas_h))
++            total_fraction = (self._progress_section_index + section_fraction) / section_count
++            value = 30 + round(62 * total_fraction)
++            strips_p

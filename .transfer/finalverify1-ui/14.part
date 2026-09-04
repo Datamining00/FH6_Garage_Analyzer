@@ -1,0 +1,25 @@
+er { background: #4a5058; border-radius: 6px; }
++        QLabel#loadingTitle { color: #f0f2f5; font-size: 12pt; font-weight: 600; }
++        QLabel#loadingSubtitle { color: #c0c5cc; font-size: 9pt; }
++        QFrame#controlBar {
++            background: #292e35; border: 1px solid #3a4049; border-radius: 8px;
++        }
++        QLabel#controlLabel, QFrame#controlBar QCheckBox { color: #dfe3e8; }
++        QFrame#controlBar QComboBox {
++            min-height: 30px; background: #363c45; color: #f3f4f6;
++            border: 1px solid #4a515c; border-radius: 6px; padding: 0 8px;
++        }
++        QFrame#controlBar QComboBox:disabled, QFrame#controlBar QCheckBox:disabled {
++            color: #8e96a2; background: #30353c;
++        }
++        QFrame#controlBar QPushButton {
++            min-height: 30px; padding: 0 13px; border-radius: 6px; font-weight: 600;
++        }
++        QPushButton#secondary3d {
++            background: #363c45; color: #e7eaee; border: 1px solid #4a515c;
++        }
++        QPushButton#secondary3d:hover { background: #404751; }
++        QPushButton#primary3d {
++            background: #8067e8; color: white; border: 1px solid #947ff0;
++        }
++        QPushBu

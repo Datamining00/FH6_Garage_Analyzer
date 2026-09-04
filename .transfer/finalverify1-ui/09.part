@@ -1,0 +1,42 @@
+atch.py
+@@ -8,9 +8,11 @@ from PySide6.QtWidgets import (
+     QCheckBox,
+     QComboBox,
+     QDialog,
++    QFrame,
+     QHBoxLayout,
+     QLabel,
+     QMessageBox,
++    QProgressBar,
+     QPushButton,
+     QTabWidget,
+     QToolButton,
+@@ -87,29 +89,63 @@ def _build_thumbnail_page(record: LiveryRecord, image: QImage) -> QWidget:
+ 
+ def _build_3d_page() -> tuple[QWidget, dict[str, Any]]:
+     page = QWidget()
++    page.setObjectName("finalverify3dPage")
+     root = QVBoxLayout(page)
+-    root.setContentsMargins(0, 0, 0, 0)
++    root.setContentsMargins(8, 8, 8, 8)
+     root.setSpacing(8)
+ 
++    progress_panel = QFrame()
++    progress_panel.setObjectName("progressPanel")
++    progress_layout = QVBoxLayout(progress_panel)
++    progress_layout.setContentsMargins(14, 9, 14, 9)
++    progress_layout.setSpacing(5)
++
++    progress_title = QLabel("3D 모델 준비 중")
++    progress_title.setObjectName("progressTitle")
++    progress_layout.addWidget(progress_title)
++
++    progress = QProgressBar()
++    progress.setRange(0, 100)
++    progress.setValue(0)
++    progress.setFormat("0%")
++    progress.setTextVisible(True)
++    progress.setFixedHeight(16)
++    progress_layout.addWidget(progress)
++
+     sta
