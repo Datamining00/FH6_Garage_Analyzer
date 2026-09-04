@@ -71,6 +71,7 @@ from fh6garage.v1_3_4_backup_action_wording_patch import (
     apply_v1_3_4_backup_action_wording_patch,
     apply_v1_3_4_v1_4_followup_patches,
 )
+from fh6garage.v1_4_finalverify1_preview_patch import apply_v1_4_finalverify1_preview_patch
 from fh6garage.v1_3_2_thread_affinity_patch import (
     apply_v1_3_2_scan_postprocessing,
     apply_v1_3_2_performance_profiler,
@@ -228,6 +229,10 @@ def _apply_release_patch_stack() -> None:
     # order inside this compatibility bridge is unchanged from the verified
     # release chain; only the ownership boundary is now visible from app.py.
     apply_v1_3_4_v1_4_followup_patches(MainWindow)
+
+    # FinalVerify1/ErrorFix1 3D livery renderer is scoped to the existing
+    # livery-card magnifier. The final thread-affinity patch still runs last.
+    apply_v1_4_finalverify1_preview_patch(MainWindow)
 
 
 def _apply_runtime_patch_stack() -> None:
