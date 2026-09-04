@@ -144,6 +144,16 @@ class ChangeViewContractTests(unittest.TestCase):
         self.assertIn("creatorGroupLabel", source)
         self.assertIn("self.creator_aliases.search_names(canonical)", source)
 
+    def test_alias_refresh_preserves_cached_cards(self):
+        patch_path = Path(__file__).resolve().parents[1] / "fh6garage" / "v1_3_2_change_view_alias_patch.py"
+        source = patch_path.read_text(encoding="utf-8")
+        start = source.index("def _refresh_alias_views")
+        end = source.index("\ndef _open_alias_dialog", start)
+        refresh_source = source[start:end]
+        self.assertNotIn("_fh6_v132_reset_ui_card_cache", refresh_source)
+        self.assertIn("_decorate_creator_copy_label", refresh_source)
+        self.assertIn("restore_scroll_positions", refresh_source)
+
 
 if __name__ == "__main__":
     unittest.main()

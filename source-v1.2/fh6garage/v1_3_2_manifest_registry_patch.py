@@ -48,7 +48,6 @@ def apply_v1_3_2_manifest_registry_patch(MainWindow) -> None:
         return
 
     original_populate_all = MainWindow._populate_all
-    original_layout_visible_grid_cards = MainWindow._layout_visible_grid_cards
     original_filter_saved_content_table = MainWindow._filter_saved_content_table
     original_visibility_t = visibility_patch._t
 
@@ -111,31 +110,6 @@ def apply_v1_3_2_manifest_registry_patch(MainWindow) -> None:
         rebuild_registry_state(self)
         original_populate_all(self)
 
-    def patched_layout_visible_grid_cards(
-        self,
-        content_type: str,
-        cards,
-    ) -> None:
-        if (
-            content_type == "livery"
-            and _AUCTION_UNAPPLIED_MODE
-            in self.livery_check_filter.selected_modes()
-        ):
-            filtered = []
-            for card in cards:
-                key = str(card.property("annotationKey") or "")
-                record = (
-                    self._record_for_content_key("livery", key)
-                    if key
-                    else None
-                )
-                if isinstance(record, LiveryRecord) and record.kind == "SoulBoundLivery":
-                    if is_auction_applied(self, record):
-                        continue
-                filtered.append(card)
-            cards = filtered
-        original_layout_visible_grid_cards(self, content_type, cards)
-
     def patched_filter_saved_content_table(
         self,
         content_type: str,
@@ -172,7 +146,6 @@ def apply_v1_3_2_manifest_registry_patch(MainWindow) -> None:
                 table.setRowHidden(row, True)
 
     MainWindow._populate_all = patched_populate_all
-    MainWindow._layout_visible_grid_cards = patched_layout_visible_grid_cards
     MainWindow._filter_saved_content_table = patched_filter_saved_content_table
     MainWindow._fh6_v132_rebuild_manifest_registry = rebuild_registry_state
     MainWindow._fh6_v132_is_auction_applied = is_auction_applied

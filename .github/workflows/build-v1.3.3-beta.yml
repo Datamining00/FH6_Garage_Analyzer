@@ -1,4 +1,4 @@
-name: Validate and build FH6 Assistant v1.3.3 Beta
+name: Validate and build FH6 Assistant v1.4
 
 on:
   workflow_dispatch:
@@ -19,7 +19,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: v133-beta-${{ github.workflow }}-${{ github.ref }}
+  group: v14-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -63,8 +63,8 @@ jobs:
             throw "Regression tests altered tracked source files."
           }
 
-  build-beta:
-    name: Standard, Portable, and Source Beta
+  build-v14:
+    name: Standard, Portable, and Source v1.4
     needs: windows-regression
     runs-on: windows-latest
     steps:
@@ -82,7 +82,16 @@ jobs:
           Set-Location source-v1.2
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
-          python -m pip install --upgrade pyinstaller
+          python -m pip install pyinstaller==6.22.2
+      - name: Verify committed vehicle data
+        shell: pwsh
+        run: |
+          $root = "source-v1.2\data\fh6_assistant_vehicle_data"
+          if (-not (Test-Path "$root\metadata.json")) { throw "Vehicle metadata is missing." }
+          $chunks = @(Get-ChildItem "$root\cars" -File -Filter "*.json" -ErrorAction Stop)
+          if ($chunks.Count -ne 9) { throw "Expected 9 uncompressed vehicle data chunks, got $($chunks.Count)." }
+          Set-Location source-v1.2
+          python -B -m unittest tests.test_v1_4_vehicle_data_integrity -v
       - name: Verify release inputs
         shell: pwsh
         run: |
@@ -94,8 +103,8 @@ jobs:
             "source-v1.2\requirements.txt",
             "source-v1.2\README.txt",
             "source-v1.2\version_info.txt",
-            "source-v1.2\FH6_Assistant_v1.3.3.spec",
-            "source-v1.2\FH6_Assistant_v1.3.3_portable.spec"
+            "source-v1.2\FH6_Assistant_v1.4.spec",
+            "source-v1.2\FH6_Assistant_v1.4_portable.spec"
           )
           foreach ($path in $required) {
             if (-not (Test-Path $path)) { throw "Required release file is missing: $path" }
@@ -104,8 +113,8 @@ jobs:
         shell: pwsh
         run: |
           Set-Location source-v1.2
-          python -m PyInstaller --clean --noconfirm .\FH6_Assistant_v1.3.3.spec
-          $exe = Join-Path $PWD "dist\FH6 Assistant v1.3.3 Beta.exe"
+          python -m PyInstaller --clean --noconfirm .\FH6_Assistant_v1.4.spec
+          $exe = Join-Path $PWD "dist\FH6 Assistant v1.4.exe"
           if (-not (Test-Path $exe)) { throw "Standard EXE was not created." }
           if ((Get-Item $exe).Length -lt 10000000) { throw "Standard EXE is unexpectedly small." }
       - name: Execute Standard and verify clean OneFile shutdown
@@ -114,7 +123,7 @@ jobs:
           $before = @(Get-ChildItem $env:TEMP -Directory -Filter "_MEI*" -ErrorAction SilentlyContinue | ForEach-Object FullName)
           $env:FH6_ASSISTANT_SMOKE_TEST_MS = "3000"
           $env:PYINSTALLER_STRICT_UNPACK_MODE = "1"
-          $exe = Resolve-Path "source-v1.2\dist\FH6 Assistant v1.3.3 Beta.exe"
+          $exe = Resolve-Path "source-v1.2\dist\FH6 Assistant v1.4.exe"
           $proc = Start-Process -FilePath $exe -PassThru
           if (-not $proc.WaitForExit(45000)) {
             Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
@@ -127,40 +136,40 @@ jobs:
             $leftovers.FullName | Write-Host
             throw "Standard EXE left a new PyInstaller extraction directory."
           }
-      - name: Package Standard Beta
+      - name: Package Standard v1.4
         shell: pwsh
         run: |
-          $dst = "package_standard\FH6 Assistant v1.3.3 Beta Standard"
+          $dst = "package_standard\FH6 Assistant v1.4 Standard"
           New-Item -ItemType Directory -Force -Path $dst | Out-Null
-          $exe = Resolve-Path "source-v1.2\dist\FH6 Assistant v1.3.3 Beta.exe"
-          Copy-Item $exe "$dst\FH6 Assistant v1.3.3 Beta.exe" -Force
+          $exe = Resolve-Path "source-v1.2\dist\FH6 Assistant v1.4.exe"
+          Copy-Item $exe "$dst\FH6 Assistant v1.4.exe" -Force
           $hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
-          "$hash  FH6 Assistant v1.3.3 Beta.exe" | Set-Content "$dst\SHA256.txt" -Encoding ascii
+          "$hash  FH6 Assistant v1.4.exe" | Set-Content "$dst\SHA256.txt" -Encoding ascii
           Copy-Item "source-v1.2\README.txt" "$dst\README.txt" -Force
       - name: Build Portable (OneDir)
         shell: pwsh
         run: |
           Set-Location source-v1.2
-          python -m PyInstaller --clean --noconfirm .\FH6_Assistant_v1.3.3_portable.spec
-          $exe = Join-Path $PWD "dist\FH6 Assistant v1.3.3 Beta Portable\FH6 Assistant v1.3.3 Beta.exe"
+          python -m PyInstaller --clean --noconfirm .\FH6_Assistant_v1.4_portable.spec
+          $exe = Join-Path $PWD "dist\FH6 Assistant v1.4 Portable\FH6 Assistant v1.4.exe"
           if (-not (Test-Path $exe)) { throw "Portable EXE was not created." }
       - name: Execute Portable with graceful shutdown
         shell: pwsh
         run: |
           $env:FH6_ASSISTANT_SMOKE_TEST_MS = "3000"
-          $exe = Resolve-Path "source-v1.2\dist\FH6 Assistant v1.3.3 Beta Portable\FH6 Assistant v1.3.3 Beta.exe"
+          $exe = Resolve-Path "source-v1.2\dist\FH6 Assistant v1.4 Portable\FH6 Assistant v1.4.exe"
           $proc = Start-Process -FilePath $exe -PassThru
           if (-not $proc.WaitForExit(45000)) {
             Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
             throw "Portable EXE did not complete its graceful startup/close smoke test."
           }
           if ($proc.ExitCode -ne 0) { throw "Portable EXE exited with code $($proc.ExitCode)." }
-      - name: Package Portable Beta
+      - name: Package Portable v1.4
         shell: pwsh
         run: |
-          $dst = "package_portable\FH6 Assistant v1.3.3 Beta Portable"
+          $dst = "package_portable\FH6 Assistant v1.4 Portable"
           New-Item -ItemType Directory -Force -Path $dst | Out-Null
-          Copy-Item "source-v1.2\dist\FH6 Assistant v1.3.3 Beta Portable\*" $dst -Recurse -Force
+          Copy-Item "source-v1.2\dist\FH6 Assistant v1.4 Portable\*" $dst -Recurse -Force
           Copy-Item "source-v1.2\README.txt" "$dst\README.txt" -Force
           $root = (Resolve-Path $dst).Path
           $lines = foreach ($file in Get-ChildItem $dst -File -Recurse | Sort-Object FullName) {
@@ -169,10 +178,10 @@ jobs:
             "$hash  $relative"
           }
           $lines | Set-Content "$dst\FILES_SHA256.txt" -Encoding ascii
-      - name: Package Source Beta
+      - name: Package Source v1.4
         shell: pwsh
         run: |
-          $dst = "package_source\FH6 Assistant v1.3.3 Beta Source"
+          $dst = "package_source\FH6 Assistant v1.4 Source"
           New-Item -ItemType Directory -Force -Path $dst | Out-Null
           $files = @(
             "FH6 Assistant.vbs",
@@ -183,8 +192,8 @@ jobs:
             "README.txt",
             "version_info.txt",
             "build_exe.ps1",
-            "FH6_Assistant_v1.3.3.spec",
-            "FH6_Assistant_v1.3.3_portable.spec"
+            "FH6_Assistant_v1.4.spec",
+            "FH6_Assistant_v1.4_portable.spec"
           )
           foreach ($file in $files) { Copy-Item "source-v1.2\$file" $dst -Force }
           foreach ($directory in @("data", "icons", "fh6garage", "tests")) { Copy-Item "source-v1.2\$directory" $dst -Recurse -Force }
@@ -201,33 +210,33 @@ jobs:
         shell: pwsh
         run: |
           $env:FH6_ASSISTANT_SMOKE_TEST_MS = "3000"
-          $work = Resolve-Path "package_source\FH6 Assistant v1.3.3 Beta Source"
+          $work = Resolve-Path "package_source\FH6 Assistant v1.4 Source"
           $proc = Start-Process -FilePath python -ArgumentList '-B','app.py' -WorkingDirectory $work -PassThru
           if (-not $proc.WaitForExit(45000)) {
             Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
             throw "Source app.py did not complete its graceful startup/close smoke test."
           }
           if ($proc.ExitCode -ne 0) { throw "Source app.py exited with code $($proc.ExitCode)." }
-      - name: Upload Standard Beta
+      - name: Upload Standard v1.4
         uses: actions/upload-artifact@v6
         with:
-          name: FH6_Assistant_v1.3.3_Beta_Standard
+          name: FH6_Assistant_v1.4_Standard
           path: package_standard/*
           if-no-files-found: error
           compression-level: 0
           retention-days: 14
-      - name: Upload Portable Beta
+      - name: Upload Portable v1.4
         uses: actions/upload-artifact@v6
         with:
-          name: FH6_Assistant_v1.3.3_Beta_Portable
+          name: FH6_Assistant_v1.4_Portable
           path: package_portable/*
           if-no-files-found: error
           compression-level: 6
           retention-days: 14
-      - name: Upload Source Beta
+      - name: Upload Source v1.4
         uses: actions/upload-artifact@v6
         with:
-          name: FH6_Assistant_v1.3.3_Beta_Source
+          name: FH6_Assistant_v1.4_Source
           path: package_source/*
           if-no-files-found: error
           compression-level: 6

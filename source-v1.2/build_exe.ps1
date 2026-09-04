@@ -16,8 +16,8 @@ $python = Join-Path $venv "Scripts\python.exe"
 & $python -m pip install -r .\requirements.txt pyinstaller
 
 if ($Distribution -in @("Standard", "All")) {
-    & $python -m PyInstaller --clean --noconfirm .\FH6_Assistant_v1.3.3.spec
-    $standard = Join-Path $PSScriptRoot "dist\FH6 Assistant v1.3.3 Beta.exe"
+    & $python -m PyInstaller --clean --noconfirm .\FH6_Assistant_v1.4.spec
+    $standard = Join-Path $PSScriptRoot "dist\FH6 Assistant v1.4.exe"
     if (-not (Test-Path $standard)) {
         throw "Standard build was not created: $standard"
     }
@@ -25,9 +25,9 @@ if ($Distribution -in @("Standard", "All")) {
 }
 
 if ($Distribution -in @("Portable", "All")) {
-    & $python -m PyInstaller --clean --noconfirm .\FH6_Assistant_v1.3.3_portable.spec
-    $portable = Join-Path $PSScriptRoot "dist\FH6 Assistant v1.3.3 Beta Portable"
-    if (-not (Test-Path (Join-Path $portable "FH6 Assistant v1.3.3 Beta.exe"))) {
+    & $python -m PyInstaller --clean --noconfirm .\FH6_Assistant_v1.4_portable.spec
+    $portable = Join-Path $PSScriptRoot "dist\FH6 Assistant v1.4 Portable"
+    if (-not (Test-Path (Join-Path $portable "FH6 Assistant v1.4.exe"))) {
         throw "Portable build was not created: $portable"
     }
     Write-Host "Portable build: $portable"

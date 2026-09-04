@@ -76,6 +76,8 @@ def _compact_change_banner(window: Any) -> None:
 
 
 def _align_left_actions_to_right_second_third(card: Any) -> None:
+    if getattr(card, "_fh6_action_grid", None) is not None:
+        return
     aligner = getattr(card, "_fh6_card_action_aligner", None)
     triangle = getattr(card, "_fh6_triangle_box", None)
     excluded = getattr(card, "_fh6_excluded_box", None)
@@ -95,30 +97,16 @@ def _align_left_actions_to_right_second_third(card: Any) -> None:
 
 
 def apply_v1_3_2_release_layout_patch(MainWindow) -> None:
-    """Final release-only placement fixes for refresh notice and card actions."""
+    """Finalize the compact refresh notice placement and initial state."""
     if getattr(MainWindow, "_fh6_v132_release_layout_patched", False):
         return
 
     original_init = MainWindow.__init__
-    original_populate_all = MainWindow._populate_all
-    original_make_card = MainWindow._make_saved_content_card
 
     def patched_init(self, *args, **kwargs) -> None:
         original_init(self, *args, **kwargs)
         _move_change_banner_to_reserved_slot(self)
         _compact_change_banner(self)
 
-    def patched_populate_all(self) -> None:
-        original_populate_all(self)
-        _compact_change_banner(self)
-
-    def patched_make_card(self, content_type: str, record: Any, key: str):
-        card = original_make_card(self, content_type, record, key)
-        if content_type == "livery":
-            _align_left_actions_to_right_second_third(card)
-        return card
-
     MainWindow.__init__ = patched_init
-    MainWindow._populate_all = patched_populate_all
-    MainWindow._make_saved_content_card = patched_make_card
     MainWindow._fh6_v132_release_layout_patched = True

@@ -49,55 +49,28 @@ def _txt(ko: str, en: str) -> str:
     return ko if (get_language() or "ko").lower().startswith("ko") else en
 
 
+_PAINT_ICON_COLORS = {
+    # Mid-lightness saturated colors remain distinct on the white card overlay.
+    "applied": QColor("#16a34a"),
+    "same_car_applied": QColor("#d97706"),
+    "unapplied": QColor("#6b7280"),
+    "unknown": QColor("#8a94a3"),
+}
+_PAINT_ICON_CACHE: dict[tuple[str, int], QPixmap] = {}
+
+
 def _paint_bucket_pixmap(state: str, size: int = CARD_ACTION_ICON_SIZE) -> QPixmap:
-    """Draw a small tilted paint bucket pouring one drop."""
-    pixmap = QPixmap(size, size)
-    pixmap.fill(Qt.GlobalColor.transparent)
-    painter = QPainter(pixmap)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    """Tint the user-provided paint-bucket artwork for the current state."""
+    key = (state, int(size))
+    cached = _PAINT_ICON_CACHE.get(key)
+    if cached is not None:
+        return QPixmap(cached)
 
-    if state == "applied":
-        color = QColor("#6e4bf2")
-    elif state == "unapplied":
-        color = QColor("#8d93a2")
-    else:
-        color = QColor("#b9bec8")
+    from .card_icons import pixmap as card_pixmap
 
-    pen = QPen(color, 1.8)
-    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-    pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
-    painter.setPen(pen)
-    painter.setBrush(Qt.BrushStyle.NoBrush)
-
-    body = QPainterPath()
-    body.moveTo(size * 0.25, size * 0.30)
-    body.lineTo(size * 0.68, size * 0.22)
-    body.lineTo(size * 0.80, size * 0.58)
-    body.lineTo(size * 0.40, size * 0.70)
-    body.closeSubpath()
-    painter.drawPath(body)
-
-    painter.drawArc(
-        QRectF(size * 0.31, size * 0.08, size * 0.40, size * 0.38),
-        15 * 16,
-        150 * 16,
-    )
-    painter.drawLine(
-        QPoint(round(size * 0.36), round(size * 0.44)),
-        QPoint(round(size * 0.73), round(size * 0.34)),
-    )
-    painter.drawLine(
-        QPoint(round(size * 0.78), round(size * 0.55)),
-        QPoint(round(size * 0.90), round(size * 0.70)),
-    )
-    if state in {"applied", "unapplied"}:
-        painter.setBrush(color)
-    drop = QPainterPath()
-    drop.moveTo(size * 0.88, size * 0.72)
-    drop.cubicTo(size * 0.80, size * 0.82, size * 0.82, size * 0.94, size * 0.90, size * 0.94)
-    drop.cubicTo(size * 0.98, size * 0.94, size * 0.99, size * 0.82, size * 0.88, size * 0.72)
-    painter.drawPath(drop)
-    painter.end()
+    color = _PAINT_ICON_COLORS.get(state, _PAINT_ICON_COLORS["unknown"])
+    pixmap = card_pixmap("paint", color, size)
+    _PAINT_ICON_CACHE[key] = QPixmap(pixmap)
     return pixmap
 
 
@@ -199,17 +172,49 @@ def _livery_state_for_record(window: Any, record: Any) -> str:
     return "unknown"
 
 
+def _paint_state_for_record(window: Any, record: Any) -> str:
+    """Return the three-color display state without changing filter semantics."""
+    state = _livery_state_for_record(window, record)
+    if state != "unapplied" or not isinstance(record, LiveryRecord):
+        return state
+
+    target_car_id = record.car_id
+    if target_car_id is None:
+        return "unapplied"
+    for candidate in getattr(getattr(window, "result", None), "liveries", []):
+        if not isinstance(candidate, LiveryRecord) or candidate.car_id != target_car_id:
+            continue
+        if _livery_state_for_record(window, candidate) == "applied":
+            return "same_car_applied"
+    return "unapplied"
+
+
 def _set_card_state_icon(window: Any, card: Any, record: Any) -> None:
     button = getattr(card, "_fh6_applied_state_button", None)
     if not isinstance(button, QToolButton):
         return
-    state = _livery_state_for_record(window, record)
+    state = _paint_state_for_record(window, record)
     button.setIcon(QIcon(_paint_bucket_pixmap(state)))
     if state == "applied":
         button.setToolTip(_txt("현재 적용 중", "Currently applied"))
         button.setAccessibleName(_txt("현재 적용 중", "Currently applied"))
+    elif state == "same_car_applied":
+        button.setToolTip(
+            _txt(
+                "현재 미적용 · 동일 차량의 다른 리버리가 적용 중",
+                "Currently unapplied · another livery for the same car is applied",
+            )
+        )
+        button.setAccessibleName(
+            _txt("동일 차량의 다른 리버리 적용 중", "Another same-car livery is applied")
+        )
     elif state == "unapplied":
-        button.setToolTip(_txt("현재 미적용", "Currently unapplied"))
+        button.setToolTip(
+            _txt(
+                "현재 미적용 · 해당 차량에 적용된 리버리 없음",
+                "Currently unapplied · no applied livery for this car",
+            )
+        )
         button.setAccessibleName(_txt("현재 미적용", "Currently unapplied"))
     else:
         button.setToolTip(
@@ -249,6 +254,16 @@ def _install_card_state_icon(window: Any, card: Any, record: Any) -> None:
     )
     button.show()
     card._fh6_applied_state_button = button
+
+    native_grid = getattr(card, "_fh6_action_grid", None)
+    if native_grid is not None:
+        button.setIconSize(QSize(20, 20))
+        native_grid.addWidget(
+            button, 0, 1,
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
+        )
+        _set_card_state_icon(window, card, record)
+        return
 
     aligner = _AppliedStateAligner(card, overlay, button)
     card._fh6_applied_state_aligner = aligner
@@ -633,6 +648,32 @@ def _on_memory_finished(window: Any, result: object) -> None:
         soulbound_unapplied_names=unapplied,
         soulbound_review_names=review,
     )
+    summary = _txt(
+        f"현재 적용 {len(state.active_livery_names)} · 경매장 적용 {len(applied)} · "
+        f"미적용 {len(unapplied)}"
+        + (f" · 재검토 {len(review)}" if review else "")
+        + "\n\n이 결과를 목록에 적용하시겠습니까?",
+        f"Applied {len(state.active_livery_names)} · auction applied {len(applied)} · "
+        f"unapplied {len(unapplied)}"
+        + (f" · review {len(review)}" if review else "")
+        + "\n\nApply this result to the list?",
+    )
+    answer = QMessageBox.question(
+        window,
+        _txt("메모리 스캔 결과", "Memory scan result"),
+        summary,
+        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        QMessageBox.StandardButton.No,
+    )
+    if answer != QMessageBox.StandardButton.Yes:
+        window.memory_scan_detail.setText(
+            _txt(
+                "스캔 결과를 적용하지 않았습니다. 마지막 정상 적용 결과를 유지합니다.",
+                "The scan result was not applied. The last applied valid result is retained.",
+            )
+        )
+        return
+
     window._fh6_memory_state = state
     save_applied_state(state)
     _refresh_memory_page(window)
