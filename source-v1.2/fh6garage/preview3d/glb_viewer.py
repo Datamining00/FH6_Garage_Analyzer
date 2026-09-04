@@ -132,7 +132,7 @@ class CarOpenGLWidget(QOpenGLWidget):
             else:
                 GL.glEnable(GL.GL_CULL_FACE)
                 GL.glCullFace(GL.GL_BACK)
-            GL.glClearColor(0.5294118, 0.8078431, 0.9215686, 1.0)
+            GL.glClearColor(0.2901961, 0.3137255, 0.3450980, 1.0)
             vertex = """
             #version 330 core
             layout(location=0) in vec3 inPosition;

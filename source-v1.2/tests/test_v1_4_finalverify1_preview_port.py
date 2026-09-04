@@ -62,7 +62,7 @@ class FinalVerify1PreviewPortContractTests(unittest.TestCase):
         self.assertIn("kfps_neutral_c_candidate", neutral)
         self.assertIn("_prepare_raster_layers", renderer)
         self.assertIn("skipped_raster_ids", renderer)
-        self.assertIn("GL.glClearColor(0.5294118, 0.8078431, 0.9215686, 1.0)", viewer)
+        self.assertIn("GL.glClearColor(0.2901961, 0.3137255, 0.3450980, 1.0)", viewer)
 
     def test_no_persistent_analysis_or_render_cache_output_is_used(self) -> None:
         converter = (PACKAGE / "chassis_converter.py").read_text(encoding="utf-8")
@@ -82,6 +82,23 @@ class FinalVerify1PreviewPortContractTests(unittest.TestCase):
         self.assertFalse((PACKAGE / "scene_cache.py").exists())
         self.assertFalse((PACKAGE / "gamedb_diagnostic.py").exists())
         self.assertFalse((PACKAGE / "tire_source_diagnostic.py").exists())
+
+
+    def test_3d_loading_ui_has_real_progress_and_consistent_controls(self) -> None:
+        patch = (ROOT / "fh6garage" / "v1_4_finalverify1_preview_patch.py").read_text(encoding="utf-8")
+        integration = (PACKAGE / "integration.py").read_text(encoding="utf-8")
+        self.assertIn("QProgressBar", patch)
+        self.assertIn('progress.setRange(0, 100)', patch)
+        self.assertIn('"progress": progress', patch)
+        self.assertIn('"progress_title": progress_title', patch)
+        self.assertIn('QFrame#controlBar', patch)
+        self.assertIn('QPushButton#primary3d', patch)
+        self.assertIn('3D 모델과 리버리를 준비하고 있습니다', patch)
+        self.assertNotIn('controls["viewer_layout"].removeWidget(placeholder)\n            placeholder.hide()', patch)
+        self.assertIn('SECTION_NAMES', integration)
+        self.assertIn('re.match(r"strip (\\d+):(\\d+)"', integration)
+        self.assertIn('strips_per_section = max(1, (canvas_h + 1023) // 1024)', integration)
+        self.assertIn('"3D 렌더링 완료"', integration)
 
     def test_runtime_dependencies_are_declared(self) -> None:
         requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8")

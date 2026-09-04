@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import shutil
 import tempfile
 import traceback
@@ -15,7 +16,7 @@ from .chassis_converter import ChassisConverterError, convert_vehicle
 from .direct_livery import DirectLiveryError, build_direct_livery_textures
 from .glb_parser import GlbViewerError, load_kfps_glb
 from .glb_viewer import CarOpenGLWidget
-from .kfps_render_backend import KfpsRenderError, render_clivery_sections
+from .kfps_render_backend import KfpsRenderError, SECTION_NAMES, render_clivery_sections
 from .livery_resolution import resolve_livery_resolution
 from .vehicle_index import (
     VehicleAsset,
@@ -308,6 +309,10 @@ class Preview3DController(QObject):
         self.viewer_layout = viewer_layout
         self.status_label = status_label
         self.controls = controls
+        self.progress_bar = controls.get("progress")
+        self.progress_title = controls.get("progress_title")
+        self._progress_resolution = "ultra4x"
+        self._progress_section_index = -1
         self.alive = True
         self.loading = False
         self.viewer: CarOpenGLWidget | None = None
@@ -338,9 +343,108 @@ class Preview3DController(QObject):
             self.controls[key].setEnabled(bool(enabled))
         self.controls["reset"].setEnabled(bool(enabled and self.viewer is not None))
 
+    def _set_progress(self, value: int, title: str | None = None, detail: str | None = None) -> None:
+        if not self.alive:
+            return
+        value = max(0, min(100, int(value)))
+        if self.progress_bar is not None:
+            self.progress_bar.setRange(0, 100)
+            self.progress_bar.setValue(value)
+            self.progress_bar.setFormat(f"{value}%")
+        if title is not None and self.progress_title is not None:
+            self.progress_title.setText(str(title))
+        if detail is not None:
+            self.status_label.setText(str(detail))
+
+    def _render_progress_from_message(self, text: str) -> bool:
+        message = str(text).strip()
+        spec = resolve_livery_resolution(self._progress_resolution)
+        canvas_h = int(spec.canvas_size[1])
+        section_count = max(1, len(SECTION_NAMES))
+
+        if message.startswith("M6.23 stage 1/4"):
+            self._set_progress(22, "리버리 렌더링 준비 중", "렌더러를 준비하고 있습니다.")
+            return True
+        if message.startswith("M6.23 stage 2/4"):
+            self._set_progress(24, "리버리 렌더링 준비 중", "렌더링 백엔드를 불러오고 있습니다.")
+            return True
+        if message.startswith("M6.23 stage 3/4"):
+            self._set_progress(27, "리버리 디코딩 중", "C_livery 레이어를 읽고 있습니다.")
+            return True
+        if "stage 4/4: rendering 11 sections" in message:
+            self._set_progress(30, "3D 리버리 렌더링 중", f"전체 {section_count}개 영역 렌더링을 시작합니다.")
+            return True
+
+        rendering = re.match(r"Rendering ([^:]+):", message)
+        if rendering:
+            section = rendering.group(1)
+            try:
+                self._progress_section_index = SECTION_NAMES.index(section)
+            except ValueError:
+                self._progress_section_index = -1
+            if self._progress_section_index >= 0:
+                base_fraction = self._progress_section_index / section_count
+                value = 30 + round(62 * base_fraction)
+                self._set_progress(
+                    value,
+                    "3D 리버리 렌더링 중",
+                    f"{section} · {self._progress_section_index + 1} / {section_count} 영역",
+                )
+                return True
+
+        strip = re.match(r"strip (\d+):(\d+)", message)
+        if strip and self._progress_section_index >= 0 and canvas_h > 0:
+            y0, y1 = (int(strip.group(1)), int(strip.group(2)))
+            section_fraction = max(0.0, min(1.0, y1 / canvas_h))
+            total_fraction = (self._progress_section_index + section_fraction) / section_count
+            value = 30 + round(62 * total_fraction)
+            strips_per_section = max(1, (canvas_h + 1023) // 1024)
+            strip_number = min(strips_per_section, (max(0, y0) // 1024) + 1)
+            section = SECTION_NAMES[self._progress_section_index]
+            self._set_progress(
+                value,
+                "3D 리버리 렌더링 중",
+                f"{section} · {strip_number} / {strips_per_section} strip · "
+                f"영역 {self._progress_section_index + 1} / {section_count}",
+            )
+            return True
+
+        rendered = re.match(r"Rendered ([^ ]+) in ", message)
+        if rendered:
+            section = rendered.group(1)
+            try:
+                index = SECTION_NAMES.index(section)
+            except ValueError:
+                index = -1
+            if index >= 0:
+                total_fraction = (index + 1) / section_count
+                value = 30 + round(62 * total_fraction)
+                self._set_progress(
+                    value,
+                    "3D 리버리 렌더링 중",
+                    f"{section} 완료 · {index + 1} / {section_count} 영역",
+                )
+                return True
+        return False
+
     def _set_status(self, text: str) -> None:
-        if self.alive:
-            self.status_label.setText(str(text))
+        if not self.alive:
+            return
+        message = str(text)
+        if self._render_progress_from_message(message):
+            return
+        if message.startswith("FH6 차량 3D 데이터를 찾는 중"):
+            self._set_progress(4, "3D 모델 준비 중", "FH6 차량 데이터를 찾고 있습니다.")
+        elif message.startswith("FinalVerify1 차량 형상을 준비하는 중"):
+            self._set_progress(10, "3D 모델 준비 중", "FinalVerify1 차량 형상을 준비하고 있습니다.")
+        elif message.startswith("선택한 리버리를 렌더링하는 중") or message.startswith("선택한 배율로 리버리를 다시 렌더링하는 중"):
+            self._set_progress(20, "리버리 렌더링 준비 중", "선택한 리버리의 렌더링 작업을 시작합니다.")
+        elif message.startswith("3D 리버리 텍스처를 준비하는 중"):
+            self._set_progress(94, "3D 텍스처 준비 중", "렌더링된 영역을 3D 텍스처로 결합하고 있습니다.")
+        elif message.startswith("TEXCOORD_"):
+            self._set_progress(98, "3D 장면 구성 중", message.replace("장면을 준비하는 중...", "장면을 구성하고 있습니다."))
+        else:
+            self.status_label.setText(message)
 
     def _confirm_high_resolution(self, resolution_key: str) -> bool:
         spec = resolve_livery_resolution(resolution_key)
@@ -380,9 +484,11 @@ class Preview3DController(QObject):
             return
 
         self.loading = True
+        self._progress_resolution = resolution
+        self._progress_section_index = -1
         self._set_controls_enabled(False)
         if not self.glb_path:
-            self._set_status("3D 모델과 선택한 리버리를 준비하는 중...")
+            self._set_progress(2, "3D 모델 준비 중", "차량 형상과 선택한 리버리를 준비합니다.")
             worker: QThread = _InitialPipelineWorker(
                 car_id=int(car_id),
                 livery_path=str(livery_path),
@@ -397,7 +503,7 @@ class Preview3DController(QObject):
             worker.progress.connect(self._set_status)
             worker.completed.connect(self._initial_completed)
         elif resolution != self.rendered_resolution:
-            self._set_status("새 배율로 리버리를 다시 렌더링하는 중...")
+            self._set_progress(20, "리버리 다시 렌더링 중", "선택한 배율로 전체 리버리를 다시 렌더링합니다.")
             worker = _RerenderWorker(
                 asset=self.asset,
                 game_root=self.game_root,
@@ -414,7 +520,7 @@ class Preview3DController(QObject):
             worker.progress.connect(self._set_status)
             worker.completed.connect(self._rerender_completed)
         else:
-            self._set_status("UV / Legacy / cleanup 옵션을 적용하는 중...")
+            self._set_progress(65, "3D 옵션 적용 중", "UV / 정책 / cleanup 옵션을 장면에 적용하고 있습니다.")
             worker = _SceneReloadWorker(
                 glb_path=self.glb_path,
                 textures=self.textures,
@@ -436,7 +542,7 @@ class Preview3DController(QObject):
     def _failed(self, message: str) -> None:
         self.loading = False
         self._set_controls_enabled(True)
-        self._set_status("3D 리버리를 표시할 수 없습니다.\n" + str(message))
+        self._set_progress(0, "3D 렌더링 실패", "3D 리버리를 표시할 수 없습니다.\n" + str(message))
 
     @Slot(object)
     def _initial_completed(self, payload: object) -> None:
@@ -466,6 +572,16 @@ class Preview3DController(QObject):
     def _install_scene(self, scene: object) -> None:
         if not self.alive or scene is None:
             return
+        placeholder = self.controls.get("placeholder")
+        if placeholder is not None:
+            try:
+                self.viewer_layout.removeWidget(placeholder)
+                placeholder.hide()
+                placeholder.deleteLater()
+            except RuntimeError:
+                pass
+            self.controls["placeholder"] = None
+
         old = self.viewer
         if old is not None:
             try:
@@ -492,9 +608,11 @@ class Preview3DController(QObject):
 
         resolution, uv_channel, eligibility, cleanup_ab, cleanup_c = self._selected()
         spec = resolve_livery_resolution(resolution)
-        self._set_status(
+        self._set_progress(
+            100,
+            "3D 렌더링 완료",
             f"{spec.scale}x · TEXCOORD_{uv_channel} · {eligibility} · "
-            f"A+B {'ON' if cleanup_ab else 'OFF'} · C {'ON' if cleanup_c else 'OFF'}"
+            f"A+B {'ON' if cleanup_ab else 'OFF'} · C {'ON' if cleanup_c else 'OFF'}",
         )
         viewer.show()
         viewer.raise_()
@@ -503,7 +621,7 @@ class Preview3DController(QObject):
 
     @Slot(str)
     def _viewer_failed(self, message: str) -> None:
-        self._set_status("OpenGL 초기화 실패: " + str(message))
+        self._set_progress(0, "OpenGL 초기화 실패", str(message))
 
     @Slot()
     def reset_camera(self) -> None:
