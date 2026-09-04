@@ -50,6 +50,7 @@ class MaterialInventoryIntegrationTests(unittest.TestCase):
              patch.object(converter, "build_material_inventory", return_value=report):
             result = converter.convert_vehicle(asset, carbin_entry="scene.carbin")
             sidecar = json.loads(output.with_suffix(".json").read_text(encoding="utf-8"))
+            source_after = archive.read_bytes()
 
         self.assertEqual(result.output_path, str(output))
         self.assertEqual(sidecar["material_inventory_status"], "ok")
@@ -58,7 +59,7 @@ class MaterialInventoryIntegrationTests(unittest.TestCase):
         self.assertEqual(sidecar["material_inventory"]["gltf_material_count"], 0)
         self.assertNotIn("records", sidecar["material_inventory"])
         self.assertFalse(sidecar["game_data_modified"])
-        self.assertEqual(archive.read_bytes(), b"read-only-source")
+        self.assertEqual(source_after, b"read-only-source")
 
     def test_inventory_failure_is_fail_open_and_keeps_valid_glb(self):
         owner, output, archive, asset = self._fixture()
@@ -70,6 +71,7 @@ class MaterialInventoryIntegrationTests(unittest.TestCase):
             result = converter.convert_vehicle(asset, carbin_entry="scene.carbin")
             sidecar = json.loads(output.with_suffix(".json").read_text(encoding="utf-8"))
             retained = output.read_bytes()
+            source_after = archive.read_bytes()
 
         self.assertEqual(result.output_path, str(output))
         self.assertEqual(retained, original_glb)
@@ -77,7 +79,7 @@ class MaterialInventoryIntegrationTests(unittest.TestCase):
         self.assertEqual(sidecar["material_inventory"], {})
         self.assertIn("MaterialInventoryError", sidecar["material_inventory_error"])
         self.assertFalse(sidecar["game_data_modified"])
-        self.assertEqual(archive.read_bytes(), b"read-only-source")
+        self.assertEqual(source_after, b"read-only-source")
 
     def test_inventory_runs_after_wheel_postprocessing(self):
         owner, output, archive, asset = self._fixture()
