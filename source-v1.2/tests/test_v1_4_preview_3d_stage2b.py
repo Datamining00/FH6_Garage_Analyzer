@@ -29,25 +29,42 @@ class Preview3DStage2BContractTests(unittest.TestCase):
         self.assertIn('eligibility.findData("strict")', wrapper)
         self.assertIn("eligibility.setCurrentIndex(strict_index)", wrapper)
         self.assertIn("livery_uv_channel=3", integration)
-        self.assertIn('str(eligibility.currentData() or "strict")', integration)
+        self.assertIn('currentData() or "legacy"', integration)
 
     def test_runtime_dependencies_are_declared(self):
         requirements = REQUIREMENTS.read_text(encoding="utf-8").casefold()
         for dependency in ("pyside6", "pyopengl", "numpy", "pillow"):
             self.assertIn(dependency, requirements)
 
-    def test_qthread_and_opengl_lifecycle_contract_is_preserved(self):
+    def test_qthread_gui_controller_and_opengl_lifecycle_are_preserved(self):
         integration = INTEGRATION.read_text(encoding="utf-8")
-        self.assertIn("class _InitialPreviewWorker(QObject):", integration)
+        self.assertIn("class _InitialPreviewWorker(QObject)", integration)
+        self.assertIn("class _SceneReloadWorker(QObject)", integration)
+        self.assertIn("class _Preview3DController(QObject)", integration)
+        self.assertIn("class _Preview3DJobLifecycle(QObject)", integration)
         self.assertIn("worker.moveToThread(thread)", integration)
-        self.assertIn("worker.finished.connect(worker.deleteLater)", integration)
-        self.assertIn("worker.failed.connect(worker.deleteLater)", integration)
-        self.assertIn("dialog.destroyed.connect", integration)
-        self.assertIn('"alive": True', integration)
+        self.assertIn("thread.started.connect(worker.run)", integration)
+        self.assertIn("worker.finished.connect(finished_slot)", integration)
+        self.assertIn("worker.failed.connect(failed_slot)", integration)
+        self.assertIn("thread.finished.connect(worker.deleteLater)", integration)
+        self.assertIn("thread.finished.connect(thread.deleteLater)", integration)
+        self.assertIn("@Slot(object)", integration)
+        self.assertIn("dialog.destroyed.connect(self._dialog_destroyed)", integration)
         self.assertIn("fmt.setVersion(3, 3)", integration)
         self.assertIn("fmt.setProfile(QSurfaceFormat.CoreProfile)", integration)
         self.assertIn("viewer.setFormat(fmt)", integration)
         self.assertNotIn("QSurfaceFormat.setDefaultFormat", integration)
+
+    def test_blank_viewer_repair_explicitly_exposes_and_repaints_gl_widget(self):
+        integration = INTEGRATION.read_text(encoding="utf-8")
+        self.assertIn("self.retired_viewers", integration)
+        self.assertIn("def _retire_viewer", integration)
+        self.assertIn("viewer.hide()", integration)
+        self.assertIn("viewer.show()", integration)
+        self.assertIn("viewer.raise_()", integration)
+        self.assertIn("viewer.update()", integration)
+        self.assertIn("QTimer.singleShot(0, viewer.update)", integration)
+        self.assertNotIn("viewer.close()", integration)
 
     def test_errorfix1_wrapper_remains_converter_entrypoint(self):
         integration = INTEGRATION.read_text(encoding="utf-8")
