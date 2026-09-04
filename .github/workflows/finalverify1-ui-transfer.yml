@@ -40,15 +40,18 @@ jobs:
             fh6garage/v1_4_finalverify1_preview_patch.py \
             fh6garage/preview3d/integration.py \
             fh6garage/preview3d/glb_viewer.py
-          python -m unittest tests.test_v1_4_finalverify1_preview_port -v
+          grep -n "test_3d_loading_ui_has_real_progress" tests/test_v1_4_finalverify1_preview_port.py
+          python -m unittest discover -s tests -p 'test_v1_4_finalverify1_preview_port.py' -v
           cd ..
-          mapfile -t changed < <(git diff --name-only)
-          printf '%s\n' "${changed[@]}"
-          test "${#changed[@]}" -eq 4
-          printf '%s\n' "${changed[@]}" | grep -qx 'source-v1.2/fh6garage/preview3d/glb_viewer.py'
-          printf '%s\n' "${changed[@]}" | grep -qx 'source-v1.2/fh6garage/preview3d/integration.py'
-          printf '%s\n' "${changed[@]}" | grep -qx 'source-v1.2/fh6garage/v1_4_finalverify1_preview_patch.py'
-          printf '%s\n' "${changed[@]}" | grep -qx 'source-v1.2/tests/test_v1_4_finalverify1_preview_port.py'
+          echo 'Changed files:'
+          git diff --name-only
+          actual="$(git diff --name-only | sort)"
+          expected="$(printf '%s\n' \
+            'source-v1.2/fh6garage/preview3d/glb_viewer.py' \
+            'source-v1.2/fh6garage/preview3d/integration.py' \
+            'source-v1.2/fh6garage/v1_4_finalverify1_preview_patch.py' \
+            'source-v1.2/tests/test_v1_4_finalverify1_preview_port.py' | sort)"
+          test "$actual" = "$expected"
 
       - name: Commit clean UI update to target branch
         shell: bash
