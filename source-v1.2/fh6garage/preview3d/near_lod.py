@@ -10,10 +10,13 @@ import zipfile
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Callable
+
+from .carbin import CarbinStructuralError, parse_fh6_carbin
+
 BUNDLE_TAG = 1198683490
 MESH_TAG = 1298494312
 NAME_TAG = 1315007845
-NORMALIZATION_REVISION = 2
+NORMALIZATION_REVISION = 3
 _MODEL_PATH_RE = re.compile(b'game:\\[^\x00]{1,512}?\.modelbin', re.IGNORECASE)
 _LOD_SUFFIX_RE = re.compile('_lod(?:s|[0-5])\d*(?:\|.*)?$', re.IGNORECASE)
 _SLOD_RE = re.compile('__slod', re.IGNORECASE)
@@ -181,11 +184,69 @@ def _archive_sha256(path: Path) -> str:
             digest.update(block)
     return digest.hexdigest()
 
+def _structural_resource_paths(carbin: bytes) -> tuple[str, ...]:
+    try:
+        scene = parse_fh6_carbin(carbin)
+    except (CarbinStructuralError, ValueError, TypeError):
+        return ()
+    paths: set[str] = set()
+
+    def add_model(model: object) -> None:
+        if not isinstance(model, dict):
+            return
+        path = model.get('resource_path')
+        if not isinstance(path, str):
+            return
+        normalized = path.replace('\\', '/').strip().casefold()
+        if normalized.endswith('.modelbin'):
+            paths.add(path.strip())
+
+    for part in scene.get('standard_parts', ()) if isinstance(scene, dict) else ():
+        if not isinstance(part, dict):
+            continue
+        for model in part.get('models', ()):
+            add_model(model)
+    for part in scene.get('upgradable_parts', ()) if isinstance(scene, dict) else ():
+        if not isinstance(part, dict):
+            continue
+        for upgrade in part.get('upgrades', ()):
+            if not isinstance(upgrade, dict):
+                continue
+            for model in upgrade.get('legacy_models', ()):
+                add_model(model)
+        for shared in part.get('shared_models', ()):
+            if isinstance(shared, dict):
+                add_model(shared.get('model'))
+    return tuple(sorted(paths, key=str.casefold))
+
+def _resolve_model_path(game_path: str, archive_names: dict[str, str], model_code: str) -> tuple[str, str | None]:
+    normalized = str(game_path or '').replace('\\', '/').strip().casefold()
+    if not normalized.endswith('.modelbin'):
+        return (normalized, None)
+    model_marker = f'/{model_code.casefold()}/'
+    candidates: list[str] = []
+    if normalized in archive_names:
+        candidates.append(normalized)
+    idx = normalized.find(model_marker)
+    if idx >= 0:
+        candidates.append(normalized[idx + len(model_marker):].lstrip('/'))
+    scene_idx = normalized.find('/scene/')
+    if scene_idx >= 0:
+        candidates.append(normalized[scene_idx + 1:].lstrip('/'))
+    if normalized.startswith('scene/'):
+        candidates.append(normalized)
+    exact = next((archive_names[c] for c in candidates if c in archive_names), None)
+    if exact is None:
+        file_name = normalized.rsplit('/', 1)[-1]
+        matches = [name for key, name in archive_names.items() if key.rsplit('/', 1)[-1] == file_name]
+        if len(matches) == 1:
+            exact = matches[0]
+    return (normalized, exact)
+
 def _referenced_model_paths(carbin: bytes, archive_names: dict[str, str], model_code: str) -> tuple[dict[str, str], tuple[str, ...], tuple[str, ...]]:
     output: dict[str, str] = {}
     discovered: set[str] = set()
     unresolved: set[str] = set()
-    model_marker = f'/{model_code.casefold()}/'
     for match in _MODEL_PATH_RE.finditer(carbin):
         raw = match.group(0)
         try:
@@ -193,26 +254,53 @@ def _referenced_model_paths(carbin: bytes, archive_names: dict[str, str], model_
         except UnicodeDecodeError:
             unresolved.add(raw.decode('ascii', errors='replace'))
             continue
-        normalized = game_path.replace('\\', '/').casefold()
+        normalized, exact = _resolve_model_path(game_path, archive_names, model_code)
+        if not normalized:
+            continue
         discovered.add(normalized)
-        candidates: list[str] = []
-        idx = normalized.find(model_marker)
-        if idx >= 0:
-            candidates.append(normalized[idx + len(model_marker):].lstrip('/'))
-        scene_idx = normalized.find('/scene/')
-        if scene_idx >= 0:
-            candidates.append(normalized[scene_idx + 1:].lstrip('/'))
-        exact = next((archive_names[c] for c in candidates if c in archive_names), None)
-        if exact is None:
-            file_name = normalized.rsplit('/', 1)[-1]
-            matches = [name for key, name in archive_names.items() if key.rsplit('/', 1)[-1] == file_name]
-            if len(matches) == 1:
-                exact = matches[0]
+        if exact is not None:
+            output[normalized] = exact
+        else:
+            unresolved.add(normalized)
+    if discovered:
+        return (output, tuple(sorted(discovered)), tuple(sorted(unresolved)))
+
+    # Many FH6 scene-v7 carbin files store model paths as ordinary
+    # length-prefixed UTF-8 resource_path fields that do not match the
+    # legacy raw "game:\\..." byte pattern. Fall back only to paths that
+    # the structural carbin parser explicitly decoded; never enumerate all
+    # modelbins in the archive as a guessed chassis assembly.
+    for game_path in _structural_resource_paths(carbin):
+        normalized, exact = _resolve_model_path(game_path, archive_names, model_code)
+        if not normalized:
+            continue
+        discovered.add(normalized)
         if exact is not None:
             output[normalized] = exact
         else:
             unresolved.add(normalized)
     return (output, tuple(sorted(discovered)), tuple(sorted(unresolved)))
+
+def _selected_entry_for_structural_path(game_path: str, selected: set[str], model_code: str) -> str | None:
+    normalized = game_path.replace('\\', '/').strip().casefold()
+    candidates: list[str] = []
+    if normalized in selected:
+        candidates.append(normalized)
+    marker = f'/{model_code.casefold()}/'
+    idx = normalized.find(marker)
+    if idx >= 0:
+        candidates.append(normalized[idx + len(marker):].lstrip('/'))
+    scene_idx = normalized.find('/scene/')
+    if scene_idx >= 0:
+        candidates.append(normalized[scene_idx + 1:].lstrip('/'))
+    if normalized.startswith('scene/'):
+        candidates.append(normalized)
+    for candidate in candidates:
+        if candidate in selected:
+            return candidate
+    file_name = normalized.rsplit('/', 1)[-1]
+    matches = [entry for entry in selected if entry.rsplit('/', 1)[-1] == file_name]
+    return matches[0] if len(matches) == 1 else None
 
 def _rewrite_selected_slod_paths(carbin: bytes, selected_entries: set[str], model_code: str) -> tuple[bytes, int, set[str]]:
     if not selected_entries:
@@ -240,6 +328,37 @@ def _rewrite_selected_slod_paths(carbin: bytes, selected_entries: set[str], mode
         mutable[absolute:absolute + 6] = b'__nlod'
         rewritten += 1
         rewritten_entries.add(rel)
+
+    # Structural-only resource paths are length-prefixed UTF-8 strings.
+    # Rewrite only an explicitly selected parsed path, preserving its byte
+    # length (__slod -> __nlod) and leaving unrelated model references intact.
+    missing = selected - rewritten_entries
+    if missing:
+        for game_path in _structural_resource_paths(carbin):
+            selected_entry = _selected_entry_for_structural_path(game_path, missing, model_code)
+            if selected_entry is None or '__slod' not in game_path.casefold():
+                continue
+            raw = game_path.encode('utf-8')
+            rel_slod = raw.lower().find(b'__slod')
+            if rel_slod < 0:
+                continue
+            needle = struct.pack('<i', len(raw)) + raw
+            search_from = 0
+            changed_this_path = 0
+            while True:
+                pos = carbin.find(needle, search_from)
+                if pos < 0:
+                    break
+                absolute = pos + 4 + rel_slod
+                mutable[absolute:absolute + 6] = b'__nlod'
+                rewritten += 1
+                changed_this_path += 1
+                search_from = pos + len(needle)
+            if changed_this_path:
+                rewritten_entries.add(selected_entry)
+                missing.discard(selected_entry)
+            if not missing:
+                break
     return (bytes(mutable), rewritten, rewritten_entries)
 
 def _renamed_slod_entry(name: str) -> str:
