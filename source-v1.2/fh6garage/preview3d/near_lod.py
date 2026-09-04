@@ -17,8 +17,8 @@ BUNDLE_TAG = 1198683490
 MESH_TAG = 1298494312
 NAME_TAG = 1315007845
 NORMALIZATION_REVISION = 3
-_MODEL_PATH_RE = re.compile(b'game:\\[^\x00]{1,512}?\.modelbin', re.IGNORECASE)
-_LOD_SUFFIX_RE = re.compile('_lod(?:s|[0-5])\d*(?:\|.*)?$', re.IGNORECASE)
+_MODEL_PATH_RE = re.compile(rb'game:\\[^\x00]{1,512}?\.modelbin', re.IGNORECASE)
+_LOD_SUFFIX_RE = re.compile(r'_lod(?:s|[0-5])\d*(?:\|.*)?$', re.IGNORECASE)
 _SLOD_RE = re.compile('__slod', re.IGNORECASE)
 
 class NearLodNormalizationError(RuntimeError):
