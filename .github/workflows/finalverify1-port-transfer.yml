@@ -1,0 +1,107 @@
+name: FinalVerify1 exact port transfer
+
+on:
+  push:
+    branches:
+      - v1.4-rc1-finalverify1-transfer
+
+permissions:
+  contents: write
+
+jobs:
+  reconstruct:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout transfer payload
+        uses: actions/checkout@v4
+        with:
+          path: transfer
+
+      - name: Checkout clean RC1 target
+        uses: actions/checkout@v4
+        with:
+          ref: v1.4-rc1-finalverify1-port
+          path: target
+          fetch-depth: 0
+
+      - name: Reconstruct and verify exact payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import base64, hashlib, subprocess, zipfile, shutil
+
+          transfer = Path('transfer/.transfer/finalverify1')
+          pieces = [transfer / f'chunk{i:02d}.b64' for i in range(6)]
+          pieces += [transfer / f'chunk06_{i:02d}.b64' for i in range(12)]
+          pieces += [transfer / f'chunk{i:02d}.b64' for i in range(7, 10)]
+          encoded = ''.join(p.read_text(encoding='ascii') for p in pieces)
+          raw = base64.b64decode(encoded, validate=True)
+          expected_zip = '9396a9f9ac5503aef010dfd7d165b6c6381f172578c735d66fc91ce6e7a7359e'
+          actual_zip = hashlib.sha256(raw).hexdigest()
+          print('payload sha256:', actual_zip)
+          if actual_zip != expected_zip:
+              raise SystemExit('payload ZIP SHA256 mismatch')
+
+          zip_path = Path('/tmp/finalverify1_all.zip')
+          out = Path('/tmp/finalverify1_payload')
+          zip_path.write_bytes(raw)
+          if out.exists():
+              shutil.rmtree(out)
+          out.mkdir(parents=True)
+          with zipfile.ZipFile(zip_path) as zf:
+              zf.extractall(out)
+
+          expected = {
+              'app.py':'34a7b06b245e7daecd326cee723db582c6bafac3',
+              'tests/test_v1_4_finalverify1_preview_port.py':'bece99fd6b8b00531e98f96459c7f9381358d44c',
+              'fh6garage/preview3d/chassis_converter.py':'08e02ae9e947ca0485b9710ba0e183845d8581c4',
+              'fh6garage/preview3d/neutral_geometry.py':'eae1f25a3108ef53bdb17715eaee083686e261c9',
+              'fh6garage/preview3d/livery_resolution.py':'b24915804cb2923924ad182c4d40fd8c56076d97',
+              'fh6garage/preview3d/wheel_visibility.py':'2a8110a4691b9e1fa0546d68ee3a061f39c06ff2',
+              'fh6garage/preview3d/glb_parser.py':'2d406eacc6469feae5b4c9c7f895638328cae421',
+              'fh6garage/preview3d/vehicle_index.py':'ea735bdac52dd6d6dcc5f49db579186511012e0a',
+              'fh6garage/preview3d/wheel_mesh_diagnostic.py':'51256f258394cd0aa49d97e1fc32208440e43335',
+              'fh6garage/preview3d/wheel_assembly.py':'1481ae0a0c103aeecf493f941080898dbd186afa',
+              'fh6garage/preview3d/direct_livery.py':'eea418b3f6114a3123f098b79e286308e22d0d98',
+              'fh6garage/preview3d/__init__.py':'c93d351443f2d83cd606b44f03e03a8e8e5ee601',
+              'fh6garage/preview3d/kfps_render_backend.py':'ace33efd70186a23337b14fa8a8d1ff63977c257',
+              'fh6garage/preview3d/integration.py':'2ade28401bd96579a841322d52517d9d0046f611',
+              'fh6garage/preview3d/glb_viewer.py':'71aea9676e7e0f130f5f73fd433cfe0cec1e16cf',
+              'fh6garage/preview3d/carbin_structural.py':'9e7488c227fbb2038413192e5626a73f59ab06bd',
+              'fh6garage/preview3d/near_lod_archive.py':'b1b7263f6cbef14629697bf2148bcc73b0b8da7b',
+              'fh6garage/v1_4_finalverify1_preview_patch.py':'9f997ac0d51d3d837898c70d3deba170bea8d3b4',
+              'requirements.txt':'18abd8ae6d5e8aaa345fb8956528506d4fdb9bc9',
+          }
+          for rel, expected_sha in expected.items():
+              data = (out / rel).read_bytes()
+              header = f'blob {len(data)}\0'.encode()
+              actual = hashlib.sha1(header + data).hexdigest()
+              if actual != expected_sha:
+                  raise SystemExit(f'blob mismatch {rel}: {actual} != {expected_sha}')
+          print('all 19 payload blob SHAs verified')
+
+          dest = Path('target/source-v1.2')
+          for rel in expected:
+              src = out / rel
+              dst = dest / rel
+              dst.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copyfile(src, dst)
+          PY
+
+      - name: Verify exact change set and create clean commit
+        shell: bash
+        working-directory: target
+        run: |
+          set -euo pipefail
+          git status --short
+          git add source-v1.2
+          mapfile -t changed < <(git diff --cached --name-only)
+          printf '%s\n' "${changed[@]}"
+          test "${#changed[@]}" -eq 19
+          python -m compileall -q source-v1.2/app.py source-v1.2/fh6garage/preview3d source-v1.2/fh6garage/v1_4_finalverify1_preview_patch.py
+          git config user.name 'FH6 RC1 Port Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git commit -m 'Port FinalVerify1 ErrorFix1 3D livery preview onto RC1 #337'
+          git push --force-with-lease origin HEAD:refs/heads/v1.4-rc1-finalverify1-staged
