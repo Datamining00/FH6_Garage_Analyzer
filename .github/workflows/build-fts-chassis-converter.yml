@@ -1,0 +1,102 @@
+name: Build FTS Chassis Converter
+
+on:
+  push:
+    branches:
+      - v1.4-rc1-forzatechstudio-real-port
+    paths:
+      - 'tools/fts-chassis-converter/patch-upstream.ps1'
+      - 'tools/fts-chassis-converter/THIRD_PARTY_NOTICES.txt'
+      - '.github/workflows/build-fts-chassis-converter.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout FH6 Assistant
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Checkout pinned KFPS converter source
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = Join-Path $env:RUNNER_TEMP 'kfps'
+          git clone --filter=blob:none https://github.com/heyitshestia/kloudys-forza-painter-suite.git $root
+          git -C $root checkout 6f53ca3c584d78659d06d4b4a39561db67d79345
+          $actual = (git -C $root rev-parse HEAD).Trim()
+          if ($actual -ne '6f53ca3c584d78659d06d4b4a39561db67d79345') {
+            throw "Pinned KFPS checkout mismatch: $actual"
+          }
+
+      - name: Apply ForzaTechStudio geometry semantics
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP 'kfps'
+          & ./tools/fts-chassis-converter/patch-upstream.ps1 -KfpsRoot $root
+
+      - name: Publish patched headless converter
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = Join-Path $env:RUNNER_TEMP 'kfps'
+          $project = Join-Path $root 'tools/livery/chassis-converter/Kfps.ChassisConverter.csproj'
+          $publish = Join-Path $env:RUNNER_TEMP 'fts-converter-publish'
+          dotnet publish $project -c Release -r win-x64 --self-contained true -o $publish
+
+          $src = Join-Path $publish 'Kfps.ChassisConverter.exe'
+          if (-not (Test-Path $src)) { throw 'Published converter executable was not produced.' }
+
+          $out = Join-Path $env:GITHUB_WORKSPACE 'tools/fts-chassis-converter/bin/win-x64'
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          $dst = Join-Path $out 'FH6.FtsChassisConverter.exe'
+          Copy-Item -Force $src $dst
+          Copy-Item -Force './tools/fts-chassis-converter/THIRD_PARTY_NOTICES.txt' (Join-Path $out 'THIRD_PARTY_NOTICES.txt')
+
+          $sha256 = (Get-FileHash -Algorithm SHA256 $dst).Hash.ToLowerInvariant()
+          $size = (Get-Item $dst).Length
+          $meta = [ordered]@{
+            format = 'fh6_fts_chassis_conversion_v1'
+            fts_reference_commit = '4f373c5fb192551ce5249e320dd79b1399b693ca'
+            kfps_base_commit = '6f53ca3c584d78659d06d4b4a39561db67d79345'
+            sha256 = $sha256
+            size = $size
+          }
+          $meta | ConvertTo-Json | Set-Content -Encoding utf8NoBOM (Join-Path $out 'build.json')
+          Get-Content (Join-Path $out 'build.json')
+
+      - name: Upload converter artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FH6-FtsChassisConverter-win-x64
+          path: |
+            tools/fts-chassis-converter/bin/win-x64/FH6.FtsChassisConverter.exe
+            tools/fts-chassis-converter/bin/win-x64/build.json
+            tools/fts-chassis-converter/bin/win-x64/THIRD_PARTY_NOTICES.txt
+          if-no-files-found: error
+
+      - name: Commit reproducible converter binary to port branch
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- 'tools/fts-chassis-converter/bin/win-x64/FH6.FtsChassisConverter.exe' `
+                    'tools/fts-chassis-converter/bin/win-x64/build.json' `
+                    'tools/fts-chassis-converter/bin/win-x64/THIRD_PARTY_NOTICES.txt'
+          if (git diff --cached --quiet) {
+            Write-Host 'Converter binary is already up to date.'
+            exit 0
+          }
+          git commit -m 'Build ForzaTechStudio chassis converter'
+          git push origin HEAD:v1.4-rc1-forzatechstudio-real-port
