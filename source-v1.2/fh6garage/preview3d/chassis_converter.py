@@ -26,11 +26,6 @@ from .wheel_visibility import (
     WheelVisibilityError,
     apply_neutral_wheel_visibility,
 )
-from .wheel_geometry import (
-    WHEEL_GEOMETRY_REVISION,
-    WheelGeometryError,
-    repair_wheelstyle_lateral_translation,
-)
 
 CONVERTER_COMMIT = "6f53ca3c584d78659d06d4b4a39561db67d79345"
 CONVERTER_BLOB_SHA1 = "7d3f83ce4d787c752a01729d1a5a6b81ca5cc800"
@@ -241,8 +236,6 @@ def convert_vehicle(
     env["KFPS_CHASSIS_DIAGNOSTICS"] = "1"
     wheel_visibility_summary: dict = {}
     wheel_visibility_error: str | None = None
-    wheel_geometry_summary: dict = {}
-    wheel_geometry_error: str | None = None
     neutral_geometry_summary: dict = {}
     neutral_geometry_error: str | None = None
     try:
@@ -268,14 +261,6 @@ def convert_vehicle(
                 ).as_dict()
             except (OSError, ValueError, zipfile.BadZipFile, WheelVisibilityError) as exc:
                 wheel_visibility_error = f"{type(exc).__name__}: {exc}"
-
-            # Repair only after the WheelStyle source/primitive mapping above has
-            # validated. This aid is fail-open and never invalidates a usable GLB.
-            if not wheel_visibility_error:
-                try:
-                    wheel_geometry_summary = repair_wheelstyle_lateral_translation(output).as_dict()
-                except (OSError, ValueError, WheelGeometryError) as exc:
-                    wheel_geometry_error = f"{type(exc).__name__}: {exc}"
 
             # FinalVerify1 A+B/C classification is metadata-only on the transient
             # derived GLB. Visibility is selected later in the viewer so A+B and C
@@ -310,9 +295,6 @@ def convert_vehicle(
         # be independently validated. Record the failure in memory only.
         wheel_visibility_summary = dict(wheel_visibility_summary or {})
         wheel_visibility_summary.setdefault("status", "validation_failed_proceeding")
-    if wheel_geometry_error:
-        wheel_geometry_summary = dict(wheel_geometry_summary or {})
-        wheel_geometry_summary.setdefault("status", "validation_failed_proceeding")
     if neutral_geometry_error:
         try:
             output.unlink(missing_ok=True)
@@ -403,12 +385,6 @@ def convert_vehicle(
     )
     diagnostics["wheel_visibility"] = wheel_visibility_summary
     diagnostics["wheel_visibility_error"] = wheel_visibility_error
-    diagnostics["wheel_geometry_revision"] = WHEEL_GEOMETRY_REVISION
-    diagnostics["wheel_geometry_status"] = (
-        wheel_geometry_summary.get("status", "not_run") if wheel_geometry_summary else "not_run"
-    )
-    diagnostics["wheel_geometry"] = wheel_geometry_summary
-    diagnostics["wheel_geometry_error"] = wheel_geometry_error
     diagnostics["neutral_geometry_revision"] = NEUTRAL_GEOMETRY_REVISION
     diagnostics["neutral_geometry_status"] = (
         neutral_geometry_summary.get("status", "failed") if neutral_geometry_summary else "failed"
