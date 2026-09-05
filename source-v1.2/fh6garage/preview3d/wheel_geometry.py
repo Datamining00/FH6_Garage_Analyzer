@@ -7,7 +7,14 @@ import struct
 from dataclasses import dataclass
 from pathlib import Path
 
-WHEEL_GEOMETRY_REVISION = 1
+WHEEL_GEOMETRY_REVISION = 2
+
+FORZATECHSTUDIO_REFERENCE_REPOSITORY = "D3FEKT/ForzaTechStudio"
+FORZATECHSTUDIO_REFERENCE_COMMIT = "4f373c5fb192551ce5249e320dd79b1399b693ca"
+GEOMETRY_MODE_ENV = "FH6_PREVIEW3D_GEOMETRY_MODE"
+FORZATECHSTUDIO_NATIVE_MODE = "forzatechstudio"
+LEGACY_REPAIR_MODE = "legacy_repair"
+DEFAULT_GEOMETRY_MODE = FORZATECHSTUDIO_NATIVE_MODE
 
 
 class WheelGeometryError(RuntimeError):
@@ -24,6 +31,25 @@ class WheelGeometryResult:
 
     def as_dict(self) -> dict:
         return self.__dict__.copy()
+
+
+def resolve_geometry_mode(value: str | None = None) -> str:
+    """Resolve preview geometry policy.
+
+    The pinned KFPS converter already vendors ForzaTechStudio's ModelImporter at
+    FORZATECHSTUDIO_REFERENCE_COMMIT and applies the Studio transform chain while
+    producing the GLB.  The default therefore preserves that native output.
+
+    ``legacy_repair`` is retained only as an explicit compatibility fallback for
+    the older derived-GLB WheelStyle lateral translation heuristic.
+    """
+    raw = value if value is not None else os.environ.get(GEOMETRY_MODE_ENV, DEFAULT_GEOMETRY_MODE)
+    mode = str(raw or "").strip().casefold().replace("-", "_")
+    if mode in {"legacy", "legacy_repair", "repair"}:
+        return LEGACY_REPAIR_MODE
+    if mode in {"fts", "studio", "forzatechstudio", "forzatech_studio", "native"}:
+        return FORZATECHSTUDIO_NATIVE_MODE
+    return DEFAULT_GEOMETRY_MODE
 
 
 def _normal(value: object) -> str:
@@ -124,7 +150,22 @@ def _median(values: list[float]) -> float:
 
 
 def repair_wheelstyle_lateral_translation(glb_path: str | Path) -> WheelGeometryResult:
-    """Repair mixed local/world lateral coordinates without name heuristics."""
+    """Preserve ForzaTechStudio-native geometry unless legacy repair is explicit.
+
+    Kfps.ChassisConverter already uses the pinned ForzaTechStudio ModelImporter
+    and applies raw POSITION -> PositionScale/Translate -> rigid bone -> carbin
+    instance transforms before writing glTF coordinates.  In Studio mode no
+    additional positional mutation is permitted here.
+    """
+    if resolve_geometry_mode() == FORZATECHSTUDIO_NATIVE_MODE:
+        return WheelGeometryResult(
+            "forzatechstudio_native",
+            WHEEL_GEOMETRY_REVISION,
+            0,
+            0,
+            0,
+        )
+
     path = Path(glb_path)
     document, chunks = _read_glb(path)
     bins = [n for n, (kind, _) in enumerate(chunks) if kind == 0x004E4942]
