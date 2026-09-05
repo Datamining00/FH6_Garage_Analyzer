@@ -1,12 +1,21 @@
 from __future__ import annotations
 
 import json
+import os
 import struct
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from fh6garage.preview3d.wheel_geometry import repair_wheelstyle_lateral_translation
+from fh6garage.preview3d.wheel_geometry import (
+    DEFAULT_GEOMETRY_MODE,
+    FORZATECHSTUDIO_NATIVE_MODE,
+    GEOMETRY_MODE_ENV,
+    LEGACY_REPAIR_MODE,
+    repair_wheelstyle_lateral_translation,
+    resolve_geometry_mode,
+)
 
 
 def _write_fixture(path) -> None:
@@ -49,19 +58,42 @@ def _write_fixture(path) -> None:
 
 
 class WheelGeometryTests(unittest.TestCase):
-    def test_repairs_only_confirmed_mixed_lateral_coordinates(self):
-        with tempfile.TemporaryDirectory() as directory:
-            target = Path(directory) / "wheel.glb"
-            _write_fixture(target)
+    def test_forzatechstudio_native_is_default_and_does_not_mutate_glb(self):
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(DEFAULT_GEOMETRY_MODE, FORZATECHSTUDIO_NATIVE_MODE)
+            self.assertEqual(resolve_geometry_mode(), FORZATECHSTUDIO_NATIVE_MODE)
 
-            first = repair_wheelstyle_lateral_translation(target)
-            second = repair_wheelstyle_lateral_translation(target)
+            with tempfile.TemporaryDirectory() as directory:
+                target = Path(directory) / "wheel.glb"
+                _write_fixture(target)
+                before = target.read_bytes()
+                result = repair_wheelstyle_lateral_translation(target)
+                after = target.read_bytes()
+
+        self.assertEqual(result.status, "forzatechstudio_native")
+        self.assertEqual(result.repaired_primitives, 0)
+        self.assertEqual(result.repaired_vertices, 0)
+        self.assertEqual(after, before)
+
+    def test_legacy_mode_retains_previous_confirmed_repair(self):
+        with patch.dict(os.environ, {GEOMETRY_MODE_ENV: LEGACY_REPAIR_MODE}, clear=False):
+            with tempfile.TemporaryDirectory() as directory:
+                target = Path(directory) / "wheel.glb"
+                _write_fixture(target)
+
+                first = repair_wheelstyle_lateral_translation(target)
+                second = repair_wheelstyle_lateral_translation(target)
 
         self.assertEqual(first.status, "applied")
         self.assertEqual(first.wheel_instances, 1)
         self.assertEqual(first.repaired_primitives, 1)
         self.assertEqual(first.repaired_vertices, 2)
         self.assertEqual(second.status, "no_confirmed_candidates")
+
+    def test_unknown_mode_falls_back_to_forzatechstudio_native(self):
+        self.assertEqual(resolve_geometry_mode("unexpected"), FORZATECHSTUDIO_NATIVE_MODE)
+        self.assertEqual(resolve_geometry_mode("fts"), FORZATECHSTUDIO_NATIVE_MODE)
+        self.assertEqual(resolve_geometry_mode("legacy"), LEGACY_REPAIR_MODE)
 
 
 if __name__ == "__main__":
