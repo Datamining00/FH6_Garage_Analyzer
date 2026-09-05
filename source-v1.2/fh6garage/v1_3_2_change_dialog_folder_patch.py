@@ -96,6 +96,13 @@ def _install_folder_button(card: Any, record: Any) -> QToolButton | None:
     button.clicked.connect(lambda _checked=False, r=record: _open_record_folder(r))
     button.show()
     card._fh6_folder_button = button
+    native_grid = getattr(card, "_fh6_action_grid", None)
+    if native_grid is not None:
+        button.setIconSize(QSize(20, 20))
+        native_grid.addWidget(
+            button, 4, 0,
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+        )
     return button
 
 
@@ -150,6 +157,8 @@ def _install_four_left_actions(card: Any, record: Any) -> None:
     if overlay is None:
         return
     _install_folder_button(card, record)
+    if getattr(card, "_fh6_action_grid", None) is not None:
+        return
     aligner = _FourLeftActionAligner(card, overlay)
     card._fh6_four_left_action_aligner = aligner
     QTimer.singleShot(0, aligner.reposition)

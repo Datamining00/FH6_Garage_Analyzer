@@ -20,7 +20,7 @@ _CACHE_SCHEMA = 1
 # Bump this whenever parse_forza_header semantics change, even if the on-disk
 # cache layout itself is unchanged. This prevents stale parsed metadata from
 # surviving an application/parser upgrade.
-_HEADER_PARSER_REVISION = 1
+_HEADER_PARSER_REVISION = 4
 
 
 def _fingerprint(path: Path) -> tuple[int, int, int] | None:
@@ -43,9 +43,12 @@ def _header_to_dict(header: HeaderInfo) -> dict[str, Any]:
         "creator": header.creator,
         "created": header.created,
         "car_id": header.car_id,
+        "parsed_car_id": header.parsed_car_id,
         "guid": header.guid,
         "decal_count": header.decal_count,
         "platform_code": header.platform_code,
+        "asset_guid": header.asset_guid,
+        "type_value": header.type_value,
     }
 
 
@@ -63,6 +66,15 @@ def _header_from_dict(value: dict[str, Any]) -> HeaderInfo:
         ),
         platform_code=(
             int(value["platform_code"]) if value.get("platform_code") is not None else None
+        ),
+        asset_guid=str(value.get("asset_guid", "") or ""),
+        type_value=(
+            int(value["type_value"]) if value.get("type_value") is not None else None
+        ),
+        parsed_car_id=(
+            int(value["parsed_car_id"])
+            if value.get("parsed_car_id") is not None
+            else (int(value["car_id"]) if value.get("car_id") is not None else None)
         ),
     )
 

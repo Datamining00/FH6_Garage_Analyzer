@@ -15,6 +15,10 @@ class ParseError(ValueError):
     pass
 
 
+_LIVERY_KINDS = {"Livery", "BaseLivery", "SoulBoundLivery"}
+_CREATOR_RELATIVE_PADDING = b"\x00" * 7
+
+
 def _u16(data: bytes, offset: int) -> int:
     if offset + 2 > len(data):
         raise ParseError("unexpected end of header")
@@ -39,12 +43,47 @@ def _read_utf16_string(data: bytes, offset: int) -> tuple[str, int]:
     return text, end
 
 
-def parse_forza_header(data: bytes, kind: str) -> HeaderInfo:
-    """Parse the common FH6 livery/tuning header fields verified from save samples.
+def _uuid_text(raw: bytes) -> str:
+    if len(raw) != 16:
+        return ""
+    try:
+        return str(uuid.UUID(bytes=raw))
+    except ValueError:
+        return ""
 
-    Supported fields are deliberately limited to positions that are stable across
-    the sampled Livery/BaseLivery/SoulBoundLivery/Tuning headers. Unknown fields
-    are skipped instead of guessed.
+
+def _has_creator_relative_tail(data: bytes, creator_end: int, tail_size: int) -> bool:
+    """Validate the stable v7 creator-relative envelope without trusting marker bytes.
+
+    The two bytes at creator_end+0x1C vary in real FH6 liveries (01 00, 01 01,
+    01 02, and potentially other values).  They are therefore diagnostic data,
+    not a parser gate.  Across the verified corpus the following seven bytes are
+    zero padding and the kind-specific tail has a stable minimum size.
+    """
+    return (
+        creator_end + tail_size <= len(data)
+        and data[creator_end + 0x1E:creator_end + 0x25]
+        == _CREATOR_RELATIVE_PADDING
+    )
+
+
+def parse_forza_header(data: bytes, kind: str) -> HeaderInfo:
+    """Parse FH6 livery/tuning header fields without breaking legacy identities.
+
+    The title/description/date/creator preamble is common to the sampled v7
+    headers.  Current v7 livery and tuning tails are parsed relative to the end
+    of the creator string.  The two bytes at +0x1C are intentionally ignored as
+    a structural condition because real FH6 Livery files use multiple values
+    while keeping the same CarOrdinal/GUID layout.
+
+    When the verified creator-relative envelope is absent, the historical
+    tail-based parser remains the compatibility fallback for older/synthetic
+    fixtures and unknown layouts.
+
+    ``guid``, ``decal_count`` and ``platform_code`` deliberately retain their
+    historical values because existing local annotations/history/backups may
+    already depend on them.  Verified creator-relative values are exposed
+    separately as ``asset_guid`` and ``type_value``.
     """
     if len(data) < 48:
         raise ParseError("header is too small")
@@ -54,8 +93,8 @@ def parse_forza_header(data: bytes, kind: str) -> HeaderInfo:
     name, offset = _read_utf16_string(data, offset)
     description, offset = _read_utf16_string(data, offset)
 
-    # Verified common timestamp layout after the two strings:
-    # uint16 year, uint32 month, uint16 day/hour/min/sec/ms.
+    # Verified against current v7 BaseLivery/Livery/SoulBoundLivery/Tuning
+    # samples: uint16 year, uint32 month, uint16 day/hour/min/sec/ms.
     if offset + 28 > len(data):
         raise ParseError("header ends before common metadata")
     year = _u16(data, offset)
@@ -65,6 +104,11 @@ def parse_forza_header(data: bytes, kind: str) -> HeaderInfo:
     minute = _u16(data, offset + 10)
     second = _u16(data, offset + 12)
     millisecond = _u16(data, offset + 14)
+
+    # Bytes offset+20:offset+28 form an 8-byte creator-identity block in the
+    # sampled headers. Its internal semantics are not assigned yet. Keep the
+    # historical +26 value for backwards compatibility only.
+    _creator_identity = data[offset + 20:offset + 28]
     platform_code = _u16(data, offset + 26)
 
     creator_len_offset = offset + 28
@@ -72,26 +116,56 @@ def parse_forza_header(data: bytes, kind: str) -> HeaderInfo:
 
     created = ""
     if 2000 <= year <= 2100 and 1 <= month <= 12 and 1 <= day <= 31:
-        created = f"{year:04d}-{month:02d}-{day:02d} {hour:02d}:{minute:02d}:{second:02d}.{millisecond:03d}"
+        created = (
+            f"{year:04d}-{month:02d}-{day:02d} "
+            f"{hour:02d}:{minute:02d}:{second:02d}.{millisecond:03d}"
+        )
 
-    # All verified headers end with: uint32 CarId + repeated 16-byte GUID.
+    # Historical tail values are intentionally preserved as compatibility
+    # identities. In real livery samples the final 16 bytes are not always the
+    # Asset GUID, but existing annotations/history/backups may already key on
+    # these values.
     car_id = _u32(data, len(data) - 20) if len(data) >= 20 else None
-    guid_bytes = data[-16:] if len(data) >= 16 else b""
-    guid = ""
-    if len(guid_bytes) == 16:
-        try:
-            guid = str(uuid.UUID(bytes=guid_bytes))
-        except ValueError:
-            pass
+    guid = _uuid_text(data[-16:] if len(data) >= 16 else b"")
 
     decal_count: Optional[int] = None
-    if kind in {"Livery", "BaseLivery", "SoulBoundLivery"} and len(data) >= 24:
+    if kind in _LIVERY_KINDS and len(data) >= 24:
         decal_count = _u32(data, len(data) - 24)
 
-    # creator_end is checked to catch malformed string lengths, even though the
-    # remaining unknown fields are intentionally not interpreted yet.
-    if creator_end > len(data):
-        raise ParseError("creator string exceeds header")
+    asset_guid = ""
+    type_value: Optional[int] = None
+
+    # Verified v7 creator-relative layouts:
+    # Livery/BaseLivery/SoulBoundLivery
+    #   +0x1C byte[2] variable marker/state bytes (not a parser gate)
+    #   +0x1E byte[7] zero padding
+    #   +0x25 u32 type_value (exact semantic meaning still unconfirmed)
+    #   +0x29 u32 target CarOrdinal
+    #   +0x2D byte[16] Asset GUID
+    # Tuning
+    #   +0x1C byte[2] variable marker/state bytes (not a parser gate)
+    #   +0x1E byte[7] zero padding
+    #   +0x25 u32 target CarOrdinal
+    #   +0x29 byte[16] GUID
+    if (
+        version >= 7
+        and kind in _LIVERY_KINDS
+        and _has_creator_relative_tail(data, creator_end, 0x3D)
+    ):
+        type_value = _u32(data, creator_end + 0x25)
+        structural_car_id = _u32(data, creator_end + 0x29)
+        if structural_car_id > 0:
+            car_id = structural_car_id
+            asset_guid = _uuid_text(data[creator_end + 0x2D:creator_end + 0x3D])
+    elif (
+        version >= 7
+        and kind == "Tuning"
+        and _has_creator_relative_tail(data, creator_end, 0x39)
+    ):
+        structural_car_id = _u32(data, creator_end + 0x25)
+        if structural_car_id > 0:
+            car_id = structural_car_id
+            asset_guid = _uuid_text(data[creator_end + 0x29:creator_end + 0x39])
 
     return HeaderInfo(
         version=version,
@@ -103,6 +177,9 @@ def parse_forza_header(data: bytes, kind: str) -> HeaderInfo:
         guid=guid,
         decal_count=decal_count,
         platform_code=platform_code,
+        asset_guid=asset_guid,
+        type_value=type_value,
+        parsed_car_id=car_id,
     )
 
 

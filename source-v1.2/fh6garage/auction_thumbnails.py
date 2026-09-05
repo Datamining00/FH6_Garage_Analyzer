@@ -48,12 +48,13 @@ class ManifestThumbnailEntry:
 class AuctionThumbnailMatchStats:
     auction_count: int = 0
     matched_by_header_id: int = 0
+    matched_by_shared_design: int = 0
     ambiguous: int = 0
     unmatched: int = 0
 
     @property
     def matched(self) -> int:
-        return self.matched_by_header_id
+        return self.matched_by_header_id + self.matched_by_shared_design
 
     # Compatibility with the first v1.3.2 work build. Time/order matching was
     # removed once the header-token relationship was verified.
@@ -309,6 +310,7 @@ def assign_auction_thumbnails(
         )
 
     by_identity: dict[tuple[int, str], list[ManifestThumbnailEntry]] = {}
+    by_design_token: dict[str, list[ManifestThumbnailEntry]] = {}
     for entry in entries:
         if not entry.livery_token:
             continue
@@ -316,8 +318,10 @@ def assign_auction_thumbnails(
             (entry.car_id, entry.livery_token),
             [],
         ).append(entry)
+        by_design_token.setdefault(entry.livery_token, []).append(entry)
 
     matched = 0
+    shared_design_matched = 0
     ambiguous = 0
 
     for record in auction_records:
@@ -327,22 +331,35 @@ def assign_auction_thumbnails(
         if not token:
             continue
 
-        candidates = by_identity.get((int(record.car_id), token), [])
-        if len(candidates) != 1:
-            if len(candidates) > 1:
-                ambiguous += 1
+        candidates = [
+            entry
+            for entry in by_identity.get((int(record.car_id), token), [])
+            if entry.path.is_file()
+        ]
+        if len(candidates) == 1:
+            record.thumbnail_path = candidates[0].path
+            matched += 1
+            continue
+        if len(candidates) > 1:
+            ambiguous += 1
             continue
 
-        entry = candidates[0]
-        if not entry.path.is_file():
-            continue
-
-        record.thumbnail_path = entry.path
-        matched += 1
+        shared_by_path = {
+            str(entry.path).casefold(): entry
+            for entry in by_design_token.get(token, [])
+            if entry.path.is_file()
+        }
+        shared_candidates = list(shared_by_path.values())
+        if len(shared_candidates) == 1:
+            record.thumbnail_path = shared_candidates[0].path
+            shared_design_matched += 1
+        elif len(shared_candidates) > 1:
+            ambiguous += 1
 
     return AuctionThumbnailMatchStats(
         auction_count=len(auction_records),
         matched_by_header_id=matched,
+        matched_by_shared_design=shared_design_matched,
         ambiguous=ambiguous,
-        unmatched=max(0, len(auction_records) - matched),
+        unmatched=max(0, len(auction_records) - matched - shared_design_matched),
     )

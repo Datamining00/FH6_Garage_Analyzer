@@ -54,7 +54,7 @@ class V132ResponsivenessSortTests(unittest.TestCase):
         QTimer.singleShot(0, lambda: fired.append(True))
         _yield_busy_events(owner, force=True)
         self.assertEqual(fired, [True])
-        self.assertLessEqual(_BUSY_YIELD_INTERVAL_SECONDS, 1.0 / 60.0)
+        self.assertEqual(_BUSY_YIELD_INTERVAL_SECONDS, 0.05)
 
     def test_busy_yield_does_nothing_when_no_busy_overlay_is_active(self) -> None:
         fired = []

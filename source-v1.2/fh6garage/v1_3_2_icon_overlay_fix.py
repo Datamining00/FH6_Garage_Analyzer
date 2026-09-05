@@ -130,7 +130,7 @@ def _normalize_card_actions(card: Any) -> None:
     # v1.3.2's alignment object positions the left hide/info controls against
     # the fourth/fifth right-side controls. Re-run it after the common 30 px
     # geometry has been applied so every centerline is calculated from final sizes.
-    aligner = getattr(card, "_fh6_card_action_aligner", None)
+    aligner = None if getattr(card, "_fh6_action_grid", None) is not None else getattr(card, "_fh6_card_action_aligner", None)
     if aligner is not None and hasattr(aligner, "reposition"):
         QTimer.singleShot(0, aligner.reposition)
 

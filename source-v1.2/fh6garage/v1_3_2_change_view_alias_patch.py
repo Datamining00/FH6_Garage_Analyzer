@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6.QtCore import QSize, Qt
+from PySide6.QtCore import QSize, QTimer, Qt
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -361,17 +361,47 @@ def _observed_creator_names(window: Any) -> list[str]:
 
 
 def _refresh_alias_views(window: Any) -> None:
-    reset_cards = getattr(window, "_fh6_v132_reset_ui_card_cache", None)
-    if callable(reset_cards):
-        reset_cards()
     if getattr(window, "result", None) is None:
         return
+
+    # Creator aliases only change presentation metadata.  The old path cleared
+    # the complete card cache before repopulating both grids, which rebuilt
+    # hundreds of widget trees on the GUI thread.  Keep the cache alive so the
+    # v1.3.2 performance layer can reorder/reuse the existing cards instead.
+    scroll_positions: list[tuple[Any, int]] = []
+    for name in ("livery_grid_scroll", "tuning_grid_scroll"):
+        scroll = getattr(window, name, None)
+        if scroll is not None and hasattr(scroll, "verticalScrollBar"):
+            bar = scroll.verticalScrollBar()
+            scroll_positions.append((bar, bar.value()))
+
     window._populate_creator_table()
     window._populate_livery_table()
     window._populate_tuning_table()
+
+    # Reused cards retain their widgets, so explicitly update the one visible
+    # field whose text depends on the alias mapping. Search/group properties
+    # are normalized by the patched relayout functions above.
+    for content_type, cards in (
+        ("livery", getattr(window, "_livery_grid_cards", [])),
+        ("tuning", getattr(window, "_tuning_grid_cards", [])),
+    ):
+        for card in cards:
+            key = str(card.property("annotationKey") or "")
+            record = window._record_for_content_key(content_type, key) if key else None
+            if record is not None:
+                _decorate_creator_copy_label(window, card, record.header.creator or "")
+
     window._filter_dashboard_table(window.car_search.text())
     if window.dashboard_content_stack.currentIndex() == 1:
         window._update_selected_creator()
+
+    def restore_scroll_positions() -> None:
+        for bar, value in scroll_positions:
+            bar.setValue(min(value, bar.maximum()))
+
+    restore_scroll_positions()
+    QTimer.singleShot(0, restore_scroll_positions)
 
 
 def _open_alias_dialog(window: Any) -> None:
@@ -572,7 +602,6 @@ def apply_v1_3_2_change_view_alias_patch(MainWindow) -> None:
         return
 
     original_init = MainWindow.__init__
-    original_populate_all = MainWindow._populate_all
     original_make_card = MainWindow._make_saved_content_card
     original_sorted_saved_content = MainWindow._sorted_saved_content
     original_filter_dashboard = MainWindow._filter_dashboard_table
@@ -646,10 +675,6 @@ def apply_v1_3_2_change_view_alias_patch(MainWindow) -> None:
             )
         )
         banner.show()
-
-    def patched_populate_all(self) -> None:
-        original_populate_all(self)
-        update_change_banner(self)
 
     def patched_make_card(self, content_type: str, record: Any, key: str):
         card = original_make_card(self, content_type, record, key)
@@ -801,7 +826,6 @@ def apply_v1_3_2_change_view_alias_patch(MainWindow) -> None:
         original_relayout_tuning(self, text)
 
     MainWindow.__init__ = patched_init
-    MainWindow._populate_all = patched_populate_all
     MainWindow._make_saved_content_card = patched_make_card
     MainWindow._sorted_saved_content = patched_sorted_saved_content
     MainWindow._creator_content_stats = alias_creator_stats

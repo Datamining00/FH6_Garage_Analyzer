@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from datetime import datetime
 from collections import Counter
+from functools import lru_cache
 import re
 from typing import Optional
 
@@ -114,6 +115,7 @@ QMessageBox QPushButton:disabled { color: #8b8f9c; background: #eceef2; border-c
 """
 
 
+@lru_cache(maxsize=64)
 def _classification_pixmap(kind: str, active: bool, size: int = 24) -> QPixmap:
     """Draw the exact active/inactive glyph shared by cards and filters."""
     pixmap = QPixmap(size, size)
@@ -121,9 +123,9 @@ def _classification_pixmap(kind: str, active: bool, size: int = 24) -> QPixmap:
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
     colors = {
-        "check": (QColor("#20a653"), QColor("#9ba5b3")),
-        "triangle": (QColor("#d98216"), QColor("#9ba5b3")),
-        "excluded": (QColor("#df3545"), QColor("#9ba5b3")),
+        "check": (QColor("#16a34a"), QColor("#9ba5b3")),
+        "triangle": (QColor("#d97706"), QColor("#9ba5b3")),
+        "excluded": (QColor("#dc2626"), QColor("#9ba5b3")),
         "memo": (QColor("#7656e8"), QColor("#9ba5b3")),
         "duplicate": (QColor("#5f39d8"), QColor("#9ba5b3")),
         "info": (QColor("#6e4bf2"), QColor("#9ba5b3")),
@@ -188,7 +190,18 @@ def _classification_pixmap(kind: str, active: bool, size: int = 24) -> QPixmap:
     return pixmap
 
 
+@lru_cache(maxsize=16)
 def _classification_toggle_icon(kind: str) -> QIcon:
+    from .card_icons import toggle_icon as card_toggle_icon
+
+    card_assets = {
+        "check": ("circle", "#39e75f"),
+        "triangle": ("triangle", "#ffe600"),
+        "excluded": ("excluded", "#ff4d5a"),
+    }
+    if kind in card_assets:
+        asset, active_color = card_assets[kind]
+        return card_toggle_icon(asset, on_color=active_color)
     icon = QIcon()
     icon.addPixmap(
         _classification_pixmap(kind, False),
@@ -3040,76 +3053,117 @@ class MainWindow(QMainWindow):
                 self._show_tuning_details(r)
             )
 
-        overlay_actions = QVBoxLayout()
-        overlay_actions.setContentsMargins(0, 0, 0, 0)
-        overlay_actions.setSpacing(6)
-        overlay_actions.addWidget(check_box)
-        overlay_actions.addWidget(triangle_box)
-        overlay_actions.addWidget(excluded_box)
-        overlay_actions.addWidget(zoom_button)
-        overlay_actions.addWidget(memo_button)
-        overlay_actions.addStretch(1)
-
-        left_actions = QVBoxLayout()
-        left_actions.setContentsMargins(0, 0, 0, 0)
-        left_actions.setSpacing(6)
+        card_action_grid = None
         if content_type == "livery":
-            left_actions.addWidget(game_move_button, 0, Qt.AlignmentFlag.AlignTop)
-        left_actions.addStretch(1)
-        left_actions.addWidget(info_button, 0, Qt.AlignmentFlag.AlignBottom)
+            # The original card owns the complete six-row action geometry.
+            # Later feature patches may fill the reserved cells, but must not
+            # create another layout or move these controls with timers.
+            card_action_grid = QGridLayout()
+            card_action_grid.setContentsMargins(0, 0, 0, 0)
+            card_action_grid.setHorizontalSpacing(0)
+            card_action_grid.setVerticalSpacing(3)
+            card_action_grid.setColumnStretch(0, 1)
+            card_action_grid.setColumnStretch(1, 1)
+            for row in range(6):
+                card_action_grid.setRowMinimumHeight(row, 34)
+            for button in (game_move_button, zoom_button, memo_button, info_button, check_box, triangle_box, excluded_box):
+                button.setIconSize(QSize(20, 20))
+            card_action_grid.addWidget(game_move_button, 0, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+            card_action_grid.addWidget(zoom_button, 1, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+            card_action_grid.addWidget(memo_button, 2, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+            card_action_grid.addWidget(info_button, 3, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+            card_action_grid.addWidget(check_box, 3, 1, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            card_action_grid.addWidget(triangle_box, 4, 1, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            card_action_grid.addWidget(excluded_box, 5, 1, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignBottom)
+            overlay_layout.setContentsMargins(5, 5, 5, 5)
+            overlay_layout.setSpacing(0)
+            overlay_layout.addLayout(card_action_grid)
+        else:
+            overlay_actions = QVBoxLayout()
+            overlay_actions.setContentsMargins(0, 0, 0, 0)
+            overlay_actions.setSpacing(6)
+            overlay_actions.addWidget(check_box)
+            overlay_actions.addWidget(triangle_box)
+            overlay_actions.addWidget(excluded_box)
+            overlay_actions.addWidget(zoom_button)
+            overlay_actions.addWidget(memo_button)
+            overlay_actions.addStretch(1)
 
-        action_columns = QHBoxLayout()
-        action_columns.setContentsMargins(0, 0, 0, 0)
-        action_columns.setSpacing(0)
-        action_columns.addLayout(left_actions)
-        action_columns.addStretch(1)
-        action_columns.addLayout(overlay_actions)
-        overlay_layout.addLayout(action_columns)
+            left_actions = QVBoxLayout()
+            left_actions.setContentsMargins(0, 0, 0, 0)
+            left_actions.setSpacing(6)
+            left_actions.addStretch(1)
+            left_actions.addWidget(info_button, 0, Qt.AlignmentFlag.AlignBottom)
+
+            action_columns = QHBoxLayout()
+            action_columns.setContentsMargins(0, 0, 0, 0)
+            action_columns.setSpacing(0)
+            action_columns.addLayout(left_actions)
+            action_columns.addStretch(1)
+            action_columns.addLayout(overlay_actions)
+            overlay_layout.addLayout(action_columns)
         image_stack.addWidget(overlay)
         image_stack.setCurrentWidget(overlay)
         outer.addWidget(image_host)
 
-        # Borderless hierarchy: vehicle first, then title and creator metadata.
+        # Stable two-by-two metadata area:
+        # vehicle | acquisition placeholder
+        # creator | title
         content_name = record.header.name or "(unnamed)"
         creator_name = record.header.creator or "—"
         vehicle_name = self._car_label(record.header.car_id)
         vehicle = CopyValueLabel(tr("card.vehicle_label"), vehicle_name)
         vehicle.setStyleSheet(
-            "QLabel { background:transparent; color:#171924; border:0; padding:4px 2px 1px 2px; "
-            "font-size:11.5pt; font-weight:700; }"
+            "QLabel { background:transparent; color:#171924; border:0; padding:0 2px; "
+            "font-size:10.5pt; font-weight:600; }"
         )
-        vehicle.setFixedHeight(31)
+        vehicle.setFixedHeight(24)
         vehicle.setToolTip(tr("common.copy_value_detail", label=tr("card.vehicle_label"), value=vehicle_name))
         vehicle.setMinimumWidth(0)
         vehicle.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
-        outer.addWidget(vehicle)
+        metadata_grid = QGridLayout()
+        metadata_grid.setContentsMargins(0, 0, 0, 0)
+        metadata_grid.setHorizontalSpacing(0)
+        metadata_grid.setVerticalSpacing(0)
+        metadata_grid.setColumnStretch(0, 1)
+        metadata_grid.setColumnStretch(1, 1)
+        metadata_grid.setRowMinimumHeight(0, 24)
+        metadata_grid.setRowMinimumHeight(1, 24)
+        metadata_grid.addWidget(vehicle, 0, 0)
 
-        meta_row = QHBoxLayout()
-        meta_row.setContentsMargins(0, 0, 0, 0)
-        meta_row.setSpacing(7)
+        acquisition_box = QLabel("")
+        acquisition_box.setObjectName("fh6AcquisitionPlaceholder")
+        acquisition_box.setFixedHeight(24)
+        acquisition_box.setMinimumWidth(0)
+        acquisition_box.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        acquisition_box.setStyleSheet(
+            "QLabel { background:transparent; color:#171924; border:0; padding:0 2px; "
+            "font-size:10.5pt; font-weight:600; }"
+        )
+        metadata_grid.addWidget(acquisition_box, 0, 1)
 
         title_box = CopyValueLabel(tr("card.title_label"), content_name)
         title_box.setStyleSheet(
-            "QLabel { background:transparent; color:#343744; border:0; padding:2px; "
-            "font-size:10pt; font-weight:600; }"
+            "QLabel { background:transparent; color:#171924; border:0; padding:0 2px; "
+            "font-size:10.5pt; font-weight:600; }"
         )
-        title_box.setFixedHeight(28)
+        title_box.setFixedHeight(24)
         title_box.setToolTip(tr("common.copy_value_detail", label=tr("card.title_label"), value=content_name))
         title_box.setMinimumWidth(0)
         title_box.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
-        meta_row.addWidget(title_box, 3)
+        metadata_grid.addWidget(title_box, 1, 1)
 
         creator_box = CopyValueLabel(tr("card.creator_label"), creator_name)
         creator_box.setStyleSheet(
-            "QLabel { background:transparent; color:#6d7282; border:0; padding:2px; "
-            "font-size:9.5pt; font-weight:500; }"
+            "QLabel { background:transparent; color:#171924; border:0; padding:0 2px; "
+            "font-size:10.5pt; font-weight:600; }"
         )
-        creator_box.setFixedHeight(28)
+        creator_box.setFixedHeight(24)
         creator_box.setToolTip(tr("common.copy_value_detail", label=tr("card.creator_label"), value=creator_name))
         creator_box.setMinimumWidth(0)
         creator_box.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
-        meta_row.addWidget(creator_box, 2)
-        outer.addLayout(meta_row)
+        metadata_grid.addWidget(creator_box, 1, 0)
+        outer.addLayout(metadata_grid)
 
         card._fh6_image_label = image_label
         card._fh6_thumbnail_path = record.thumbnail_path
@@ -3121,6 +3175,9 @@ class MainWindow(QMainWindow):
         card._fh6_zoom_button = zoom_button
         card._fh6_game_move_button = game_move_button
         card._fh6_info_button = info_button
+        card._fh6_action_grid = card_action_grid
+        card._fh6_metadata_grid = metadata_grid
+        card._fh6_acquisition_placeholder = acquisition_box
         card._fh6_content_type = content_type
         self._apply_pointing_cursors(card)
         return card

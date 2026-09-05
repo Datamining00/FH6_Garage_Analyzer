@@ -9,7 +9,7 @@ from PySide6.QtWidgets import QApplication, QFrame, QLabel
 from .i18n import tr
 from .models import LiveryRecord
 
-_BUSY_YIELD_INTERVAL_SECONDS = 1.0 / 60.0
+_BUSY_YIELD_INTERVAL_SECONDS = 0.05
 _BUSY_PROCESS_EVENTS_MS = 4
 _HIDDEN_MODE = 11
 _AUCTION_APPLIED_MODE = 12
