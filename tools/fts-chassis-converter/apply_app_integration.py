@@ -6,7 +6,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SOURCE = REPO_ROOT / "source-v1.2" / "fh6garage" / "preview3d" / "chassis_converter.py"
-EXPECTED_SOURCE_BLOB = "e6f8031afdf8d4c5d18328f5d6f71f595183eb3f"
+EXPECTED_SOURCE_BLOB = "5f1f895a5da23b82a2b35f5177de6329d68ecc07"
 FTS_BINARY_COMMIT = "e0a0b5e3ad5054b8410ae4497c5dacf2db6adf19"
 FTS_BINARY_BLOB = "7556c1e4cd3b3d532339a9226241988be69cd27d"
 FTS_REFERENCE_COMMIT = "4f373c5fb192551ce5249e320dd79b1399b693ca"
@@ -115,7 +115,8 @@ def main() -> None:
         "geometry revision diagnostic",
     )
 
-    # Retain the existing fail-open visibility behavior and fail-closed neutral A+B/C\n    # classification. Only the legacy positional heuristic is removed.
+    # Retain the existing fail-open visibility behavior and fail-closed neutral A+B/C
+    # classification. Only the legacy positional heuristic is removed.
     SOURCE.write_text(text, encoding="utf-8", newline="\n")
     print(f"Applied FTS app integration to {SOURCE}")
     print(f"Pinned converter commit: {FTS_BINARY_COMMIT}")
