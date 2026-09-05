@@ -20,6 +20,13 @@ def test_fts_converter_patch_is_pinned_and_structural():
     assert "instanceTransform" in text
     assert "fh6_fts_chassis_conversion_v1" in text
     assert "lateral_translation_v1" not in text
+    assert "MorphRawPositionDeltas" in text
+    assert "mesh.MorphDataBufferIndex >= 0" in text
+    assert "minVertexIndex + mesh.IndexedVertexOffset + i" in text
+    assert "TransformMorphPositionDeltas" in text
+    assert "targets = morphTargets" in text
+    assert "weights = Enumerable.Repeat(0.0f" in text
+    assert "kfps_morph_default_weights_verified" in text
 
 
 def test_fts_converter_workflow_builds_patched_source():
