@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from pathlib import Path
 
 
@@ -25,6 +26,13 @@ def replace_once(text: str, old: str, new: str, label: str) -> str:
     return text.replace(old, new, 1)
 
 
+def sub_once(text: str, pattern: str, replacement: str, label: str) -> str:
+    result, count = re.subn(pattern, replacement, text, count=1, flags=re.MULTILINE | re.DOTALL)
+    if count != 1:
+        raise RuntimeError(f"{label}: expected exactly one structural match, found {count}")
+    return result
+
+
 def main() -> None:
     raw = SOURCE.read_bytes()
     text = raw.decode("utf-8")
@@ -40,17 +48,28 @@ def main() -> None:
             f"expected Git blob {EXPECTED_SOURCE_BLOB}, got {actual_blob}"
         )
 
-    text = replace_once(
+    text = sub_once(
         text,
-        '''from .wheel_geometry import (\n    WHEEL_GEOMETRY_REVISION,\n    WheelGeometryError,\n    repair_wheelstyle_lateral_translation,\n)\n\n''',
+        r"from \.wheel_geometry import \(\s*WHEEL_GEOMETRY_REVISION,\s*WheelGeometryError,\s*repair_wheelstyle_lateral_translation,\s*\)\s*",
         "",
         "legacy WheelStyle heuristic import",
     )
 
-    text = replace_once(
+    text = sub_once(
         text,
-        '''CONVERTER_COMMIT = "6f53ca3c584d78659d06d4b4a39561db67d79345"\nCONVERTER_BLOB_SHA1 = "7d3f83ce4d787c752a01729d1a5a6b81ca5cc800"\nCONVERTER_URL = (\n    "https://raw.githubusercontent.com/heyitshestia/kloudys-forza-painter-suite/"\n    f"{CONVERTER_COMMIT}/tools/livery/chassis-converter/bin/win-x64/Kfps.ChassisConverter.exe"\n)\n''',
-        f'''# Real ForzaTechStudio geometry port. The binary is reproducibly built in this\n# repository from the pinned KFPS headless exporter plus the pinned FTS geometry\n# semantics patch. Do not silently fall back to the legacy KFPS binary.\nCONVERTER_COMMIT = "{FTS_BINARY_COMMIT}"\nCONVERTER_BLOB_SHA1 = "{FTS_BINARY_BLOB}"\nCONVERTER_URL = (\n    "https://raw.githubusercontent.com/Datamining00/FH6_Garage_Analyzer/"\n    f"{{CONVERTER_COMMIT}}/tools/fts-chassis-converter/bin/win-x64/FH6.FtsChassisConverter.exe"\n)\nFTS_REFERENCE_COMMIT = "{FTS_REFERENCE_COMMIT}"\nFTS_CONVERTER_FORMAT = "{FTS_FORMAT}"\nFTS_NATIVE_GEOMETRY_REVISION = "{FTS_GEOMETRY_REVISION}"\n''',
+        r'''CONVERTER_COMMIT = "6f53ca3c584d78659d06d4b4a39561db67d79345"\s*CONVERTER_BLOB_SHA1 = "7d3f83ce4d787c752a01729d1a5a6b81ca5cc800"\s*CONVERTER_URL = \(\s*"https://raw\.githubusercontent\.com/heyitshestia/kloudys-forza-painter-suite/"\s*f"\{CONVERTER_COMMIT\}/tools/livery/chassis-converter/bin/win-x64/Kfps\.ChassisConverter\.exe"\s*\)''',
+        f'''# Real ForzaTechStudio geometry port. The binary is reproducibly built in this
+# repository from the pinned KFPS headless exporter plus the pinned FTS geometry
+# semantics patch. Do not silently fall back to the legacy KFPS binary.
+CONVERTER_COMMIT = "{FTS_BINARY_COMMIT}"
+CONVERTER_BLOB_SHA1 = "{FTS_BINARY_BLOB}"
+CONVERTER_URL = (
+    "https://raw.githubusercontent.com/Datamining00/FH6_Garage_Analyzer/"
+    f"{{CONVERTER_COMMIT}}/tools/fts-chassis-converter/bin/win-x64/FH6.FtsChassisConverter.exe"
+)
+FTS_REFERENCE_COMMIT = "{FTS_REFERENCE_COMMIT}"
+FTS_CONVERTER_FORMAT = "{FTS_FORMAT}"
+FTS_NATIVE_GEOMETRY_REVISION = "{FTS_GEOMETRY_REVISION}"''',
         "converter pin",
     )
 
@@ -73,17 +92,27 @@ def main() -> None:
         "download error",
     )
 
-    text = replace_once(
+    text = sub_once(
         text,
-        '''    wheel_geometry_summary: dict = {}\n    wheel_geometry_error: str | None = None\n''',
-        '''    # FTS reconstructs WheelStyle in source-space. Never apply the legacy\n    # lateral_translation_v1 vertex heuristic to FTS-generated geometry.\n    wheel_geometry_summary: dict = {\n        "status": "fts_native_geometry",\n        "revision": FTS_NATIVE_GEOMETRY_REVISION,\n        "repaired_vertices": 0,\n    }\n    wheel_geometry_error: str | None = None\n''',
+        r"    wheel_geometry_summary: dict = \{\}\s*    wheel_geometry_error: str \| None = None",
+        '''    # FTS reconstructs WheelStyle in source-space. Never apply the legacy
+    # lateral_translation_v1 vertex heuristic to FTS-generated geometry.
+    wheel_geometry_summary: dict = {
+        "status": "fts_native_geometry",
+        "revision": FTS_NATIVE_GEOMETRY_REVISION,
+        "repaired_vertices": 0,
+    }
+    wheel_geometry_error: str | None = None''',
         "native geometry diagnostic initialization",
     )
 
-    text = replace_once(
+    text = sub_once(
         text,
-        '''            # Repair only after the WheelStyle source/primitive mapping above has\n            # validated. This aid is fail-open and never invalidates a usable GLB.\n            if not wheel_visibility_error:\n                try:\n                    wheel_geometry_summary = repair_wheelstyle_lateral_translation(output).as_dict()\n                except (OSError, ValueError, WheelGeometryError) as exc:\n                    wheel_geometry_error = f"{type(exc).__name__}: {exc}"\n\n''',
-        '''            # Geometry is already reconstructed by the pinned FTS converter.\n            # Wheel visibility validation remains fail-open, but no vertex-position\n            # repair is permitted on this path.\n\n''',
+        r'''            # Repair only after the WheelStyle source/primitive mapping above has\s*            # validated\. This aid is fail-open and never invalidates a usable GLB\.\s*            if not wheel_visibility_error:\s*                try:\s*                    wheel_geometry_summary = repair_wheelstyle_lateral_translation\(output\)\.as_dict\(\)\s*                except \(OSError, ValueError, WheelGeometryError\) as exc:\s*                    wheel_geometry_error = f"\{type\(exc\)\.__name__\}: \{exc\}"\s*''',
+        '''            # Geometry is already reconstructed by the pinned FTS converter.
+            # Wheel visibility validation remains fail-open, but no vertex-position
+            # repair is permitted on this path.
+''',
         "legacy WheelStyle repair call",
     )
 
@@ -94,17 +123,33 @@ def main() -> None:
         "converter start error",
     )
 
-    text = replace_once(
+    text = sub_once(
         text,
-        '''    if wheel_geometry_error:\n        wheel_geometry_summary = dict(wheel_geometry_summary or {})\n        wheel_geometry_summary.setdefault("status", "validation_failed_proceeding")\n''',
+        r'''    if wheel_geometry_error:\s*        wheel_geometry_summary = dict\(wheel_geometry_summary or \{\}\)\s*        wheel_geometry_summary\.setdefault\("status", "validation_failed_proceeding"\)\s*''',
         "",
         "legacy wheel geometry error handling",
     )
 
-    text = replace_once(
+    text = sub_once(
         text,
-        '''        if isinstance(candidate, dict):\n            diagnostics = candidate\n\n    # The raw carbin can mention optional/unselected models that are absent from\n''',
-        '''        if isinstance(candidate, dict):\n            diagnostics = candidate\n\n    # A valid GLB is not enough for this branch: refuse to represent a legacy or\n    # unknown exporter as an FTS result. The binary itself is Git-blob pinned above.\n    converter_format = str(diagnostics.get("format") or "")\n    if converter_format != FTS_CONVERTER_FORMAT:\n        try:\n            output.unlink(missing_ok=True)\n        except OSError:\n            pass\n        raise ChassisConverterError(\n            "Pinned ForzaTechStudio converter returned an unexpected format marker: "\n            f"{converter_format or '<missing>'}; expected {FTS_CONVERTER_FORMAT}."\n        )\n\n    # The raw carbin can mention optional/unselected models that are absent from\n''',
+        r'''        if isinstance\(candidate, dict\):\s*            diagnostics = candidate\s*(?=    # The raw carbin can mention optional/unselected models that are absent from)''',
+        '''        if isinstance(candidate, dict):
+            diagnostics = candidate
+
+    # A valid GLB is not enough for this branch: refuse to represent a legacy or
+    # unknown exporter as an FTS result. The binary itself is Git-blob pinned above.
+    converter_format = str(diagnostics.get("format") or "")
+    if converter_format != FTS_CONVERTER_FORMAT:
+        try:
+            output.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise ChassisConverterError(
+            "Pinned ForzaTechStudio converter returned an unexpected format marker: "
+            f"{converter_format or '<missing>'}; expected {FTS_CONVERTER_FORMAT}."
+        )
+
+''',
         "FTS format validation",
     )
 
