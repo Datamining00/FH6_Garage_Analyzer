@@ -3,6 +3,8 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
+from fh6garage.preview3d.glb_parser import _structural_livery_exclusion_reason
+
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = ROOT / "fh6garage" / "preview3d"
@@ -52,6 +54,29 @@ class FinalVerify1PreviewPortContractTests(unittest.TestCase):
         self.assertIn("neutral_cleanup_c: bool = False", parser)
         self.assertIn("livery_uv_channel not in (0, 1, 2, 3)", parser)
         self.assertIn("cleanup_ab and bool(extras.get(\"kfps_neutral_ab_hidden\"", parser)
+
+    def test_interior_and_brakes_are_not_body_livery_targets(self) -> None:
+        self.assertEqual(
+            "scene_interior",
+            _structural_livery_exclusion_reason({
+                "kfps_part_type": "CarBody",
+                "kfps_source_entry": "Scene/Interior/Floor/floor_a.modelbin",
+            }),
+        )
+        self.assertEqual(
+            "part_type_brakes",
+            _structural_livery_exclusion_reason({
+                "kfps_part_type": "Brakes",
+                "kfps_source_entry": "Scene/_library/Scene/Brakes/Rotors/rotor.modelbin",
+            }),
+        )
+        self.assertEqual(
+            "",
+            _structural_livery_exclusion_reason({
+                "kfps_part_type": "CarBody",
+                "kfps_source_entry": "Scene/Exterior/Platform/body_a.modelbin",
+            }),
+        )
 
     def test_finalverify1_geometry_and_raster_policies_are_present(self) -> None:
         neutral = (PACKAGE / "neutral_geometry.py").read_text(encoding="utf-8")

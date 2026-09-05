@@ -53,6 +53,18 @@ def _neutral_geometry_excluded(
         return True, "neutral_c"
     return False, ""
 
+
+def _structural_livery_exclusion_reason(extras: dict) -> str:
+    """Return strong scene evidence that a mesh cannot receive body livery."""
+    part_type = str(extras.get("kfps_part_type") or "").strip().casefold()
+    if part_type == "brakes":
+        return "part_type_brakes"
+
+    source_entry = str(extras.get("kfps_source_entry") or "").replace("\\", "/").casefold()
+    if "/scene/interior/" in f"/{source_entry.lstrip('/')}":
+        return "scene_interior"
+    return ""
+
 @dataclass(frozen=True)
 class GlbSceneData:
     positions: np.ndarray
@@ -590,6 +602,7 @@ def load_kfps_glb(
         extras = dict(node_extras_by_mesh.get(mesh_index) or {})
         extras.update(mesh.get("extras") or {})
         role = str(extras.get("kfps_role") or "trim").casefold()
+        structural_livery_exclusion = _structural_livery_exclusion_reason(extras)
         neutral_excluded, neutral_exclusion_reason = _neutral_geometry_excluded(
             extras, bool(neutral_cleanup_ab), bool(neutral_cleanup_c)
         )
@@ -792,6 +805,15 @@ def load_kfps_glb(
                 else:
                     allowed_mask = 0
 
+            # Body livery never targets interior or brake assemblies. Keep the
+            # geometry visible, but prevent converter-name heuristics or UV/mask
+            # overlap from promoting it under any eligibility policy.
+            if structural_livery_exclusion:
+                allowed_mask = 0
+                projection_mask = 0
+                direct_flag = 0.0
+                selected_uv_channel = None
+
             if selected_uv_channel is not None:
                 selected_uv_channel_counts[selected_uv_channel] = (
                     selected_uv_channel_counts.get(selected_uv_channel, 0) + 1
@@ -832,6 +854,7 @@ def load_kfps_glb(
                 "part_type": str(extras.get("kfps_part_type") or ""),
                 "instance_identity": str(extras.get("kfps_instance_identity") or ""),
                 "declared_role": role,
+                "structural_livery_exclusion": structural_livery_exclusion,
                 "neutral_ab_hidden": bool(extras.get("kfps_neutral_ab_hidden", False)),
                 "neutral_ab_reasons": list(extras.get("kfps_neutral_ab_reasons") or []),
                 "neutral_c_candidate": bool(extras.get("kfps_neutral_c_candidate", False)),
@@ -866,7 +889,9 @@ def load_kfps_glb(
                     else "none"
                 ),
                 "inference_action": (
-                    "promoted_by_vehicle_mask"
+                    "structurally_excluded"
+                    if structural_livery_exclusion
+                    else "promoted_by_vehicle_mask"
                     if (
                         livery_eligibility == "legacy"
                         and inferred_mask
@@ -964,5 +989,4 @@ def load_kfps_glb(
         bounds_min=positions.min(axis=0),
         bounds_max=positions.max(axis=0),
     )
-
 
