@@ -108,7 +108,7 @@ FTS_NATIVE_GEOMETRY_REVISION = "{FTS_GEOMETRY_REVISION}"''',
 
     text = sub_once(
         text,
-        r'''            # Repair only after the WheelStyle source/primitive mapping above has\s*            # validated\. This aid is fail-open and never invalidates a usable GLB\.\s*            if not wheel_visibility_error:\s*                try:\s*                    wheel_geometry_summary = repair_wheelstyle_lateral_translation\(output\)\.as_dict\(\)\s*                except \(OSError, ValueError, WheelGeometryError\) as exc:\s*                    wheel_geometry_error = f"\{type\(exc\)\.__name__\}: \{exc\}"\s*''',
+        r'''            # Repair only after the WheelStyle source/primitive mapping above has\s*            # validated\. This aid is fail-open and never invalidates a usable GLB\.\s*            if not wheel_visibility_error:\s*                try:\s*                    wheel_geometry_summary = repair_wheelstyle_lateral_translation\(output\)\.as_dict\(\)\s*                except \(OSError, ValueError, WheelGeometryError\) as exc:\s*                    wheel_geometry_error = f"\{type\(exc\)\.__name__\}: \{exc\}"[ \t]*\r?\n''',
         '''            # Geometry is already reconstructed by the pinned FTS converter.
             # Wheel visibility validation remains fail-open, but no vertex-position
             # repair is permitted on this path.
@@ -125,14 +125,14 @@ FTS_NATIVE_GEOMETRY_REVISION = "{FTS_GEOMETRY_REVISION}"''',
 
     text = sub_once(
         text,
-        r'''    if wheel_geometry_error:\s*        wheel_geometry_summary = dict\(wheel_geometry_summary or \{\}\)\s*        wheel_geometry_summary\.setdefault\("status", "validation_failed_proceeding"\)\s*''',
+        r'''^    if wheel_geometry_error:[ \t]*\r?\n        wheel_geometry_summary = dict\(wheel_geometry_summary or \{\}\)[ \t]*\r?\n        wheel_geometry_summary\.setdefault\("status", "validation_failed_proceeding"\)[ \t]*\r?\n''',
         "",
         "legacy wheel geometry error handling",
     )
 
     text = sub_once(
         text,
-        r'''        if isinstance\(candidate, dict\):\s*            diagnostics = candidate\s*(?=    # The raw carbin can mention optional/unselected models that are absent from)''',
+        r'''        if isinstance\(candidate, dict\):\s*            diagnostics = candidate[ \t]*\r?\n(?=    # The raw carbin can mention optional/unselected models that are absent from)''',
         '''        if isinstance(candidate, dict):
             diagnostics = candidate
 
