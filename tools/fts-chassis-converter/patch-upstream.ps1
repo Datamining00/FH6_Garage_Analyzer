@@ -22,14 +22,16 @@ if ($actualCommit -ne $kfpsCommit) {
     throw "Unexpected KFPS source commit. Expected $kfpsCommit, got $actualCommit"
 }
 
-$importerText = Get-Content -Raw -LiteralPath $modelImporter
+$importerText = (Get-Content -Raw -LiteralPath $modelImporter) -replace "`r`n", "`n"
 foreach ($required in @('GetRotationMatrix()', 'RawPositions', 'PositionScale', 'PositionTranslate', 'BoneTransform')) {
     if (-not $importerText.Contains($required)) {
         throw "Vendored FTS ModelImporter contract missing: $required"
     }
 }
 
-$text = Get-Content -Raw -LiteralPath $program
+# Normalize the pinned source to LF before exact replacement. The GitHub source is
+# CRLF on Windows while this repository stores the patch script with LF.
+$text = (Get-Content -Raw -LiteralPath $program) -replace "`r`n", "`n"
 $old = @'
     private static Vector3[] TransformPositions(ForzaGeometryData geometry, Matrix4x4 instanceTransform)
     {
@@ -94,7 +96,7 @@ $new = @'
 '@
 
 if (-not $text.Contains($old)) {
-    throw 'Pinned TransformPositions block did not match; refusing a fuzzy patch.'
+    throw 'Pinned TransformPositions block did not match after LF normalization; refusing a fuzzy patch.'
 }
 
 $text = $text.Replace($old, $new)
