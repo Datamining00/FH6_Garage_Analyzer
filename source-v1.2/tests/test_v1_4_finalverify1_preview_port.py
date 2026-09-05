@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 
 from fh6garage.preview3d.glb_parser import _structural_livery_exclusion_reason
+from fh6garage.preview3d.neutral_geometry import _neutral_support_reasons
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -82,7 +83,15 @@ class FinalVerify1PreviewPortContractTests(unittest.TestCase):
         neutral = (PACKAGE / "neutral_geometry.py").read_text(encoding="utf-8")
         renderer = (PACKAGE / "kfps_render_backend.py").read_text(encoding="utf-8")
         viewer = (PACKAGE / "glb_viewer.py").read_text(encoding="utf-8")
-        self.assertIn("wheelstyle_hidden_no_tire_runtime", neutral)
+        self.assertNotIn("wheelstyle_hidden_no_tire_runtime", neutral)
+        self.assertEqual((), _neutral_support_reasons({
+            "part_type": 44,
+            "assembly_name": "Wheels",
+        }))
+        self.assertEqual(
+            ("wheel_dependent_support_part_type",),
+            _neutral_support_reasons({"part_type": 5, "assembly_name": ""}),
+        )
         self.assertIn("extreme_thin_auxiliary_geometry", neutral)
         self.assertIn("kfps_neutral_c_candidate", neutral)
         self.assertIn("_prepare_raster_layers", renderer)

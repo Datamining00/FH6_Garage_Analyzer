@@ -11,7 +11,7 @@ from pathlib import Path
 from .carbin_structural import parse_fh6_carbin
 from .wheel_mesh_diagnostic import MeshStructureRecord, parse_modelbin_mesh_structures
 
-NEUTRAL_GEOMETRY_REVISION = 2
+NEUTRAL_GEOMETRY_REVISION = 3
 
 # Draw-group bits documented by the FH6 carbin structural parser.
 DRAW_EXTERIOR = 0x01
@@ -35,7 +35,6 @@ ALTERNATE_DRAW_GROUPS = (
 # the neutral viewer after the user elected not to reconstruct runtime suspension.
 SUPPORT_PART_TYPES = frozenset({5, 6, 7})  # SpringDamper, AntiSwayFront, AntiSwayRear
 SUPPORT_ASSEMBLY_NAMES = frozenset({"controlarm", "springdamper", "antiswayfront", "antiswayrear"})
-WHEEL_STYLE_PART_TYPE = 44
 BRAKES_PART_TYPE = 4
 THIN_PROTECTED_ROLES = frozenset({"paint", "glass"})
 THIN_LONG_AXIS_MIN = 0.05
@@ -80,7 +79,7 @@ class NeutralGeometryResult:
             "carbin_instances_unmatched": self.carbin_instances_unmatched,
             "policy": {
                 "A": "hide structurally presentation-only draw groups and validated shadow-only mesh passes",
-                "B": "hide WheelStyle plus wheel-position-dependent support geometry from semantic converter/carbin structure",
+                "B": "hide wheel-position-dependent support geometry from semantic converter/carbin structure",
                 "thin_geometry": "hide extreme sheet/line-like auxiliary meshes using AABB ratios while preserving paint/glass and brakes",
                 "C": "optional aggressive alternate-presentation cleanup candidate; default off",
                 "vehicle_specific_rules": False,
@@ -96,6 +95,23 @@ def _canonical_source(value: object) -> str:
 
 def _normalize_text(value: object) -> str:
     return str(value or "").casefold().replace(" ", "").replace("-", "").replace("_", "")
+
+
+def _neutral_support_reasons(model_meta: dict | None) -> tuple[str, ...]:
+    """Return only runtime-position-dependent support exclusions.
+
+    WheelStyle is intentionally not excluded here. Its native rim/tire geometry
+    is valid in the neutral scene, while wheel_visibility.py independently marks
+    only the structurally confirmed motion/blur primitive as hidden.
+    """
+    if model_meta is None:
+        return ()
+    reasons: list[str] = []
+    if int(model_meta.get("part_type", -1)) in SUPPORT_PART_TYPES:
+        reasons.append("wheel_dependent_support_part_type")
+    if _normalize_text(model_meta.get("assembly_name")) in SUPPORT_ASSEMBLY_NAMES:
+        reasons.append("wheel_dependent_support_assembly")
+    return tuple(reasons)
 
 
 def _float_bits(value: float) -> str:
@@ -402,24 +418,12 @@ def annotate_neutral_geometry(
                     reasons_a.append("shadow_only_mesh_pass")
 
                 # Pass B: use semantic converter/carbin fields, never vehicle IDs,
-                # source filenames, mesh names, or material names. WheelStyle is
-                # hidden globally because this final verification viewer no longer
-                # reconstructs runtime tires/wheel presentation.
-                structured_part_name = _normalize_text(extras.get("kfps_part_type"))
-                wheelstyle = structured_part_name == "wheelstyle"
+                # source filenames, mesh names, or material names. Native
+                # WheelStyle remains visible; wheel_visibility.py has already
+                # hidden only its structurally confirmed motion/blur primitive.
                 if model_meta is not None:
-                    part_type = int(model_meta.get("part_type", -1))
-                    assembly = _normalize_text(model_meta.get("assembly_name"))
-                    if part_type == WHEEL_STYLE_PART_TYPE:
-                        wheelstyle = True
-                    if part_type in SUPPORT_PART_TYPES:
-                        reasons_b.append("wheel_dependent_support_part_type")
-                    if assembly in SUPPORT_ASSEMBLY_NAMES:
-                        reasons_b.append("wheel_dependent_support_assembly")
                     extras["kfps_assembly_name"] = str(model_meta.get("assembly_name") or "")
-                if wheelstyle:
-                    reasons_b.append("wheelstyle_hidden_no_tire_runtime")
-                    wheelstyle_hidden += 1
+                reasons_b.extend(_neutral_support_reasons(model_meta))
 
                 # Extreme-thin cleanup is geometric rather than name based. Preserve
                 # declared paint/glass and Brakes so legitimate body skins, windows,
