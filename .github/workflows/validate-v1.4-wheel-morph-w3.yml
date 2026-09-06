@@ -7,6 +7,7 @@ on:
       - v1.4-rc1-wheel-morph-w3
     paths:
       - "source-v1.2/fh6garage/preview3d/modelbin_morph.py"
+      - "source-v1.2/fh6garage/preview3d/modelbin_morph_profile.py"
       - "source-v1.2/fh6garage/preview3d/vehicle_morph_diagnostic.py"
       - "source-v1.2/fh6garage/preview3d/wheel_morph_weights.py"
       - "source-v1.2/tests/test_modelbin_morph*.py"
@@ -54,6 +55,7 @@ jobs:
         run: |
           Set-Location source-v1.2
           python -m py_compile fh6garage/preview3d/modelbin_morph.py
+          python -m py_compile fh6garage/preview3d/modelbin_morph_profile.py
           python -m py_compile fh6garage/preview3d/vehicle_morph_diagnostic.py
           python -m py_compile fh6garage/preview3d/wheel_morph_weights.py
           python -m py_compile tools/inspect_modelbin_morph.py
