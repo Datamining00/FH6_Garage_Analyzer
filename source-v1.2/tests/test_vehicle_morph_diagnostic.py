@@ -23,6 +23,10 @@ from fh6garage.preview3d.vehicle_morph_diagnostic import (
 )
 
 
+def _half4(x: float, y: float, z: float, selector: float) -> bytes:
+    return struct.pack("<eeee", x, y, z, selector)
+
+
 def _empty_modelbin() -> bytes:
     data = bytearray(0x14)
     struct.pack_into("<I", data, 0, BUNDLE_TAG)
@@ -33,17 +37,23 @@ def _empty_modelbin() -> bytes:
 
 
 def _inventory(*, damage: bool = False) -> ModelbinMorphInventory:
+    raw = (
+        _half4(1, 0, 0, 0)
+        + _half4(0, 2, 0, 1)
+        + _half4(0, 0, 1, 0)
+        + _half4(0, 1, 0, 1)
+    )
     buffer = MorphBufferInfo(
         blob_index=0,
         identifier_id=77,
         version_major=1,
         version_minor=0,
         length=1,
-        size=8,
-        stride=8,
+        size=len(raw),
+        stride=len(raw),
         sub_element_count=4,
         format=10,
-        raw_data=b"\x00" * 8,
+        raw_data=raw,
     )
     mesh = MeshMorphBinding(
         blob_index=1,
@@ -111,6 +121,37 @@ class VehicleMorphDiagnosticTests(unittest.TestCase):
             self.assertEqual(report.modelbins[0].category, "wheel")
             self.assertIsNone(report.modelbins[0].parse_error)
 
+            profiles = report.modelbins[0].weighted_target_profiles
+            self.assertEqual(len(profiles), 1)
+            self.assertEqual(profiles[0]["mesh_blob_indices"], (1,))
+            self.assertEqual(profiles[0]["morph_target_count"], 2)
+            self.assertEqual(profiles[0]["morph_buffer_blob_index"], 0)
+            self.assertEqual(profiles[0]["resolved_by"], "identifier")
+            self.assertIsNone(profiles[0]["profile_error"])
+            profile = profiles[0]["profile"]
+            self.assertIsNotNone(profile)
+            self.assertEqual(profile["missing_selectors"], ())
+            self.assertEqual([item["selector"] for item in profile["selectors"]], [0, 1])
+            self.assertEqual(profile["selectors"][0]["sum_abs_delta"], (1.0, 0.0, 0.0))
+            self.assertEqual(profile["selectors"][1]["sum_abs_delta"], (0.0, 2.0, 0.0))
+
+    def test_damage_binding_is_not_profiled_as_weighted_geometry(self):
+        with tempfile.TemporaryDirectory() as td:
+            archive = Path(td) / "FER_FXX_05.zip"
+            _write_vehicle_archive(archive)
+            with patch(
+                "fh6garage.preview3d.vehicle_morph_diagnostic.parse_modelbin_morph_inventory",
+                return_value=_inventory(damage=True),
+            ):
+                report = inspect_vehicle_morph_archive(
+                    archive,
+                    "FER_FXX_05.carbin",
+                    "FER_FXX_05",
+                )
+            self.assertEqual(report.damage_morph_meshes, 1)
+            self.assertEqual(report.weighted_morph_meshes, 0)
+            self.assertEqual(report.modelbins[0].weighted_target_profiles, ())
+
     def test_parse_failure_is_recorded_without_mutating_archive(self):
         with tempfile.TemporaryDirectory() as td:
             archive = Path(td) / "FER_FXX_05.zip"
@@ -130,6 +171,7 @@ class VehicleMorphDiagnosticTests(unittest.TestCase):
             self.assertEqual(report.parsed_modelbins, 0)
             self.assertEqual(report.morph_meshes, 0)
             self.assertEqual(report.modelbins[0].parse_error, "unsupported fixture")
+            self.assertEqual(report.modelbins[0].weighted_target_profiles, ())
 
     def test_report_writer_refuses_source_archive_directory(self):
         with tempfile.TemporaryDirectory() as td:
