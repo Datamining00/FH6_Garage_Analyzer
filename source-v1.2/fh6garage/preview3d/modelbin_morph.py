@@ -203,9 +203,6 @@ def _metadata_identifier(data: bytes, blob: BlobRecord) -> int | None:
             size,
             f"blob {blob.blob_index} identifier metadata data",
         )
-        # FTS stores IdentifierMetadata as uint32 while MeshBlob stores the
-        # reference as int32. Interpret the same four bytes as signed to match
-        # the reference domain used by the mesh.
         return struct.unpack_from("<i", data, value_offset)[0]
     return None
 
@@ -282,11 +279,11 @@ def _parse_mesh_binding(data: bytes, blob: BlobRecord) -> MeshMorphBinding:
     cursor += material_group_count * group_size
 
     need(2 + 2 + 2 + 2 + 1, "fixed pre-morph fields")
-    cursor += 2  # RigidBoneIndex
-    cursor += 2  # LODFlags
-    cursor += 2  # MinLOD, MaxLOD
-    cursor += 2  # Bucket flags
-    cursor += 1  # BucketOrder
+    cursor += 2
+    cursor += 2
+    cursor += 2
+    cursor += 2
+    cursor += 1
 
     morph_target_count = 1
     if _version_at_least(blob.version_major, blob.version_minor, 1, 2):
@@ -308,8 +305,8 @@ def _parse_mesh_binding(data: bytes, blob: BlobRecord) -> MeshMorphBinding:
         cursor += 1
 
     need(1 + 2 + 24, "index fields")
-    cursor += 1  # Is32BitIndices
-    cursor += 2  # Topology
+    cursor += 1
+    cursor += 2
     index_fields = struct.unpack_from("<iiiiii", data, cursor)
     indexed_vertex_offset = int(index_fields[3])
     cursor += 24
@@ -329,7 +326,7 @@ def _parse_mesh_binding(data: bytes, blob: BlobRecord) -> MeshMorphBinding:
         cursor += ref_count * 4
 
     need(8, "vertex-layout/VB count")
-    cursor += 4  # VertexLayoutIndex
+    cursor += 4
     vb_count = struct.unpack_from("<i", data, cursor)[0]
     cursor += 4
     if vb_count < 0 or vb_count > 4096:
@@ -541,8 +538,11 @@ def decode_damage_delta(buffer: MorphBufferInfo, vertex_index: int) -> tuple[flo
     if base + min(buffer.stride, 6) > len(buffer.raw_data):
         raise ModelbinMorphError("damage morph record is outside raw morph buffer")
     if buffer.format == DXGI_R16G16B16A16_FLOAT:
-        record = decode_half4_record(buffer.raw_data, base)
-        return (record.dx, record.dy, record.dz)
+        return (
+            _half_to_float(buffer.raw_data, base),
+            _half_to_float(buffer.raw_data, base + 2),
+            _half_to_float(buffer.raw_data, base + 4),
+        )
     if buffer.format == DXGI_R16G16B16A16_SNORM:
         record = decode_snorm16_delta(buffer.raw_data, base)
         return (record.dx, record.dy, record.dz)

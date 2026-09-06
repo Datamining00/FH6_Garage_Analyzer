@@ -14,6 +14,7 @@ from fh6garage.preview3d.modelbin_morph import (
     ModelbinMorphError,
     MorphBufferInfo,
     apply_weighted_morph,
+    decode_damage_delta,
     decode_half4_record,
     decode_snorm16_delta,
     decode_weighted_vertex_morph,
@@ -115,6 +116,11 @@ class ModelbinMorphTests(unittest.TestCase):
     def test_half4_target_selector_must_be_integral(self):
         with self.assertRaises(ModelbinMorphError):
             decode_half4_record(_half4(0, 0, 0, 1.5))
+
+    def test_damage_half_decoder_ignores_fourth_half_selector(self):
+        raw = _half4(1.0, -2.0, 0.5, 1.5)
+        delta = decode_damage_delta(_buffer(raw, stride=8, length=1), 0)
+        self.assertEqual(delta, (1.0, -2.0, 0.5))
 
     def test_snorm16_clamps_negative_full_scale(self):
         record = decode_snorm16_delta(struct.pack("<hhh", -32768, 32767, 0))
