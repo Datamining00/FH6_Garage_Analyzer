@@ -1,0 +1,76 @@
+from __future__ import annotations
+
+import tempfile
+from pathlib import Path
+import unittest
+import zipfile
+
+from fh6garage.preview3d.tire_asset import (
+    TireAssetError,
+    inspect_tire_archive,
+    resolve_tire_archive,
+)
+
+
+class TireAssetTests(unittest.TestCase):
+    def _fixture(self) -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
+        temp = tempfile.TemporaryDirectory()
+        root = Path(temp.name) / "Forza Horizon 6"
+        cars = root / "Content" / "media" / "cars"
+        tires = cars / "_library" / "scene" / "tires"
+        tires.mkdir(parents=True)
+
+        with zipfile.ZipFile(cars / "FER_FXX_05.zip", "w") as bundle:
+            bundle.writestr("carclips_1006.clipd", b"fixture")
+
+        archive = tires / "tire_slick.zip"
+        with zipfile.ZipFile(archive, "w") as bundle:
+            bundle.writestr(
+                "_library/scene/tires/tire_Slick/tireL_Slick.modelbin",
+                b"left-modelbin",
+            )
+            bundle.writestr(
+                "_library/scene/tires/tire_Slick/tireR_Slick.modelbin",
+                b"right-modelbin",
+            )
+            bundle.writestr("textures/tire_slick_d.dds", b"texture")
+        return temp, root, archive
+
+    def test_resolves_native_tire_archive_case_insensitively(self) -> None:
+        temp, root, archive = self._fixture()
+        with temp:
+            self.assertEqual(resolve_tire_archive(root, "Slick"), archive)
+
+    def test_reports_modelbin_candidates_without_modifying_archive(self) -> None:
+        temp, root, archive = self._fixture()
+        with temp:
+            before = archive.read_bytes()
+            report = inspect_tire_archive(root, "Slick")
+            after = archive.read_bytes()
+
+            self.assertEqual(before, after)
+            self.assertEqual(report.archive_name, "tire_slick.zip")
+            self.assertEqual(report.entry_count, 3)
+            self.assertEqual(len(report.modelbin_entries), 2)
+            self.assertEqual(len(report.preferred_modelbin_entries), 2)
+            self.assertTrue(
+                all(entry.casefold().endswith(".modelbin") for entry in report.modelbin_entries)
+            )
+
+    def test_missing_native_tire_archive_fails_closed(self) -> None:
+        temp, root, _archive = self._fixture()
+        with temp:
+            with self.assertRaisesRegex(TireAssetError, "was not found"):
+                resolve_tire_archive(root, "Wet")
+
+    def test_path_like_tire_model_name_is_rejected(self) -> None:
+        temp, root, _archive = self._fixture()
+        with temp:
+            for value in ("../Slick", "foo/bar", r"foo\\bar", "C:Slick"):
+                with self.subTest(value=value):
+                    with self.assertRaises(TireAssetError):
+                        resolve_tire_archive(root, value)
+
+
+if __name__ == "__main__":
+    unittest.main()
