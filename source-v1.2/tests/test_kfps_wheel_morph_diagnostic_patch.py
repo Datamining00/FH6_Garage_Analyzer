@@ -13,11 +13,9 @@ class KfpsWheelMorphDiagnosticPatchTests(unittest.TestCase):
     def test_patcher_is_pinned_and_inserts_before_transforms(self):
         text = PATCHER.read_text(encoding="utf-8")
         self.assertIn("6f53ca3c584d78659d06d4b4a39561db67d79345", text)
-        self.assertIn("local += WheelMorphRuntime.DecodePositionDelta(morph, index);", text)
-        self.assertLess(
-            text.index("local += WheelMorphRuntime.DecodePositionDelta(morph, index);"),
-            text.index("Vector3.Transform(local, geometry.BoneTransform)"),
-        )
+        morph = text.index("local += WheelMorphRuntime.DecodePositionDelta(morph, index);")
+        transform = text.index("Vector3.Transform(local, geometry.BoneTransform)", morph)
+        self.assertLess(morph, transform)
         self.assertIn("model.Bundle", text)
         self.assertIn("WheelMorphRuntime.Configure(instances)", text)
 
