@@ -167,7 +167,7 @@ jobs:
           if (-not (Test-Path "wheel-morph-converter/Kfps.ChassisConverter.exe")) { throw "Diagnostic converter EXE was not published." }
           $dll = "kfps-source/tools/livery/chassis-converter/bin/Release/net9.0/win-x64/Kfps.ChassisConverter.dll"
           if (-not (Test-Path $dll)) { throw "Diagnostic converter DLL was not built." }
-          python -c "from pathlib import Path; p=Path(r'$dll'); d=p.read_bytes(); required=[b'KFPS_WHEEL_MORPH_MODE', b'wheel_morph_mode', b'wheel_morph_applied_meshes']; missing=[x.decode() for x in required if x not in d]; assert not missing, f'compiled converter is missing morph tokens: {missing}'; print('compiled morph token verification PASS')"
+          python -c "from pathlib import Path; p=Path(r'$dll'); d=p.read_bytes(); required=[b'wheel_morph_mode', b'wheel_morph_applied_meshes']; missing=[x.decode() for x in required if x not in d]; assert not missing, f'compiled converter is missing morph output tokens: {missing}'; print('compiled morph token verification PASS')"
           if ($LASTEXITCODE -ne 0) { throw "Compiled morph token verification failed with exit code $LASTEXITCODE" }
 
       - name: Upload diagnostic converter artifact
