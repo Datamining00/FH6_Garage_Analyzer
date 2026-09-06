@@ -9,6 +9,7 @@ on:
       - "source-v1.2/FH6_Assistant_v1.4.spec"
       - "source-v1.2/FH6_Assistant_v1.4_portable.spec"
       - "source-v1.2/fh6garage/preview3d/chassis_converter.py"
+      - "source-v1.2/fh6garage/preview3d/glb_parser.py"
       - "source-v1.2/fh6garage/preview3d/wheel_morph_auto.py"
       - "source-v1.2/fh6garage/preview3d/wheel_morph_helper.py"
       - "source-v1.2/fh6garage/preview3d/wheel_morph_runtime.py"
@@ -17,6 +18,7 @@ on:
       - "source-v1.2/fh6garage/preview3d/wheel_spec_database.py"
       - "source-v1.2/tests/test_chassis_converter_auto_rim_morph.py"
       - "source-v1.2/tests/test_chassis_converter_wheel_morph_helper.py"
+      - "source-v1.2/tests/test_glb_livery_structural_exclusion.py"
       - "source-v1.2/tests/test_wheel_morph_auto.py"
       - "source-v1.2/tests/test_wheel_morph_helper.py"
       - "source-v1.2/tests/test_wheel_morph_runtime.py"
@@ -67,9 +69,11 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: |
           Set-Location source-v1.2
+          python -m py_compile fh6garage/preview3d/glb_parser.py
           python -m py_compile fh6garage/preview3d/wheel_spec_database.py
           python -m py_compile fh6garage/preview3d/wheel_morph_auto.py
           python -m py_compile fh6garage/preview3d/chassis_converter.py
+          python -m unittest tests.test_glb_livery_structural_exclusion -v
           python -m unittest tests.test_wheel_spec_database -v
           python -m unittest tests.test_wheel_morph_auto -v
           python -m unittest tests.test_chassis_converter_wheel_morph_helper -v
