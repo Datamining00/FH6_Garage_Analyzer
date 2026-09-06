@@ -167,17 +167,38 @@ def compare_aabbs(baseline: list[dict], candidate: list[dict]) -> list[dict]:
 
 
 def _converter_json(stdout: str) -> dict | None:
-    for line in reversed(stdout.splitlines()):
-        line = line.strip()
-        if not line.startswith("{"):
-            continue
+    stripped = stdout.strip()
+    if not stripped:
+        return None
+    try:
+        value = json.loads(stripped)
+    except json.JSONDecodeError:
+        first = stripped.find("{")
+        last = stripped.rfind("}")
+        if first < 0 or last <= first:
+            return None
         try:
-            value = json.loads(line)
+            value = json.loads(stripped[first:last + 1])
         except json.JSONDecodeError:
-            continue
-        if isinstance(value, dict):
-            return value
-    return None
+            return None
+    return value if isinstance(value, dict) else None
+
+
+def validate_converter_diagnostics(mode: str, payload: dict | None) -> None:
+    if not isinstance(payload, dict) or "wheel_morph_mode" not in payload:
+        raise RuntimeError(
+            "converter is not the verified wheel-morph diagnostic build: wheel_morph_mode is missing"
+        )
+    actual_mode = str(payload.get("wheel_morph_mode") or "").casefold()
+    if actual_mode != mode.casefold():
+        raise RuntimeError(f"converter reported wheel morph mode {actual_mode!r}, expected {mode!r}")
+    applied_meshes = payload.get("wheel_morph_applied_meshes")
+    applied_vertices = payload.get("wheel_morph_applied_vertices")
+    if mode != "none":
+        if not isinstance(applied_meshes, int) or applied_meshes <= 0:
+            raise RuntimeError(f"wheel morph mode {mode} applied no meshes: {applied_meshes!r}")
+        if not isinstance(applied_vertices, int) or applied_vertices <= 0:
+            raise RuntimeError(f"wheel morph mode {mode} applied no vertices: {applied_vertices!r}")
 
 
 def apply_neutral_visibility(output: Path, archive: Path) -> dict:
@@ -226,12 +247,13 @@ def run_conversion(
         capture_output=True,
         check=False,
     )
+    converter_json = _converter_json(process.stdout)
     record = {
         "mode": mode,
         "returncode": process.returncode,
         "stdout": process.stdout,
         "stderr": process.stderr,
-        "converter_json": _converter_json(process.stdout),
+        "converter_json": converter_json,
         "output": str(output),
         "request": str(request),
     }
@@ -240,6 +262,8 @@ def run_conversion(
             f"converter failed for {mode}: returncode={process.returncode}\n"
             f"stdout:\n{process.stdout}\nstderr:\n{process.stderr}"
         )
+    validate_converter_diagnostics(mode, converter_json)
+    record["output_sha256"] = sha256_file(output)
     record["neutral_wheel_visibility"] = apply_neutral_visibility(output, archive)
     record["wheelstyle_aabbs"] = wheelstyle_aabbs(read_glb_json(output))
     return record
@@ -316,13 +340,23 @@ def main() -> int:
     if before_sha != after_sha:
         raise RuntimeError("source vehicle ZIP SHA-256 changed; refusing diagnostic result")
 
+    baseline_sha = conversions["none"]["output_sha256"]
+    unchanged_modes = [
+        mode for mode in ("diameter", "width", "combined")
+        if conversions[mode]["output_sha256"] == baseline_sha
+    ]
+    if unchanged_modes:
+        raise RuntimeError(
+            "wheel morph output remained byte-identical to baseline for: " + ", ".join(unchanged_modes)
+        )
+
     baseline = conversions["none"]["wheelstyle_aabbs"]
     comparisons = {
         mode: compare_aabbs(baseline, conversions[mode]["wheelstyle_aabbs"])
         for mode in ("diameter", "width", "combined")
     }
     report = {
-        "format": "fh6_wheel_morph_four_way_diagnostic_v1",
+        "format": "fh6_wheel_morph_four_way_diagnostic_v2",
         "archive": str(archive),
         "archive_sha256_before": before_sha,
         "archive_sha256_after": after_sha,
@@ -341,6 +375,7 @@ def main() -> int:
             "front": {"diameter": front_diameter, "width": front_width, "scale_x": 1.0},
             "rear": {"diameter": rear_diameter, "width": rear_width, "scale_x": 1.0},
         },
+        "output_sha256": {mode: conversions[mode]["output_sha256"] for mode in MODES},
         "conversions": conversions,
         "comparisons_vs_baseline": comparisons,
     }
