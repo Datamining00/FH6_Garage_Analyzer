@@ -49,3 +49,16 @@ jobs:
         run: |
           Set-Location source-v1.2
           python -m unittest discover -s tests -v
+
+      - name: Upload W1 source artifact
+        if: matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: FH6_Assistant_v1.4_WheelSpec_W1_Source
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            source-v1.2/fh6garage/preview3d/wheel_spec.py
+            source-v1.2/tools/resolve_wheel_spec.py
+            source-v1.2/tests/test_wheel_spec.py
+            .github/workflows/validate-v1.4-wheel-spec-w1.yml
