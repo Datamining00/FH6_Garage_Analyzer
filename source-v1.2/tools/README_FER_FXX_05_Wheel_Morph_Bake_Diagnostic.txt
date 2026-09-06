@@ -38,6 +38,13 @@ scale_x  = 1
 No tire morph, arbitrary X-axis shrink, per-vehicle geometry correction, or source
 archive modification is performed.
 
+KFPS request schema
+-------------------
+The pinned KFPS converter deserializes request JSON with SnakeCaseLower naming.
+Scene mode therefore uses the exact key carbin_entry. Using CarbinEntry leaves the
+scene entry empty and incorrectly falls through to the loose model-entry validation.
+The launcher now emits archive, output, carbin_entry, and entries explicitly.
+
 Verified FXX morph evidence
 ---------------------------
 The latest FER_FXX_05 W3 report resolves the actual signed base-vertex addressing:
