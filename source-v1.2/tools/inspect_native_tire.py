@@ -12,7 +12,9 @@ from fh6garage.preview3d.tire_asset import (
     TireAssetError,
     compare_tire_library_to_database,
     inspect_tire_archive,
+    profile_tire_morph_archive,
     report_json,
+    resolve_tire_archive,
     scan_tire_library,
 )
 
@@ -38,6 +40,11 @@ def _parser() -> argparse.ArgumentParser:
         help="Read-only FH6 SQLite DB; compare every TireModelName with the native tire catalog.",
     )
     parser.add_argument(
+        "--profile-morph",
+        action="store_true",
+        help="Profile weighted morph selectors in the exact tire ZIP without modifying it.",
+    )
+    parser.add_argument(
         "--output",
         help="Optional JSON output path. Without this option JSON is printed to stdout.",
     )
@@ -53,8 +60,15 @@ def main(argv: list[str] | None = None) -> int:
             report = scan_tire_library(args.game)
         else:
             if not args.tire_model_name:
-                raise TireAssetError("tire_model_name is required unless --catalog or --db is used")
-            report = inspect_tire_archive(args.game, args.tire_model_name)
+                raise TireAssetError(
+                    "tire_model_name is required unless --catalog or --db is used"
+                )
+            if args.profile_morph:
+                report = profile_tire_morph_archive(
+                    resolve_tire_archive(args.game, args.tire_model_name)
+                )
+            else:
+                report = inspect_tire_archive(args.game, args.tire_model_name)
         text = report_json(report)
         if args.output:
             output = Path(args.output).expanduser().resolve()
