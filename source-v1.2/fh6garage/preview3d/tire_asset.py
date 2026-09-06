@@ -14,6 +14,7 @@ class TireAssetError(RuntimeError):
 
 
 _TIRE_MODEL_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
+_TIRE_ARCHIVE_RE = re.compile(r"^tire_(.+)\.zip$", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -29,6 +30,31 @@ class TireArchiveReport:
 
     def as_dict(self) -> dict[str, object]:
         return asdict(self)
+
+
+@dataclass(frozen=True)
+class TireLibraryEntry:
+    tire_model_name: str
+    archive_name: str
+    archive_path: str
+
+    def as_dict(self) -> dict[str, str]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class TireLibraryCatalog:
+    tires_dir: str
+    entries: tuple[TireLibraryEntry, ...]
+    duplicate_model_names: tuple[str, ...]
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "tires_dir": self.tires_dir,
+            "entry_count": len(self.entries),
+            "entries": [item.as_dict() for item in self.entries],
+            "duplicate_model_names": list(self.duplicate_model_names),
+        }
 
 
 def _normalize_tire_model_name(value: str) -> str:
@@ -48,6 +74,46 @@ def tire_library_dir(game_or_cars_path: str | Path) -> Path:
     if not tires_dir.is_dir():
         raise TireAssetError(f"FH6 tire library directory does not exist: {tires_dir}")
     return tires_dir
+
+
+def scan_tire_library(game_or_cars_path: str | Path) -> TireLibraryCatalog:
+    """Enumerate native tire_*.zip assets without collapsing model-name suffixes."""
+    tires_dir = tire_library_dir(game_or_cars_path)
+    entries: list[TireLibraryEntry] = []
+    seen: dict[str, list[str]] = {}
+    try:
+        children = tuple(tires_dir.iterdir())
+    except (OSError, PermissionError) as exc:
+        raise TireAssetError(f"could not inspect FH6 tire library: {exc}") from exc
+
+    for child in children:
+        if not child.is_file():
+            continue
+        match = _TIRE_ARCHIVE_RE.fullmatch(child.name)
+        if match is None:
+            continue
+        model_name = _normalize_tire_model_name(match.group(1))
+        entries.append(
+            TireLibraryEntry(
+                tire_model_name=model_name,
+                archive_name=child.name,
+                archive_path=str(child),
+            )
+        )
+        seen.setdefault(model_name.casefold(), []).append(model_name)
+
+    entries.sort(key=lambda item: (item.tire_model_name.casefold(), item.archive_name.casefold()))
+    duplicates = tuple(
+        sorted(
+            (names[0] for names in seen.values() if len(names) > 1),
+            key=str.casefold,
+        )
+    )
+    return TireLibraryCatalog(
+        tires_dir=str(tires_dir),
+        entries=tuple(entries),
+        duplicate_model_names=duplicates,
+    )
 
 
 def resolve_tire_archive(
@@ -121,5 +187,5 @@ def inspect_tire_archive(
     )
 
 
-def report_json(report: TireArchiveReport) -> str:
+def report_json(report: TireArchiveReport | TireLibraryCatalog) -> str:
     return json.dumps(report.as_dict(), indent=2, ensure_ascii=False)
