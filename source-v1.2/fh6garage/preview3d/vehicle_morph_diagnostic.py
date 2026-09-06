@@ -7,7 +7,12 @@ from pathlib import Path
 from typing import Any
 import zipfile
 
-from .modelbin_morph import ModelbinMorphError, parse_modelbin_morph_inventory
+from .modelbin_morph import (
+    ModelbinMorphError,
+    ModelbinMorphInventory,
+    parse_modelbin_morph_inventory,
+)
+from .modelbin_morph_profile import profile_weighted_morph_targets
 from .near_lod_archive import _referenced_model_paths
 
 DIAGNOSTIC_REVISION = 1
@@ -30,6 +35,7 @@ class ModelbinMorphDiagnostic:
     unresolved_morph_bindings: int
     inventory: dict[str, Any] | None
     parse_error: str | None
+    weighted_target_profiles: tuple[dict[str, Any], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -69,6 +75,69 @@ def classify_modelbin_path(archive_entry: str, game_references: tuple[str, ...] 
     if any(token in text for token in ("/wheel", "_wheel", "/rim", "_rim", "wheelstyle", "wheel_style")):
         return "wheel"
     return "other"
+
+
+def _weighted_target_profiles(inventory: ModelbinMorphInventory) -> tuple[dict[str, Any], ...]:
+    """Build diagnostic-only selector profiles for resolved non-damage morph bindings."""
+    resolutions = {item.mesh_blob_index: item for item in inventory.resolutions}
+    buffers = {item.blob_index: item for item in inventory.morph_buffers}
+    groups: dict[tuple[int | None, int, int | None, str], list[int]] = defaultdict(list)
+
+    for mesh in inventory.mesh_bindings:
+        buffer_index = mesh.morph_data_buffer_index
+        if (
+            mesh.morph_target_count <= 0
+            or mesh.is_morph_damage
+            or buffer_index is None
+            or buffer_index < 0
+        ):
+            continue
+        resolution = resolutions.get(mesh.blob_index)
+        resolved_blob = resolution.morph_buffer_blob_index if resolution is not None else None
+        resolved_by = resolution.resolved_by if resolution is not None else "unresolved"
+        groups[(resolved_blob, mesh.morph_target_count, buffer_index, resolved_by)].append(mesh.blob_index)
+
+    profiles: list[dict[str, Any]] = []
+    for (resolved_blob, target_count, buffer_index, resolved_by), mesh_blob_indices in sorted(
+        groups.items(),
+        key=lambda item: (
+            item[0][0] is None,
+            -1 if item[0][0] is None else item[0][0],
+            item[0][1],
+            item[0][2] if item[0][2] is not None else -1,
+            item[0][3],
+        ),
+    ):
+        profile_payload: dict[str, Any] | None = None
+        profile_error: str | None = None
+        if resolved_blob is None:
+            profile_error = "morph buffer binding unresolved"
+        else:
+            morph_buffer = buffers.get(resolved_blob)
+            if morph_buffer is None:
+                profile_error = f"resolved morph buffer blob {resolved_blob} missing from inventory"
+            else:
+                try:
+                    profile_payload = profile_weighted_morph_targets(
+                        morph_buffer,
+                        target_count,
+                    ).as_dict()
+                except ModelbinMorphError as exc:
+                    profile_error = str(exc)
+
+        profiles.append(
+            {
+                "mesh_blob_indices": tuple(sorted(mesh_blob_indices)),
+                "morph_target_count": target_count,
+                "morph_data_buffer_index": buffer_index,
+                "morph_buffer_blob_index": resolved_blob,
+                "resolved_by": resolved_by,
+                "profile": profile_payload,
+                "profile_error": profile_error,
+            }
+        )
+
+    return tuple(profiles)
 
 
 def _summarize_modelbin(
@@ -124,6 +193,7 @@ def _summarize_modelbin(
         unresolved_morph_bindings=unresolved,
         inventory=inventory.as_dict(),
         parse_error=None,
+        weighted_target_profiles=_weighted_target_profiles(inventory),
     )
 
 
