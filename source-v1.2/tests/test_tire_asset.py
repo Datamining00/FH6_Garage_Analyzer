@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import sqlite3
 import tempfile
 from pathlib import Path
 import unittest
@@ -7,6 +9,7 @@ import zipfile
 
 from fh6garage.preview3d.tire_asset import (
     TireAssetError,
+    compare_tire_library_to_database,
     inspect_tire_archive,
     resolve_tire_archive,
     scan_tire_library,
@@ -41,6 +44,33 @@ class TireAssetTests(unittest.TestCase):
                 bundle.writestr("placeholder.modelbin", b"fixture")
         return temp, root, archive
 
+    def _database(self, root: Path) -> Path:
+        database = root / "fh6_game_db.sqlite"
+        connection = sqlite3.connect(database)
+        try:
+            connection.execute(
+                "CREATE TABLE List_UpgradeTireCompound "
+                "(Id INTEGER, Ordinal INTEGER, IsStock INTEGER, TireModelName TEXT)"
+            )
+            connection.executemany(
+                "INSERT INTO List_UpgradeTireCompound VALUES (?, ?, ?, ?)",
+                [
+                    (1, 1006, 1, "Slick"),
+                    (2, 1006, 0, "Slick_FE"),
+                    (3, 1229, 1, "semi_slick_Dually_FE"),
+                    (4, 1260, 1, "Wet"),
+                    (5, 1260, 0, "Slick"),
+                ],
+            )
+            connection.commit()
+        finally:
+            connection.close()
+        return database
+
+    @staticmethod
+    def _sha256(path: Path) -> str:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+
     def test_resolves_native_tire_archive_case_insensitively(self) -> None:
         temp, root, archive = self._fixture()
         with temp:
@@ -69,6 +99,26 @@ class TireAssetTests(unittest.TestCase):
                 ["semi_slick_Dually_FE", "slick", "slick_FE"],
             )
             self.assertEqual(catalog.duplicate_model_names, ())
+
+    def test_database_coverage_matches_exact_model_names_read_only(self) -> None:
+        temp, root, _archive = self._fixture()
+        with temp:
+            database = self._database(root)
+            before = self._sha256(database)
+            report = compare_tire_library_to_database(root, database)
+            after = self._sha256(database)
+
+            self.assertEqual(before, after)
+            self.assertTrue(report.database_read_only_unchanged)
+            self.assertEqual(
+                report.database_model_names,
+                ("semi_slick_Dually_FE", "Slick", "Slick_FE", "Wet"),
+            )
+            self.assertEqual(report.missing_database_model_names, ("Wet",))
+            self.assertEqual(report.missing_stock_model_names, ("Wet",))
+            self.assertEqual(report.unused_library_model_names, ())
+            self.assertEqual(report.as_dict()["database_coverage_ratio"], 0.75)
+            self.assertEqual(report.as_dict()["stock_coverage_ratio"], 2 / 3)
 
     def test_reports_modelbin_candidates_without_modifying_archive(self) -> None:
         temp, root, archive = self._fixture()
