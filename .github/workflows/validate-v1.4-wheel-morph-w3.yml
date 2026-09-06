@@ -180,6 +180,8 @@ jobs:
 
       - name: Build FXX four-way portable package
         shell: pwsh
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
         run: |
           $pkg = Join-Path $PWD "fxx-four-way-package"
           New-Item -ItemType Directory -Force $pkg | Out-Null
@@ -196,6 +198,7 @@ jobs:
           python (Join-Path $pkg "run_wheel_morph_bake_diagnostic.py") --help
           $env:PYTHONPATH = $pkg
           python -c "from fh6garage.preview3d.wheel_visibility import apply_neutral_wheel_visibility; print('neutral wheel visibility import PASS')"
+          Get-ChildItem -Path $pkg -Directory -Recurse -Filter "__pycache__" | Remove-Item -Recurse -Force
 
       - name: Upload FXX four-way diagnostic artifact
         uses: actions/upload-artifact@v4
