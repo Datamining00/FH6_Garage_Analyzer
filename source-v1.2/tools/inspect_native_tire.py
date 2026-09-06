@@ -10,6 +10,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 from fh6garage.preview3d.tire_asset import (
     TireAssetError,
+    compare_tire_library_to_database,
     inspect_tire_archive,
     report_json,
     scan_tire_library,
@@ -24,12 +25,17 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "tire_model_name",
         nargs="?",
-        help="Exact DB TireModelName, for example Slick. Omit with --catalog.",
+        help="Exact DB TireModelName, for example Slick. Omit with --catalog/--db.",
     )
     parser.add_argument(
         "--catalog",
         action="store_true",
         help="List all tire_*.zip assets without collapsing suffix variants.",
+    )
+    parser.add_argument(
+        "--db",
+        type=Path,
+        help="Read-only FH6 SQLite DB; compare every TireModelName with the native tire catalog.",
     )
     parser.add_argument(
         "--output",
@@ -41,11 +47,13 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
-        if args.catalog:
+        if args.db is not None:
+            report = compare_tire_library_to_database(args.game, args.db)
+        elif args.catalog:
             report = scan_tire_library(args.game)
         else:
             if not args.tire_model_name:
-                raise TireAssetError("tire_model_name is required unless --catalog is used")
+                raise TireAssetError("tire_model_name is required unless --catalog or --db is used")
             report = inspect_tire_archive(args.game, args.tire_model_name)
         text = report_json(report)
         if args.output:
