@@ -12,18 +12,14 @@ if not exist "%INSPECTOR%" (
 )
 
 set "ARCHIVE=%~1"
-if not defined ARCHIVE (
-  set "PICKFILE=%TEMP%\fh6_wheel_morph_pick_%RANDOM%_%RANDOM%.txt"
-  powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -Command ^
-    "Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.OpenFileDialog; $d.Filter = 'FH6 vehicle ZIP (*.zip)|*.zip|All files (*.*)|*.*'; $d.Title = 'Select FH6 vehicle ZIP'; if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { [System.IO.File]::WriteAllText($env:PICKFILE, $d.FileName) }"
-  if not exist "%PICKFILE%" (
-    echo No archive selected.
-    exit /b 1
-  )
-  set /p "ARCHIVE="<"%PICKFILE%"
-  del /q "%PICKFILE%" >nul 2>&1
+if defined ARCHIVE goto archive_selected
+call :pick_archive
+if errorlevel 1 (
+  echo No archive selected.
+  exit /b 1
 )
 
+:archive_selected
 if not exist "%ARCHIVE%" (
   echo ERROR: Vehicle ZIP does not exist:
   echo %ARCHIVE%
@@ -95,4 +91,15 @@ echo Diagnostic completed successfully.
 echo Result: %OUTPUT%
 start "" explorer.exe /select,"%OUTPUT%"
 pause
+exit /b 0
+
+:pick_archive
+set "PICKFILE=%TEMP%\fh6_wheel_morph_pick_%RANDOM%_%RANDOM%.txt"
+if exist "%PICKFILE%" del /q "%PICKFILE%" >nul 2>&1
+powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -Command ^
+  "Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.OpenFileDialog; $d.Filter = 'FH6 vehicle ZIP (*.zip)|*.zip|All files (*.*)|*.*'; $d.Title = 'Select FH6 vehicle ZIP'; if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { [System.IO.File]::WriteAllText($env:PICKFILE, $d.FileName) }"
+if not exist "%PICKFILE%" exit /b 1
+set /p "ARCHIVE="<"%PICKFILE%"
+del /q "%PICKFILE%" >nul 2>&1
+if not defined ARCHIVE exit /b 1
 exit /b 0
