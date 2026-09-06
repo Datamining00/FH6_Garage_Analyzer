@@ -12,6 +12,7 @@ from .modelbin_morph import (
     ModelbinMorphInventory,
     parse_modelbin_morph_inventory,
 )
+from .modelbin_morph_index_profile import profile_modelbin_index_addressing
 from .modelbin_morph_profile import profile_weighted_morph_targets
 from .near_lod_archive import _referenced_model_paths
 
@@ -36,6 +37,8 @@ class ModelbinMorphDiagnostic:
     inventory: dict[str, Any] | None
     parse_error: str | None
     weighted_target_profiles: tuple[dict[str, Any], ...] = ()
+    index_addressing_profiles: tuple[dict[str, Any], ...] = ()
+    index_addressing_error: str | None = None
 
 
 @dataclass(frozen=True)
@@ -140,6 +143,42 @@ def _weighted_target_profiles(inventory: ModelbinMorphInventory) -> tuple[dict[s
     return tuple(profiles)
 
 
+def _weighted_index_addressing_profiles(
+    data: bytes,
+    inventory: ModelbinMorphInventory,
+) -> tuple[tuple[dict[str, Any], ...], str | None]:
+    """Return FTS-compatible index/base-vertex diagnostics for weighted morph meshes only."""
+    weighted_mesh_blob_indices = {
+        mesh.blob_index
+        for mesh in inventory.mesh_bindings
+        if (
+            mesh.morph_target_count > 0
+            and not mesh.is_morph_damage
+            and mesh.morph_data_buffer_index is not None
+            and mesh.morph_data_buffer_index >= 0
+        )
+    }
+    if not weighted_mesh_blob_indices:
+        return (), None
+
+    try:
+        profiles = profile_modelbin_index_addressing(data)
+    except ModelbinMorphError as exc:
+        return (), str(exc)
+
+    filtered = tuple(
+        profile.as_dict()
+        for profile in profiles
+        if profile.mesh_blob_index in weighted_mesh_blob_indices
+    )
+    missing = weighted_mesh_blob_indices.difference(
+        profile["mesh_blob_index"] for profile in filtered
+    )
+    if missing:
+        return filtered, f"index addressing profile missing mesh blobs: {sorted(missing)}"
+    return filtered, None
+
+
 def _summarize_modelbin(
     archive_entry: str,
     game_references: tuple[str, ...],
@@ -181,6 +220,7 @@ def _summarize_modelbin(
         if resolution is None or resolution.morph_buffer_blob_index is None:
             unresolved += 1
 
+    index_profiles, index_error = _weighted_index_addressing_profiles(data, inventory)
     return ModelbinMorphDiagnostic(
         archive_entry=archive_entry,
         game_references=game_references,
@@ -194,6 +234,8 @@ def _summarize_modelbin(
         inventory=inventory.as_dict(),
         parse_error=None,
         weighted_target_profiles=_weighted_target_profiles(inventory),
+        index_addressing_profiles=index_profiles,
+        index_addressing_error=index_error,
     )
 
 
