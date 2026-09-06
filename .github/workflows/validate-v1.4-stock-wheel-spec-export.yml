@@ -8,6 +8,7 @@ on:
     paths:
       - "source-v1.2/tools/export_stock_wheel_specs_real_db.py"
       - "source-v1.2/tests/test_stock_wheel_spec_export.py"
+      - "source-v1.2/data/car_names.json"
       - ".github/workflows/validate-v1.4-stock-wheel-spec-export.yml"
 
 permissions:
@@ -77,6 +78,55 @@ jobs:
           if ([double]$fxx.rear_tire_aspect -ne 35) { throw "FXX rear tire aspect mismatch." }
           if ([double]$fxx.rear_wheel_diameter_in -ne 19) { throw "FXX rear wheel diameter mismatch." }
 
+      - name: Compare wheel source with current 660-car catalog
+        shell: pwsh
+        run: |
+          $catalog = Get-Content "source-v1.2\data\car_names.json" -Raw | ConvertFrom-Json
+          $data = Get-Content "stock-wheel-export\fh6_stock_wheel_specs.json" -Raw | ConvertFrom-Json
+
+          $catalogMap = @{}
+          foreach ($property in $catalog.cars.PSObject.Properties) {
+            $catalogMap[[int]$property.Name] = [string]$property.Value
+          }
+          $wheelMap = @{}
+          foreach ($record in $data.records) {
+            $wheelMap[[int]$record.car_id] = [string]$record.media_name
+          }
+
+          $missing = @(
+            foreach ($id in ($catalogMap.Keys | Sort-Object)) {
+              if (-not $wheelMap.ContainsKey($id)) {
+                [ordered]@{ car_id = $id; name = $catalogMap[$id] }
+              }
+            }
+          )
+          $extra = @(
+            foreach ($id in ($wheelMap.Keys | Sort-Object)) {
+              if (-not $catalogMap.ContainsKey($id)) {
+                [ordered]@{ car_id = $id; media_name = $wheelMap[$id] }
+              }
+            }
+          )
+          $shared = @($catalogMap.Keys | Where-Object { $wheelMap.ContainsKey($_) })
+
+          $report = [ordered]@{
+            format = "fh6_stock_wheel_catalog_coverage_v1"
+            catalog_count = $catalogMap.Count
+            wheel_source_count = $wheelMap.Count
+            shared_count = $shared.Count
+            catalog_coverage_percent = [math]::Round(100.0 * $shared.Count / $catalogMap.Count, 3)
+            missing_from_wheel_source_count = $missing.Count
+            missing_from_wheel_source = $missing
+            extra_in_wheel_source_count = $extra.Count
+            extra_in_wheel_source = $extra
+          }
+          $report | ConvertTo-Json -Depth 6 | Set-Content `
+            "stock-wheel-export\fh6_stock_wheel_catalog_coverage.json" -Encoding utf8
+          $report | ConvertTo-Json -Depth 6
+          if ($shared.Count -lt 600) {
+            throw "Current stock wheel source covers only $($shared.Count) current catalog IDs."
+          }
+
       - name: Run full regression suite
         shell: pwsh
         env:
@@ -94,5 +144,6 @@ jobs:
           path: |
             stock-wheel-export/fh6_stock_wheel_specs.json
             stock-wheel-export/fh6_stock_wheel_specs_report.json
+            stock-wheel-export/fh6_stock_wheel_catalog_coverage.json
           if-no-files-found: error
           retention-days: 14
