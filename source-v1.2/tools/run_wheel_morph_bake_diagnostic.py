@@ -7,10 +7,15 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import zipfile
 
 
 MODES = ("none", "diameter", "width", "combined")
+SCRIPT_DIR = Path(__file__).resolve().parent
+SOURCE_ROOT = SCRIPT_DIR.parent if (SCRIPT_DIR.parent / "fh6garage").is_dir() else SCRIPT_DIR
+if str(SOURCE_ROOT) not in sys.path:
+    sys.path.insert(0, str(SOURCE_ROOT))
 
 
 def rim_morph_weights(wheel_diameter_in: float, tire_width_mm: float) -> tuple[float, float]:
@@ -76,7 +81,7 @@ def read_glb_json(path: Path) -> dict:
     return document
 
 
-def wheelstyle_aabbs(document: dict) -> list[dict]:
+def wheelstyle_aabbs(document: dict, *, include_hidden: bool = False) -> list[dict]:
     meshes = document.get("meshes")
     accessors = document.get("accessors")
     if not isinstance(meshes, list) or not isinstance(accessors, list):
@@ -88,6 +93,8 @@ def wheelstyle_aabbs(document: dict) -> list[dict]:
         extras = mesh.get("extras") if isinstance(mesh.get("extras"), dict) else {}
         part_type = str(extras.get("kfps_part_type") or "").casefold()
         if part_type not in {"wheelstyle", "ccarparts_wheelstyle"}:
+            continue
+        if not include_hidden and str(extras.get("kfps_role") or "").casefold() == "hidden":
             continue
         identity = str(extras.get("kfps_instance_identity") or "")
         if not identity:
@@ -111,7 +118,7 @@ def wheelstyle_aabbs(document: dict) -> list[dict]:
         group["max"] = [max(group["max"][axis], high[axis]) for axis in range(3)]
         group["mesh_count"] += 1
     if not groups:
-        raise RuntimeError("no WheelStyle geometry found in GLB")
+        raise RuntimeError("no visible WheelStyle geometry found in GLB")
 
     result = []
     for identity, item in groups.items():
@@ -173,6 +180,16 @@ def _converter_json(stdout: str) -> dict | None:
     return None
 
 
+def apply_neutral_visibility(output: Path, archive: Path) -> dict:
+    try:
+        from fh6garage.preview3d.wheel_visibility import apply_neutral_wheel_visibility
+    except ImportError as exc:
+        raise RuntimeError(
+            "neutral wheel visibility support is missing from this diagnostic package"
+        ) from exc
+    return apply_neutral_wheel_visibility(output, archive).as_dict()
+
+
 def run_conversion(
     converter: Path,
     archive: Path,
@@ -214,6 +231,7 @@ def run_conversion(
             f"converter failed for {mode}: returncode={process.returncode}\n"
             f"stdout:\n{process.stdout}\nstderr:\n{process.stderr}"
         )
+    record["neutral_wheel_visibility"] = apply_neutral_visibility(output, archive)
     record["wheelstyle_aabbs"] = wheelstyle_aabbs(read_glb_json(output))
     return record
 
@@ -303,6 +321,7 @@ def main() -> int:
         "carbin_entry": carbin,
         "converter": str(converter),
         "spec_basis": args.spec_basis,
+        "aabb_scope": "visible WheelStyle after structural neutral-wheel motion/blur exclusion",
         "input_spec": {
             "front_tire_width_mm": args.front_width_mm,
             "front_wheel_diameter_in": args.front_wheel_diameter_in,
