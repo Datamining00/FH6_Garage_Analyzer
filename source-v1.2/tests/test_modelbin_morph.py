@@ -19,6 +19,7 @@ from fh6garage.preview3d.modelbin_morph import (
     decode_snorm16_delta,
     decode_weighted_vertex_morph,
     parse_modelbin_morph_inventory,
+    resolve_morph_vertex_start,
 )
 
 
@@ -134,15 +135,24 @@ class ModelbinMorphTests(unittest.TestCase):
         self.assertEqual(decoded.position_delta, (0.5, 4.0, 0.0))
         self.assertEqual(decoded.normal_delta, (0.0, 2.0, 0.5))
 
-    def test_indexed_vertex_offset_selects_absolute_morph_record(self):
+    def test_morph_vertex_start_combines_min_index_and_signed_base_offset(self):
+        self.assertEqual(resolve_morph_vertex_start(3212, -3212), 0)
+        self.assertEqual(resolve_morph_vertex_start(4000, -3212), 788)
+
+    def test_morph_vertex_start_rejects_negative_resolved_address(self):
+        with self.assertRaises(ModelbinMorphError):
+            resolve_morph_vertex_start(3211, -3212)
+
+    def test_signed_indexed_vertex_offset_selects_resolved_morph_record(self):
         zero = b"\x00" * 32
         second = _half4(2, 0, 0, 0) + _half4(0, 0, 0, 1) + _half4(0, 0, 0, 0) + _half4(0, 0, 0, 1)
         positions, normals = apply_weighted_morph(
             [(10, 0, 0)],
             _buffer(zero + second, stride=32, length=2),
-            indexed_vertex_offset=1,
+            indexed_vertex_offset=-3212,
             morph_target_count=2,
             weights=[0.5, 0],
+            min_vertex_index=3213,
         )
         self.assertEqual(positions, ((11.0, 0.0, 0.0),))
         self.assertIsNone(normals)
