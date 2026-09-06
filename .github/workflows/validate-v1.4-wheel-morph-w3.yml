@@ -57,7 +57,7 @@ jobs:
           PYTHONDONTWRITEBYTECODE: "1"
         run: |
           Set-Location source-v1.2
-          python -m unittest tests.test_modelbin_morph tests.test_modelbin_morph_modern -v
+          python -m unittest discover -s tests -p "test_modelbin_morph*.py" -v
 
       - name: Run full regression suite
         shell: pwsh
