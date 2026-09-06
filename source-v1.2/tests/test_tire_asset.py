@@ -9,6 +9,7 @@ from fh6garage.preview3d.tire_asset import (
     TireAssetError,
     inspect_tire_archive,
     resolve_tire_archive,
+    scan_tire_library,
 )
 
 
@@ -34,6 +35,10 @@ class TireAssetTests(unittest.TestCase):
                 b"right-modelbin",
             )
             bundle.writestr("textures/tire_slick_d.dds", b"texture")
+
+        for name in ("tire_slick_FE.zip", "tire_semi_slick_Dually_FE.zip"):
+            with zipfile.ZipFile(tires / name, "w") as bundle:
+                bundle.writestr("placeholder.modelbin", b"fixture")
         return temp, root, archive
 
     def test_resolves_native_tire_archive_case_insensitively(self) -> None:
@@ -44,6 +49,26 @@ class TireAssetTests(unittest.TestCase):
                 resolved.samefile(archive),
                 f"resolved tire archive points to a different file: {resolved} != {archive}",
             )
+
+    def test_exact_model_name_does_not_collapse_tire_variants(self) -> None:
+        temp, root, archive = self._fixture()
+        with temp:
+            self.assertTrue(resolve_tire_archive(root, "Slick").samefile(archive))
+            self.assertEqual(resolve_tire_archive(root, "Slick_FE").name, "tire_slick_FE.zip")
+            self.assertEqual(
+                resolve_tire_archive(root, "semi_slick_Dually_FE").name,
+                "tire_semi_slick_Dually_FE.zip",
+            )
+
+    def test_catalog_preserves_full_native_tire_model_names(self) -> None:
+        temp, root, _archive = self._fixture()
+        with temp:
+            catalog = scan_tire_library(root)
+            self.assertEqual(
+                [item.tire_model_name for item in catalog.entries],
+                ["semi_slick_Dually_FE", "slick", "slick_FE"],
+            )
+            self.assertEqual(catalog.duplicate_model_names, ())
 
     def test_reports_modelbin_candidates_without_modifying_archive(self) -> None:
         temp, root, archive = self._fixture()
