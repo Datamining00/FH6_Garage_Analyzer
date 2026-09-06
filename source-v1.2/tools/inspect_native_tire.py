@@ -12,25 +12,28 @@ from fh6garage.preview3d.tire_asset import (
     TireAssetError,
     inspect_tire_archive,
     report_json,
+    scan_tire_library,
 )
 
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Read-only FH6 native tire ZIP/modelbin locator."
+        description="Read-only FH6 native tire archive/library diagnostic."
+    )
+    parser.add_argument("game", help="FH6 install root or Content/media/cars directory")
+    parser.add_argument(
+        "tire_model_name",
+        nargs="?",
+        help="Exact DB TireModelName, for example Slick. Omit with --catalog.",
     )
     parser.add_argument(
-        "game_path",
-        help="FH6 installation root, Content path, or Content/media/cars path",
-    )
-    parser.add_argument(
-        "--tire-model",
-        required=True,
-        help="TireModelName from FH6 DB, for example Slick",
+        "--catalog",
+        action="store_true",
+        help="List all tire_*.zip assets without collapsing suffix variants.",
     )
     parser.add_argument(
         "--output",
-        help="Optional JSON output path. Output inside the FH6 media/cars tree is refused.",
+        help="Optional JSON output path. Without this option JSON is printed to stdout.",
     )
     return parser
 
@@ -38,15 +41,15 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
-        report = inspect_tire_archive(args.game_path, args.tire_model)
+        if args.catalog:
+            report = scan_tire_library(args.game)
+        else:
+            if not args.tire_model_name:
+                raise TireAssetError("tire_model_name is required unless --catalog is used")
+            report = inspect_tire_archive(args.game, args.tire_model_name)
         text = report_json(report)
         if args.output:
             output = Path(args.output).expanduser().resolve()
-            cars_dir = Path(report.cars_dir).resolve()
-            if output == cars_dir or output.is_relative_to(cars_dir):
-                raise TireAssetError(
-                    "refusing to write diagnostic output inside the FH6 media/cars tree"
-                )
             output.parent.mkdir(parents=True, exist_ok=True)
             output.write_text(text + "\n", encoding="utf-8")
             print(output)
