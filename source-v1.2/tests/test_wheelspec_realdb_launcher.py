@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+import subprocess
+import sys
 import unittest
 
 
@@ -18,6 +20,12 @@ class WheelSpecRealDBLauncherTests(unittest.TestCase):
         self.assertIn("FER_FXX_05_wheelspec_realdb.json", text)
         self.assertIn("READ-ONLY", text)
 
+    def test_launcher_supports_argument_or_database_picker(self):
+        text = LAUNCHER.read_text(encoding="utf-8")
+        self.assertIn('set "DBFILE=%~1"', text)
+        self.assertIn("System.Windows.Forms.OpenFileDialog", text)
+        self.assertIn("SQLite database (*.sqlite;*.db)", text)
+
     def test_validator_still_opens_sqlite_read_only(self):
         text = VALIDATOR.read_text(encoding="utf-8")
         self.assertIn("?mode=ro", text)
@@ -25,6 +33,18 @@ class WheelSpecRealDBLauncherTests(unittest.TestCase):
         self.assertIn("sha256_before", text)
         self.assertIn("sha256_after", text)
         self.assertIn("read_only_unchanged", text)
+
+    def test_validator_direct_script_resolves_sibling_fh6garage_package(self):
+        completed = subprocess.run(
+            [sys.executable, str(VALIDATOR), "--help"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("real read-only FH6 SQLite DB", completed.stdout)
 
 
 if __name__ == "__main__":
