@@ -567,6 +567,27 @@ def _normalize(value: tuple[float, float, float]) -> tuple[float, float, float]:
     return (value[0] / length, value[1] / length, value[2] / length)
 
 
+def resolve_morph_vertex_start(min_vertex_index: int, indexed_vertex_offset: int) -> int:
+    """Resolve a mesh-local morph start using ForzaTech base-vertex semantics.
+
+    IndexedVertexOffset is a signed BaseVertexLocation.  It is therefore valid for
+    the serialized offset itself to be negative; only min_vertex_index plus that
+    offset must resolve to a non-negative MBuf vertex index.
+    """
+    if min_vertex_index < 0:
+        raise ModelbinMorphError(
+            f"min_vertex_index must be non-negative: {min_vertex_index}"
+        )
+    resolved = min_vertex_index + indexed_vertex_offset
+    if resolved < 0:
+        raise ModelbinMorphError(
+            "resolved morph vertex start must be non-negative: "
+            f"min_vertex_index={min_vertex_index}, indexed_vertex_offset={indexed_vertex_offset}, "
+            f"resolved={resolved}"
+        )
+    return resolved
+
+
 def apply_weighted_morph(
     base_positions: Sequence[Sequence[float]],
     buffer: MorphBufferInfo,
@@ -574,12 +595,13 @@ def apply_weighted_morph(
     morph_target_count: int,
     weights: Sequence[float],
     *,
+    min_vertex_index: int = 0,
     base_normals: Sequence[Sequence[float]] | None = None,
 ) -> tuple[tuple[tuple[float, float, float], ...], tuple[tuple[float, float, float], ...] | None]:
-    if indexed_vertex_offset < 0:
-        raise ModelbinMorphError(
-            f"indexed_vertex_offset must be non-negative: {indexed_vertex_offset}"
-        )
+    morph_vertex_start = resolve_morph_vertex_start(
+        min_vertex_index,
+        indexed_vertex_offset,
+    )
     if len(weights) < morph_target_count:
         raise ModelbinMorphError(
             f"need at least {morph_target_count} morph weights, got {len(weights)}"
@@ -595,7 +617,7 @@ def apply_weighted_morph(
         position = _vec3(source_position, f"base position {local_index}")
         decoded = decode_weighted_vertex_morph(
             buffer,
-            indexed_vertex_offset + local_index,
+            morph_vertex_start + local_index,
             morph_target_count,
             weights,
             include_normals=include_normals,
