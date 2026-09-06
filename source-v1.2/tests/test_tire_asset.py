@@ -39,7 +39,11 @@ class TireAssetTests(unittest.TestCase):
     def test_resolves_native_tire_archive_case_insensitively(self) -> None:
         temp, root, archive = self._fixture()
         with temp:
-            self.assertEqual(resolve_tire_archive(root, "Slick"), archive)
+            resolved = resolve_tire_archive(root, "Slick")
+            self.assertTrue(
+                resolved.samefile(archive),
+                f"resolved tire archive points to a different file: {resolved} != {archive}",
+            )
 
     def test_reports_modelbin_candidates_without_modifying_archive(self) -> None:
         temp, root, archive = self._fixture()
