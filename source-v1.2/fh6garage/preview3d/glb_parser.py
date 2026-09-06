@@ -59,10 +59,17 @@ def _structural_livery_exclusion_reason(extras: dict) -> str:
     part_type = str(extras.get("kfps_part_type") or "").strip().casefold()
     if part_type == "brakes":
         return "part_type_brakes"
+    if part_type == "wheelstyle":
+        return "part_type_wheelstyle"
 
     source_entry = str(extras.get("kfps_source_entry") or "").replace("\\", "/").casefold()
-    if "/scene/interior/" in f"/{source_entry.lstrip('/')}":
+    canonical_source = f"/{source_entry.lstrip('/')}"
+    if "/scene/interior/" in canonical_source:
         return "scene_interior"
+    if "/scene/exterior/doors/doorjamb" in canonical_source:
+        return "exterior_door_jamb"
+    if "/scene/exterior/platform/doorsill" in canonical_source:
+        return "exterior_door_sill"
     return ""
 
 @dataclass(frozen=True)
