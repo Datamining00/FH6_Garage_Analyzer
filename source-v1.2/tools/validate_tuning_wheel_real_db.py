@@ -56,6 +56,7 @@ def _rows(
             return []
         clauses.append(f"{_quote(column)} = ?")
         values.append(value)
+    where = " AND ".join(clauses) if clauses else "1"
     order = ""
     if "level" in columns:
         order = f" ORDER BY {_quote(columns['level'])} ASC"
@@ -63,7 +64,7 @@ def _rows(
         order = f" ORDER BY {_quote(columns['id'])} ASC"
     return list(
         connection.execute(
-            f"SELECT * FROM {_quote(table)} WHERE {' AND '.join(clauses)}{order}",
+            f"SELECT * FROM {_quote(table)} WHERE {where}{order}",
             values,
         )
     )
@@ -198,7 +199,11 @@ def _build_payload_from_real_rows(
             if effective:
                 wheel_rows = _rows(connection, "List_Wheels", {})
                 alternative = next(
-                    (row for row in wheel_rows if _row_id(row) != stock_wheel and 0 <= _row_id(row) <= 0xFFFF),
+                    (
+                        row
+                        for row in wheel_rows
+                        if _row_id(row) != stock_wheel and 0 <= _row_id(row) <= 0xFFFF
+                    ),
                     None,
                 )
                 if alternative is not None:
@@ -285,9 +290,14 @@ def main() -> int:
     if not stock.wheel.is_stock() or not stock.placement.is_stock():
         raise SystemExit("real-DB stock payload did not normalize to stock selections")
     if stock.unresolved_slots:
-        raise SystemExit("real-DB stock payload has unresolved wheel slots: " + ", ".join(stock.unresolved_slots))
+        raise SystemExit(
+            "real-DB stock payload has unresolved wheel slots: "
+            + ", ".join(stock.unresolved_slots)
+        )
     if not effective.wheel.applied_ids() and not effective.placement.applied_ids():
-        raise SystemExit("real-DB effective payload did not resolve any non-stock wheel selections")
+        raise SystemExit(
+            "real-DB effective payload did not resolve any non-stock wheel selections"
+        )
     return 0
 
 
