@@ -41,10 +41,16 @@ def patch(kfps_root: Path, helper: Path) -> None:
 
     text = _replace_exact(
         text,
-        """                result,\n                model.Imported,""",
-        """                result,\n                model.Bundle,\n                model.Imported,""",
-        "pass model bundle into AppendMeshes",
-        count=2,
+        """            AppendMeshes(result, model.Imported, entryName, instance, instanceTransform, ref estimatedBinaryBytes);""",
+        """            AppendMeshes(result, model.Bundle, model.Imported, entryName, instance, instanceTransform, ref estimatedBinaryBytes);""",
+        "pass model bundle into scene AppendMeshes",
+    )
+
+    text = _replace_exact(
+        text,
+        """            AppendMeshes(\n                result,\n                model.Imported,""",
+        """            AppendMeshes(\n                result,\n                model.Bundle,\n                model.Imported,""",
+        "pass model bundle into loose AppendMeshes",
     )
 
     text = _replace_exact(
