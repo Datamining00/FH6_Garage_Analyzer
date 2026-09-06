@@ -30,6 +30,12 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Install runtime dependencies
+        shell: pwsh
+        run: |
+          Set-Location source-v1.2
+          python -m pip install --disable-pip-version-check -r requirements.txt
+
       - name: Compile source
         shell: pwsh
         run: |
@@ -38,6 +44,8 @@ jobs:
 
       - name: Run regression tests
         shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
         run: |
           Set-Location source-v1.2
           python -m unittest discover -s tests -v

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import closing
 from dataclasses import dataclass, field
 import os
 from pathlib import Path
@@ -159,7 +160,7 @@ class FH6WheelSpecResolver:
             raise WheelSpecError(f"car_id must be positive: {car_id}")
         selection = selection or WheelUpgradeSelection()
 
-        with self._connect() as connection:
+        with closing(self._connect()) as connection:
             source_table = self._first_existing_table(
                 connection, self._BASE_TABLE_CANDIDATES
             )
