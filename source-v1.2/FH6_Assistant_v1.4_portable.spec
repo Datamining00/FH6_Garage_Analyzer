@@ -12,6 +12,10 @@ vehicle_data = project_root / 'data' / 'fh6_assistant_vehicle_data'
 if vehicle_data.is_dir():
     datas.append((str(vehicle_data), 'data/fh6_assistant_vehicle_data'))
 
+wheel_morph_helper = project_root / 'runtime' / 'Kfps.ChassisConverter.WheelMorph.exe'
+if wheel_morph_helper.is_file():
+    datas.append((str(wheel_morph_helper), 'runtime'))
+
 a = Analysis(
     ['app.py'],
     pathex=[str(project_root)],
