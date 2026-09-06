@@ -15,6 +15,7 @@ from fh6garage.preview3d.modelbin_morph import (
     MorphBindingResolution,
     MorphBufferInfo,
 )
+from fh6garage.preview3d.modelbin_morph_index_profile import MeshIndexAddressingProfile
 from fh6garage.preview3d.vehicle_morph_diagnostic import (
     VehicleMorphDiagnosticError,
     classify_modelbin_path,
@@ -73,6 +74,33 @@ def _inventory(*, damage: bool = False) -> ModelbinMorphInventory:
     return ModelbinMorphInventory(1, 1, (buffer,), (mesh,), (resolution,))
 
 
+def _index_profile() -> MeshIndexAddressingProfile:
+    return MeshIndexAddressingProfile(
+        mesh_blob_index=1,
+        mesh_version="1.13",
+        index_buffer_blob_index=2,
+        index_buffer_blob_count=1,
+        index_buffer_resolution="fts_first_indb",
+        index_buffer_index=0,
+        index_buffer_offset_bytes=0,
+        index_buffer_draw_offset=7422,
+        indexed_vertex_offset=-3212,
+        index_count=3444,
+        primitive_count=1148,
+        is_32bit_indices=True,
+        index_stride=4,
+        serialized_index_buffer_stride=4,
+        stride_matches_mesh=True,
+        index_byte_start=29688,
+        index_byte_end=43464,
+        min_vertex_index=3212,
+        max_vertex_index=4136,
+        resolved_vertex_start=0,
+        resolved_vertex_end=924,
+        resolved_vertex_count=925,
+    )
+
+
 def _write_vehicle_archive(path: Path) -> None:
     modelbin_entry = "Scene/Wheels/FER_FXX_05_wheel.modelbin"
     resolved_ref = "game:\\media\\cars\\FER_FXX_05\\Scene\\Wheels\\FER_FXX_05_wheel.modelbin"
@@ -99,6 +127,9 @@ class VehicleMorphDiagnosticTests(unittest.TestCase):
             with patch(
                 "fh6garage.preview3d.vehicle_morph_diagnostic.parse_modelbin_morph_inventory",
                 return_value=_inventory(damage=False),
+            ), patch(
+                "fh6garage.preview3d.vehicle_morph_diagnostic.profile_modelbin_index_addressing",
+                return_value=(_index_profile(),),
             ):
                 report = inspect_vehicle_morph_archive(
                     archive,
@@ -135,6 +166,15 @@ class VehicleMorphDiagnosticTests(unittest.TestCase):
             self.assertEqual(profile["selectors"][0]["sum_abs_delta"], (1.0, 0.0, 0.0))
             self.assertEqual(profile["selectors"][1]["sum_abs_delta"], (0.0, 2.0, 0.0))
 
+            index_profiles = report.modelbins[0].index_addressing_profiles
+            self.assertEqual(len(index_profiles), 1)
+            self.assertIsNone(report.modelbins[0].index_addressing_error)
+            self.assertEqual(index_profiles[0]["mesh_blob_index"], 1)
+            self.assertEqual(index_profiles[0]["indexed_vertex_offset"], -3212)
+            self.assertEqual(index_profiles[0]["min_vertex_index"], 3212)
+            self.assertEqual(index_profiles[0]["resolved_vertex_start"], 0)
+            self.assertEqual(index_profiles[0]["resolved_vertex_end"], 924)
+
     def test_damage_binding_is_not_profiled_as_weighted_geometry(self):
         with tempfile.TemporaryDirectory() as td:
             archive = Path(td) / "FER_FXX_05.zip"
@@ -142,6 +182,9 @@ class VehicleMorphDiagnosticTests(unittest.TestCase):
             with patch(
                 "fh6garage.preview3d.vehicle_morph_diagnostic.parse_modelbin_morph_inventory",
                 return_value=_inventory(damage=True),
+            ), patch(
+                "fh6garage.preview3d.vehicle_morph_diagnostic.profile_modelbin_index_addressing",
+                side_effect=AssertionError("damage morph must not request weighted index profile"),
             ):
                 report = inspect_vehicle_morph_archive(
                     archive,
@@ -151,6 +194,30 @@ class VehicleMorphDiagnosticTests(unittest.TestCase):
             self.assertEqual(report.damage_morph_meshes, 1)
             self.assertEqual(report.weighted_morph_meshes, 0)
             self.assertEqual(report.modelbins[0].weighted_target_profiles, ())
+            self.assertEqual(report.modelbins[0].index_addressing_profiles, ())
+            self.assertIsNone(report.modelbins[0].index_addressing_error)
+
+    def test_index_addressing_failure_does_not_invalidate_morph_inventory(self):
+        with tempfile.TemporaryDirectory() as td:
+            archive = Path(td) / "FER_FXX_05.zip"
+            _write_vehicle_archive(archive)
+            with patch(
+                "fh6garage.preview3d.vehicle_morph_diagnostic.parse_modelbin_morph_inventory",
+                return_value=_inventory(damage=False),
+            ), patch(
+                "fh6garage.preview3d.vehicle_morph_diagnostic.profile_modelbin_index_addressing",
+                side_effect=ModelbinMorphError("IndB fixture unavailable"),
+            ):
+                report = inspect_vehicle_morph_archive(
+                    archive,
+                    "FER_FXX_05.carbin",
+                    "FER_FXX_05",
+                )
+            self.assertEqual(report.parsed_modelbins, 1)
+            self.assertEqual(report.weighted_morph_meshes, 1)
+            self.assertEqual(report.modelbins[0].index_addressing_profiles, ())
+            self.assertEqual(report.modelbins[0].index_addressing_error, "IndB fixture unavailable")
+            self.assertIsNone(report.modelbins[0].parse_error)
 
     def test_parse_failure_is_recorded_without_mutating_archive(self):
         with tempfile.TemporaryDirectory() as td:
@@ -172,6 +239,8 @@ class VehicleMorphDiagnosticTests(unittest.TestCase):
             self.assertEqual(report.morph_meshes, 0)
             self.assertEqual(report.modelbins[0].parse_error, "unsupported fixture")
             self.assertEqual(report.modelbins[0].weighted_target_profiles, ())
+            self.assertEqual(report.modelbins[0].index_addressing_profiles, ())
+            self.assertIsNone(report.modelbins[0].index_addressing_error)
 
     def test_report_writer_refuses_source_archive_directory(self):
         with tempfile.TemporaryDirectory() as td:
