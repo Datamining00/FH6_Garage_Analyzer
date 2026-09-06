@@ -7,8 +7,11 @@ on:
       - v1.4-rc1-wheel-spec-w1
     paths:
       - "source-v1.2/fh6garage/preview3d/wheel_spec.py"
+      - "source-v1.2/fh6garage/preview3d/wheel_placement.py"
       - "source-v1.2/tools/validate_wheel_spec_real_db.py"
+      - "source-v1.2/tools/validate_wheel_placement_real_db.py"
       - "source-v1.2/tests/test_wheel_spec.py"
+      - "source-v1.2/tests/test_wheel_placement.py"
       - ".github/workflows/validate-v1.4-wheel-spec-real-db.yml"
 
 permissions:
@@ -16,7 +19,7 @@ permissions:
 
 jobs:
   validate-real-db:
-    name: Real FH6 DB wheel spec validation
+    name: Real FH6 DB wheel/placement validation
     runs-on: windows-latest
 
     steps:
@@ -47,19 +50,23 @@ jobs:
             throw "Pinned FH6 DB Git blob mismatch: $actual"
           }
 
-      - name: Compile W1 resolver and validator
+      - name: Compile W1 resolvers and validators
         shell: pwsh
         run: |
           Set-Location source-v1.2
-          python -m py_compile fh6garage\preview3d\wheel_spec.py tools\validate_wheel_spec_real_db.py
+          python -m py_compile `
+            fh6garage\preview3d\wheel_spec.py `
+            fh6garage\preview3d\wheel_placement.py `
+            tools\validate_wheel_spec_real_db.py `
+            tools\validate_wheel_placement_real_db.py
 
       - name: Run synthetic W1 regression
         shell: pwsh
         run: |
           Set-Location source-v1.2
-          python -m unittest tests.test_wheel_spec -v
+          python -m unittest tests.test_wheel_spec tests.test_wheel_placement -v
 
-      - name: Validate real DB and resolve representative cars
+      - name: Validate real DB wheel specs
         shell: pwsh
         run: |
           Set-Location source-v1.2
@@ -70,10 +77,23 @@ jobs:
             --car-id 1229 `
             --car-id 1260
 
-      - name: Upload validation report only
+      - name: Validate real DB placement and brakes
+        shell: pwsh
+        run: |
+          Set-Location source-v1.2
+          python tools\validate_wheel_placement_real_db.py `
+            --db ..\real-db\fh6_game_db.sqlite `
+            --output ..\real-db\wheel_placement_real_db_report.json `
+            --car-id 1006 `
+            --car-id 1229 `
+            --car-id 1260
+
+      - name: Upload validation reports only
         uses: actions/upload-artifact@v6
         with:
           name: FH6_WheelSpec_W1_RealDB_Report
-          path: real-db/wheel_spec_real_db_report.json
+          path: |
+            real-db/wheel_spec_real_db_report.json
+            real-db/wheel_placement_real_db_report.json
           if-no-files-found: error
           retention-days: 14
