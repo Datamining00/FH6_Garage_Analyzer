@@ -84,3 +84,56 @@ jobs:
         run: |
           Set-Location source-v1.2
           python -m unittest discover -s tests -v
+
+  package-diagnostic:
+    name: Package wheel morph diagnostic
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - name: Checkout W3 branch
+        uses: actions/checkout@v6
+
+      - name: Build portable diagnostic source bundle
+        shell: pwsh
+        run: |
+          $pkg = Join-Path $PWD "diagnostic-package"
+          New-Item -ItemType Directory -Force (Join-Path $pkg "tools") | Out-Null
+          New-Item -ItemType Directory -Force (Join-Path $pkg "fh6garage\preview3d") | Out-Null
+
+          Copy-Item "source-v1.2\tools\Run_FH6_Wheel_Morph_Diagnostic.cmd" (Join-Path $pkg "tools\")
+          Copy-Item "source-v1.2\tools\inspect_vehicle_morph.py" (Join-Path $pkg "tools\")
+          Copy-Item "source-v1.2\fh6garage\__init__.py" (Join-Path $pkg "fh6garage\")
+          Copy-Item "source-v1.2\fh6garage\preview3d\__init__.py" (Join-Path $pkg "fh6garage\preview3d\")
+          Copy-Item "source-v1.2\fh6garage\preview3d\vehicle_index.py" (Join-Path $pkg "fh6garage\preview3d\")
+          Copy-Item "source-v1.2\fh6garage\preview3d\near_lod_archive.py" (Join-Path $pkg "fh6garage\preview3d\")
+          Copy-Item "source-v1.2\fh6garage\preview3d\modelbin_morph.py" (Join-Path $pkg "fh6garage\preview3d\")
+          Copy-Item "source-v1.2\fh6garage\preview3d\modelbin_morph_profile.py" (Join-Path $pkg "fh6garage\preview3d\")
+          Copy-Item "source-v1.2\fh6garage\preview3d\modelbin_morph_index_profile.py" (Join-Path $pkg "fh6garage\preview3d\")
+          Copy-Item "source-v1.2\fh6garage\preview3d\vehicle_morph_diagnostic.py" (Join-Path $pkg "fh6garage\preview3d\")
+
+          @"
+          FH6 Wheel Morph Diagnostic W3
+          =============================
+
+          Requirements:
+          - Windows
+          - Python 3.12+ recommended
+
+          Usage:
+          1. Open the tools folder.
+          2. Double-click Run_FH6_Wheel_Morph_Diagnostic.cmd.
+          3. Select the FH6 vehicle ZIP.
+          4. The source ZIP remains read-only.
+          5. The JSON report is written to:
+             %LOCALAPPDATA%\FH6 Assistant\Diagnostics
+
+          Return the generated *_morph_w3.json file for analysis.
+          "@ | Set-Content -Encoding UTF8 (Join-Path $pkg "README.txt")
+
+      - name: Upload wheel morph diagnostic artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FH6-Wheel-Morph-Diagnostic-W3
+          path: diagnostic-package
+          retention-days: 14
+          if-no-files-found: error
