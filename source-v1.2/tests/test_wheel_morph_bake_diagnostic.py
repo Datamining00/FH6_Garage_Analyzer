@@ -107,12 +107,66 @@ class WheelMorphBakeDiagnosticTests(unittest.TestCase):
         self.assertAlmostEqual(row["center_delta"][0], 0.1)
         self.assertAlmostEqual(row["center_delta"][2], 0.2)
 
+    def test_converter_json_parses_pretty_printed_payload(self):
+        stdout = """{
+  "format": "kfps_local_chassis_conversion_v5",
+  "wheel_morph_mode": "combined",
+  "wheel_morph_applied_meshes": 33,
+  "wheel_morph_applied_vertices": 6736
+}
+"""
+        payload = self.module._converter_json(stdout)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload["wheel_morph_mode"], "combined")
+        self.assertEqual(payload["wheel_morph_applied_meshes"], 33)
+
+    def test_converter_diagnostics_fail_closed_for_unpatched_or_inactive_build(self):
+        with self.assertRaises(RuntimeError):
+            self.module.validate_converter_diagnostics("combined", {})
+        with self.assertRaises(RuntimeError):
+            self.module.validate_converter_diagnostics("combined", {
+                "wheel_morph_mode": "width",
+                "wheel_morph_applied_meshes": 1,
+                "wheel_morph_applied_vertices": 1,
+            })
+        with self.assertRaises(RuntimeError):
+            self.module.validate_converter_diagnostics("combined", {
+                "wheel_morph_mode": "combined",
+                "wheel_morph_applied_meshes": 0,
+                "wheel_morph_applied_vertices": 100,
+            })
+        with self.assertRaises(RuntimeError):
+            self.module.validate_converter_diagnostics("combined", {
+                "wheel_morph_mode": "combined",
+                "wheel_morph_applied_meshes": 10,
+                "wheel_morph_applied_vertices": 0,
+            })
+
+    def test_converter_diagnostics_accept_verified_none_and_combined_modes(self):
+        self.module.validate_converter_diagnostics("none", {
+            "wheel_morph_mode": "none",
+            "wheel_morph_applied_meshes": 0,
+            "wheel_morph_applied_vertices": 0,
+        })
+        self.module.validate_converter_diagnostics("combined", {
+            "wheel_morph_mode": "combined",
+            "wheel_morph_applied_meshes": 33,
+            "wheel_morph_applied_vertices": 6736,
+        })
+
     def test_launcher_reuses_structural_neutral_wheel_visibility(self):
         script = SCRIPT.read_text(encoding="utf-8")
         self.assertIn("apply_neutral_wheel_visibility", script)
         self.assertIn('"neutral_wheel_visibility"', script)
         self.assertIn('"aabb_scope"', script)
         self.assertIn('kfps_role") or "").casefold() == "hidden"', script)
+
+    def test_launcher_fails_closed_on_identical_outputs_and_records_v2_hashes(self):
+        script = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("wheel morph output remained byte-identical to baseline", script)
+        self.assertIn('"output_sha256"', script)
+        self.assertIn('"fh6_wheel_morph_four_way_diagnostic_v2"', script)
+        self.assertIn("validate_converter_diagnostics(mode, converter_json)", script)
 
     def test_launcher_is_fxx_candidate_only_and_has_no_geometry_scale_patch(self):
         launcher = LAUNCHER.read_text(encoding="utf-8")
