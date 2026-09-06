@@ -1,0 +1,43 @@
+name: Validate FH6 Assistant v1.4 wheel spec W1
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - v1.4-rc1-wheel-spec-w1
+    paths:
+      - "source-v1.2/**"
+      - ".github/workflows/validate-v1.4-wheel-spec-w1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    name: Python ${{ matrix.python-version }} regression
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Compile source
+        shell: pwsh
+        run: |
+          Set-Location source-v1.2
+          python -m compileall -q .
+
+      - name: Run regression tests
+        shell: pwsh
+        run: |
+          Set-Location source-v1.2
+          python -m unittest discover -s tests -v
