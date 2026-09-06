@@ -8,10 +8,13 @@ on:
     paths:
       - "source-v1.2/fh6garage/preview3d/wheel_spec.py"
       - "source-v1.2/fh6garage/preview3d/wheel_placement.py"
+      - "source-v1.2/fh6garage/preview3d/tuning_wheel_selection.py"
       - "source-v1.2/tools/validate_wheel_spec_real_db.py"
       - "source-v1.2/tools/validate_wheel_placement_real_db.py"
+      - "source-v1.2/tools/validate_tuning_wheel_real_db.py"
       - "source-v1.2/tests/test_wheel_spec.py"
       - "source-v1.2/tests/test_wheel_placement.py"
+      - "source-v1.2/tests/test_tuning_wheel_selection.py"
       - ".github/workflows/validate-v1.4-wheel-spec-real-db.yml"
 
 permissions:
@@ -19,11 +22,11 @@ permissions:
 
 jobs:
   validate-real-db:
-    name: Real FH6 DB wheel/placement validation
+    name: Real FH6 DB wheel/tuning validation
     runs-on: windows-latest
 
     steps:
-      - name: Checkout W1 branch
+      - name: Checkout wheel branch
         uses: actions/checkout@v6
 
       - name: Set up Python 3.12
@@ -50,21 +53,26 @@ jobs:
             throw "Pinned FH6 DB Git blob mismatch: $actual"
           }
 
-      - name: Compile W1 resolvers and validators
+      - name: Compile W1 and W2 resolvers
         shell: pwsh
         run: |
           Set-Location source-v1.2
           python -m py_compile `
             fh6garage\preview3d\wheel_spec.py `
             fh6garage\preview3d\wheel_placement.py `
+            fh6garage\preview3d\tuning_wheel_selection.py `
             tools\validate_wheel_spec_real_db.py `
-            tools\validate_wheel_placement_real_db.py
+            tools\validate_wheel_placement_real_db.py `
+            tools\validate_tuning_wheel_real_db.py
 
-      - name: Run synthetic W1 regression
+      - name: Run synthetic W1 and W2 regression
         shell: pwsh
         run: |
           Set-Location source-v1.2
-          python -m unittest tests.test_wheel_spec tests.test_wheel_placement -v
+          python -m unittest `
+            tests.test_wheel_spec `
+            tests.test_wheel_placement `
+            tests.test_tuning_wheel_selection -v
 
       - name: Validate real DB wheel specs
         shell: pwsh
@@ -88,12 +96,22 @@ jobs:
             --car-id 1229 `
             --car-id 1260
 
+      - name: Validate W2 tuning selection bridge against real DB
+        shell: pwsh
+        run: |
+          Set-Location source-v1.2
+          python tools\validate_tuning_wheel_real_db.py `
+            --db ..\real-db\fh6_game_db.sqlite `
+            --output ..\real-db\tuning_wheel_real_db_report.json `
+            --car-id 1006
+
       - name: Upload validation reports only
         uses: actions/upload-artifact@v6
         with:
-          name: FH6_WheelSpec_W1_RealDB_Report
+          name: FH6_WheelSpec_W2_RealDB_Report
           path: |
             real-db/wheel_spec_real_db_report.json
             real-db/wheel_placement_real_db_report.json
+            real-db/tuning_wheel_real_db_report.json
           if-no-files-found: error
           retention-days: 14
