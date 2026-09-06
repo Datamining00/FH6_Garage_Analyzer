@@ -15,6 +15,11 @@ Outputs are written under:
 
 %LOCALAPPDATA%\FH6 Assistant\Diagnostics\<vehicle>_wheel_morph_bake_<timestamp>
 
+After each conversion, the existing structure-only neutral wheel visibility pass is
+applied. WheelStyle motion/blur primitives identified by the previously verified
+MeshBlob signature are marked hidden before AABB measurement. The comparison report
+therefore measures visible/static WheelStyle geometry rather than motion geometry.
+
 FER_FXX_05 candidate stock inputs
 ---------------------------------
 Front: 245 mm, 19 in
@@ -57,10 +62,11 @@ selector 0 as wheel-diameter/radial morph and selector 1 as wheel-width/axial mo
 
 Usage
 -----
-1. Keep these files together in one folder:
+1. Keep the distributed package intact. It contains:
    - Kfps.ChassisConverter.exe
    - run_wheel_morph_bake_diagnostic.py
    - Run_FER_FXX_05_Wheel_Morph_Bake_Diagnostic.cmd
+   - fh6garage/preview3d/wheel_visibility.py and its structural parser dependency
 2. Double-click Run_FER_FXX_05_Wheel_Morph_Bake_Diagnostic.cmd.
 3. Select FER_FXX_05.zip when prompted.
 4. Wait for the four conversions to finish.
@@ -69,5 +75,6 @@ Usage
    - *_wheel_combined.glb
    - optionally the baseline/diameter/width GLBs for visual comparison
 
-The JSON report records per-WheelStyle-instance AABB spans and center shifts for all
-four modes, plus converter morph counters and source SHA-256 verification.
+The JSON report records per-visible-WheelStyle-instance AABB spans and center shifts
+for all four modes, the neutral visibility result, converter morph counters, and source
+SHA-256 verification.
