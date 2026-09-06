@@ -48,7 +48,12 @@ def _asset(archive: Path):
 class ChassisConverterAutomaticRimMorphTests(unittest.TestCase):
     def _run_until_near_lod(self, automatic, *, explicit_weights=None, override=None):
         with tempfile.TemporaryDirectory() as temp_dir:
-            archive = Path(temp_dir) / "FER_FXX_05.zip"
+            root = Path(temp_dir)
+            game_root = root / "game"
+            runtime_root = root / "runtime"
+            game_root.mkdir()
+            runtime_root.mkdir()
+            archive = game_root / "FER_FXX_05.zip"
             archive.write_bytes(b"fixture")
             stop = RuntimeError("stop-after-helper-selection")
             with (
@@ -62,7 +67,7 @@ class ChassisConverterAutomaticRimMorphTests(unittest.TestCase):
                 ) as morph_environment,
                 patch(
                     "fh6garage.preview3d.chassis_converter._resolve_converter_helper",
-                    return_value=(Path(temp_dir) / "helper.exe", "test-helper"),
+                    return_value=(runtime_root / "helper.exe", "test-helper"),
                 ) as resolve_helper,
                 patch(
                     "fh6garage.preview3d.chassis_converter.prepare_near_lod_archive",
@@ -73,7 +78,7 @@ class ChassisConverterAutomaticRimMorphTests(unittest.TestCase):
                     convert_vehicle(
                         _asset(archive),
                         carbin_entry="FER_FXX_05.carbin",
-                        work_root=Path(temp_dir) / "work",
+                        work_root=runtime_root / "work",
                         rim_morph_weights=explicit_weights,
                         converter_override=override,
                     )
