@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import closing
 import hashlib
 import json
 from pathlib import Path
@@ -88,7 +89,7 @@ def export_stock_wheel_specs(
             f"source Git blob mismatch: expected {source_blob_sha1}, got {actual_blob_sha1}"
         )
 
-    with _connect_read_only(database) as connection:
+    with closing(_connect_read_only(database)) as connection:
         table, columns = _source_table(connection)
         select_columns = [columns[name.casefold()] for name in REQUIRED_COLUMNS]
         sql = (
