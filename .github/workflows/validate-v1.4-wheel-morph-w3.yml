@@ -1,0 +1,69 @@
+name: Validate FH6 Assistant v1.4 wheel morph W3
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - v1.4-rc1-wheel-morph-w3
+    paths:
+      - "source-v1.2/fh6garage/preview3d/modelbin_morph.py"
+      - "source-v1.2/tests/test_modelbin_morph.py"
+      - "source-v1.2/tools/inspect_modelbin_morph.py"
+      - ".github/workflows/validate-v1.4-wheel-morph-w3.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v14-wheel-morph-w3-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Python ${{ matrix.python-version }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+
+    steps:
+      - name: Checkout W3 branch
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: source-v1.2/requirements.txt
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          Set-Location source-v1.2
+          python -m pip install --disable-pip-version-check -r requirements.txt
+
+      - name: Compile morph decoder
+        shell: pwsh
+        run: |
+          Set-Location source-v1.2
+          python -m py_compile fh6garage/preview3d/modelbin_morph.py
+          python -m py_compile tools/inspect_modelbin_morph.py
+
+      - name: Run W3 morph tests
+        shell: pwsh
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          Set-Location source-v1.2
+          python -m unittest tests.test_modelbin_morph -v
+
+      - name: Run full regression suite
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          Set-Location source-v1.2
+          python -m unittest discover -s tests -v
