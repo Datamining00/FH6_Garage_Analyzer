@@ -43,7 +43,7 @@ class WheelMorphBakeDiagnosticTests(unittest.TestCase):
             self.assertEqual(self.module.resolve_carbin_entry(archive), "FER_FXX_05.carbin")
             self.assertEqual(before, self.module.sha256_file(archive))
 
-    def test_wheelstyle_aabb_groups_by_structured_instance_identity(self):
+    def test_wheelstyle_aabb_groups_visible_structured_instances_only(self):
         document = {
             "meshes": [
                 {
@@ -59,14 +59,23 @@ class WheelMorphBakeDiagnosticTests(unittest.TestCase):
                     "primitives": [{"attributes": {"POSITION": 2}}],
                 },
                 {
-                    "extras": {"kfps_part_type": "CarBody", "kfps_instance_identity": "body"},
+                    "extras": {
+                        "kfps_part_type": "WheelStyle",
+                        "kfps_instance_identity": "rear",
+                        "kfps_role": "hidden",
+                    },
                     "primitives": [{"attributes": {"POSITION": 3}}],
+                },
+                {
+                    "extras": {"kfps_part_type": "CarBody", "kfps_instance_identity": "body"},
+                    "primitives": [{"attributes": {"POSITION": 4}}],
                 },
             ],
             "accessors": [
                 {"min": [-1, 0, -2], "max": [0, 1, -1]},
                 {"min": [0, -1, -2], "max": [2, 2, -1]},
                 {"min": [-1, 0, 1], "max": [1, 2, 2]},
+                {"min": [-50, -50, -50], "max": [50, 50, 50]},
                 {"min": [-9, -9, -9], "max": [9, 9, 9]},
             ],
         }
@@ -76,6 +85,10 @@ class WheelMorphBakeDiagnosticTests(unittest.TestCase):
         self.assertEqual(by_identity["rear"]["span"], [3.0, 3.0, 1.0])
         self.assertEqual(by_identity["rear"]["axle_from_world_z"], "rear")
         self.assertEqual(by_identity["front"]["axle_from_world_z"], "front")
+
+        with_hidden = self.module.wheelstyle_aabbs(document, include_hidden=True)
+        hidden_map = {row["instance_identity"]: row for row in with_hidden}
+        self.assertEqual(hidden_map["rear"]["span"], [100.0, 100.0, 100.0])
 
     def test_aabb_comparison_reports_span_and_center_deltas(self):
         baseline = [{
@@ -93,6 +106,13 @@ class WheelMorphBakeDiagnosticTests(unittest.TestCase):
         self.assertEqual(row["span_delta"], [0.5, 0.0, 1.0])
         self.assertAlmostEqual(row["center_delta"][0], 0.1)
         self.assertAlmostEqual(row["center_delta"][2], 0.2)
+
+    def test_launcher_reuses_structural_neutral_wheel_visibility(self):
+        script = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("apply_neutral_wheel_visibility", script)
+        self.assertIn('"neutral_wheel_visibility"', script)
+        self.assertIn('"aabb_scope"', script)
+        self.assertIn('kfps_role") or "").casefold() == "hidden"', script)
 
     def test_launcher_is_fxx_candidate_only_and_has_no_geometry_scale_patch(self):
         launcher = LAUNCHER.read_text(encoding="utf-8")
