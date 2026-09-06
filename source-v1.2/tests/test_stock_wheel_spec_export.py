@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import closing
 import hashlib
 import json
 from pathlib import Path
@@ -24,7 +25,7 @@ def _sha256(path: Path) -> str:
 
 
 def _fixture(path: Path) -> None:
-    with sqlite3.connect(path) as connection:
+    with closing(sqlite3.connect(path)) as connection:
         connection.executescript(
             """
             CREATE TABLE Data_Car (
@@ -42,6 +43,7 @@ def _fixture(path: Path) -> None:
               (2000, 'TEST_INCOMPLETE', 0, 35, 18, 275, 35, 18);
             """
         )
+        connection.commit()
 
 
 class StockWheelSpecExportTests(unittest.TestCase):
