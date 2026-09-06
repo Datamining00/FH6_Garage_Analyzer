@@ -21,6 +21,11 @@ from .near_lod_archive import (
 )
 
 from .neutral_geometry import NEUTRAL_GEOMETRY_REVISION, NeutralGeometryError, annotate_neutral_geometry
+from .wheel_morph_helper import (
+    WHEEL_MORPH_HELPER_REVISION,
+    WheelMorphHelperError,
+    verified_bundled_wheel_morph_helper,
+)
 from .wheel_morph_runtime import (
     WHEEL_MORPH_RUNTIME_REVISION,
     WheelMorphRuntimeContractError,
@@ -151,6 +156,32 @@ def ensure_converter(progress: Callable[[str], None] | None = None) -> Path:
     return target
 
 
+def _resolve_converter_helper(
+    progress: Callable[[str], None] | None,
+    rim_morph_weights: VehicleRimMorphWeights | None,
+    converter_override: str | Path | None,
+) -> tuple[Path, str]:
+    """Select upstream, explicit override, or SHA-verified bundled morph helper."""
+    if converter_override is not None:
+        helper = Path(converter_override).expanduser().resolve()
+        if not helper.is_file():
+            raise ChassisConverterError(f"Converter override does not exist: {helper}")
+        return helper, "explicit_override"
+
+    if rim_morph_weights is None:
+        return ensure_converter(progress), "pinned_upstream"
+
+    try:
+        helper = verified_bundled_wheel_morph_helper()
+    except WheelMorphHelperError as exc:
+        raise ChassisConverterError(f"Bundled rim morph helper is invalid: {exc}") from exc
+    if helper is None:
+        raise ChassisConverterError(
+            "Rim morph was requested but the verified bundled wheel morph helper is unavailable."
+        )
+    return helper, WHEEL_MORPH_HELPER_REVISION
+
+
 def _safe_output_for(asset: VehicleAsset, work_root: Path | None = None) -> Path:
     safe_model = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in asset.model_code)
     root = Path(work_root) if work_root is not None else cache_dir()
@@ -196,17 +227,11 @@ def convert_vehicle(
     except WheelMorphRuntimeContractError as exc:
         raise ChassisConverterError(f"Rim morph request is invalid: {exc}") from exc
 
-    if rim_morph_weights is not None and converter_override is None:
-        raise ChassisConverterError(
-            "Rim morph was requested but the default pinned KFPS helper is not morph-capable. "
-            "A verified morph-capable converter_override is required."
-        )
-    if converter_override is None:
-        helper = ensure_converter(progress)
-    else:
-        helper = Path(converter_override).expanduser().resolve()
-        if not helper.is_file():
-            raise ChassisConverterError(f"Converter override does not exist: {helper}")
+    helper, helper_revision = _resolve_converter_helper(
+        progress,
+        rim_morph_weights,
+        converter_override,
+    )
 
     transient_root = Path(work_root) if work_root is not None else cache_dir()
     transient_root.mkdir(parents=True, exist_ok=True)
@@ -434,6 +459,7 @@ def convert_vehicle(
     diagnostics["neutral_geometry"] = neutral_geometry_summary
     diagnostics["neutral_geometry_error"] = neutral_geometry_error
     diagnostics["rim_morph_runtime_revision"] = WHEEL_MORPH_RUNTIME_REVISION
+    diagnostics["rim_morph_helper_revision"] = helper_revision if rim_morph_summary is not None else None
     diagnostics["rim_morph_status"] = (
         rim_morph_summary.get("status", "not_requested")
         if rim_morph_summary is not None
