@@ -21,6 +21,13 @@ from .near_lod_archive import (
 )
 
 from .neutral_geometry import NEUTRAL_GEOMETRY_REVISION, NeutralGeometryError, annotate_neutral_geometry
+from .wheel_morph_runtime import (
+    WHEEL_MORPH_RUNTIME_REVISION,
+    WheelMorphRuntimeContractError,
+    validate_wheel_morph_diagnostics,
+    wheel_morph_environment,
+)
+from .wheel_morph_weights import VehicleRimMorphWeights
 from .wheel_visibility import (
     WHEEL_VISIBILITY_REVISION,
     WheelVisibilityError,
@@ -174,6 +181,8 @@ def convert_vehicle(
     *,
     carbin_entry: str | None = None,
     work_root: str | Path | None = None,
+    rim_morph_weights: VehicleRimMorphWeights | None = None,
+    converter_override: str | Path | None = None,
 ) -> ConversionResult:
     if os.name != "nt":
         raise ChassisConverterError("The bundled conversion workflow is Windows x64 only.")
@@ -182,7 +191,23 @@ def convert_vehicle(
     if not Path(asset.archive_path).is_file():
         raise ChassisConverterError(f"Vehicle archive no longer exists: {asset.archive_path}")
 
-    helper = ensure_converter(progress)
+    try:
+        morph_env = wheel_morph_environment(asset.car_id, rim_morph_weights)
+    except WheelMorphRuntimeContractError as exc:
+        raise ChassisConverterError(f"Rim morph request is invalid: {exc}") from exc
+
+    if rim_morph_weights is not None and converter_override is None:
+        raise ChassisConverterError(
+            "Rim morph was requested but the default pinned KFPS helper is not morph-capable. "
+            "A verified morph-capable converter_override is required."
+        )
+    if converter_override is None:
+        helper = ensure_converter(progress)
+    else:
+        helper = Path(converter_override).expanduser().resolve()
+        if not helper.is_file():
+            raise ChassisConverterError(f"Converter override does not exist: {helper}")
+
     transient_root = Path(work_root) if work_root is not None else cache_dir()
     transient_root.mkdir(parents=True, exist_ok=True)
     output = _safe_output_for(asset, transient_root)
@@ -209,7 +234,7 @@ def convert_vehicle(
     except (OSError, ValueError, NearLodNormalizationError) as exc:
         raise ChassisConverterError(f"Near-LOD assembly preparation failed: {exc}") from exc
 
-    # The pinned converter reads only this LocalAppData derivative.  The original FH6 archive
+    # The converter reads only this LocalAppData derivative. The original FH6 archive
     # was opened read-only by prepare_near_lod_archive and is never passed to a write path.
     request = {
         "archive": str(normalized_archive.resolve()),
@@ -234,6 +259,7 @@ def convert_vehicle(
 
     env = os.environ.copy()
     env["KFPS_CHASSIS_DIAGNOSTICS"] = "1"
+    env.update(morph_env)
     wheel_visibility_summary: dict = {}
     wheel_visibility_error: str | None = None
     neutral_geometry_summary: dict = {}
@@ -332,6 +358,22 @@ def convert_vehicle(
         if isinstance(candidate, dict):
             diagnostics = candidate
 
+    try:
+        rim_morph_summary = validate_wheel_morph_diagnostics(
+            asset.car_id,
+            rim_morph_weights,
+            diagnostics,
+        )
+    except WheelMorphRuntimeContractError as exc:
+        try:
+            output.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise ChassisConverterError(
+            "Requested rim morph was not proven by the converter; the derived GLB was discarded. "
+            + str(exc)
+        ) from exc
+
     # The raw carbin can mention optional/unselected models that are absent from
     # the archive. The pinned scene parser knows which instances are actually
     # active. Refuse only unresolved required active instances; skipped optional
@@ -391,6 +433,13 @@ def convert_vehicle(
     )
     diagnostics["neutral_geometry"] = neutral_geometry_summary
     diagnostics["neutral_geometry_error"] = neutral_geometry_error
+    diagnostics["rim_morph_runtime_revision"] = WHEEL_MORPH_RUNTIME_REVISION
+    diagnostics["rim_morph_status"] = (
+        rim_morph_summary.get("status", "not_requested")
+        if rim_morph_summary is not None
+        else "not_requested"
+    )
+    diagnostics["rim_morph"] = rim_morph_summary
     if progress:
         progress(f"Transient GLB created: {output}")
     return ConversionResult(str(output), str(helper), diagnostics)
