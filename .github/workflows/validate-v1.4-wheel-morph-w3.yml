@@ -19,6 +19,7 @@ on:
       - "source-v1.2/tests/test_wheelspec_realdb_launcher.py"
       - "source-v1.2/tests/test_wheelspec_realdb_packager.py"
       - "source-v1.2/tests/test_kfps_wheel_morph_diagnostic_patch.py"
+      - "source-v1.2/tests/test_wheel_morph_bake_diagnostic.py"
       - "source-v1.2/tools/inspect_modelbin_morph.py"
       - "source-v1.2/tools/inspect_vehicle_morph.py"
       - "source-v1.2/tools/Run_FH6_Wheel_Morph_Diagnostic.cmd"
@@ -28,6 +29,9 @@ on:
       - "source-v1.2/tools/package_wheelspec_realdb_diagnostic.py"
       - "source-v1.2/tools/patch_kfps_wheel_morph_diagnostic.py"
       - "source-v1.2/tools/kfps_wheel_morph/WheelMorphDiagnostic.cs"
+      - "source-v1.2/tools/run_wheel_morph_bake_diagnostic.py"
+      - "source-v1.2/tools/Run_FER_FXX_05_Wheel_Morph_Bake_Diagnostic.cmd"
+      - "source-v1.2/tools/README_FER_FXX_05_Wheel_Morph_Bake_Diagnostic.txt"
       - ".github/workflows/validate-v1.4-wheel-morph-w3.yml"
 
 permissions:
@@ -78,6 +82,7 @@ jobs:
           python -m py_compile tools/validate_wheel_spec_real_db.py
           python -m py_compile tools/package_wheelspec_realdb_diagnostic.py
           python -m py_compile tools/patch_kfps_wheel_morph_diagnostic.py
+          python -m py_compile tools/run_wheel_morph_bake_diagnostic.py
 
       - name: Run W3 morph tests
         shell: pwsh
@@ -92,6 +97,7 @@ jobs:
           python -m unittest discover -s tests -p "test_wheelspec_realdb_launcher.py" -v
           python -m unittest discover -s tests -p "test_wheelspec_realdb_packager.py" -v
           python -m unittest discover -s tests -p "test_kfps_wheel_morph_diagnostic_patch.py" -v
+          python -m unittest discover -s tests -p "test_wheel_morph_bake_diagnostic.py" -v
 
       - name: Run full regression suite
         shell: pwsh
@@ -146,6 +152,45 @@ jobs:
         with:
           name: KFPS-Wheel-Morph-Diagnostic-Converter-W3
           path: wheel-morph-converter
+          retention-days: 14
+          if-no-files-found: error
+
+  package-four-way-bake-diagnostic:
+    name: Package FXX four-way wheel morph bake diagnostic
+    needs: [test, build-wheel-morph-converter]
+    runs-on: windows-latest
+    steps:
+      - name: Checkout W3 branch
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Download diagnostic converter
+        uses: actions/download-artifact@v4
+        with:
+          name: KFPS-Wheel-Morph-Diagnostic-Converter-W3
+          path: downloaded-converter
+
+      - name: Build FXX four-way portable package
+        shell: pwsh
+        run: |
+          $pkg = Join-Path $PWD "fxx-four-way-package"
+          New-Item -ItemType Directory -Force $pkg | Out-Null
+          Copy-Item "downloaded-converter\Kfps.ChassisConverter.exe" $pkg
+          Copy-Item "source-v1.2\tools\run_wheel_morph_bake_diagnostic.py" $pkg
+          Copy-Item "source-v1.2\tools\Run_FER_FXX_05_Wheel_Morph_Bake_Diagnostic.cmd" $pkg
+          Copy-Item "source-v1.2\tools\README_FER_FXX_05_Wheel_Morph_Bake_Diagnostic.txt" $pkg
+          if (-not (Test-Path (Join-Path $pkg "Kfps.ChassisConverter.exe"))) { throw "Packaged diagnostic converter is missing." }
+          python (Join-Path $pkg "run_wheel_morph_bake_diagnostic.py") --help
+
+      - name: Upload FXX four-way diagnostic artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FER-FXX-05-Wheel-Morph-Four-Way-Diagnostic-W3
+          path: fxx-four-way-package
           retention-days: 14
           if-no-files-found: error
 
