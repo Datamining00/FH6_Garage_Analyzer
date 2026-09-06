@@ -71,7 +71,7 @@ def _car_identity(connection: sqlite3.Connection, car_id: int) -> dict[str, Any]
         return {}
     wanted = [
         name
-        for key in ("id", "medianame", "makedisplayname", "modeldisplayname")
+        for key in ("id", "medianame", "displayname", "stockwheelid")
         if (name := columns.get(key)) is not None
     ]
     quoted_table = '"' + table.replace('"', '""') + '"'
@@ -82,6 +82,79 @@ def _car_identity(connection: sqlite3.Connection, car_id: int) -> dict[str, Any]
         (int(car_id),),
     ).fetchone()
     return dict(row) if row is not None else {}
+
+
+def _rows_for(
+    connection: sqlite3.Connection,
+    table_name: str,
+    filter_column: str,
+    value: int,
+    *,
+    limit: int = 32,
+) -> list[dict[str, Any]]:
+    tables = _table_map(connection)
+    table = tables.get(table_name.casefold())
+    if not table:
+        return []
+    columns = {name.casefold(): name for name in _columns(connection, table)}
+    column = columns.get(filter_column.casefold())
+    if not column:
+        return []
+    quoted_table = '"' + table.replace('"', '""') + '"'
+    quoted_column = '"' + column.replace('"', '""') + '"'
+    order_columns = [
+        columns[key]
+        for key in ("isstock", "level", "id")
+        if key in columns
+    ]
+    order = ""
+    if order_columns:
+        pieces = []
+        for name in order_columns:
+            direction = "DESC" if name.casefold() == "isstock" else "ASC"
+            pieces.append('"' + name.replace('"', '""') + f'" {direction}')
+        order = " ORDER BY " + ", ".join(pieces)
+    rows = connection.execute(
+        f"SELECT * FROM {quoted_table} WHERE {quoted_column}=?{order} LIMIT ?",
+        (int(value), int(limit)),
+    )
+    return [dict(row) for row in rows]
+
+
+def _sample_rows(connection: sqlite3.Connection, car_id: int) -> dict[str, Any]:
+    car_body_rows = _rows_for(connection, "List_UpgradeCarBody", "Ordinal", car_id)
+    stock_body = next(
+        (row for row in car_body_rows if int(row.get("IsStock") or 0) == 1),
+        car_body_rows[0] if car_body_rows else None,
+    )
+    car_body_id = None
+    if stock_body is not None:
+        for key in ("CarBodyID", "CarBodyId"):
+            if stock_body.get(key) is not None:
+                car_body_id = int(stock_body[key])
+                break
+
+    result: dict[str, Any] = {
+        "car_id": car_id,
+        "car": _car_identity(connection, car_id),
+        "List_UpgradeCarBody": car_body_rows,
+        "Data_CarBody": _rows_for(connection, "Data_CarBody", "Id", car_body_id) if car_body_id else [],
+        "List_UpgradeRimSizeFront": _rows_for(connection, "List_UpgradeRimSizeFront", "Ordinal", car_id),
+        "List_UpgradeRimSizeRear": _rows_for(connection, "List_UpgradeRimSizeRear", "Ordinal", car_id),
+        "List_UpgradeTireCompound": _rows_for(connection, "List_UpgradeTireCompound", "Ordinal", car_id),
+        "List_UpgradeBrakes": _rows_for(connection, "List_UpgradeBrakes", "Ordinal", car_id),
+    }
+    if car_body_id is not None:
+        for table in (
+            "List_UpgradeCarBodyTireWidthFront",
+            "List_UpgradeCarBodyTireWidthRear",
+            "List_UpgradeCarBodyTireAspectRatioFront",
+            "List_UpgradeCarBodyTireAspectRatioRear",
+            "List_UpgradeCarBodyTrackSpacingFront",
+            "List_UpgradeCarBodyTrackSpacingRear",
+        ):
+            result[table] = _rows_for(connection, table, "CarBodyId", car_body_id)
+    return result
 
 
 def main() -> int:
@@ -102,6 +175,7 @@ def main() -> int:
 
     schema: dict[str, Any] = {}
     identities: dict[str, Any] = {}
+    sample_rows: dict[str, Any] = {}
     with _connect_read_only(database) as connection:
         tables = _table_map(connection)
         for requested in TARGET_TABLES:
@@ -113,6 +187,8 @@ def main() -> int:
             }
         for car_id in car_ids:
             identities[str(car_id)] = _car_identity(connection, car_id)
+        if car_ids:
+            sample_rows[str(car_ids[0])] = _sample_rows(connection, car_ids[0])
 
     resolver = FH6WheelSpecResolver(database)
     resolved: dict[str, Any] = {}
@@ -125,7 +201,7 @@ def main() -> int:
 
     after_sha256 = _sha256(database)
     report = {
-        "format": "fh6_wheel_spec_real_db_validation_v1",
+        "format": "fh6_wheel_spec_real_db_validation_v2",
         "database": {
             "path_name": database.name,
             "size": database.stat().st_size,
@@ -135,6 +211,7 @@ def main() -> int:
         },
         "schema": schema,
         "car_identity": identities,
+        "sample_rows": sample_rows,
         "resolved_stock_specs": resolved,
         "failures": failures,
     }
