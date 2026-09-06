@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from contextlib import closing
 from dataclasses import asdict, dataclass
+import hashlib
 import json
 from pathlib import Path
 import re
+import sqlite3
 import zipfile
 
 from .vehicle_index import VehicleIndexError, resolve_cars_dir
@@ -57,11 +60,64 @@ class TireLibraryCatalog:
         }
 
 
+@dataclass(frozen=True)
+class TireLibraryCoverage:
+    tires_dir: str
+    database_path: str
+    source_table: str
+    database_sha256: str
+    database_read_only_unchanged: bool
+    library_model_names: tuple[str, ...]
+    database_model_names: tuple[str, ...]
+    stock_database_model_names: tuple[str, ...]
+    matched_model_names: tuple[str, ...]
+    missing_database_model_names: tuple[str, ...]
+    missing_stock_model_names: tuple[str, ...]
+    unused_library_model_names: tuple[str, ...]
+    duplicate_library_model_names: tuple[str, ...]
+
+    def as_dict(self) -> dict[str, object]:
+        database_count = len(self.database_model_names)
+        stock_count = len(self.stock_database_model_names)
+        matched = len(self.matched_model_names)
+        stock_missing = len(self.missing_stock_model_names)
+        return {
+            "format": "fh6_native_tire_library_coverage_v1",
+            "tires_dir": self.tires_dir,
+            "database_path": self.database_path,
+            "source_table": self.source_table,
+            "database_sha256": self.database_sha256,
+            "database_read_only_unchanged": self.database_read_only_unchanged,
+            "library_model_name_count": len(self.library_model_names),
+            "database_model_name_count": database_count,
+            "stock_database_model_name_count": stock_count,
+            "matched_model_name_count": matched,
+            "database_coverage_ratio": matched / database_count if database_count else None,
+            "stock_coverage_ratio": (stock_count - stock_missing) / stock_count if stock_count else None,
+            "library_model_names": list(self.library_model_names),
+            "database_model_names": list(self.database_model_names),
+            "stock_database_model_names": list(self.stock_database_model_names),
+            "matched_model_names": list(self.matched_model_names),
+            "missing_database_model_names": list(self.missing_database_model_names),
+            "missing_stock_model_names": list(self.missing_stock_model_names),
+            "unused_library_model_names": list(self.unused_library_model_names),
+            "duplicate_library_model_names": list(self.duplicate_library_model_names),
+        }
+
+
 def _normalize_tire_model_name(value: str) -> str:
     name = str(value).strip()
     if not name or name in {".", ".."} or not _TIRE_MODEL_RE.fullmatch(name):
         raise TireAssetError(f"unsafe or invalid TireModelName: {value!r}")
     return name
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def tire_library_dir(game_or_cars_path: str | Path) -> Path:
@@ -113,6 +169,98 @@ def scan_tire_library(game_or_cars_path: str | Path) -> TireLibraryCatalog:
         tires_dir=str(tires_dir),
         entries=tuple(entries),
         duplicate_model_names=duplicates,
+    )
+
+
+def compare_tire_library_to_database(
+    game_or_cars_path: str | Path,
+    database_path: str | Path,
+) -> TireLibraryCoverage:
+    """Compare exact DB TireModelName values with native tire ZIP names read-only."""
+    catalog = scan_tire_library(game_or_cars_path)
+    if catalog.duplicate_model_names:
+        raise TireAssetError(
+            "native tire library contains duplicate case-insensitive model names: "
+            + ", ".join(catalog.duplicate_model_names)
+        )
+
+    database = Path(database_path).expanduser().resolve()
+    if not database.is_file():
+        raise TireAssetError(f"FH6 game database does not exist: {database}")
+    before = _sha256(database)
+    try:
+        uri = database.as_uri() + "?mode=ro"
+        with closing(sqlite3.connect(uri, uri=True)) as connection:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA query_only = ON")
+            tables = {
+                str(row[0]).casefold(): str(row[0])
+                for row in connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type IN ('table', 'view')"
+                )
+            }
+            table = tables.get("list_upgradetirecompound")
+            if table is None:
+                raise TireAssetError("FH6 DB is missing List_UpgradeTireCompound")
+            quoted = '"' + table.replace('"', '""') + '"'
+            columns = {
+                str(row[1]).casefold(): str(row[1])
+                for row in connection.execute(f"PRAGMA table_info({quoted})")
+            }
+            model_column = columns.get("tiremodelname")
+            if model_column is None:
+                raise TireAssetError(f"{table} is missing TireModelName")
+            stock_column = columns.get("isstock")
+            q_model = '"' + model_column.replace('"', '""') + '"'
+            q_stock = (
+                '"' + stock_column.replace('"', '""') + '"'
+                if stock_column is not None
+                else None
+            )
+            select = q_model + (f", {q_stock}" if q_stock else "")
+            rows = list(connection.execute(f"SELECT {select} FROM {quoted}"))
+    except sqlite3.Error as exc:
+        raise TireAssetError(f"could not read FH6 game database read-only: {exc}") from exc
+
+    after = _sha256(database)
+    if before != after:
+        raise TireAssetError("read-only tire coverage query changed the source database")
+
+    database_names: dict[str, str] = {}
+    stock_names: dict[str, str] = {}
+    for row in rows:
+        raw = row[0]
+        if raw is None or not str(raw).strip():
+            continue
+        name = _normalize_tire_model_name(str(raw).strip())
+        database_names.setdefault(name.casefold(), name)
+        if q_stock and bool(row[1]):
+            stock_names.setdefault(name.casefold(), name)
+
+    library_names = {
+        item.tire_model_name.casefold(): item.tire_model_name for item in catalog.entries
+    }
+    db_keys = set(database_names)
+    library_keys = set(library_names)
+    stock_keys = set(stock_names)
+
+    def values(keys: set[str], source: dict[str, str]) -> tuple[str, ...]:
+        return tuple(sorted((source[key] for key in keys), key=str.casefold))
+
+    return TireLibraryCoverage(
+        tires_dir=catalog.tires_dir,
+        database_path=str(database),
+        source_table=table,
+        database_sha256=before,
+        database_read_only_unchanged=True,
+        library_model_names=values(library_keys, library_names),
+        database_model_names=values(db_keys, database_names),
+        stock_database_model_names=values(stock_keys, stock_names),
+        matched_model_names=values(db_keys & library_keys, database_names),
+        missing_database_model_names=values(db_keys - library_keys, database_names),
+        missing_stock_model_names=values(stock_keys - library_keys, stock_names),
+        unused_library_model_names=values(library_keys - db_keys, library_names),
+        duplicate_library_model_names=catalog.duplicate_model_names,
     )
 
 
@@ -187,5 +335,5 @@ def inspect_tire_archive(
     )
 
 
-def report_json(report: TireArchiveReport | TireLibraryCatalog) -> str:
+def report_json(report: TireArchiveReport | TireLibraryCatalog | TireLibraryCoverage) -> str:
     return json.dumps(report.as_dict(), indent=2, ensure_ascii=False)
