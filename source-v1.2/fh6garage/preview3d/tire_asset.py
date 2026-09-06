@@ -9,6 +9,8 @@ import re
 import sqlite3
 import zipfile
 
+from .modelbin_morph import ModelbinMorphError, parse_modelbin_morph_inventory
+from .modelbin_morph_profile import profile_weighted_morph_targets
 from .vehicle_index import VehicleIndexError, resolve_cars_dir
 
 
@@ -102,6 +104,26 @@ class TireLibraryCoverage:
             "missing_stock_model_names": list(self.missing_stock_model_names),
             "unused_library_model_names": list(self.unused_library_model_names),
             "duplicate_library_model_names": list(self.duplicate_library_model_names),
+        }
+
+
+@dataclass(frozen=True)
+class TireMorphArchiveProfile:
+    archive_path: str
+    archive_sha256: str
+    archive_read_only_unchanged: bool
+    modelbins: tuple[dict[str, object], ...]
+    left_right_morph_buffers_identical: bool | None
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "format": "fh6_native_tire_morph_profile_v1",
+            "archive_path": self.archive_path,
+            "archive_sha256": self.archive_sha256,
+            "archive_read_only_unchanged": self.archive_read_only_unchanged,
+            "modelbin_count": len(self.modelbins),
+            "modelbins": list(self.modelbins),
+            "left_right_morph_buffers_identical": self.left_right_morph_buffers_identical,
         }
 
 
@@ -264,6 +286,102 @@ def compare_tire_library_to_database(
     )
 
 
+def profile_tire_morph_archive(archive_path: str | Path) -> TireMorphArchiveProfile:
+    """Profile all weighted tire morph selectors without applying geometry changes."""
+    archive = Path(archive_path).expanduser().resolve()
+    if not archive.is_file():
+        raise TireAssetError(f"native tire archive does not exist: {archive}")
+    before = _sha256(archive)
+    model_reports: list[dict[str, object]] = []
+    try:
+        with zipfile.ZipFile(archive, "r") as bundle:
+            model_entries = [
+                item for item in bundle.infolist()
+                if not item.is_dir() and item.filename.casefold().endswith(".modelbin")
+            ]
+            for item in model_entries:
+                data = bundle.read(item)
+                try:
+                    inventory = parse_modelbin_morph_inventory(data)
+                    buffers = {buffer.blob_index: buffer for buffer in inventory.morph_buffers}
+                    resolutions = {
+                        resolution.mesh_blob_index: resolution
+                        for resolution in inventory.resolutions
+                    }
+                    groups: dict[tuple[int, int], list[int]] = {}
+                    unresolved: list[int] = []
+                    weighted_mesh_count = 0
+                    for mesh in inventory.mesh_bindings:
+                        if mesh.is_morph_damage or mesh.morph_target_count <= 0:
+                            continue
+                        weighted_mesh_count += 1
+                        resolution = resolutions.get(mesh.blob_index)
+                        if resolution is None or resolution.morph_buffer_blob_index is None:
+                            unresolved.append(mesh.blob_index)
+                            continue
+                        key = (resolution.morph_buffer_blob_index, mesh.morph_target_count)
+                        groups.setdefault(key, []).append(mesh.blob_index)
+
+                    profiles: list[dict[str, object]] = []
+                    raw_hashes: list[str] = []
+                    for (buffer_blob_index, target_count), mesh_blob_indices in sorted(groups.items()):
+                        morph_buffer = buffers.get(buffer_blob_index)
+                        if morph_buffer is None:
+                            raise TireAssetError(
+                                f"{item.filename}: resolved MBuf blob {buffer_blob_index} is missing"
+                            )
+                        profile = profile_weighted_morph_targets(morph_buffer, target_count)
+                        raw_hash = hashlib.sha256(morph_buffer.raw_data).hexdigest()
+                        raw_hashes.append(raw_hash)
+                        profiles.append(
+                            {
+                                "mesh_blob_indices": mesh_blob_indices,
+                                "morph_buffer_raw_sha256": raw_hash,
+                                "profile": profile.as_dict(),
+                            }
+                        )
+                except ModelbinMorphError as exc:
+                    raise TireAssetError(
+                        f"could not profile weighted morphs in {item.filename}: {exc}"
+                    ) from exc
+
+                model_reports.append(
+                    {
+                        "entry": item.filename.replace("\\", "/"),
+                        "modelbin_sha256": hashlib.sha256(data).hexdigest(),
+                        "mesh_binding_count": len(inventory.mesh_bindings),
+                        "weighted_mesh_count": weighted_mesh_count,
+                        "damage_mesh_count": sum(
+                            1 for mesh in inventory.mesh_bindings if mesh.is_morph_damage
+                        ),
+                        "morph_buffer_count": len(inventory.morph_buffers),
+                        "unresolved_weighted_mesh_blob_indices": unresolved,
+                        "morph_buffer_raw_sha256s": raw_hashes,
+                        "profiles": profiles,
+                    }
+                )
+    except (OSError, zipfile.BadZipFile) as exc:
+        raise TireAssetError(f"could not read native tire archive {archive}: {exc}") from exc
+
+    after = _sha256(archive)
+    if before != after:
+        raise TireAssetError("read-only tire morph profiling changed the source archive")
+
+    identical: bool | None = None
+    if len(model_reports) == 2:
+        identical = (
+            model_reports[0]["morph_buffer_raw_sha256s"]
+            == model_reports[1]["morph_buffer_raw_sha256s"]
+        )
+    return TireMorphArchiveProfile(
+        archive_path=str(archive),
+        archive_sha256=before,
+        archive_read_only_unchanged=True,
+        modelbins=tuple(model_reports),
+        left_right_morph_buffers_identical=identical,
+    )
+
+
 def resolve_tire_archive(
     game_or_cars_path: str | Path,
     tire_model_name: str,
@@ -335,5 +453,7 @@ def inspect_tire_archive(
     )
 
 
-def report_json(report: TireArchiveReport | TireLibraryCatalog | TireLibraryCoverage) -> str:
+def report_json(
+    report: TireArchiveReport | TireLibraryCatalog | TireLibraryCoverage | TireMorphArchiveProfile,
+) -> str:
     return json.dumps(report.as_dict(), indent=2, ensure_ascii=False)
