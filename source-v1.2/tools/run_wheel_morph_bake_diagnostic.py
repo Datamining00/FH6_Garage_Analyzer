@@ -190,6 +190,17 @@ def apply_neutral_visibility(output: Path, archive: Path) -> dict:
     return apply_neutral_wheel_visibility(output, archive).as_dict()
 
 
+def conversion_request_payload(archive: Path, output: Path, carbin_entry: str) -> dict:
+    # KFPS uses JsonNamingPolicy.SnakeCaseLower for request deserialization.
+    # In particular, carbin_entry must contain the underscore; CarbinEntry is not equivalent.
+    return {
+        "archive": str(archive),
+        "output": str(output),
+        "carbin_entry": carbin_entry,
+        "entries": [],
+    }
+
+
 def run_conversion(
     converter: Path,
     archive: Path,
@@ -199,12 +210,10 @@ def run_conversion(
     weights: dict[str, float],
 ) -> dict:
     request = output.with_suffix(".request.json")
-    request.write_text(json.dumps({
-        "Archive": str(archive),
-        "Output": str(output),
-        "CarbinEntry": carbin_entry,
-        "Entries": [],
-    }, indent=2), encoding="utf-8")
+    request.write_text(
+        json.dumps(conversion_request_payload(archive, output, carbin_entry), indent=2),
+        encoding="utf-8",
+    )
     env = os.environ.copy()
     env["KFPS_WHEEL_MORPH_MODE"] = mode
     for key, value in weights.items():
