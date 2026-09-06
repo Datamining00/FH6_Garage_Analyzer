@@ -21,6 +21,7 @@ from .near_lod_archive import (
 )
 
 from .neutral_geometry import NEUTRAL_GEOMETRY_REVISION, NeutralGeometryError, annotate_neutral_geometry
+from .wheel_morph_auto import resolve_automatic_stock_rim_morph
 from .wheel_morph_helper import (
     WHEEL_MORPH_HELPER_REVISION,
     WheelMorphHelperError,
@@ -221,6 +222,25 @@ def convert_vehicle(
         raise ChassisConverterError("The selected vehicle archive has no .carbin scene entry.")
     if not Path(asset.archive_path).is_file():
         raise ChassisConverterError(f"Vehicle archive no longer exists: {asset.archive_path}")
+
+    automatic_rim_morph = None
+    if rim_morph_weights is None and converter_override is None:
+        automatic_rim_morph = resolve_automatic_stock_rim_morph(
+            asset.car_id,
+            asset.model_code,
+            progress,
+        )
+        rim_morph_weights = automatic_rim_morph.weights
+        if progress:
+            if automatic_rim_morph.applied:
+                progress(
+                    "검증된 stock 휠 규격으로 rim diameter/width morph를 적용합니다."
+                )
+            else:
+                progress(
+                    "Stock rim morph를 적용하지 않고 기존 geometry로 진행합니다 "
+                    f"({automatic_rim_morph.status})."
+                )
 
     try:
         morph_env = wheel_morph_environment(asset.car_id, rim_morph_weights)
@@ -466,6 +486,15 @@ def convert_vehicle(
         else "not_requested"
     )
     diagnostics["rim_morph"] = rim_morph_summary
+    diagnostics["automatic_rim_morph_status"] = (
+        automatic_rim_morph.status if automatic_rim_morph is not None else "not_evaluated"
+    )
+    diagnostics["automatic_rim_morph_detail"] = (
+        automatic_rim_morph.detail if automatic_rim_morph is not None else None
+    )
+    diagnostics["automatic_rim_morph_source_revision"] = (
+        automatic_rim_morph.source_revision if automatic_rim_morph is not None else None
+    )
     if progress:
         progress(f"Transient GLB created: {output}")
     return ConversionResult(str(output), str(helper), diagnostics)
