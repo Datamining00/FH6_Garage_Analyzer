@@ -51,6 +51,7 @@ on:
       - "source-v1.2/tools/export_native_tire_family_samples.py"
       - "source-v1.2/tools/find_native_tire_family_candidates.py"
       - "source-v1.2/tools/inspect_native_tire.py"
+      - "source-v1.2/tools/merge_native_tire_spindle_trial_glb.py"
       - "source-v1.2/tools/run_native_tire_cross_family_diagnostic.py"
       - "source-v1.2/tools/validate_native_tire_morph_auto_families.py"
       - "source-v1.2/tools/validate_native_tire_morph_families.py"
@@ -123,6 +124,7 @@ jobs:
           python -m py_compile tools/export_native_tire_family_samples.py
           python -m py_compile tools/find_native_tire_family_candidates.py
           python -m py_compile tools/inspect_native_tire.py
+          python -m py_compile tools/merge_native_tire_spindle_trial_glb.py
           python -m py_compile tools/run_native_tire_cross_family_diagnostic.py
           python -m py_compile tools/validate_native_tire_morph_auto_families.py
           python -m py_compile tools/validate_native_tire_morph_families.py
