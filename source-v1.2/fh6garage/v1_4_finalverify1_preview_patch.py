@@ -324,6 +324,11 @@ def _show_livery_preview(window: Any, record: LiveryRecord) -> None:
         if index != 1 or controller_holder["controller"] is not None:
             return
         try:
+            from .preview3d.tire_preview_integration import (
+                install_validated_fxx_native_tire_preview,
+            )
+
+            install_validated_fxx_native_tire_preview()
             from .preview3d.integration import Preview3DController
 
             controller = Preview3DController(
