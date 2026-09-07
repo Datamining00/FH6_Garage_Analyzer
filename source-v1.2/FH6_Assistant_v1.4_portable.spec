@@ -23,6 +23,7 @@ native_tire_hiddenimports = [
     'fh6garage.preview3d.tire_production_trial_geometry',
     'fh6garage.preview3d.tire_spindle_attachment',
     'fh6garage.preview3d.tire_spindle_glb_merge',
+    'fh6garage.preview3d.tire_viewer_matrix_bake',
 ]
 
 a = Analysis(
