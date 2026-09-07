@@ -5,6 +5,12 @@ import json
 from pathlib import Path
 import sys
 
+# Allow this tool to be launched directly as
+# `python tools/run_native_tire_cross_family_diagnostic.py` from source-v1.2.
+_SOURCE_ROOT = Path(__file__).resolve().parents[1]
+if str(_SOURCE_ROOT) not in sys.path:
+    sys.path.insert(0, str(_SOURCE_ROOT))
+
 from fh6garage.preview3d.tire_cross_family_diagnostic import (
     TireCrossFamilyDiagnosticError,
     run_native_tire_cross_family_diagnostic,
