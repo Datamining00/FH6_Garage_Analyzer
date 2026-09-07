@@ -22,6 +22,7 @@ on:
       - "source-v1.2/fh6garage/preview3d/tire_morph_weights.py"
       - "source-v1.2/fh6garage/preview3d/tire_production_policy.py"
       - "source-v1.2/fh6garage/preview3d/tire_production_trial_geometry.py"
+      - "source-v1.2/fh6garage/preview3d/tire_spindle_attachment.py"
       - "source-v1.2/fh6garage/preview3d/tire_stock_geometry_validation.py"
       - "source-v1.2/tests/test_tire_asset.py"
       - "source-v1.2/tests/test_tire_cross_family_diagnostic.py"
@@ -39,6 +40,7 @@ on:
       - "source-v1.2/tests/test_tire_morph_weights.py"
       - "source-v1.2/tests/test_tire_production_policy.py"
       - "source-v1.2/tests/test_tire_production_trial_geometry.py"
+      - "source-v1.2/tests/test_tire_spindle_attachment.py"
       - "source-v1.2/tests/test_tire_stock_geometry_validation.py"
       - "source-v1.2/tools/analyze_native_tire_selector_roles.py"
       - "source-v1.2/tools/analyze_native_tire_selector_semantics.py"
@@ -51,6 +53,7 @@ on:
       - "source-v1.2/tools/validate_native_tire_morph_auto_families.py"
       - "source-v1.2/tools/validate_native_tire_morph_families.py"
       - "source-v1.2/tools/validate_native_tire_morph_formula.py"
+      - "source-v1.2/tools/validate_native_tire_spindle_attachment.py"
       - ".github/workflows/validate-v1.4-native-tire-w3.yml"
 
 permissions:
@@ -108,6 +111,7 @@ jobs:
           python -m py_compile fh6garage/preview3d/tire_morph_weights.py
           python -m py_compile fh6garage/preview3d/tire_production_policy.py
           python -m py_compile fh6garage/preview3d/tire_production_trial_geometry.py
+          python -m py_compile fh6garage/preview3d/tire_spindle_attachment.py
           python -m py_compile fh6garage/preview3d/tire_stock_geometry_validation.py
           python -m py_compile tools/analyze_native_tire_selector_roles.py
           python -m py_compile tools/analyze_native_tire_selector_semantics.py
@@ -120,6 +124,7 @@ jobs:
           python -m py_compile tools/validate_native_tire_morph_auto_families.py
           python -m py_compile tools/validate_native_tire_morph_families.py
           python -m py_compile tools/validate_native_tire_morph_formula.py
+          python -m py_compile tools/validate_native_tire_spindle_attachment.py
 
       - name: Run native tire tests
         shell: pwsh
@@ -145,6 +150,7 @@ jobs:
           python -m unittest tests.test_tire_morph_weights -v
           python -m unittest tests.test_tire_production_policy -v
           python -m unittest tests.test_tire_production_trial_geometry -v
+          python -m unittest tests.test_tire_spindle_attachment -v
           python -m unittest tests.test_tire_stock_geometry_validation -v
 
       - name: Run full regression suite
