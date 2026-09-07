@@ -9,6 +9,7 @@ on:
       - "source-v1.2/fh6garage/preview3d/tire_asset.py"
       - "source-v1.2/fh6garage/preview3d/tire_family_candidates.py"
       - "source-v1.2/fh6garage/preview3d/tire_morph_auto_family_validation.py"
+      - "source-v1.2/fh6garage/preview3d/tire_morph_boundary_roles.py"
       - "source-v1.2/fh6garage/preview3d/tire_morph_cross_family_validation.py"
       - "source-v1.2/fh6garage/preview3d/tire_morph_formula_evidence.py"
       - "source-v1.2/fh6garage/preview3d/tire_morph_formula_pipeline.py"
@@ -19,6 +20,7 @@ on:
       - "source-v1.2/tests/test_tire_asset.py"
       - "source-v1.2/tests/test_tire_family_candidates.py"
       - "source-v1.2/tests/test_tire_morph_auto_family_validation.py"
+      - "source-v1.2/tests/test_tire_morph_boundary_roles.py"
       - "source-v1.2/tests/test_tire_morph_cross_family_validation.py"
       - "source-v1.2/tests/test_tire_morph_formula_evidence.py"
       - "source-v1.2/tests/test_tire_morph_formula_pipeline.py"
@@ -26,6 +28,7 @@ on:
       - "source-v1.2/tests/test_tire_morph_geometry_wire_tags.py"
       - "source-v1.2/tests/test_tire_morph_weights.py"
       - "source-v1.2/tests/test_tire_stock_geometry_validation.py"
+      - "source-v1.2/tools/analyze_native_tire_selector_roles.py"
       - "source-v1.2/tools/bake_native_tire_morph_selectors.py"
       - "source-v1.2/tools/find_native_tire_family_candidates.py"
       - "source-v1.2/tools/inspect_native_tire.py"
@@ -76,6 +79,7 @@ jobs:
           python -m py_compile fh6garage/preview3d/tire_asset.py
           python -m py_compile fh6garage/preview3d/tire_family_candidates.py
           python -m py_compile fh6garage/preview3d/tire_morph_auto_family_validation.py
+          python -m py_compile fh6garage/preview3d/tire_morph_boundary_roles.py
           python -m py_compile fh6garage/preview3d/tire_morph_cross_family_validation.py
           python -m py_compile fh6garage/preview3d/tire_morph_formula_evidence.py
           python -m py_compile fh6garage/preview3d/tire_morph_formula_pipeline.py
@@ -83,6 +87,7 @@ jobs:
           python -m py_compile fh6garage/preview3d/tire_morph_geometry_impl.py
           python -m py_compile fh6garage/preview3d/tire_morph_weights.py
           python -m py_compile fh6garage/preview3d/tire_stock_geometry_validation.py
+          python -m py_compile tools/analyze_native_tire_selector_roles.py
           python -m py_compile tools/bake_native_tire_morph_selectors.py
           python -m py_compile tools/find_native_tire_family_candidates.py
           python -m py_compile tools/inspect_native_tire.py
@@ -101,6 +106,7 @@ jobs:
           python -m unittest tests.test_tire_asset -v
           python -m unittest tests.test_tire_family_candidates -v
           python -m unittest tests.test_tire_morph_auto_family_validation -v
+          python -m unittest tests.test_tire_morph_boundary_roles -v
           python -m unittest tests.test_tire_morph_cross_family_validation -v
           python -m unittest tests.test_tire_morph_formula_evidence -v
           python -m unittest tests.test_tire_morph_formula_pipeline -v
