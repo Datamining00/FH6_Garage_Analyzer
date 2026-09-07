@@ -6,8 +6,10 @@ on:
     branches:
       - v1.4-rc1-wheel-morph-w3
     paths:
+      - "source-v1.2/fh6garage/v1_4_finalverify1_preview_patch.py"
       - "source-v1.2/fh6garage/preview3d/chassis_converter.py"
       - "source-v1.2/fh6garage/preview3d/tire_morph_weights.py"
+      - "source-v1.2/fh6garage/preview3d/tire_preview_integration.py"
       - "source-v1.2/fh6garage/preview3d/tire_production_policy.py"
       - "source-v1.2/fh6garage/preview3d/tire_production_trial_geometry.py"
       - "source-v1.2/fh6garage/preview3d/tire_spindle_attachment.py"
@@ -19,6 +21,7 @@ on:
       - "source-v1.2/fh6garage/preview3d/wheel_spec_database.py"
       - "source-v1.2/tests/test_chassis_converter_auto_rim_morph.py"
       - "source-v1.2/tests/test_chassis_converter_wheel_morph_helper.py"
+      - "source-v1.2/tests/test_tire_preview_integration.py"
       - "source-v1.2/tests/test_tire_production_policy.py"
       - "source-v1.2/tests/test_tire_production_trial_geometry.py"
       - "source-v1.2/tests/test_tire_spindle_attachment.py"
@@ -70,7 +73,9 @@ jobs:
           $ErrorActionPreference = "Stop"
           $PSNativeCommandUseErrorActionPreference = $true
           Set-Location source-v1.2
+          python -m py_compile fh6garage/v1_4_finalverify1_preview_patch.py
           python -m py_compile fh6garage/preview3d/tire_morph_weights.py
+          python -m py_compile fh6garage/preview3d/tire_preview_integration.py
           python -m py_compile fh6garage/preview3d/tire_production_policy.py
           python -m py_compile fh6garage/preview3d/tire_production_trial_geometry.py
           python -m py_compile fh6garage/preview3d/tire_spindle_attachment.py
@@ -92,6 +97,7 @@ jobs:
           $ErrorActionPreference = "Stop"
           $PSNativeCommandUseErrorActionPreference = $true
           Set-Location source-v1.2
+          python -m unittest tests.test_tire_preview_integration -v
           python -m unittest tests.test_tire_production_policy -v
           python -m unittest tests.test_tire_production_trial_geometry -v
           python -m unittest tests.test_tire_spindle_attachment -v
