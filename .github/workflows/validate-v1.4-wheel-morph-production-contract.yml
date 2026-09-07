@@ -1,4 +1,4 @@
-name: Validate FH6 Assistant v1.4 rim morph production contract
+name: Validate FH6 Assistant v1.4 rim/tire morph production contract
 
 on:
   workflow_dispatch:
@@ -7,6 +7,8 @@ on:
       - v1.4-rc1-wheel-morph-w3
     paths:
       - "source-v1.2/fh6garage/preview3d/chassis_converter.py"
+      - "source-v1.2/fh6garage/preview3d/tire_morph_weights.py"
+      - "source-v1.2/fh6garage/preview3d/tire_production_policy.py"
       - "source-v1.2/fh6garage/preview3d/wheel_morph_auto.py"
       - "source-v1.2/fh6garage/preview3d/wheel_morph_helper.py"
       - "source-v1.2/fh6garage/preview3d/wheel_morph_runtime.py"
@@ -14,6 +16,7 @@ on:
       - "source-v1.2/fh6garage/preview3d/wheel_spec_database.py"
       - "source-v1.2/tests/test_chassis_converter_auto_rim_morph.py"
       - "source-v1.2/tests/test_chassis_converter_wheel_morph_helper.py"
+      - "source-v1.2/tests/test_tire_production_policy.py"
       - "source-v1.2/tests/test_wheel_morph_auto.py"
       - "source-v1.2/tests/test_wheel_morph_helper.py"
       - "source-v1.2/tests/test_wheel_morph_runtime.py"
@@ -53,10 +56,14 @@ jobs:
           Set-Location source-v1.2
           python -m pip install --disable-pip-version-check -r requirements.txt
 
-      - name: Compile production rim morph contract
+      - name: Compile production rim/tire morph contract
         shell: pwsh
         run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
           Set-Location source-v1.2
+          python -m py_compile fh6garage/preview3d/tire_morph_weights.py
+          python -m py_compile fh6garage/preview3d/tire_production_policy.py
           python -m py_compile fh6garage/preview3d/wheel_morph_auto.py
           python -m py_compile fh6garage/preview3d/wheel_morph_helper.py
           python -m py_compile fh6garage/preview3d/wheel_morph_runtime.py
@@ -64,12 +71,15 @@ jobs:
           python -m py_compile fh6garage/preview3d/wheel_spec_database.py
           python -m py_compile fh6garage/preview3d/chassis_converter.py
 
-      - name: Run production rim morph contract tests
+      - name: Run production rim/tire morph contract tests
         shell: pwsh
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
           Set-Location source-v1.2
+          python -m unittest tests.test_tire_production_policy -v
           python -m unittest tests.test_wheel_morph_runtime -v
           python -m unittest tests.test_wheel_morph_helper -v
           python -m unittest tests.test_wheel_spec_database -v
@@ -83,5 +93,7 @@ jobs:
           QT_QPA_PLATFORM: offscreen
           PYTHONDONTWRITEBYTECODE: "1"
         run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
           Set-Location source-v1.2
           python -m unittest discover -s tests -v
