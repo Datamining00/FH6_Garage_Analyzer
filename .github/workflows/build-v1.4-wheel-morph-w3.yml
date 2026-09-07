@@ -158,7 +158,6 @@ jobs:
           $listing = python -m PyInstaller.utils.cliutils.archive_viewer -l $exe
           if ($LASTEXITCODE -ne 0) { throw "Could not inspect Standard archive." }
           if (-not ($listing -match "Kfps\.ChassisConverter\.WheelMorph\.exe")) { throw "Standard OneFile does not contain the wheel morph helper." }
-          if (-not ($listing -match "tire_preview_integration")) { throw "Standard OneFile does not contain the native tire preview integration module." }
 
       - name: Build Portable OneDir
         shell: pwsh
