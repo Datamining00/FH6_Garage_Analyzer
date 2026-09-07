@@ -13,6 +13,11 @@ from .tire_morph_formula_evidence import (
     build_tire_morph_formula_evidence,
 )
 from .tire_morph_geometry import TireMorphGeometryError, bake_tire_morph_selectors
+from .tire_stock_geometry_validation import (
+    TireStockGeometryValidationError,
+    TireStockGeometryValidationReport,
+    validate_stock_tire_geometry,
+)
 from .wheel_spec import FH6WheelSpecResolver, VehicleWheelSpec, WheelSpecError
 
 
@@ -31,10 +36,11 @@ class TireMorphFormulaValidationReport:
     archive_read_only_unchanged: bool
     car_spec: VehicleWheelSpec
     evidence: TireMorphFormulaEvidenceReport
+    stock_geometry: TireStockGeometryValidationReport
 
     def as_dict(self) -> dict[str, Any]:
         return {
-            "format": "fh6_native_tire_morph_formula_validation_v1",
+            "format": "fh6_native_tire_morph_formula_validation_v2",
             "game_or_cars_path": self.game_or_cars_path,
             "database_path": self.database_path,
             "database_sha256": self.database_sha256,
@@ -44,6 +50,7 @@ class TireMorphFormulaValidationReport:
             "archive_read_only_unchanged": self.archive_read_only_unchanged,
             "car_spec": self.car_spec.as_dict(),
             "evidence": self.evidence.as_dict(),
+            "stock_geometry": self.stock_geometry.as_dict(),
         }
 
 
@@ -64,7 +71,8 @@ def validate_stock_tire_morph_formula(
 
     Pipeline:
       DB stock wheel/tire spec -> exact TireModelName ZIP -> weighted morph profile
-      -> selector geometry bake without GLBs -> physical-formula evidence report.
+      -> selector geometry bake without GLBs -> formula-role evidence
+      -> stock weight reconstruction -> nominal width/outer-diameter comparison.
 
     The source DB and tire ZIP are hashed before/after. The function never enables
     production tire assembly or modifies game/save data.
@@ -101,11 +109,13 @@ def validate_stock_tire_morph_formula(
             morph_profile,
             geometry_report,
         )
+        stock_geometry = validate_stock_tire_geometry(archive, spec)
         archive_after = _sha256(archive)
     except (
         TireAssetError,
         TireMorphFormulaEvidenceError,
         TireMorphGeometryError,
+        TireStockGeometryValidationError,
         WheelSpecError,
         OSError,
     ) as exc:
@@ -124,9 +134,17 @@ def validate_stock_tire_morph_formula(
         raise TireMorphFormulaValidationError("morph profiler did not preserve the tire archive")
     if not geometry_report.archive_read_only_unchanged:
         raise TireMorphFormulaValidationError("geometry bake did not preserve the tire archive")
+    if not stock_geometry.archive_read_only_unchanged:
+        raise TireMorphFormulaValidationError(
+            "stock geometry validation did not preserve the tire archive"
+        )
     if morph_profile.archive_sha256 != geometry_report.archive_sha256:
         raise TireMorphFormulaValidationError(
             "morph profile and geometry bake were not produced from the same tire archive bytes"
+        )
+    if morph_profile.archive_sha256 != stock_geometry.archive_sha256:
+        raise TireMorphFormulaValidationError(
+            "stock geometry validation was not produced from the same tire archive bytes"
         )
 
     return TireMorphFormulaValidationReport(
@@ -139,4 +157,5 @@ def validate_stock_tire_morph_formula(
         archive_read_only_unchanged=True,
         car_spec=spec,
         evidence=evidence,
+        stock_geometry=stock_geometry,
     )
