@@ -4,6 +4,7 @@ from dataclasses import asdict, dataclass
 import hashlib
 import math
 from pathlib import Path
+import tempfile
 from typing import Any, Iterable
 
 from .tire_morph_boundary_roles import (
@@ -208,7 +209,8 @@ def _geometry_identity(modelbin_hashes: Iterable[str]) -> str:
 def _archive_signature(archive_path: str | Path) -> ArchiveSelectorSignature:
     archive = Path(archive_path).expanduser().resolve()
     try:
-        bake = bake_tire_morph_selectors(archive, None, write_glb=False)
+        with tempfile.TemporaryDirectory(prefix="fh6-tire-signature-") as directory:
+            bake = bake_tire_morph_selectors(archive, Path(directory), write_glb=False)
     except TireMorphGeometryError as exc:
         raise TireMorphSignatureComparisonError(str(exc)) from exc
     if not bake.archive_read_only_unchanged:
