@@ -8,8 +8,15 @@ on:
     paths:
       - "source-v1.2/FH6_Assistant_v1.4.spec"
       - "source-v1.2/FH6_Assistant_v1.4_portable.spec"
+      - "source-v1.2/fh6garage/v1_4_finalverify1_preview_patch.py"
       - "source-v1.2/fh6garage/preview3d/chassis_converter.py"
       - "source-v1.2/fh6garage/preview3d/glb_parser.py"
+      - "source-v1.2/fh6garage/preview3d/tire_asset.py"
+      - "source-v1.2/fh6garage/preview3d/tire_preview_integration.py"
+      - "source-v1.2/fh6garage/preview3d/tire_production_policy.py"
+      - "source-v1.2/fh6garage/preview3d/tire_production_trial_geometry.py"
+      - "source-v1.2/fh6garage/preview3d/tire_spindle_attachment.py"
+      - "source-v1.2/fh6garage/preview3d/tire_spindle_glb_merge.py"
       - "source-v1.2/fh6garage/preview3d/wheel_morph_auto.py"
       - "source-v1.2/fh6garage/preview3d/wheel_morph_helper.py"
       - "source-v1.2/fh6garage/preview3d/wheel_morph_runtime.py"
@@ -19,6 +26,11 @@ on:
       - "source-v1.2/tests/test_chassis_converter_auto_rim_morph.py"
       - "source-v1.2/tests/test_chassis_converter_wheel_morph_helper.py"
       - "source-v1.2/tests/test_glb_livery_structural_exclusion.py"
+      - "source-v1.2/tests/test_tire_preview_integration.py"
+      - "source-v1.2/tests/test_tire_production_policy.py"
+      - "source-v1.2/tests/test_tire_production_trial_geometry.py"
+      - "source-v1.2/tests/test_tire_spindle_attachment.py"
+      - "source-v1.2/tests/test_tire_spindle_glb_merge.py"
       - "source-v1.2/tests/test_wheel_morph_auto.py"
       - "source-v1.2/tests/test_wheel_morph_helper.py"
       - "source-v1.2/tests/test_wheel_morph_runtime.py"
@@ -36,7 +48,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build Standard and Portable with verified rim morph helper
+    name: Build Standard and Portable with verified rim/native tire preview
     runs-on: windows-latest
 
     steps:
@@ -62,22 +74,35 @@ jobs:
           python -m pip install --disable-pip-version-check -r requirements.txt
           python -m pip install --disable-pip-version-check --upgrade pyinstaller
 
-      - name: Validate production rim morph runtime before packaging
+      - name: Validate production rim and native tire preview before packaging
         shell: pwsh
         env:
           PYTHONDONTWRITEBYTECODE: "1"
           QT_QPA_PLATFORM: offscreen
         run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
           Set-Location source-v1.2
+          python -m py_compile fh6garage/v1_4_finalverify1_preview_patch.py
           python -m py_compile fh6garage/preview3d/glb_parser.py
           python -m py_compile fh6garage/preview3d/wheel_spec_database.py
           python -m py_compile fh6garage/preview3d/wheel_morph_auto.py
           python -m py_compile fh6garage/preview3d/chassis_converter.py
+          python -m py_compile fh6garage/preview3d/tire_preview_integration.py
+          python -m py_compile fh6garage/preview3d/tire_production_policy.py
+          python -m py_compile fh6garage/preview3d/tire_production_trial_geometry.py
+          python -m py_compile fh6garage/preview3d/tire_spindle_attachment.py
+          python -m py_compile fh6garage/preview3d/tire_spindle_glb_merge.py
           python -m unittest tests.test_glb_livery_structural_exclusion -v
           python -m unittest tests.test_wheel_spec_database -v
           python -m unittest tests.test_wheel_morph_auto -v
           python -m unittest tests.test_chassis_converter_wheel_morph_helper -v
           python -m unittest tests.test_chassis_converter_auto_rim_morph -v
+          python -m unittest tests.test_tire_preview_integration -v
+          python -m unittest tests.test_tire_production_policy -v
+          python -m unittest tests.test_tire_production_trial_geometry -v
+          python -m unittest tests.test_tire_spindle_attachment -v
+          python -m unittest tests.test_tire_spindle_glb_merge -v
 
       - name: Validate helper locator contract
         shell: pwsh
@@ -133,6 +158,7 @@ jobs:
           $listing = python -m PyInstaller.utils.cliutils.archive_viewer -l $exe
           if ($LASTEXITCODE -ne 0) { throw "Could not inspect Standard archive." }
           if (-not ($listing -match "Kfps\.ChassisConverter\.WheelMorph\.exe")) { throw "Standard OneFile does not contain the wheel morph helper." }
+          if (-not ($listing -match "tire_preview_integration")) { throw "Standard OneFile does not contain the native tire preview integration module." }
 
       - name: Build Portable OneDir
         shell: pwsh
