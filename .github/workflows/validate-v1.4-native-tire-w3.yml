@@ -24,6 +24,7 @@ on:
       - "source-v1.2/fh6garage/preview3d/tire_production_trial_geometry.py"
       - "source-v1.2/fh6garage/preview3d/tire_spindle_attachment.py"
       - "source-v1.2/fh6garage/preview3d/tire_spindle_glb_merge.py"
+      - "source-v1.2/fh6garage/preview3d/tire_viewer_matrix_bake.py"
       - "source-v1.2/fh6garage/preview3d/tire_stock_geometry_validation.py"
       - "source-v1.2/tests/test_tire_asset.py"
       - "source-v1.2/tests/test_tire_cross_family_diagnostic.py"
@@ -43,6 +44,7 @@ on:
       - "source-v1.2/tests/test_tire_production_trial_geometry.py"
       - "source-v1.2/tests/test_tire_spindle_attachment.py"
       - "source-v1.2/tests/test_tire_spindle_glb_merge.py"
+      - "source-v1.2/tests/test_tire_viewer_matrix_bake.py"
       - "source-v1.2/tests/test_tire_stock_geometry_validation.py"
       - "source-v1.2/tools/analyze_native_tire_selector_roles.py"
       - "source-v1.2/tools/analyze_native_tire_selector_semantics.py"
@@ -116,6 +118,7 @@ jobs:
           python -m py_compile fh6garage/preview3d/tire_production_trial_geometry.py
           python -m py_compile fh6garage/preview3d/tire_spindle_attachment.py
           python -m py_compile fh6garage/preview3d/tire_spindle_glb_merge.py
+          python -m py_compile fh6garage/preview3d/tire_viewer_matrix_bake.py
           python -m py_compile fh6garage/preview3d/tire_stock_geometry_validation.py
           python -m py_compile tools/analyze_native_tire_selector_roles.py
           python -m py_compile tools/analyze_native_tire_selector_semantics.py
@@ -157,6 +160,7 @@ jobs:
           python -m unittest tests.test_tire_production_trial_geometry -v
           python -m unittest tests.test_tire_spindle_attachment -v
           python -m unittest tests.test_tire_spindle_glb_merge -v
+          python -m unittest tests.test_tire_viewer_matrix_bake -v
           python -m unittest tests.test_tire_stock_geometry_validation -v
 
       - name: Run full regression suite
