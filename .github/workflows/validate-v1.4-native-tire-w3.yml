@@ -20,6 +20,7 @@ on:
       - "source-v1.2/fh6garage/preview3d/tire_morph_semantic_evidence.py"
       - "source-v1.2/fh6garage/preview3d/tire_morph_signature_comparison.py"
       - "source-v1.2/fh6garage/preview3d/tire_morph_weights.py"
+      - "source-v1.2/fh6garage/preview3d/tire_production_policy.py"
       - "source-v1.2/fh6garage/preview3d/tire_stock_geometry_validation.py"
       - "source-v1.2/tests/test_tire_asset.py"
       - "source-v1.2/tests/test_tire_cross_family_diagnostic.py"
@@ -35,6 +36,7 @@ on:
       - "source-v1.2/tests/test_tire_morph_semantic_evidence.py"
       - "source-v1.2/tests/test_tire_morph_signature_comparison.py"
       - "source-v1.2/tests/test_tire_morph_weights.py"
+      - "source-v1.2/tests/test_tire_production_policy.py"
       - "source-v1.2/tests/test_tire_stock_geometry_validation.py"
       - "source-v1.2/tools/analyze_native_tire_selector_roles.py"
       - "source-v1.2/tools/analyze_native_tire_selector_semantics.py"
@@ -102,6 +104,7 @@ jobs:
           python -m py_compile fh6garage/preview3d/tire_morph_semantic_evidence.py
           python -m py_compile fh6garage/preview3d/tire_morph_signature_comparison.py
           python -m py_compile fh6garage/preview3d/tire_morph_weights.py
+          python -m py_compile fh6garage/preview3d/tire_production_policy.py
           python -m py_compile fh6garage/preview3d/tire_stock_geometry_validation.py
           python -m py_compile tools/analyze_native_tire_selector_roles.py
           python -m py_compile tools/analyze_native_tire_selector_semantics.py
@@ -137,6 +140,7 @@ jobs:
           python -m unittest tests.test_tire_morph_semantic_evidence -v
           python -m unittest tests.test_tire_morph_signature_comparison -v
           python -m unittest tests.test_tire_morph_weights -v
+          python -m unittest tests.test_tire_production_policy -v
           python -m unittest tests.test_tire_stock_geometry_validation -v
 
       - name: Run full regression suite
@@ -145,5 +149,7 @@ jobs:
           QT_QPA_PLATFORM: offscreen
           PYTHONDONTWRITEBYTECODE: "1"
         run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
           Set-Location source-v1.2
           python -m unittest discover -s tests -v
