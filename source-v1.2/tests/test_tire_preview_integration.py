@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
+import json
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
@@ -74,7 +75,7 @@ class TirePreviewIntegrationTests(unittest.TestCase):
             self.assertEqual(Path(result.selected_vehicle_glb), glb.resolve())
             database.assert_not_called()
 
-    def test_fxx_success_selects_merged_glb_and_reads_exact_carbin(self) -> None:
+    def test_fxx_success_selects_baked_merged_glb_and_reads_exact_carbin(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             asset = _asset(root)
@@ -99,6 +100,18 @@ class TirePreviewIntegrationTests(unittest.TestCase):
             def merge(source_glb, contract_payload, output_glb):
                 Path(output_glb).write_bytes(b"glTF-merged")
                 return _Report({"status": "spindle_tire_trial_glb_ready"}, ready=True)
+
+            viewer_bake_payload = {
+                "format": "fh6_native_tire_viewer_matrix_bake_v1",
+                "status": "native_tire_trial_node_matrices_baked",
+                "node_count": 4,
+                "vertex_count": 8100,
+                "native_matrix_only": True,
+                "procedural_translation_applied": False,
+                "procedural_rotation_applied": False,
+                "procedural_scale_applied": False,
+            }
+            viewer_bake = Mock(return_value=viewer_bake_payload)
 
             with (
                 patch(
@@ -125,6 +138,10 @@ class TirePreviewIntegrationTests(unittest.TestCase):
                     "fh6garage.preview3d.tire_preview_integration.merge_tire_spindle_trial_glb",
                     side_effect=merge,
                 ),
+                patch(
+                    "fh6garage.preview3d.tire_preview_integration.bake_native_tire_trial_node_matrices",
+                    viewer_bake,
+                ),
             ):
                 result = try_apply_validated_fxx_native_tire_preview(
                     asset,
@@ -141,6 +158,9 @@ class TirePreviewIntegrationTests(unittest.TestCase):
             self.assertEqual(glb.read_bytes(), source_before)
             self.assertEqual(Path(result.selected_vehicle_glb).read_bytes(), b"glTF-merged")
             self.assertTrue(Path(result.manifest_path).is_file())
+            viewer_bake.assert_called_once_with(Path(result.selected_vehicle_glb))
+            manifest = json.loads(Path(result.manifest_path).read_text(encoding="utf-8"))
+            self.assertEqual(manifest["viewer_matrix_bake"], viewer_bake_payload)
 
     def test_fxx_failure_falls_back_to_existing_glb_and_cleans_trial(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
