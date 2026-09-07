@@ -11,14 +11,15 @@ from typing import Any, Mapping, Sequence
 import numpy as np
 
 
-TIRE_VIEWER_MATRIX_BAKE_REVISION = "native_tire_world_position_bake_v1"
+TIRE_VIEWER_MATRIX_BAKE_REVISION = "native_tire_kfps_render_space_bake_v2"
 _EXPECTED_SPINDLES = ("spindleLF", "spindleRF", "spindleLR", "spindleRR")
 _JSON_CHUNK = 0x4E4F534A
 _BIN_CHUNK = 0x004E4942
+_KFPS_RENDER_SPACE_RULE = "(-x,y,z)"
 
 
 class TireViewerMatrixBakeError(RuntimeError):
-    """Raised when a native tire node matrix cannot be baked without guessing."""
+    """Raised when native tire geometry cannot be baked into KFPS render space exactly."""
 
 
 def _sha256(path: Path) -> str:
@@ -109,7 +110,7 @@ def _glTF_matrix(raw: object, *, bone: str) -> np.ndarray:
     values = np.asarray([float(value) for value in raw], dtype=np.float64)
     if not np.isfinite(values).all():
         raise TireViewerMatrixBakeError(f"{bone}: native node matrix contains non-finite values")
-    # glTF serializes matrices column-major.  The merge stage deliberately writes
+    # glTF serializes matrices column-major. The merge stage deliberately writes
     # the flattened ForzaTech/System.Numerics row-major values unchanged, which is
     # the correct transpose for glTF's column-vector convention.
     matrix = values.reshape((4, 4), order="F")
@@ -156,6 +157,48 @@ def _float_vec3_accessor(
     return accessor, start, stride, values
 
 
+def _index_accessor(
+    document: Mapping[str, Any],
+    binary: bytearray,
+    accessor_index: int,
+) -> tuple[int, int, int, str, int]:
+    try:
+        accessor = document["accessors"][accessor_index]
+        view = document["bufferViews"][int(accessor["bufferView"])]
+    except (KeyError, IndexError, TypeError, ValueError) as exc:
+        raise TireViewerMatrixBakeError(f"invalid index accessor {accessor_index}") from exc
+    if not isinstance(accessor, Mapping) or not isinstance(view, Mapping):
+        raise TireViewerMatrixBakeError(f"invalid index accessor graph for {accessor_index}")
+    if str(accessor.get("type") or "") != "SCALAR" or accessor.get("sparse") is not None:
+        raise TireViewerMatrixBakeError(
+            f"accessor {accessor_index}: expected a non-sparse SCALAR index accessor"
+        )
+    if int(view.get("buffer", 0)) != 0:
+        raise TireViewerMatrixBakeError(f"accessor {accessor_index}: external buffers are not supported")
+    formats = {
+        5121: ("<B", 1),
+        5123: ("<H", 2),
+        5125: ("<I", 4),
+    }
+    try:
+        fmt, size = formats[int(accessor.get("componentType", 0))]
+    except (KeyError, TypeError, ValueError) as exc:
+        raise TireViewerMatrixBakeError(
+            f"accessor {accessor_index}: unsupported index component type"
+        ) from exc
+    count = int(accessor.get("count", 0))
+    stride = int(view.get("byteStride", size))
+    start = int(view.get("byteOffset", 0)) + int(accessor.get("byteOffset", 0))
+    if count <= 0 or count % 3 != 0 or stride < size:
+        raise TireViewerMatrixBakeError(
+            f"accessor {accessor_index}: tire indices must be a non-empty triangle list"
+        )
+    end = start + (count - 1) * stride + size
+    if start < 0 or end > len(binary):
+        raise TireViewerMatrixBakeError(f"accessor {accessor_index}: data range is outside the BIN chunk")
+    return start, stride, count, fmt, size
+
+
 def _write_vec3(binary: bytearray, start: int, stride: int, values: np.ndarray) -> None:
     for index, (x_value, y_value, z_value) in enumerate(
         np.asarray(values, dtype=np.float32)
@@ -170,14 +213,34 @@ def _write_vec3(binary: bytearray, start: int, stride: int, values: np.ndarray) 
         )
 
 
-def bake_native_tire_trial_node_matrices(glb_path: str | Path) -> dict[str, object]:
-    """Bake the four native tire root-node matrices into their POSITION streams.
+def _reverse_triangle_winding(
+    document: Mapping[str, Any],
+    binary: bytearray,
+    accessor_index: int,
+) -> int:
+    start, stride, count, fmt, _size = _index_accessor(
+        document,
+        binary,
+        accessor_index,
+    )
+    for index in range(0, count, 3):
+        second = struct.unpack_from(fmt, binary, start + (index + 1) * stride)[0]
+        third = struct.unpack_from(fmt, binary, start + (index + 2) * stride)[0]
+        struct.pack_into(fmt, binary, start + (index + 1) * stride, third)
+        struct.pack_into(fmt, binary, start + (index + 2) * stride, second)
+    return count // 3
 
-    FinalVerify1 historically consumes converter meshes as already-world-positioned
-    geometry and does not traverse the glTF node transform graph.  The validated
-    native tire merge is the first production-preview path to add non-identity
-    root-node matrices.  Baking those exact native matrices preserves the same
-    world geometry without adding any procedural placement correction.
+
+def bake_native_tire_trial_node_matrices(glb_path: str | Path) -> dict[str, object]:
+    """Bake native tire matrices into the same render space as KFPS chassis meshes.
+
+    KFPS ChassisConverter applies the carbin/bone transform and then emits
+    ``(-X, Y, Z)`` positions, reflects normal X, and reverses triangle winding.
+    FinalVerify1 consumes those converter meshes as already-world-positioned geometry
+    and does not traverse the glTF node transform graph. The native tire preview must
+    therefore reproduce that exact converter coordinate convention after baking the
+    four validated WheelStyle matrices. This is a format-space conversion, not a
+    per-car placement correction.
     """
     path = Path(glb_path).expanduser().resolve()
     if not path.is_file():
@@ -228,6 +291,7 @@ def bake_native_tire_trial_node_matrices(glb_path: str | Path) -> dict[str, obje
             )
 
     transformed_vertices = 0
+    reversed_triangles = 0
     original_matrices: dict[str, list[float]] = {}
     for _node_index, node in targets:
         extras = dict(node.get("extras") or {})
@@ -239,12 +303,20 @@ def bake_native_tire_trial_node_matrices(glb_path: str | Path) -> dict[str, obje
         if not isinstance(mesh, Mapping):
             raise TireViewerMatrixBakeError(f"{bone}: referenced mesh is invalid")
 
-        for primitive in mesh.get("primitives") or ():
+        primitives = mesh.get("primitives") or ()
+        if not isinstance(primitives, Sequence) or not primitives:
+            raise TireViewerMatrixBakeError(f"{bone}: referenced mesh has no primitives")
+        for primitive in primitives:
             if not isinstance(primitive, Mapping):
                 raise TireViewerMatrixBakeError(f"{bone}: primitive is invalid")
+            if int(primitive.get("mode", 4)) != 4:
+                raise TireViewerMatrixBakeError(f"{bone}: native tire primitive is not a triangle list")
             attributes = primitive.get("attributes") or {}
             if "POSITION" not in attributes:
-                continue
+                raise TireViewerMatrixBakeError(f"{bone}: native tire primitive has no POSITION")
+            if "indices" not in primitive:
+                raise TireViewerMatrixBakeError(f"{bone}: native tire primitive is not indexed")
+
             accessor, start, stride, positions = _float_vec3_accessor(
                 document,
                 binary,
@@ -254,14 +326,16 @@ def bake_native_tire_trial_node_matrices(glb_path: str | Path) -> dict[str, obje
                 (positions, np.ones((len(positions), 1), dtype=np.float64)),
                 axis=1,
             )
-            world_positions = (matrix @ homogeneous.T).T[:, :3]
-            if not np.isfinite(world_positions).all():
+            render_positions = (matrix @ homogeneous.T).T[:, :3]
+            # Exact KFPS ChassisConverter render-coordinate conversion.
+            render_positions[:, 0] *= -1.0
+            if not np.isfinite(render_positions).all():
                 raise TireViewerMatrixBakeError(f"{bone}: transformed POSITION contains non-finite values")
-            _write_vec3(binary, start, stride, world_positions)
-            if len(world_positions):
-                accessor["min"] = [float(value) for value in world_positions.min(axis=0)]
-                accessor["max"] = [float(value) for value in world_positions.max(axis=0)]
-            transformed_vertices += len(world_positions)
+            _write_vec3(binary, start, stride, render_positions)
+            if len(render_positions):
+                accessor["min"] = [float(value) for value in render_positions.min(axis=0)]
+                accessor["max"] = [float(value) for value in render_positions.max(axis=0)]
+            transformed_vertices += len(render_positions)
 
             if "NORMAL" in attributes:
                 _normal_accessor, normal_start, normal_stride, normals = _float_vec3_accessor(
@@ -273,23 +347,35 @@ def bake_native_tire_trial_node_matrices(glb_path: str | Path) -> dict[str, obje
                     normal_matrix = np.linalg.inv(matrix[:3, :3]).T
                 except np.linalg.LinAlgError as exc:
                     raise TireViewerMatrixBakeError(f"{bone}: native normal matrix is singular") from exc
-                world_normals = (normal_matrix @ normals.T).T
-                lengths = np.linalg.norm(world_normals, axis=1)
+                render_normals = (normal_matrix @ normals.T).T
+                render_normals[:, 0] *= -1.0
+                lengths = np.linalg.norm(render_normals, axis=1)
                 valid = lengths > 0.0
-                world_normals[valid] /= lengths[valid, None]
-                if not np.isfinite(world_normals).all():
+                render_normals[valid] /= lengths[valid, None]
+                if not np.isfinite(render_normals).all():
                     raise TireViewerMatrixBakeError(f"{bone}: transformed NORMAL contains non-finite values")
-                _write_vec3(binary, normal_start, normal_stride, world_normals)
+                _write_vec3(binary, normal_start, normal_stride, render_normals)
+
+            # Reflecting one axis changes handedness. KFPS ChassisConverter performs
+            # the equivalent B/C swap in CleanTriangleIndices(), so mirror that exact
+            # triangle-winding rule for the derived tire primitive.
+            reversed_triangles += _reverse_triangle_winding(
+                document,
+                binary,
+                int(primitive["indices"]),
+            )
 
         node.pop("matrix", None)
         extras["fh6_viewer_matrix_baked"] = True
         extras["fh6_viewer_matrix_bake_revision"] = TIRE_VIEWER_MATRIX_BAKE_REVISION
+        extras["fh6_kfps_render_space_reflection_applied"] = True
+        extras["fh6_kfps_render_space_rule"] = _KFPS_RENDER_SPACE_RULE
         node["extras"] = extras
 
     _write_glb(path, document, binary)
     sha_after = _sha256(path)
     return {
-        "format": "fh6_native_tire_viewer_matrix_bake_v1",
+        "format": "fh6_native_tire_viewer_matrix_bake_v2",
         "status": "native_tire_trial_node_matrices_baked",
         "revision": TIRE_VIEWER_MATRIX_BAKE_REVISION,
         "glb_path": str(path),
@@ -297,9 +383,13 @@ def bake_native_tire_trial_node_matrices(glb_path: str | Path) -> dict[str, obje
         "sha256_after": sha_after,
         "node_count": 4,
         "vertex_count": int(transformed_vertices),
+        "triangle_winding_reversed_count": int(reversed_triangles),
         "spindles": list(bones),
         "original_native_matrices": original_matrices,
-        "native_matrix_only": True,
+        "native_matrix_only": False,
+        "native_matrix_and_kfps_render_space_only": True,
+        "kfps_render_space_reflection_applied": True,
+        "kfps_render_space_rule": _KFPS_RENDER_SPACE_RULE,
         "procedural_translation_applied": False,
         "procedural_rotation_applied": False,
         "procedural_scale_applied": False,
