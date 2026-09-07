@@ -16,12 +16,21 @@ wheel_morph_helper = project_root / 'runtime' / 'Kfps.ChassisConverter.WheelMorp
 if wheel_morph_helper.is_file():
     datas.append((str(wheel_morph_helper), 'runtime'))
 
+native_tire_hiddenimports = [
+    'fh6garage.preview3d.tire_preview_integration',
+    'fh6garage.preview3d.tire_asset',
+    'fh6garage.preview3d.tire_production_policy',
+    'fh6garage.preview3d.tire_production_trial_geometry',
+    'fh6garage.preview3d.tire_spindle_attachment',
+    'fh6garage.preview3d.tire_spindle_glb_merge',
+]
+
 a = Analysis(
     ['app.py'],
     pathex=[str(project_root)],
     binaries=[],
     datas=datas,
-    hiddenimports=[],
+    hiddenimports=native_tire_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
