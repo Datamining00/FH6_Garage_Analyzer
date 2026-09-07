@@ -40,7 +40,8 @@ class TireMorphSignatureComparisonTests(unittest.TestCase):
         self.assertTrue(role_match)
         self.assertAlmostEqual(max_abs, 0.0, places=12)
         self.assertAlmostEqual(rms, 0.0, places=12)
-        self.assertTrue(all(value == 0.0 for value in per_selector.values()))
+        for value in per_selector.values():
+            self.assertAlmostEqual(value, 0.0, places=12)
 
     def test_role_change_is_detected_even_when_dimensions_are_finite(self) -> None:
         reference = normalized_selector_signatures_from_states(_slick_like_states())
