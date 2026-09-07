@@ -27,6 +27,7 @@ on:
       - "source-v1.2/tests/test_wheel_morph_helper.py"
       - "source-v1.2/tests/test_wheel_morph_runtime.py"
       - "source-v1.2/tests/test_wheel_spec_database.py"
+      - "source-v1.2/tools/merge_native_tire_spindle_trial_glb.py"
       - "source-v1.2/tools/validate_native_tire_spindle_attachment.py"
       - ".github/workflows/validate-v1.4-wheel-morph-production-contract.yml"
 
@@ -74,6 +75,7 @@ jobs:
           python -m py_compile fh6garage/preview3d/tire_production_trial_geometry.py
           python -m py_compile fh6garage/preview3d/tire_spindle_attachment.py
           python -m py_compile fh6garage/preview3d/tire_spindle_glb_merge.py
+          python -m py_compile tools/merge_native_tire_spindle_trial_glb.py
           python -m py_compile tools/validate_native_tire_spindle_attachment.py
           python -m py_compile fh6garage/preview3d/wheel_morph_auto.py
           python -m py_compile fh6garage/preview3d/wheel_morph_helper.py
