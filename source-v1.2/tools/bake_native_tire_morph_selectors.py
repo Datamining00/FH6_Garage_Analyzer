@@ -21,7 +21,8 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("archive", help="Path to native tire_*.zip, e.g. tire_slick.zip")
     parser.add_argument(
         "--output-dir",
-        help="Output directory. Default: <archive stem>_selector_bake next to the archive.",
+        required=True,
+        help="Writable diagnostics directory outside the FH6 installation.",
     )
     parser.add_argument(
         "--no-glb",
@@ -31,14 +32,35 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _is_within(path: Path, parent: Path) -> bool:
+    try:
+        path.relative_to(parent)
+    except ValueError:
+        return False
+    return True
+
+
 def main() -> int:
     args = _parser().parse_args()
     archive = Path(args.archive).expanduser().resolve()
-    output_dir = (
-        Path(args.output_dir).expanduser().resolve()
-        if args.output_dir
-        else archive.with_name(f"{archive.stem}_selector_bake")
-    )
+    output_dir = Path(args.output_dir).expanduser().resolve()
+
+    # A native game tire archive normally lives under .../_library/scene/tires.
+    # Never create diagnostic output inside that library when the source path
+    # has the expected FH6 layout; keep the installation read-only.
+    archive_parent_parts = tuple(part.casefold() for part in archive.parent.parts)
+    if (
+        len(archive_parent_parts) >= 3
+        and archive_parent_parts[-3:] == ("_library", "scene", "tires")
+        and _is_within(output_dir, archive.parent)
+    ):
+        print(
+            "ERROR: --output-dir must be outside the FH6 native tire library; "
+            "the game installation is read-only for this diagnostic.",
+            file=sys.stderr,
+        )
+        return 2
+
     try:
         report = bake_tire_morph_selectors(
             archive,
