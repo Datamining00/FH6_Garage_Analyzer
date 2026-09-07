@@ -227,7 +227,7 @@ def select_stock_tire_family_candidates(
             asset = library_by_key[family_key]
             selected = TireFamilyCandidate(
                 car_id=car_id,
-                tire_model_name=asset.tire_model_name,
+                tire_model_name=display_by_family[family_key],
                 archive_name=asset.archive_name,
                 archive_path=asset.archive_path,
                 spec=spec,
