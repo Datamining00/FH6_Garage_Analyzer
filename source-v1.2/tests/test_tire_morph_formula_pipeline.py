@@ -65,6 +65,20 @@ class TireMorphFormulaPipelineTests(unittest.TestCase):
             report.evidence.complete_mapping_status,
             "diagnostic_only_not_corroborated",
         )
+        self.assertTrue(report.stock_geometry.archive_read_only_unchanged)
+        self.assertEqual(report.stock_geometry.archive_sha256, report.archive_sha256)
+        self.assertFalse(report.stock_geometry.production_mapping_enabled)
+        # Width scaling happens to match the synthetic 1 m X span, but Y/Z radial
+        # dimensions do not. A partial dimensional match must still fail closed.
+        self.assertAlmostEqual(
+            report.stock_geometry.front.modelbins[0].reconstructed_width_mm,
+            report.car_spec.front.tire_width_mm,
+            places=6,
+        )
+        self.assertEqual(
+            report.stock_geometry.complete_mapping_status,
+            "diagnostic_stock_dimensions_not_corroborated",
+        )
 
     def test_missing_exact_tire_archive_fails_closed(self):
         with tempfile.TemporaryDirectory() as directory:
