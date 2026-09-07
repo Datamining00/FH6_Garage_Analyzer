@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from fh6garage.preview3d.tire_morph_weights import (
+    TIRE_MORPH_MAPPING_REVISION,
     TireMorphWeightError,
     stock_vehicle_tire_morph_weights,
     tire_morph_weights,
@@ -11,14 +12,18 @@ from fh6garage.preview3d.wheel_spec import AxleWheelSpec, VehicleWheelSpec
 
 
 class TireMorphWeightTests(unittest.TestCase):
-    def test_fxx_stock_front_weights_match_forzatech_mapping(self) -> None:
+    def test_mapping_is_explicitly_unverified_diagnostic(self) -> None:
+        self.assertIn("unverified", TIRE_MORPH_MAPPING_REVISION)
+        self.assertIn("diagnostic", TIRE_MORPH_MAPPING_REVISION)
+
+    def test_fxx_stock_front_weights_match_historical_forzatech_mapping(self) -> None:
         weights, scale_x = tire_morph_weights(245.0, 35.0, 19.0, 19.0)
         self.assertAlmostEqual(weights[0], 0.3710909090909091)
         self.assertAlmostEqual(weights[1], 0.6428571428571429)
         self.assertEqual(weights[2:], (0.0, 0.0, 0.0))
         self.assertAlmostEqual(scale_x, 0.245)
 
-    def test_fxx_stock_rear_weights_match_forzatech_mapping(self) -> None:
+    def test_fxx_stock_rear_weights_match_historical_forzatech_mapping(self) -> None:
         weights, scale_x = tire_morph_weights(345.0, 35.0, 19.0, 19.0)
         self.assertAlmostEqual(weights[0], 0.49836363636363636)
         self.assertAlmostEqual(weights[1], 0.6428571428571429)
@@ -53,6 +58,7 @@ class TireMorphWeightTests(unittest.TestCase):
         self.assertAlmostEqual(mapped.rear.scale_x, 0.345)
         self.assertEqual(mapped.front.selector_weights[2:], (0.0, 0.0, 0.0))
         self.assertEqual(mapped.rear.selector_weights[2:], (0.0, 0.0, 0.0))
+        self.assertEqual(mapped.mapping_revision, TIRE_MORPH_MAPPING_REVISION)
 
     def test_effective_upgrade_mode_fails_closed(self) -> None:
         spec = VehicleWheelSpec(

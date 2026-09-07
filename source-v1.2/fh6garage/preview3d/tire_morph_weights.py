@@ -6,11 +6,10 @@ from typing import Any
 
 from .wheel_spec import AxleWheelSpec, VehicleWheelSpec
 
-# Historical ForzaTech mapping from Doliman's importer.  The source labels the
-# tire mapping "not verified".  W3 has independently corroborated it on the
-# actual FH6 tire_slick model for FER_FXX_05 stock geometry, but it remains
-# diagnostic-only until more TireModelName variants are cross-checked.
-TIRE_MORPH_MAPPING_REVISION = "doliman_tire_weights_v1_fxx_slick_corroborated"
+# Historical ForzaTech mapping from Doliman's importer. The source itself labels
+# the tire mapping "not verified". Keep it diagnostic-only until selector roles
+# and the physical-dimension formula are independently verified from geometry.
+TIRE_MORPH_MAPPING_REVISION = "doliman_tire_weights_v1_unverified_diagnostic"
 
 
 class TireMorphWeightError(ValueError):
@@ -67,7 +66,7 @@ def tire_morph_weights(
     original_rim_diameter_in: float,
     rim_diameter_in: float,
 ) -> tuple[tuple[float, float, float, float, float], float]:
-    """Return the historical 5-selector tire weights and post-morph X scale.
+    """Return Doliman's historical, explicitly unverified tire mapping.
 
     Source mapping (Doliman ForzaTech importer; source comment: "not verified"):
       selector 0 = (width_mm * original_aspect / 100 - 225
@@ -76,9 +75,9 @@ def tire_morph_weights(
       selectors 2..4 = 0
       scale_x = width_mm / 1000
 
-    W3 independently corroborated these equations for the actual FH6
-    tire_slick model and stock FER_FXX_05 dimensions.  This function does not
-    clamp values and does not enable production tire geometry by itself.
+    This function preserves the historical formula for diagnostic comparison only.
+    Selector-controlled geometry characterization does not validate this physical
+    formula, and this function does not enable production tire geometry by itself.
     """
     width = _finite_positive(tire_width_mm, "tire_width_mm")
     aspect = _finite_positive(original_tire_aspect_ratio, "original_tire_aspect_ratio")
@@ -94,7 +93,7 @@ def tire_morph_weights(
 
 
 def stock_axle_tire_morph_weights(spec: AxleWheelSpec) -> AxleTireMorphWeights:
-    """Map a stock axle spec; original/current rim dimensions are identical."""
+    """Map a stock axle spec for diagnostic comparison only."""
     weights, scale_x = tire_morph_weights(
         spec.tire_width_mm,
         spec.tire_aspect_ratio,
