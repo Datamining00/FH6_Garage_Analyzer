@@ -9,8 +9,8 @@ from typing import Any, Iterable, Mapping, Sequence
 from .carbin_structural import CarbinStructuralError, parse_fh6_carbin
 
 
-TIRE_SPINDLE_ATTACHMENT_REVISION = "native_carbin_tirecompound_spindle_contract_v1"
-_TIRE_COMPOUND_PART_TYPE = 8
+TIRE_SPINDLE_ATTACHMENT_REVISION = "native_carbin_wheelstyle_spindle_contract_v2"
+_WHEEL_STYLE_PART_TYPE = 44
 _EXPECTED_SPINDLES: dict[str, tuple[str, str]] = {
     "spindleLF": ("front", "left"),
     "spindleRF": ("front", "right"),
@@ -46,7 +46,7 @@ class TireSpindleAttachmentContract:
     status: str
     revision: str
     car_id: int
-    tire_part_type: int
+    attachment_part_type: int
     attachments: tuple[TireSpindleAttachment, ...]
     native_carbin_transform_only: bool
     procedural_translation_applied: bool
@@ -57,13 +57,19 @@ class TireSpindleAttachmentContract:
     production_renderer_enabled: bool
     limitations: tuple[str, ...]
 
+    @property
+    def tire_part_type(self) -> int:
+        """Compatibility alias retained for the v1 diagnostic contract."""
+        return self.attachment_part_type
+
     def as_dict(self) -> dict[str, object]:
         return {
-            "format": "fh6_native_tire_spindle_attachment_contract_v1",
+            "format": "fh6_native_tire_spindle_attachment_contract_v2",
             "status": self.status,
             "revision": self.revision,
             "car_id": self.car_id,
-            "tire_part_type": self.tire_part_type,
+            "attachment_part_type": self.attachment_part_type,
+            "tire_part_type": self.attachment_part_type,
             "attachments": [item.as_dict() for item in self.attachments],
             "native_carbin_transform_only": self.native_carbin_transform_only,
             "procedural_translation_applied": self.procedural_translation_applied,
@@ -93,8 +99,8 @@ def _finite_matrix(raw: object, *, bone: str) -> tuple[float, ...]:
     return matrix
 
 
-def _stock_models_from_tirecompound_part(part: Mapping[str, Any]) -> Iterable[Mapping[str, Any]]:
-    if int(part.get("resolved_part_type", -1)) != _TIRE_COMPOUND_PART_TYPE:
+def _stock_models_from_wheelstyle_part(part: Mapping[str, Any]) -> Iterable[Mapping[str, Any]]:
+    if int(part.get("resolved_part_type", -1)) != _WHEEL_STYLE_PART_TYPE:
         return ()
 
     kind = str(part.get("kind") or "")
@@ -112,13 +118,13 @@ def _stock_models_from_tirecompound_part(part: Mapping[str, Any]) -> Iterable[Ma
     ]
     if len(upgrades) != 1:
         raise TireSpindleAttachmentError(
-            "CCarParts_TireCompound must have exactly one stock upgrade for the first production trial"
+            "CCarParts_WheelStyle must have exactly one stock upgrade for the first production trial"
         )
     stock = upgrades[0]
     stock_part_id = int(stock.get("part_id", -1))
     if stock_part_id < 0:
         raise TireSpindleAttachmentError(
-            "stock CCarParts_TireCompound upgrade has no valid part_id"
+            "stock CCarParts_WheelStyle upgrade has no valid part_id"
         )
 
     selected: list[Mapping[str, Any]] = []
@@ -137,13 +143,13 @@ def _stock_models_from_tirecompound_part(part: Mapping[str, Any]) -> Iterable[Ma
 
 def _native_spindle_models(parsed_carbin: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
     found: dict[str, list[Mapping[str, Any]]] = {name: [] for name in _EXPECTED_SPINDLES}
-    tire_parts = parsed_carbin.get("tire_related_parts") or ()
-    for part in tire_parts:
+    rim_parts = parsed_carbin.get("rim_related_parts") or ()
+    for part in rim_parts:
         if not isinstance(part, Mapping):
             continue
-        if int(part.get("resolved_part_type", -1)) != _TIRE_COMPOUND_PART_TYPE:
+        if int(part.get("resolved_part_type", -1)) != _WHEEL_STYLE_PART_TYPE:
             continue
-        for model in _stock_models_from_tirecompound_part(part):
+        for model in _stock_models_from_wheelstyle_part(part):
             bone = str(model.get("bone_name") or "")
             if bone in found:
                 found[bone].append(model)
@@ -152,12 +158,12 @@ def _native_spindle_models(parsed_carbin: Mapping[str, Any]) -> dict[str, Mappin
     duplicates = [bone for bone, models in found.items() if len(models) > 1]
     if missing:
         raise TireSpindleAttachmentError(
-            "stock CCarParts_TireCompound is missing exact native spindle bone(s): "
+            "stock CCarParts_WheelStyle is missing exact native spindle bone(s): "
             + ", ".join(missing)
         )
     if duplicates:
         raise TireSpindleAttachmentError(
-            "stock CCarParts_TireCompound has ambiguous duplicate spindle bone(s): "
+            "stock CCarParts_WheelStyle has ambiguous duplicate spindle bone(s): "
             + ", ".join(duplicates)
         )
     return {bone: models[0] for bone, models in found.items()}
@@ -225,12 +231,14 @@ def resolve_tire_spindle_attachment_contract(
     parsed_carbin: Mapping[str, Any],
     trial_geometry: Mapping[str, Any],
 ) -> TireSpindleAttachmentContract:
-    """Resolve a fail-closed tire attachment contract from native carbin transforms.
+    """Resolve a fail-closed tire attachment contract from native WheelStyle transforms.
 
     No placement formula is evaluated here. For the first production trial, only
-    exact stock CCarParts_TireCompound models bound to spindleLF/RF/LR/RR are
+    exact stock CCarParts_WheelStyle models bound to spindleLF/RF/LR/RR are
     accepted. Their serialized 4x4 matrices are preserved verbatim for the later
-    GLB merge stage.
+    GLB merge stage. This matches the real FER_FXX_05 carbin structure, where the
+    WheelStyle part owns the four wheel spindle transforms while TireCompound is
+    not serialized in the carbin scene.
     """
     scene = parsed_carbin.get("scene")
     if not isinstance(scene, Mapping):
@@ -251,7 +259,7 @@ def resolve_tire_spindle_attachment_contract(
         resource_path = str(model.get("resource_path") or "")
         if not resource_path:
             raise TireSpindleAttachmentError(
-                f"{bone}: stock TireCompound model has no native resource path"
+                f"{bone}: stock WheelStyle model has no native resource path"
             )
         derivative = trial_by_side[(axle, side)]
         attachments.append(
@@ -270,7 +278,7 @@ def resolve_tire_spindle_attachment_contract(
         status="spindle_attachment_contract_ready",
         revision=TIRE_SPINDLE_ATTACHMENT_REVISION,
         car_id=car_id,
-        tire_part_type=_TIRE_COMPOUND_PART_TYPE,
+        attachment_part_type=_WHEEL_STYLE_PART_TYPE,
         attachments=tuple(attachments),
         native_carbin_transform_only=True,
         procedural_translation_applied=False,
@@ -280,8 +288,8 @@ def resolve_tire_spindle_attachment_contract(
         spindle_attachment_applied=False,
         production_renderer_enabled=False,
         limitations=(
-            "This contract validates native attachment transforms but does not yet merge the derived tire GLBs into the vehicle GLB.",
-            "The first production trial is restricted to exact stock TireCompound spindle models; track-spacing and tire-spacer formulas are intentionally not substituted for carbin transforms.",
+            "This contract validates native WheelStyle attachment transforms but does not yet merge the derived tire GLBs into the vehicle GLB.",
+            "The first production trial uses exact stock WheelStyle spindle matrices; brake-rotor, track-spacing, tire-spacer, and TireCompound placement formulas are intentionally not substituted for these native transforms.",
             "Visual left/right orientation and wheel-arch alignment remain to be verified after the derived-GLB merge stage.",
         ),
     )
