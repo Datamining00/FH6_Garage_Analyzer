@@ -66,7 +66,7 @@ class TireSpindleAttachmentContract:
 
     def as_dict(self) -> dict[str, object]:
         return {
-            "format": "fh6_native_tire_spindle_attachment_contract_v3",
+            "format": "fh6_native_tire_spindle_attachment_contract_v2",
             "status": self.status,
             "revision": self.revision,
             "car_id": self.car_id,
@@ -233,10 +233,6 @@ def _trial_geometry_by_axle_side(
             result[(axle, "right")] = side_models["right"]
             continue
 
-        # Native one-model tire families observed in FH6 and in the public
-        # extractor use tireL_ as the canonical geometry source.  The right-side
-        # WheelStyle spindle matrix performs the side transform; geometry is not
-        # mirrored or offset procedurally by FHA.
         if set(side_models) == {"left"}:
             result[(axle, "left")] = side_models["left"]
             result[(axle, "right")] = side_models["left"]
