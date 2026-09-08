@@ -58,65 +58,141 @@ internal sealed record MeshTransformAuditDiagnostic(
     float[] RenderAabbMin,
     float[] RenderAabbMax);
 
+internal sealed record SceneSkeletonCandidate(string SourceEntry, SkeletonBlob Skeleton);
+
 internal static class TransformAuditRuntime
 {
     private const uint WheelStylePartType = 44;
     private static readonly List<WheelStyleAnchorDiagnostic> _wheelAnchors = [];
     private static readonly List<MeshTransformAuditDiagnostic> _meshAudit = [];
+    private static readonly List<SceneSkeletonCandidate> _sceneSkeletons = [];
+    private static readonly HashSet<string> _sceneSkeletonSources = new(StringComparer.OrdinalIgnoreCase);
     private static readonly HashSet<string> _wheelIdentities = new(StringComparer.Ordinal);
     private static readonly Dictionary<string, AttachmentBoneResolution> _attachmentResolutions =
         new(StringComparer.Ordinal);
 
     public static IReadOnlyList<WheelStyleAnchorDiagnostic> WheelStyleAnchors => _wheelAnchors;
     public static IReadOnlyList<MeshTransformAuditDiagnostic> MeshTransformAudit => _meshAudit;
+    public static int SceneSkeletonCount => _sceneSkeletons.Count;
 
     public static void Configure(IReadOnlyList<ModelInstance> instances)
     {
         _wheelAnchors.Clear();
         _meshAudit.Clear();
+        _sceneSkeletons.Clear();
+        _sceneSkeletonSources.Clear();
         _wheelIdentities.Clear();
         _attachmentResolutions.Clear();
     }
 
-    public static AttachmentBoneResolution ResolveAttachmentBone(Bundle bundle, ModelInstance instance)
+    public static void RegisterSceneSkeleton(string sourceEntry, Bundle bundle)
     {
-        const string skeletonSource = "instance_model_bundle";
-        var requestedName = instance.BoneName ?? "";
-        var requestedId = instance.BoneId;
         var skeleton = bundle.Blobs.OfType<SkeletonBlob>().FirstOrDefault();
         if (skeleton is null || skeleton.Bones.Count == 0)
-        {
-            return new AttachmentBoneResolution(
-                "no_skeleton", requestedName, requestedId, "", -1, skeletonSource, null);
-        }
+            return;
+        if (!_sceneSkeletonSources.Add(sourceEntry))
+            return;
+        _sceneSkeletons.Add(new SceneSkeletonCandidate(sourceEntry, skeleton));
+    }
 
-        var target = -1;
-        var mode = "none";
+    public static AttachmentBoneResolution ResolveAttachmentBone(Bundle bundle, ModelInstance instance)
+    {
+        const string instanceSkeletonSource = "instance_model_bundle";
+        var requestedName = instance.BoneName ?? "";
+        var requestedId = instance.BoneId;
+        var instanceSkeleton = bundle.Blobs.OfType<SkeletonBlob>().FirstOrDefault();
+
         if (!string.IsNullOrWhiteSpace(requestedName))
         {
-            target = skeleton.Bones.FindIndex(
-                bone => string.Equals(bone.Name, requestedName, StringComparison.OrdinalIgnoreCase));
-            if (target < 0)
+            if (instanceSkeleton is not null && instanceSkeleton.Bones.Count > 0)
             {
-                // A BoneId belongs to a specific skeleton namespace. Never silently
-                // reinterpret a named Carbin attachment as the same numeric index in
-                // a different/child model skeleton when its name did not resolve.
-                return new AttachmentBoneResolution(
-                    "name_not_found", requestedName, requestedId, "", -1, skeletonSource, null);
+                var childTarget = instanceSkeleton.Bones.FindIndex(
+                    bone => string.Equals(bone.Name, requestedName, StringComparison.OrdinalIgnoreCase));
+                if (childTarget >= 0)
+                {
+                    return new AttachmentBoneResolution(
+                        "name",
+                        requestedName,
+                        requestedId,
+                        instanceSkeleton.Bones[childTarget].Name ?? "",
+                        childTarget,
+                        instanceSkeletonSource,
+                        ResolveBoneWorld(instanceSkeleton, childTarget));
+                }
             }
-            mode = "name";
-        }
-        else if (requestedId >= 0 && requestedId < skeleton.Bones.Count)
-        {
-            target = requestedId;
-            mode = "id_only";
-        }
-        else
-        {
+
+            // A named Carbin attachment may refer to the scene/chassis skeleton,
+            // not the child part model's own skeleton. Resolve that namespace only
+            // when the name identifies exactly one registered stock CarBody
+            // skeleton. Never reinterpret the numeric BoneId across namespaces.
+            var sceneMatches = new List<(SceneSkeletonCandidate Candidate, int Index)>();
+            foreach (var candidate in _sceneSkeletons)
+            {
+                var index = candidate.Skeleton.Bones.FindIndex(
+                    bone => string.Equals(bone.Name, requestedName, StringComparison.OrdinalIgnoreCase));
+                if (index >= 0)
+                    sceneMatches.Add((candidate, index));
+            }
+            if (sceneMatches.Count == 1)
+            {
+                var match = sceneMatches[0];
+                return new AttachmentBoneResolution(
+                    "scene_name",
+                    requestedName,
+                    requestedId,
+                    match.Candidate.Skeleton.Bones[match.Index].Name ?? "",
+                    match.Index,
+                    $"scene_stock_carbody:{match.Candidate.SourceEntry}",
+                    ResolveBoneWorld(match.Candidate.Skeleton, match.Index));
+            }
+            if (sceneMatches.Count > 1)
+            {
+                return new AttachmentBoneResolution(
+                    "scene_name_ambiguous",
+                    requestedName,
+                    requestedId,
+                    "",
+                    -1,
+                    "scene_stock_carbody",
+                    null);
+            }
+
             return new AttachmentBoneResolution(
-                "none", requestedName, requestedId, "", -1, skeletonSource, null);
+                "name_not_found",
+                requestedName,
+                requestedId,
+                "",
+                -1,
+                instanceSkeleton is null ? "no_instance_or_scene_match" : instanceSkeletonSource,
+                null);
         }
 
+        if (instanceSkeleton is not null
+            && requestedId >= 0
+            && requestedId < instanceSkeleton.Bones.Count)
+        {
+            return new AttachmentBoneResolution(
+                "id_only",
+                requestedName,
+                requestedId,
+                instanceSkeleton.Bones[requestedId].Name ?? "",
+                requestedId,
+                instanceSkeletonSource,
+                ResolveBoneWorld(instanceSkeleton, requestedId));
+        }
+
+        return new AttachmentBoneResolution(
+            instanceSkeleton is null || instanceSkeleton.Bones.Count == 0 ? "no_skeleton" : "none",
+            requestedName,
+            requestedId,
+            "",
+            -1,
+            instanceSkeletonSource,
+            null);
+    }
+
+    private static Matrix4x4 ResolveBoneWorld(SkeletonBlob skeleton, int target)
+    {
         var cache = new Matrix4x4?[skeleton.Bones.Count];
         var visiting = new bool[skeleton.Bones.Count];
         Matrix4x4 Resolve(int index)
@@ -133,15 +209,7 @@ internal static class TransformAuditRuntime
             cache[index] = world;
             return world;
         }
-
-        return new AttachmentBoneResolution(
-            mode,
-            requestedName,
-            requestedId,
-            skeleton.Bones[target].Name ?? "",
-            target,
-            skeletonSource,
-            Resolve(target));
+        return Resolve(target);
     }
 
     public static void RecordInstance(
@@ -210,9 +278,7 @@ internal static class TransformAuditRuntime
 
             // TransformPositions writes KFPS render space as (-x, y, z). Undo
             // that reflection and then the exact effective instance transform to
-            // recover the post-morph/post-rigid-bone geometry in WheelStyle/model
-            // instance-local coordinates. This gives the tire pipeline the same
-            // physical rim frame that the converter actually rendered.
+            // recover post-morph/post-rigid-bone geometry in instance-local space.
             var transformed = new Vector3(-point.X, point.Y, point.Z);
             var local = hasInstanceTransform
                 ? Vector3.Transform(transformed, inverseInstance)
