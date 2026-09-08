@@ -35,8 +35,10 @@ class KfpsWheelMorphDiagnosticPatchTests(unittest.TestCase):
         self.assertIn("instance.PartType == CCarParts.CarBody", patcher)
         self.assertIn("model.SnapToParent", patcher)
         self.assertIn("model.AssemblyName", patcher)
-        self.assertIn('model.SnapToParent ? "snap:1" : "snap:0"', patcher)
-        self.assertIn('"assembly:" + (model.AssemblyName ?? "").ToLowerInvariant()', patcher)
+        # The C# replacement source lives inside Python string literals, so the
+        # double quotes are escaped in the patcher source representation.
+        self.assertIn('model.SnapToParent ? \\"snap:1\\" : \\"snap:0\\"', patcher)
+        self.assertIn('\\"assembly:\\" + (model.AssemblyName ?? \\"\\").ToLowerInvariant()', patcher)
 
         self.assertIn('"scene_path_name"', audit)
         self.assertIn('"scene_fallback_name"', audit)
