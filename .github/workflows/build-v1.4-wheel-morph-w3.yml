@@ -9,8 +9,10 @@ on:
       - "source-v1.2/FH6_Assistant_v1.4.spec"
       - "source-v1.2/FH6_Assistant_v1.4_portable.spec"
       - "source-v1.2/fh6garage/v1_4_finalverify1_preview_patch.py"
+      - "source-v1.2/fh6garage/preview3d/__init__.py"
       - "source-v1.2/fh6garage/preview3d/chassis_converter.py"
       - "source-v1.2/fh6garage/preview3d/glb_parser.py"
+      - "source-v1.2/fh6garage/preview3d/native_transform_chain_patch.py"
       - "source-v1.2/fh6garage/preview3d/tire_asset.py"
       - "source-v1.2/fh6garage/preview3d/tire_morph_boundary_roles.py"
       - "source-v1.2/fh6garage/preview3d/tire_morph_geometry.py"
@@ -30,6 +32,7 @@ on:
       - "source-v1.2/tests/test_chassis_converter_auto_rim_morph.py"
       - "source-v1.2/tests/test_chassis_converter_wheel_morph_helper.py"
       - "source-v1.2/tests/test_glb_livery_structural_exclusion.py"
+      - "source-v1.2/tests/test_native_transform_chain_patch.py"
       - "source-v1.2/tests/test_tire_morph_boundary_roles.py"
       - "source-v1.2/tests/test_tire_morph_geometry.py"
       - "source-v1.2/tests/test_tire_preview_integration.py"
@@ -45,6 +48,7 @@ on:
       - "source-v1.2/tests/test_wheel_spec_database.py"
       - "source-v1.2/tools/patch_kfps_wheel_morph_diagnostic.py"
       - "source-v1.2/tools/kfps_wheel_morph/WheelMorphDiagnostic.cs"
+      - "source-v1.2/tools/kfps_wheel_morph/TransformAudit.cs"
       - ".github/workflows/build-v1.4-wheel-morph-w3.yml"
 
 permissions:
@@ -92,10 +96,12 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           Set-Location source-v1.2
           python -m py_compile fh6garage/v1_4_finalverify1_preview_patch.py
+          python -m py_compile fh6garage/preview3d/__init__.py
           python -m py_compile fh6garage/preview3d/glb_parser.py
           python -m py_compile fh6garage/preview3d/wheel_spec_database.py
           python -m py_compile fh6garage/preview3d/wheel_morph_auto.py
           python -m py_compile fh6garage/preview3d/chassis_converter.py
+          python -m py_compile fh6garage/preview3d/native_transform_chain_patch.py
           python -m py_compile fh6garage/preview3d/tire_morph_boundary_roles.py
           python -m py_compile fh6garage/preview3d/tire_morph_geometry.py
           python -m py_compile fh6garage/preview3d/tire_morph_geometry_impl.py
@@ -110,6 +116,7 @@ jobs:
           python -m unittest tests.test_wheel_morph_auto -v
           python -m unittest tests.test_chassis_converter_wheel_morph_helper -v
           python -m unittest tests.test_chassis_converter_auto_rim_morph -v
+          python -m unittest tests.test_native_transform_chain_patch -v
           python -m unittest tests.test_tire_morph_boundary_roles -v
           python -m unittest tests.test_tire_morph_geometry -v
           python -m unittest tests.test_tire_preview_integration -v
@@ -139,16 +146,19 @@ jobs:
           $actual = (git -C kfps-source rev-parse HEAD).Trim()
           if ($actual -ne "6f53ca3c584d78659d06d4b4a39561db67d79345") { throw "Pinned KFPS commit mismatch: $actual" }
 
-      - name: Apply verified W3 rim morph patch
+      - name: Apply verified W3 rim morph and transform-chain patch
         shell: pwsh
         run: |
           python source-v1.2/tools/patch_kfps_wheel_morph_diagnostic.py --kfps-root kfps-source
-          if ($LASTEXITCODE -ne 0) { throw "Wheel morph patcher failed with exit code $LASTEXITCODE" }
+          if ($LASTEXITCODE -ne 0) { throw "Wheel morph/transform-chain patcher failed with exit code $LASTEXITCODE" }
           git -C kfps-source diff --check
           if ($LASTEXITCODE -ne 0) { throw "Patched KFPS diff check failed with exit code $LASTEXITCODE" }
           $program = "kfps-source/tools/livery/chassis-converter/Program.cs"
           if (-not (Select-String -Path $program -SimpleMatch "WheelMorphRuntime.Configure(instances)" -Quiet)) { throw "Patched Program.cs is missing WheelMorphRuntime.Configure." }
+          if (-not (Select-String -Path $program -SimpleMatch "TransformAuditRuntime.Configure(instances)" -Quiet)) { throw "Patched Program.cs is missing TransformAuditRuntime.Configure." }
           if (-not (Select-String -Path $program -SimpleMatch "wheel_morph_applied_meshes = WheelMorphRuntime.AppliedMeshes" -Quiet)) { throw "Patched Program.cs is missing rim morph diagnostics." }
+          if (-not (Select-String -Path $program -SimpleMatch "wheel_style_anchors = TransformAuditRuntime.WheelStyleAnchors" -Quiet)) { throw "Patched Program.cs is missing WheelStyle transform diagnostics." }
+          if (-not (Test-Path "kfps-source/tools/livery/chassis-converter/TransformAudit.cs")) { throw "TransformAudit.cs was not staged." }
 
       - name: Publish and stage verified helper
         shell: pwsh
@@ -157,12 +167,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Diagnostic converter publish failed with exit code $LASTEXITCODE" }
           $built = Resolve-Path "wheel-morph-converter/Kfps.ChassisConverter.exe"
           $hash = (Get-FileHash $built -Algorithm SHA256).Hash.ToLower()
-          $expected = "c23c6e2b5ee0c81e58f5ed917ea6b1548fd5223f53fc257328ab85f7a9fc933d"
+          $expected = "f51bb233514088060fb3ee931612612978c2c76496dba947dbeca42dcbf9375a"
           if ($hash -ne $expected) { throw "Patched helper SHA-256 mismatch: expected $expected, got $hash" }
           $runtime = "source-v1.2/runtime"
           New-Item -ItemType Directory -Force $runtime | Out-Null
           Copy-Item $built "$runtime/Kfps.ChassisConverter.WheelMorph.exe" -Force
-          Write-Host "Verified staged helper SHA-256: $hash"
+          Write-Host "Verified staged transform-chain helper SHA-256: $hash"
 
       - name: Build Standard OneFile
         shell: pwsh
@@ -174,6 +184,7 @@ jobs:
           $listing = python -m PyInstaller.utils.cliutils.archive_viewer -l $exe
           if ($LASTEXITCODE -ne 0) { throw "Could not inspect Standard archive." }
           if (-not ($listing -match "Kfps\.ChassisConverter\.WheelMorph\.exe")) { throw "Standard OneFile does not contain the wheel morph helper." }
+          if (-not ($listing -match "native_transform_chain_patch")) { throw "Standard OneFile does not contain the native transform-chain module." }
 
       - name: Build Portable OneDir
         shell: pwsh
@@ -184,7 +195,7 @@ jobs:
           $helper = "dist\FH6 Assistant v1.4 Portable\_internal\runtime\Kfps.ChassisConverter.WheelMorph.exe"
           if (-not (Test-Path $helper)) { throw "Portable build does not contain the wheel morph helper." }
           $hash = (Get-FileHash $helper -Algorithm SHA256).Hash.ToLower()
-          if ($hash -ne "c23c6e2b5ee0c81e58f5ed917ea6b1548fd5223f53fc257328ab85f7a9fc933d") { throw "Portable bundled helper SHA-256 mismatch: $hash" }
+          if ($hash -ne "f51bb233514088060fb3ee931612612978c2c76496dba947dbeca42dcbf9375a") { throw "Portable bundled helper SHA-256 mismatch: $hash" }
 
       - name: Upload W3 build candidates
         uses: actions/upload-artifact@v4
