@@ -16,11 +16,12 @@ from .wheel_spec import FH6WheelSpecResolver
 from .wheel_spec_database import ensure_stock_wheel_database
 
 
-FXX_NATIVE_TIRE_PREVIEW_REVISION = "fxx_1006_slick_lazy_preview_v2"
-_FXX_CAR_ID = 1006
-_FXX_MODEL_CODE = "FER_FXX_05"
-_PATCH_MARKER = "_fh6_validated_fxx_native_tire_preview_patched"
-_ORIGINAL_CONVERTER = "_fh6_validated_fxx_native_tire_preview_original_convert_vehicle"
+GLOBAL_NATIVE_TIRE_PREVIEW_REVISION = "stock_native_tire_global_preview_v1"
+# Compatibility constant retained for older diagnostics/tests.
+FXX_NATIVE_TIRE_PREVIEW_REVISION = GLOBAL_NATIVE_TIRE_PREVIEW_REVISION
+_PATCH_MARKER = "_fh6_global_stock_native_tire_preview_patched"
+_LEGACY_PATCH_MARKER = "_fh6_validated_fxx_native_tire_preview_patched"
+_ORIGINAL_CONVERTER = "_fh6_global_stock_native_tire_preview_original_convert_vehicle"
 
 
 @dataclass(frozen=True)
@@ -46,21 +47,29 @@ def _notify(progress: Callable[[str], None] | None, message: str) -> None:
         progress(message)
 
 
-def _is_validated_fxx(asset: Any) -> bool:
+def _car_id(asset: Any) -> int:
     try:
-        car_id = int(getattr(asset, "car_id"))
-    except (TypeError, ValueError):
-        return False
-    model_code = str(getattr(asset, "model_code", "") or "").strip()
-    return car_id == _FXX_CAR_ID and model_code.casefold() == _FXX_MODEL_CODE.casefold()
+        value = int(getattr(asset, "car_id"))
+    except (AttributeError, TypeError, ValueError):
+        return 0
+    return value if value > 0 else 0
 
 
-def _passthrough(asset: Any, vehicle_glb: Path, status: str, detail: str) -> TirePreviewIntegrationResult:
+def _model_code(asset: Any) -> str:
+    return str(getattr(asset, "model_code", "") or "").strip()
+
+
+def _passthrough(
+    asset: Any,
+    vehicle_glb: Path,
+    status: str,
+    detail: str,
+) -> TirePreviewIntegrationResult:
     return TirePreviewIntegrationResult(
         status=status,
-        revision=FXX_NATIVE_TIRE_PREVIEW_REVISION,
-        car_id=int(getattr(asset, "car_id", 0) or 0),
-        model_code=str(getattr(asset, "model_code", "") or ""),
+        revision=GLOBAL_NATIVE_TIRE_PREVIEW_REVISION,
+        car_id=_car_id(asset),
+        model_code=_model_code(asset),
         source_vehicle_glb=str(vehicle_glb),
         selected_vehicle_glb=str(vehicle_glb),
         applied=False,
@@ -71,7 +80,7 @@ def _passthrough(asset: Any, vehicle_glb: Path, status: str, detail: str) -> Tir
     )
 
 
-def try_apply_validated_fxx_native_tire_preview(
+def try_apply_stock_native_tire_preview(
     asset: Any,
     *,
     carbin_entry: str,
@@ -80,20 +89,22 @@ def try_apply_validated_fxx_native_tire_preview(
     work_root: str | Path,
     progress: Callable[[str], None] | None = None,
 ) -> TirePreviewIntegrationResult:
-    """Add the empirically validated FXX/Slick tire trial to a derived preview GLB.
+    """Apply the supported native stock-tire preview to any eligible FH6 vehicle.
 
-    This is deliberately narrow and fail-open for the UI: only Car ID 1006 with the
-    exact FER_FXX_05 model code is attempted. Any missing/changed prerequisite leaves
-    the already valid converter GLB selected. Native FH6 archives are read only.
+    Eligibility is global at the vehicle level and fail-closed at the native tire
+    family/geometry level.  Unsupported or structurally mismatched tire families,
+    missing WheelStyle spindle evidence, archive changes, or any merge/bake failure
+    leave the already valid converter GLB selected.  Native FH6 files are read only.
     """
 
     source_glb = Path(vehicle_glb).expanduser().resolve()
-    if not _is_validated_fxx(asset):
+    car_id = _car_id(asset)
+    if car_id <= 0:
         return _passthrough(
             asset,
             source_glb,
             "not_applicable",
-            "validated native tire preview is currently restricted to FER_FXX_05 (Car ID 1006)",
+            "vehicle has no valid positive Car ID",
         )
 
     trial_root = Path(work_root).expanduser().resolve()
@@ -109,23 +120,24 @@ def try_apply_validated_fxx_native_tire_preview(
         if not selected_carbin:
             raise ValueError("selected carbin entry is empty")
         indexed_entries = tuple(str(item) for item in getattr(asset, "carbin_entries", ()) or ())
-        if selected_carbin not in indexed_entries:
+        if indexed_entries and selected_carbin not in indexed_entries:
             raise ValueError(f"selected carbin is not indexed in the vehicle archive: {selected_carbin}")
 
-        _notify(progress, "검증된 FXX native Slick 타이어를 준비합니다...")
+        _notify(progress, "Stock native 타이어 데이터를 확인합니다...")
         database_path = ensure_stock_wheel_database(progress)
-        spec = FH6WheelSpecResolver(database_path).resolve(_FXX_CAR_ID)
-        if int(spec.car_id) != _FXX_CAR_ID:
-            raise ValueError(f"stock wheel database returned unexpected Car ID {spec.car_id}")
-        if str(spec.tire_model_name or "").casefold() != "slick":
+        spec = FH6WheelSpecResolver(database_path).resolve(car_id)
+        if int(spec.car_id) != car_id:
             raise ValueError(
-                f"validated FXX native tire preview requires TireModelName='Slick', got {spec.tire_model_name!r}"
+                f"stock wheel database returned unexpected Car ID {spec.car_id}; expected {car_id}"
             )
+        tire_model_name = str(spec.tire_model_name or "").strip()
+        if not tire_model_name:
+            raise ValueError("stock wheel database returned no TireModelName")
 
-        tire_archive = resolve_tire_archive(game_or_cars_path, spec.tire_model_name)
+        tire_archive = resolve_tire_archive(game_or_cars_path, tire_model_name)
 
-        # This directory contains derived preview-only files. It is always separate
-        # from the source vehicle ZIP and generated base GLB.
+        # Derived preview-only workspace.  Source vehicle/tire archives and the
+        # converter's base GLB are never overwritten.
         shutil.rmtree(trial_root, ignore_errors=True)
         trial_root.mkdir(parents=True, exist_ok=False)
 
@@ -159,22 +171,20 @@ def try_apply_validated_fxx_native_tire_preview(
         if not merge_report.trial_vehicle_glb_ready or not output_glb.is_file():
             raise RuntimeError("native tire merge did not produce a ready trial vehicle GLB")
 
-        # FinalVerify1 historically renders converter meshes from baked world-space
-        # POSITION arrays and does not traverse glTF node matrices. Bake only the
-        # four newly added native tire matrices into their derivative POSITION
-        # streams. This preserves the exact WheelStyle transforms while leaving
-        # every pre-existing vehicle mesh untouched.
+        # KFPS converter emits already-world-positioned geometry in render space
+        # after its X-axis handedness conversion.  Apply the exact same conversion
+        # to the four native tire derivatives before FinalVerify1 consumes them.
         viewer_matrix_bake = bake_native_tire_trial_node_matrices(output_glb)
         if int(viewer_matrix_bake.get("node_count", 0)) != 4:
             raise RuntimeError("native tire viewer matrix bake did not process four spindle nodes")
 
         manifest_path = trial_root / "native_tire_preview_integration.json"
         manifest = {
-            "format": "fh6_validated_native_tire_preview_integration_v1",
-            "revision": FXX_NATIVE_TIRE_PREVIEW_REVISION,
-            "status": "validated_fxx_native_tire_preview_applied",
-            "car_id": _FXX_CAR_ID,
-            "model_code": _FXX_MODEL_CODE,
+            "format": "fh6_global_stock_native_tire_preview_integration_v1",
+            "revision": GLOBAL_NATIVE_TIRE_PREVIEW_REVISION,
+            "status": "stock_native_tire_preview_applied",
+            "car_id": car_id,
+            "model_code": _model_code(asset),
             "source_vehicle_glb": str(source_glb),
             "selected_vehicle_glb": str(output_glb),
             "source_vehicle_archive": str(source_archive),
@@ -188,46 +198,53 @@ def try_apply_validated_fxx_native_tire_preview(
             "fallback_on_failure": True,
             "production_renderer_enabled": False,
             "limitations": [
-                "Automatic native tire preview is currently restricted to the visually validated FER_FXX_05 stock Slick case.",
+                "Automatic native tire preview is stock-spec only.",
+                "Only exact native tire-family geometry identities admitted by the global preview policy are used; unsupported or structurally mismatched families fall back to the base vehicle GLB.",
+                "Selector 2..4 remain zero until their game-facing semantics are verified.",
                 "No arbitrary per-car translation, rotation, or scale correction is applied.",
-                "The exact native WheelStyle node matrices are baked into the four derivative tire POSITION streams for FinalVerify1 viewer compatibility.",
-                "Other tire families and vehicles remain on the existing preview path until independently validated.",
+                "WheelStyle spindle matrices and the KFPS render-space handedness conversion are used for placement.",
             ],
         }
         manifest_path.write_text(
             json.dumps(manifest, indent=2, ensure_ascii=False),
             encoding="utf-8",
         )
-        _notify(progress, "FXX native Slick 타이어를 WheelStyle spindle에 적용했습니다.")
+        _notify(
+            progress,
+            f"Native stock 타이어({tire_model_name})를 WheelStyle spindle에 적용했습니다.",
+        )
         return TirePreviewIntegrationResult(
-            status="validated_fxx_native_tire_preview_applied",
-            revision=FXX_NATIVE_TIRE_PREVIEW_REVISION,
-            car_id=_FXX_CAR_ID,
-            model_code=_FXX_MODEL_CODE,
+            status="stock_native_tire_preview_applied",
+            revision=GLOBAL_NATIVE_TIRE_PREVIEW_REVISION,
+            car_id=car_id,
+            model_code=_model_code(asset),
             source_vehicle_glb=str(source_glb),
             selected_vehicle_glb=str(output_glb),
             applied=True,
             fallback_used=False,
             production_renderer_enabled=False,
-            detail="validated stock FXX/Slick derivative selected for the 3D preview",
+            detail=(
+                f"stock native tire preview selected for Car ID {car_id} "
+                f"using TireModelName={tire_model_name}"
+            ),
             manifest_path=str(manifest_path),
         )
     except Exception as exc:
-        # The native tire path must never make a previously valid 3D preview fail.
+        # Global native tire preview must never make a previously valid 3D preview fail.
         shutil.rmtree(trial_root, ignore_errors=True)
         detail = f"{type(exc).__name__}: {exc}"
         _notify(
             progress,
-            "Native tire trial을 적용하지 못해 기존 차량 GLB로 계속합니다 "
+            "Native stock tire preview를 적용하지 못해 기존 차량 GLB로 계속합니다 "
             f"({detail}).",
         )
         return _passthrough(asset, source_glb, "fallback_existing_vehicle_glb", detail)
 
 
-def make_validated_fxx_tire_convert_wrapper(original_convert: Callable[..., Any]) -> Callable[..., Any]:
-    """Wrap only the preview controller's converter result; the converter itself is unchanged."""
+def make_stock_native_tire_convert_wrapper(original_convert: Callable[..., Any]) -> Callable[..., Any]:
+    """Wrap the normal FHA preview conversion with global stock native-tire integration."""
 
-    def convert_with_validated_fxx_tires(
+    def convert_with_stock_native_tires(
         asset: Any,
         progress: Callable[[str], None] | None = None,
         *,
@@ -245,12 +262,12 @@ def make_validated_fxx_tire_convert_wrapper(original_convert: Callable[..., Any]
             converter_override=converter_override,
         )
 
-        # Explicit diagnostic/converter overrides are intentionally kept byte-for-byte
-        # on their existing path. The automatic native-tire trial belongs only to the
-        # normal FHA 3D preview request.
+        # Explicit diagnostic/converter overrides stay byte-for-byte on their
+        # existing path.  Global native tire integration belongs to normal FHA 3D.
         if rim_morph_weights is not None or converter_override is not None:
             return result
-        if not _is_validated_fxx(asset):
+        car_id = _car_id(asset)
+        if car_id <= 0:
             return result
 
         selected_carbin = str(carbin_entry or "").strip()
@@ -268,8 +285,8 @@ def make_validated_fxx_tire_convert_wrapper(original_convert: Callable[..., Any]
             if work_root is not None
             else Path(result.output_path).expanduser().resolve().parent
         )
-        tire_root = converter_root / "native_tire_preview"
-        integration = try_apply_validated_fxx_native_tire_preview(
+        tire_root = converter_root / "native_tire_preview" / f"car_{car_id}"
+        integration = try_apply_stock_native_tire_preview(
             asset,
             carbin_entry=selected_carbin,
             game_or_cars_path=cars_root,
@@ -281,28 +298,42 @@ def make_validated_fxx_tire_convert_wrapper(original_convert: Callable[..., Any]
             return result
         return replace(result, output_path=str(Path(integration.selected_vehicle_glb).resolve()))
 
-    convert_with_validated_fxx_tires.__name__ = getattr(
+    convert_with_stock_native_tires.__name__ = getattr(
         original_convert,
         "__name__",
         "convert_vehicle",
     )
-    convert_with_validated_fxx_tires.__doc__ = getattr(original_convert, "__doc__", None)
-    return convert_with_validated_fxx_tires
+    convert_with_stock_native_tires.__doc__ = getattr(original_convert, "__doc__", None)
+    return convert_with_stock_native_tires
 
 
-def install_validated_fxx_native_tire_preview() -> bool:
-    """Lazily install the FXX-only preview wrapper into preview3d.integration.
-
-    Returns True only on the first installation. Importing FHA or opening non-3D UI
-    does not activate this path; the FinalVerify1 3D tab calls this installer lazily.
-    """
+def install_global_stock_native_tire_preview() -> bool:
+    """Lazily install the global stock native-tire wrapper into preview3d.integration."""
 
     from . import integration as preview_integration
 
     if bool(getattr(preview_integration, _PATCH_MARKER, False)):
         return False
+    if bool(getattr(preview_integration, _LEGACY_PATCH_MARKER, False)):
+        return False
     original = preview_integration.convert_vehicle
     setattr(preview_integration, _ORIGINAL_CONVERTER, original)
-    preview_integration.convert_vehicle = make_validated_fxx_tire_convert_wrapper(original)
+    preview_integration.convert_vehicle = make_stock_native_tire_convert_wrapper(original)
     setattr(preview_integration, _PATCH_MARKER, True)
+    # Retain the old marker so older code cannot install a second wrapper.
+    setattr(preview_integration, _LEGACY_PATCH_MARKER, True)
     return True
+
+
+# Compatibility APIs retained so FinalVerify1 and older diagnostic scripts do not
+# need a synchronized import-name migration.  Their behavior is now global.
+def try_apply_validated_fxx_native_tire_preview(*args: Any, **kwargs: Any) -> TirePreviewIntegrationResult:
+    return try_apply_stock_native_tire_preview(*args, **kwargs)
+
+
+def make_validated_fxx_tire_convert_wrapper(original_convert: Callable[..., Any]) -> Callable[..., Any]:
+    return make_stock_native_tire_convert_wrapper(original_convert)
+
+
+def install_validated_fxx_native_tire_preview() -> bool:
+    return install_global_stock_native_tire_preview()
