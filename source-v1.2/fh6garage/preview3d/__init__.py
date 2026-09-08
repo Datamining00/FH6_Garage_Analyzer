@@ -1,8 +1,26 @@
 """FinalVerify1 ErrorFix1 3D livery rendering backend for FH6 Assistant."""
 
-from .geometry_integrity_patch import install_geometry_integrity_patch
+from __future__ import annotations
 
-install_geometry_integrity_patch()
+import sys
+
+
+def _allow_missing_source_subset(exc: ModuleNotFoundError, module: str) -> bool:
+    """Allow intentionally minimal source diagnostics, but never a frozen app gap."""
+    return (
+        exc.name == f"{__name__}.{module}"
+        and not bool(getattr(sys, "frozen", False))
+    )
+
+
+try:
+    from .geometry_integrity_patch import install_geometry_integrity_patch
+except ModuleNotFoundError as exc:
+    if not _allow_missing_source_subset(exc, "geometry_integrity_patch"):
+        raise
+else:
+    install_geometry_integrity_patch()
+
 
 # Keep the established FinalVerify1 lazy installer contract: importing preview3d
 # must not globally replace the conversion/tire APIs used by diagnostics and tests.
@@ -10,16 +28,26 @@ install_geometry_integrity_patch()
 # constructing Preview3DController. Redirect only that installer to the current
 # global native transform-chain path, then let the existing global installer wrap
 # integration's convert_vehicle exactly once.
-from . import tire_preview_integration as _tire_preview_integration
-
-
 def _install_native_transform_chain_preview() -> bool:
     from .native_transform_chain_v2 import install_native_transform_chain_v2
+    from . import tire_preview_integration as tire_preview_integration
 
     install_native_transform_chain_v2()
-    return _tire_preview_integration.install_global_stock_native_tire_preview()
+    return tire_preview_integration.install_global_stock_native_tire_preview()
 
 
-_tire_preview_integration.install_validated_fxx_native_tire_preview = (
-    _install_native_transform_chain_preview
-)
+def _wire_native_tire_lazy_installer() -> bool:
+    try:
+        from . import tire_preview_integration as tire_preview_integration
+    except ModuleNotFoundError as exc:
+        if _allow_missing_source_subset(exc, "tire_preview_integration"):
+            return False
+        raise
+
+    tire_preview_integration.install_validated_fxx_native_tire_preview = (
+        _install_native_transform_chain_preview
+    )
+    return True
+
+
+_wire_native_tire_lazy_installer()
