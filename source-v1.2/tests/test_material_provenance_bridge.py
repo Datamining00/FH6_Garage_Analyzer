@@ -14,7 +14,9 @@ class MaterialProvenanceBridgeTests(unittest.TestCase):
         patcher = PATCHER.read_text(encoding="utf-8")
         self.assertIn("MaterialAppearanceDiagnostic MaterialAppearance", patcher)
         self.assertIn("MaterialAppearanceRuntime.Resolve", patcher)
-        self.assertIn('"kfps_material_appearance"', patcher)
+        # This C# writer fragment lives inside a Python replacement string, so
+        # its quotes are escaped in the patcher's source representation.
+        self.assertIn('\\"kfps_material_appearance\\"', patcher)
         self.assertIn("MaterialAppearanceDiagnostic.cs", patcher)
         self.assertIn("glb_writer.write_text", patcher)
 
