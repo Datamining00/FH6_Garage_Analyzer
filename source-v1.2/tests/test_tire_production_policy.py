@@ -8,10 +8,9 @@ import unittest
 from unittest.mock import patch
 import zipfile
 
-from fh6garage.preview3d import tire_production_policy as policy
-from fh6garage.preview3d.tire_production_policy import (
-    evaluate_stock_tire_production_candidate,
-)
+from fh6garage.preview3d.tire_morph_auto_inference import TireMorphAutoInferenceError
+from fh6garage.preview3d.tire_morph_weights import stock_vehicle_tire_morph_weights
+from fh6garage.preview3d.tire_production_policy import evaluate_stock_tire_production_candidate
 from fh6garage.preview3d.wheel_spec import AxleWheelSpec, VehicleWheelSpec
 
 
@@ -38,151 +37,128 @@ def _write_archive(path: Path, *modelbins: bytes) -> str:
     with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for index, payload in enumerate(modelbins):
             archive.writestr(f"tire{index}.modelbin", payload)
-    hashes = sorted(hashlib.sha256(payload).hexdigest() for payload in modelbins)
-    return hashlib.sha256("\n".join(hashes).encode("ascii")).hexdigest()
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _structural_report(archive: Path, *, compatible: bool = True):
-    pattern = list(policy._EXPECTED_SELECTOR_ROLE_PATTERN)
-    if not compatible:
-        pattern[0] = "mixed_or_unclassified"
-    roles = tuple(
-        SimpleNamespace(selector=index, geometric_role=role, confidence="high")
-        for index, role in enumerate(pattern)
-    )
+def _inference(spec: VehicleWheelSpec, archive: Path):
+    weights = stock_vehicle_tire_morph_weights(spec)
+    sha = hashlib.sha256(archive.read_bytes()).hexdigest()
+    payload = {
+        "format": "fh6_generic_native_tire_morph_auto_inference_v1",
+        "status": "generic_auto_inference_accepted",
+        "car_id": spec.car_id,
+        "tire_model_name": spec.tire_model_name,
+    }
     return SimpleNamespace(
+        archive_sha256=sha,
         archive_read_only_unchanged=True,
-        archive_sha256=hashlib.sha256(archive.read_bytes()).hexdigest(),
-        modelbin_roles={"tireL_unknown.modelbin": roles},
-        left_right_role_match=None,
+        weights=weights,
+        persistent_report_path="diagnostic.json",
+        as_dict=lambda: dict(payload),
     )
 
 
 class TireProductionPolicyTests(unittest.TestCase):
-    def test_validated_stock_fxx_slick_is_eligible(self) -> None:
+    def test_slick_is_eligible_by_generic_auto_inference(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             archive = Path(directory) / "tire_slick.zip"
-            identity = _write_archive(archive, b"left", b"right")
-            with patch.object(policy, "_VALIDATED_SLICK_GEOMETRY_IDENTITY", identity):
-                result = evaluate_stock_tire_production_candidate(_spec(), archive)
+            _write_archive(archive, b"left", b"right")
+            spec = _spec()
+            with patch(
+                "fh6garage.preview3d.tire_production_policy.infer_stock_native_tire_morph",
+                return_value=_inference(spec, archive),
+            ) as infer:
+                result = evaluate_stock_tire_production_candidate(spec, archive)
 
         self.assertEqual(result.status, "production_trial_eligible")
         self.assertTrue(result.production_trial_eligible)
         self.assertFalse(result.production_renderer_enabled)
         self.assertIsNotNone(result.weights)
-        assert result.weights is not None
-        self.assertEqual(result.weights.front.selector_weights[2:], (0.0, 0.0, 0.0))
-        self.assertEqual(result.weights.rear.selector_weights[2:], (0.0, 0.0, 0.0))
-        self.assertAlmostEqual(result.weights.front.scale_x, 0.245)
-        self.assertAlmostEqual(result.weights.rear.scale_x, 0.345)
+        self.assertIn("no tire-family whitelist", result.detail)
+        infer.assert_called_once()
 
-    def test_slick_is_no_longer_car_specific(self) -> None:
+    def test_vintage_is_not_family_whitelisted_or_signature_blocked(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            archive = Path(directory) / "tire_slick.zip"
-            identity = _write_archive(archive, b"slick")
-            with patch.object(policy, "_VALIDATED_SLICK_GEOMETRY_IDENTITY", identity):
-                result = evaluate_stock_tire_production_candidate(
-                    _spec(car_id=1229),
-                    archive,
-                )
-        self.assertEqual(result.status, "production_trial_eligible")
-        self.assertTrue(result.production_trial_eligible)
-        self.assertEqual(result.car_id, 1229)
-
-    def test_topology_compatible_family_is_globally_eligible(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            archive = Path(directory) / "tire_a.zip"
-            identity = _write_archive(archive, b"a")
-            with patch.dict(
-                policy._TOPOLOGY_COMPATIBLE_IDENTITIES,
-                {"a": identity},
-                clear=True,
+            archive = Path(directory) / "tire_vintage.zip"
+            _write_archive(archive, b"vintage")
+            spec = _spec(car_id=247, model="Vintage")
+            with patch(
+                "fh6garage.preview3d.tire_production_policy.infer_stock_native_tire_morph",
+                return_value=_inference(spec, archive),
             ):
-                result = evaluate_stock_tire_production_candidate(
-                    _spec(car_id=2001, model="a"),
-                    archive,
-                )
+                result = evaluate_stock_tire_production_candidate(spec, archive)
+
         self.assertEqual(result.status, "production_trial_eligible")
         self.assertTrue(result.production_trial_eligible)
-        self.assertIn("selector-topology", result.detail)
+        self.assertEqual(result.tire_model_name, "Vintage")
 
-    def test_unlisted_structurally_compatible_family_is_admitted_runtime(self) -> None:
+    def test_previously_mismatched_family_can_pass_if_geometry_inference_passes(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            archive = Path(directory) / "tire_unknown.zip"
-            _write_archive(archive, b"unknown")
-            report = _structural_report(archive, compatible=True)
-            with patch.object(
-                policy,
-                "analyze_native_tire_selector_boundary_roles",
-                return_value=report,
-            ) as analyze:
-                result = evaluate_stock_tire_production_candidate(
-                    _spec(car_id=4000, model="unknown"), archive
-                )
-        self.assertEqual(result.status, "production_trial_eligible")
-        self.assertTrue(result.production_trial_eligible)
-        self.assertIn("runtime read-only selector-boundary validation", result.detail)
-        analyze.assert_called_once()
-
-    def test_unlisted_structural_role_mismatch_is_blocked(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            archive = Path(directory) / "tire_unknown.zip"
-            _write_archive(archive, b"unknown")
-            report = _structural_report(archive, compatible=False)
-            with patch.object(
-                policy,
-                "analyze_native_tire_selector_boundary_roles",
-                return_value=report,
+            archive = Path(directory) / "tire_b_Horizon.zip"
+            _write_archive(archive, b"horizon")
+            spec = _spec(car_id=2000, model="b_Horizon")
+            with patch(
+                "fh6garage.preview3d.tire_production_policy.infer_stock_native_tire_morph",
+                return_value=_inference(spec, archive),
             ):
-                result = evaluate_stock_tire_production_candidate(
-                    _spec(model="unknown"), archive
-                )
-        self.assertEqual(result.status, "blocked_family_structural_validation_failed")
+                result = evaluate_stock_tire_production_candidate(spec, archive)
+
+        self.assertTrue(result.production_trial_eligible)
+        self.assertEqual(result.status, "production_trial_eligible")
+
+    def test_generic_auto_inference_failure_is_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            archive = Path(directory) / "tire_vintage.zip"
+            _write_archive(archive, b"vintage")
+            spec = _spec(car_id=247, model="Vintage")
+            error = TireMorphAutoInferenceError(
+                "outer diameter residual too high; report=diagnostic.json",
+                report={"status": "auto_inference_rejected"},
+                report_path="diagnostic.json",
+            )
+            with patch(
+                "fh6garage.preview3d.tire_production_policy.infer_stock_native_tire_morph",
+                side_effect=error,
+            ):
+                result = evaluate_stock_tire_production_candidate(spec, archive)
+
+        self.assertEqual(result.status, "blocked_generic_auto_inference_failed")
         self.assertFalse(result.production_trial_eligible)
-        self.assertIn("does not match", result.detail)
+        self.assertIsNone(result.weights)
+        self.assertEqual(result.auto_inference_report, {"status": "auto_inference_rejected"})
 
-    def test_nonstock_spec_fails_closed_before_archive_use(self) -> None:
-        result = evaluate_stock_tire_production_candidate(
-            _spec(mode="effective"),
-            Path("does-not-exist.zip"),
-        )
+    def test_nonstock_spec_fails_closed_before_inference(self) -> None:
+        with patch(
+            "fh6garage.preview3d.tire_production_policy.infer_stock_native_tire_morph"
+        ) as infer:
+            result = evaluate_stock_tire_production_candidate(
+                _spec(mode="effective"),
+                Path("does-not-exist.zip"),
+            )
         self.assertEqual(result.status, "blocked_nonstock_spec")
         self.assertFalse(result.production_trial_eligible)
         self.assertIsNone(result.weights)
+        infer.assert_not_called()
 
-    def test_supported_family_geometry_identity_mismatch_is_blocked(self) -> None:
+    def test_archive_model_name_mismatch_is_blocked(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            archive = Path(directory) / "tire_slick.zip"
-            _write_archive(archive, b"unexpected")
-            result = evaluate_stock_tire_production_candidate(_spec(), archive)
-        self.assertEqual(result.status, "blocked_geometry_identity_mismatch")
+            archive = Path(directory) / "tire_other.zip"
+            _write_archive(archive, b"other")
+            result = evaluate_stock_tire_production_candidate(_spec(model="Slick"), archive)
+        self.assertEqual(result.status, "blocked_archive_model_mismatch")
         self.assertFalse(result.production_trial_eligible)
 
-    def test_structural_mismatch_family_is_explicitly_blocked(self) -> None:
+    def test_stock_dimension_variation_uses_inferred_vehicle_weights(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            archive = Path(directory) / "tire_b_Horizon.zip"
-            identity = _write_archive(archive, b"horizon")
-            with patch.dict(
-                policy._STRUCTURAL_MISMATCH_IDENTITIES,
-                {"b_horizon": identity},
-                clear=True,
+            archive = Path(directory) / "tire_slick.zip"
+            _write_archive(archive, b"slick")
+            spec = _spec(car_id=3000, front_width=255.0)
+            inferred = _inference(spec, archive)
+            with patch(
+                "fh6garage.preview3d.tire_production_policy.infer_stock_native_tire_morph",
+                return_value=inferred,
             ):
-                result = evaluate_stock_tire_production_candidate(
-                    _spec(model="b_Horizon"),
-                    archive,
-                )
-        self.assertEqual(result.status, "blocked_selector_signature_mismatch")
-        self.assertFalse(result.production_trial_eligible)
-
-    def test_stock_dimension_variation_uses_vehicle_specific_width(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            archive = Path(directory) / "tire_slick.zip"
-            identity = _write_archive(archive, b"slick")
-            with patch.object(policy, "_VALIDATED_SLICK_GEOMETRY_IDENTITY", identity):
-                result = evaluate_stock_tire_production_candidate(
-                    _spec(car_id=3000, front_width=255.0),
-                    archive,
-                )
+                result = evaluate_stock_tire_production_candidate(spec, archive)
         self.assertTrue(result.production_trial_eligible)
         assert result.weights is not None
         self.assertAlmostEqual(result.weights.front.scale_x, 0.255)
