@@ -33,6 +33,7 @@ on:
       - "source-v1.2/tests/test_chassis_converter_auto_rim_morph.py"
       - "source-v1.2/tests/test_chassis_converter_wheel_morph_helper.py"
       - "source-v1.2/tests/test_glb_livery_structural_exclusion.py"
+      - "source-v1.2/tests/test_kfps_wheel_morph_diagnostic_patch.py"
       - "source-v1.2/tests/test_native_transform_chain_patch.py"
       - "source-v1.2/tests/test_native_transform_chain_v2.py"
       - "source-v1.2/tests/test_tire_morph_boundary_roles.py"
@@ -119,6 +120,7 @@ jobs:
           python -m unittest tests.test_wheel_morph_auto -v
           python -m unittest tests.test_chassis_converter_wheel_morph_helper -v
           python -m unittest tests.test_chassis_converter_auto_rim_morph -v
+          python -m unittest tests.test_kfps_wheel_morph_diagnostic_patch -v
           python -m unittest tests.test_native_transform_chain_patch -v
           python -m unittest tests.test_native_transform_chain_v2 -v
           python -m unittest tests.test_tire_morph_boundary_roles -v
@@ -139,7 +141,7 @@ jobs:
           Set-Location source-v1.2
           python -m py_compile fh6garage/preview3d/wheel_morph_helper.py
           python -m unittest tests.test_wheel_morph_helper -v
-          $expected = (python -c "from fh6garage.preview3d.wheel_morph_helper import WHEEL_MORPH_HELPER_SHA256; print(WHEEL_MORPH_HELPER_SHA256)").Trim()
+          $expected = (python -c "import runpy; print(runpy.run_path(r'fh6garage/preview3d/wheel_morph_helper.py')['WHEEL_MORPH_HELPER_SHA256'])").Trim()
           if ($LASTEXITCODE -ne 0 -or -not $expected) { throw "Could not read the pinned helper SHA-256 from wheel_morph_helper.py" }
           Add-Content -Path $env:GITHUB_ENV -Value "EXPECTED_HELPER_SHA256=$expected"
           Write-Host "Pinned transform-chain helper SHA-256: $expected"
