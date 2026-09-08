@@ -9,6 +9,7 @@ from typing import Any, Callable
 import zipfile
 
 from .tire_asset import resolve_tire_archive
+from .tire_morph_boundary_roles import analyze_native_tire_selector_boundary_roles
 from .tire_production_trial_geometry import build_stock_tire_production_trial_geometry
 from .tire_spindle_attachment import build_tire_spindle_attachment_contract
 from .tire_spindle_glb_merge import merge_tire_spindle_trial_glb
@@ -95,6 +96,19 @@ def _write_manifest_best_effort(path: Path, payload: dict[str, Any]) -> str | No
         return None
 
 
+def _capture_selector_boundary_report(diagnostic: dict[str, Any]) -> None:
+    """Best-effort structural evidence capture for a geometry-stage fallback."""
+    archive_path = diagnostic.get("tire_archive")
+    if not archive_path or diagnostic.get("selector_boundary_report") is not None:
+        return
+    try:
+        report = analyze_native_tire_selector_boundary_roles(archive_path)
+        diagnostic["selector_boundary_report"] = report.as_dict()
+        diagnostic["selector_boundary_report_error"] = None
+    except Exception as exc:
+        diagnostic["selector_boundary_report_error"] = f"{type(exc).__name__}: {exc}"
+
+
 def _passthrough(
     asset: Any,
     vehicle_glb: Path,
@@ -156,6 +170,8 @@ def try_apply_stock_native_tire_preview(
         "tire_archive": None,
         "wheel_spec": None,
         "geometry_report": None,
+        "selector_boundary_report": None,
+        "selector_boundary_report_error": None,
         "attachment_contract": None,
         "attachment_count": 0,
         "merge_report": None,
@@ -325,6 +341,8 @@ def try_apply_stock_native_tire_preview(
         )
     except Exception as exc:
         detail = f"{type(exc).__name__}: {exc}"
+        if stage == "build_tire_geometry":
+            _capture_selector_boundary_report(diagnostic)
         diagnostic.update(
             {
                 "status": "fallback_existing_vehicle_glb",
