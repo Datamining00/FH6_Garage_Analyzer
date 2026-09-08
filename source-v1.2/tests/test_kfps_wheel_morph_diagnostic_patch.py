@@ -35,11 +35,12 @@ class KfpsWheelMorphDiagnosticPatchTests(unittest.TestCase):
         self.assertIn("ResolvedAttachmentBoneIndex", audit)
         # A named attachment that failed to resolve must return immediately; it
         # must not silently reinterpret the same numeric BoneId in another model skeleton.
-        named_failure = audit.index('"name_not_found"')
-        id_only = audit.index('mode = "id_only"', named_failure)
-        self.assertLess(named_failure, id_only)
-        segment = audit[named_failure:id_only]
+        name_branch = audit.index("if (target < 0)")
+        id_only = audit.index('mode = "id_only"', name_branch)
+        self.assertLess(name_branch, id_only)
+        segment = audit[name_branch:id_only]
         self.assertIn("return new AttachmentBoneResolution", segment)
+        self.assertIn('"name_not_found"', segment)
 
     def test_runtime_uses_signed_base_vertex_and_selector_indices(self):
         text = HELPER.read_text(encoding="utf-8")
