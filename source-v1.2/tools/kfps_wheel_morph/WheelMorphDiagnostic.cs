@@ -28,6 +28,7 @@ internal static class WheelMorphRuntime
     private static float _rearWidth;
     private static float _axleSplitZ;
     private static bool _configured;
+    private static readonly HashSet<string> _namedFrontInstances = new(StringComparer.Ordinal);
 
     public static string Mode => _mode;
     public static int AppliedMeshes { get; private set; }
@@ -38,6 +39,7 @@ internal static class WheelMorphRuntime
     {
         _mode = "none";
         _configured = false;
+        _namedFrontInstances.Clear();
         AppliedMeshes = 0;
         AppliedVertices = 0;
     }
@@ -46,6 +48,7 @@ internal static class WheelMorphRuntime
     {
         AppliedMeshes = 0;
         AppliedVertices = 0;
+        _namedFrontInstances.Clear();
         _mode = (Environment.GetEnvironmentVariable("KFPS_WHEEL_MORPH_MODE") ?? "none")
             .Trim().ToLowerInvariant();
         if (_mode is not ("none" or "diameter" or "width" or "combined"))
@@ -62,20 +65,35 @@ internal static class WheelMorphRuntime
         _rearDiameter = ReadWeight("KFPS_WHEEL_MORPH_REAR_DIAMETER");
         _rearWidth = ReadWeight("KFPS_WHEEL_MORPH_REAR_WIDTH");
 
-        var wheelZ = instances
+        var wheelInstances = instances
             .Where(instance => (uint)instance.PartType == WheelStylePartType)
+            .ToArray();
+        if (wheelInstances.Length < 2)
+            throw new InvalidDataException(
+                "Wheel morph diagnostic requires at least two WheelStyle instances.");
+        var wheelZ = wheelInstances
             .Select(instance => instance.Transform.M43)
             .Where(float.IsFinite)
             .ToArray();
-        if (wheelZ.Length < 2)
-            throw new InvalidDataException(
-                "Wheel morph diagnostic requires at least two WheelStyle instances.");
+        if (wheelZ.Length != wheelInstances.Length)
+            throw new InvalidDataException("WheelStyle carbin transforms contain a non-finite Z value.");
         var minZ = wheelZ.Min();
         var maxZ = wheelZ.Max();
-        if (!float.IsFinite(minZ) || !float.IsFinite(maxZ) || maxZ - minZ <= 1e-4f)
+        if (!float.IsFinite(minZ) || !float.IsFinite(maxZ) || maxZ <= minZ)
             throw new InvalidDataException(
-                "WheelStyle carbin transforms do not form distinct front/rear Z clusters.");
+                "WheelStyle carbin transforms do not span multiple longitudinal positions.");
         _axleSplitZ = (minZ + maxZ) * 0.5f;
+
+        // Prefer the scene's own wheel-bone semantics for identifying the front
+        // axle.  This keeps every additional/middle/rear WheelStyle instance on
+        // the rear stock-spec path without assuming a four-wheel topology.  If a
+        // scene exposes no directional wheel names, retain the coordinate-only
+        // split as a compatibility fallback rather than introducing model rules.
+        foreach (var instance in wheelInstances)
+        {
+            if (IsNamedFrontWheel(instance.BoneName))
+                _namedFrontInstances.Add(instance.Identity);
+        }
         _configured = true;
     }
 
@@ -94,10 +112,12 @@ internal static class WheelMorphRuntime
                 $"Wheel mesh {geometry.Name} declares unsupported morph target count {mesh.MorphTargetCount}.");
 
         var z = instance.Transform.M43;
-        if (!float.IsFinite(z) || MathF.Abs(z - _axleSplitZ) <= 1e-6f)
+        if (!float.IsFinite(z))
             throw new InvalidDataException(
-                $"WheelStyle instance {instance.Identity} cannot be assigned to a front/rear axle from carbin Z.");
-        var front = z > _axleSplitZ;
+                $"WheelStyle instance {instance.Identity} has a non-finite carbin Z coordinate.");
+        var front = _namedFrontInstances.Count > 0
+            ? _namedFrontInstances.Contains(instance.Identity)
+            : z > _axleSplitZ;
         var weights = EffectiveWeights(front);
         if (mesh.MorphTargetCount == 1 && MathF.Abs(weights[0]) <= 1e-12f)
             return null;
@@ -186,6 +206,17 @@ internal static class WheelMorphRuntime
         if (count < 0)
             throw new InvalidDataException("Wheel morph vertex count cannot be negative.");
         AppliedVertices = checked(AppliedVertices + count);
+    }
+
+    private static bool IsNamedFrontWheel(string rawName)
+    {
+        var compact = new string((rawName ?? "")
+            .Where(char.IsLetterOrDigit)
+            .Select(char.ToLowerInvariant)
+            .ToArray());
+        return compact.Contains("front", StringComparison.Ordinal)
+            || compact.EndsWith("lf", StringComparison.Ordinal)
+            || compact.EndsWith("rf", StringComparison.Ordinal);
     }
 
     private static float[] EffectiveWeights(bool front)
