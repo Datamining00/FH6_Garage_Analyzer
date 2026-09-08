@@ -4,6 +4,7 @@ import struct
 import tempfile
 from pathlib import Path
 import unittest
+import zipfile
 
 from fh6garage.preview3d.modelbin_morph import BUNDLE_TAG, MESH_TAG, MORPH_BUFFER_TAG
 from fh6garage.preview3d.tire_morph_geometry import (
@@ -13,6 +14,7 @@ from fh6garage.preview3d.tire_morph_geometry import (
     TireMorphGeometryError,
     _glb_bytes,
     bake_modelbin_selector_geometry,
+    bake_tire_morph_selectors,
 )
 
 
@@ -204,6 +206,24 @@ class TireMorphGeometryTests(unittest.TestCase):
             for path in report.glb_files.values():
                 self.assertTrue(Path(path).is_file())
                 self.assertEqual(Path(path).read_bytes()[:4], b"glTF")
+
+    def test_archive_selector_bake_accepts_no_output_dir_when_glb_writes_disabled(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            archive = Path(directory) / "tire_Vintage.zip"
+            with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
+                bundle.writestr("tireL_vintage.modelbin", _bundle())
+            before = archive.read_bytes()
+
+            report = bake_tire_morph_selectors(
+                archive,
+                None,
+                write_glb=False,
+            )
+
+            self.assertTrue(report.archive_read_only_unchanged)
+            self.assertEqual(archive.read_bytes(), before)
+            self.assertEqual(len(report.modelbins), 1)
+            self.assertEqual(report.modelbins[0].glb_files, {})
 
     def test_unverified_position_format_fails_closed(self) -> None:
         source = _bundle(position_format=10)
