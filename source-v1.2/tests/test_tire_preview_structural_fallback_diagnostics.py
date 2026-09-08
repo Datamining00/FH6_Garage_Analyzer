@@ -100,7 +100,7 @@ class TirePreviewStructuralFallbackDiagnosticsTests(unittest.TestCase):
 
             self.assertEqual(result.status, "fallback_existing_vehicle_glb")
             self.assertEqual(Path(result.selected_vehicle_glb), vehicle_glb.resolve())
-            analyze.assert_called_once_with(str(tire_archive.resolve()))
+            analyze.assert_called_once_with(str(tire_archive))
 
             manifest_path = Path(result.manifest_path or "")
             self.assertTrue(manifest_path.is_file())
