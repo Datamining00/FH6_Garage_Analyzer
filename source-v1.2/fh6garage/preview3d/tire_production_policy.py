@@ -6,20 +6,12 @@ from pathlib import Path
 from typing import Any
 import zipfile
 
-from .tire_morph_auto_inference import (
-    GENERIC_TIRE_AUTO_INFERENCE_REVISION,
-    TireMorphAutoInferenceError,
-    infer_stock_native_tire_morph,
-)
-from .tire_morph_weights import (
-    TireMorphWeightError,
-    VehicleTireMorphWeights,
-    stock_vehicle_tire_morph_weights,
-)
-from .wheel_spec import VehicleWheelSpec
+from .tire_morph_weights import AxleTireMorphWeights, VehicleTireMorphWeights
+from .wheel_spec import AxleWheelSpec, VehicleWheelSpec
 
 
-TIRE_PRODUCTION_POLICY_REVISION = "stock_native_tire_global_auto_recognition_v3"
+TIRE_PRODUCTION_POLICY_REVISION = "stock_native_tire_global_auto_recognition_v4"
+_NORMALIZATION_MAPPING_REVISION = "native_tire_stock_dimension_normalization_v1"
 
 
 @dataclass(frozen=True)
@@ -87,7 +79,6 @@ def _blocked(
     archive: Path,
     archive_sha256: str | None = None,
     geometry_identity: str | None = None,
-    auto_inference_report: dict[str, Any] | None = None,
 ) -> TireProductionEligibility:
     return TireProductionEligibility(
         status=status,
@@ -101,7 +92,32 @@ def _blocked(
         production_trial_eligible=False,
         production_renderer_enabled=False,
         weights=None,
-        auto_inference_report=auto_inference_report,
+        auto_inference_report=None,
+    )
+
+
+def _axle_normalization_weights(spec: AxleWheelSpec) -> AxleTireMorphWeights:
+    """Zero-selector carrier used by the global base-geometry normalization path."""
+    return AxleTireMorphWeights(
+        axle=str(spec.axle),
+        tire_width_mm=float(spec.tire_width_mm),
+        tire_aspect_ratio=float(spec.tire_aspect_ratio),
+        original_rim_diameter_in=float(spec.rim_diameter_in),
+        rim_diameter_in=float(spec.rim_diameter_in),
+        selector_weights=(0.0, 0.0, 0.0, 0.0, 0.0),
+        scale_x=1.0,
+        mapping_revision=_NORMALIZATION_MAPPING_REVISION,
+    )
+
+
+def _normalization_weights(spec: VehicleWheelSpec) -> VehicleTireMorphWeights:
+    return VehicleTireMorphWeights(
+        car_id=int(spec.car_id),
+        wheel_spec_mode=str(spec.mode),
+        tire_model_name=spec.tire_model_name,
+        front=_axle_normalization_weights(spec.front),
+        rear=_axle_normalization_weights(spec.rear),
+        mapping_revision=_NORMALIZATION_MAPPING_REVISION,
     )
 
 
@@ -109,16 +125,13 @@ def evaluate_stock_tire_production_candidate(
     spec: VehicleWheelSpec,
     archive_path: str | Path,
 ) -> TireProductionEligibility:
-    """Admit every resolvable stock native tire archive into the global FHA path.
+    """Admit every resolvable stock tire archive into the FHA global tire path.
 
-    TireModelName is used only to resolve the native ``tire_<name>.zip`` file.  The
-    program first attempts measured selector auto-inference from that exact modelbin.
-    If the selector fit is unavailable or unsuitable, admission still continues with
-    the deterministic stock seed; the geometry builder then uses the decoded tire
-    mesh itself and normalizes it to the stock width and outer diameter from the DB.
-
-    This removes per-family whitelists, per-family selector signatures and per-car
-    validation gates while keeping the source game archive read-only.
+    TireModelName is used only for automatic file resolution.  There is no family
+    whitelist, selector-signature validation, geometry-family identity gate, or
+    per-car morph calibration.  Once the matching native ZIP is found and contains
+    at least one modelbin, the base tire geometry is decoded and later normalized to
+    the stock width and outer diameter from the game database.
     """
     archive = Path(archive_path).expanduser().resolve()
     if str(spec.mode).casefold() != "stock":
@@ -157,46 +170,18 @@ def evaluate_stock_tire_production_candidate(
     except (OSError, ValueError, zipfile.BadZipFile) as exc:
         return _blocked(
             "blocked_archive_invalid",
-            f"could not verify native tire archive read-only: {type(exc).__name__}: {exc}",
+            f"could not inspect native tire archive read-only: {type(exc).__name__}: {exc}",
             spec,
             archive,
         )
 
-    inference_payload: dict[str, Any] | None
-    try:
-        inference = infer_stock_native_tire_morph(spec, archive)
-        weights = inference.weights
-        inference_payload = inference.as_dict()
-        mode_detail = (
-            f"measured selector auto-inference ({GENERIC_TIRE_AUTO_INFERENCE_REVISION})"
-        )
-    except TireMorphAutoInferenceError as exc:
-        try:
-            weights = stock_vehicle_tire_morph_weights(spec)
-        except TireMorphWeightError as seed_exc:
-            return _blocked(
-                "blocked_stock_dimension_mapping_invalid",
-                str(seed_exc),
-                spec,
-                archive,
-                archive_sha,
-                identity,
-                auto_inference_report=exc.report,
-            )
-        inference_payload = {
-            "status": "selector_auto_inference_unavailable_using_geometry_normalization",
-            "error": str(exc),
-            "report": exc.report,
-        }
-        mode_detail = (
-            "generic decoded-geometry normalization using stock DB width/outer diameter"
-        )
-
+    weights = _normalization_weights(spec)
     return TireProductionEligibility(
         status="production_trial_eligible",
         detail=(
-            f"Car ID {int(spec.car_id)} / TireModelName={model_name} admitted globally; "
-            f"mode={mode_detail}; no tire-family whitelist, selector-role signature or Car-ID-specific mapping"
+            f"Car ID {int(spec.car_id)} / TireModelName={model_name} admitted by automatic file resolution; "
+            "native base geometry will be normalized directly to stock DB dimensions; "
+            "no tire-family or Car-ID-specific mapping"
         ),
         policy_revision=TIRE_PRODUCTION_POLICY_REVISION,
         car_id=int(spec.car_id),
@@ -207,5 +192,8 @@ def evaluate_stock_tire_production_candidate(
         production_trial_eligible=True,
         production_renderer_enabled=False,
         weights=weights,
-        auto_inference_report=inference_payload,
+        auto_inference_report={
+            "status": "not_required",
+            "mode": _NORMALIZATION_MAPPING_REVISION,
+        },
     )
