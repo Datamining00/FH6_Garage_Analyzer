@@ -181,10 +181,10 @@ jobs:
           python -m PyInstaller --clean --noconfirm .\FH6_Assistant_v1.4.spec
           if ($LASTEXITCODE -ne 0) { throw "Standard PyInstaller build failed with exit code $LASTEXITCODE" }
           $exe = Resolve-Path "dist\FH6 Assistant v1.4.exe"
-          $listing = python -m PyInstaller.utils.cliutils.archive_viewer -l $exe
-          if ($LASTEXITCODE -ne 0) { throw "Could not inspect Standard archive." }
+          $listing = python -m PyInstaller.utils.cliutils.archive_viewer -l -r $exe
+          if ($LASTEXITCODE -ne 0) { throw "Could not recursively inspect Standard archive." }
           if (-not ($listing -match "Kfps\.ChassisConverter\.WheelMorph\.exe")) { throw "Standard OneFile does not contain the wheel morph helper." }
-          if (-not ($listing -match "native_transform_chain_patch")) { throw "Standard OneFile does not contain the native transform-chain module." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_transform_chain_patch")) { throw "Standard OneFile does not contain the native transform-chain module." }
 
       - name: Build Portable OneDir
         shell: pwsh
