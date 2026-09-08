@@ -14,20 +14,19 @@ from .tire_morph_weights import (
 from .wheel_spec import VehicleWheelSpec
 
 
-TIRE_PRODUCTION_POLICY_REVISION = "fxx_1006_slick_stock_trial_v1"
+TIRE_PRODUCTION_POLICY_REVISION = "stock_native_tire_global_preview_v1"
 
-# Evidence captured from the actual native tire diagnostic bundle produced from
-# the user's FH6 installation on 2026-09-07.  Only Slick has both selector-role
-# corroboration and an independent physical-dimension check against a real stock
-# vehicle (Car ID 1006, FER_FXX_05).  Other families remain diagnostic-only.
+# Native tire-family geometry identities captured from the user's FH6 installation.
+# Slick has the strongest evidence because selector 0/1 were also checked against
+# real FER_FXX_05 stock dimensions.  The other approved families reproduced the
+# same selector topology/sign pattern in the cross-family diagnostic.  Global
+# preview is therefore permitted for stock specs only when the exact known native
+# geometry identity is present.  b_Horizon remains excluded because its selector
+# signature was structurally different.
 _VALIDATED_SLICK_GEOMETRY_IDENTITY = (
     "c8a210f9cc9f09bd2cef658ebd5afb1630d7fe780c0e1b61d285591d31f9c9f1"
 )
-_VALIDATED_FXX_CAR_ID = 1006
-_VALIDATED_FXX_FRONT = (245.0, 35.0, 19.0)
-_VALIDATED_FXX_REAR = (345.0, 35.0, 19.0)
-
-_TOPOLOGY_ONLY_IDENTITIES = {
+_TOPOLOGY_COMPATIBLE_IDENTITIES = {
     "a": "d8e6c0ca112e99775f731515637ab9f91fff705ee0b7bb786917dfd30d277435",
     "b": "627b8ee10019649dee3e353699ed660e3b6602abc9e414b7b696261790647b10",
     "b_dmack": "d9ff20f7be8fb9cb06729bf2966a594d3655f804b181f6bb79973ea105491fad",
@@ -93,10 +92,6 @@ def _geometry_identity(archive: Path) -> tuple[str, str]:
     return before, identity
 
 
-def _same_axle_spec(actual: tuple[float, float, float], expected: tuple[float, float, float]) -> bool:
-    return all(abs(float(a) - float(b)) <= 1.0e-9 for a, b in zip(actual, expected))
-
-
 def _blocked(
     status: str,
     detail: str,
@@ -120,24 +115,36 @@ def _blocked(
     )
 
 
+def _expected_identity(model_name: str) -> str | None:
+    key = model_name.casefold()
+    if key == "slick":
+        return _VALIDATED_SLICK_GEOMETRY_IDENTITY
+    return _TOPOLOGY_COMPATIBLE_IDENTITIES.get(key)
+
+
 def evaluate_stock_tire_production_candidate(
     spec: VehicleWheelSpec,
     archive_path: str | Path,
 ) -> TireProductionEligibility:
-    """Fail-closed gate for the first evidence-backed native tire production trial.
+    """Gate the global stock native-tire preview using exact native-family evidence.
 
-    This does *not* attach geometry to spindles.  It only proves that the input is
-    the exact stock FXX/Slick combination whose selector 0/1 + X-width mapping was
-    physically corroborated.  Selector 2..4 must remain literal zero.
+    Vehicle-specific FXX restrictions are intentionally removed after successful
+    FXX wheel/rim/brake/tire visual validation.  The preview remains fail-closed at
+    the tire-family level: only exact known geometry identities whose selector
+    topology matches the validated Slick layout are admitted.  b_Horizon and
+    unknown/changed families remain on FHA's existing vehicle-GLB path.
+
+    Selector 2..4 remain literal zero for every admitted family.
     """
     archive = Path(archive_path).expanduser().resolve()
     if str(spec.mode).casefold() != "stock":
         return _blocked(
             "blocked_nonstock_spec",
-            f"production tire trial requires stock wheel spec; got mode={spec.mode!r}",
+            f"global native tire preview requires stock wheel spec; got mode={spec.mode!r}",
             spec,
             archive,
         )
+
     model_name = str(spec.tire_model_name or "").strip()
     if not model_name:
         return _blocked(
@@ -172,81 +179,40 @@ def evaluate_stock_tire_production_candidate(
         )
 
     key = model_name.casefold()
-    topology_identity = _TOPOLOGY_ONLY_IDENTITIES.get(key)
-    if topology_identity is not None:
-        if identity != topology_identity:
+    mismatch_identity = _STRUCTURAL_MISMATCH_IDENTITIES.get(key)
+    if mismatch_identity is not None:
+        if identity != mismatch_identity:
             return _blocked(
                 "blocked_geometry_identity_mismatch",
-                "known topology-only TireModelName has an unexpected modelbin identity",
+                "known structurally different TireModelName has an unexpected modelbin identity",
                 spec,
                 archive,
                 archive_sha,
                 identity,
             )
         return _blocked(
-            "blocked_dimension_formula_not_corroborated",
-            "selector topology matches Slick, but physical tire dimensions have not been independently corroborated for this family",
-            spec,
-            archive,
-            archive_sha,
-            identity,
-        )
-
-    mismatch_identity = _STRUCTURAL_MISMATCH_IDENTITIES.get(key)
-    if mismatch_identity is not None:
-        return _blocked(
             "blocked_selector_signature_mismatch",
-            "this tire family produced a different selector-role signature and is excluded from the production trial",
+            "this native tire family has a different selector-role signature and is excluded from global automatic preview",
             spec,
             archive,
             archive_sha,
             identity,
         )
 
-    if key != "slick":
+    expected_identity = _expected_identity(model_name)
+    if expected_identity is None:
         return _blocked(
             "blocked_family_not_evidence_approved",
-            "this TireModelName has no physical-dimension production evidence",
+            "this TireModelName has not been verified as selector-topology compatible with the global native tire preview",
             spec,
             archive,
             archive_sha,
             identity,
         )
-    if identity != _VALIDATED_SLICK_GEOMETRY_IDENTITY:
+    if identity != expected_identity:
         return _blocked(
             "blocked_geometry_identity_mismatch",
-            "Slick modelbin identity differs from the physically validated native sample",
-            spec,
-            archive,
-            archive_sha,
-            identity,
-        )
-    if int(spec.car_id) != _VALIDATED_FXX_CAR_ID:
-        return _blocked(
-            "blocked_car_dimension_validation_missing",
-            "Slick selector formula has not yet been physically dimension-validated for this Car ID",
-            spec,
-            archive,
-            archive_sha,
-            identity,
-        )
-
-    front = (
-        float(spec.front.tire_width_mm),
-        float(spec.front.tire_aspect_ratio),
-        float(spec.front.rim_diameter_in),
-    )
-    rear = (
-        float(spec.rear.tire_width_mm),
-        float(spec.rear.tire_aspect_ratio),
-        float(spec.rear.rim_diameter_in),
-    )
-    if not _same_axle_spec(front, _VALIDATED_FXX_FRONT) or not _same_axle_spec(
-        rear, _VALIDATED_FXX_REAR
-    ):
-        return _blocked(
-            "blocked_validated_dimension_mismatch",
-            "FXX stock tire dimensions differ from the physically corroborated 245/35R19 front and 345/35R19 rear evidence",
+            "native tire modelbin identity differs from the verified family sample",
             spec,
             archive,
             archive_sha,
@@ -264,6 +230,7 @@ def evaluate_stock_tire_production_candidate(
             archive_sha,
             identity,
         )
+
     if weights.front.selector_weights[2:] != (0.0, 0.0, 0.0) or weights.rear.selector_weights[2:] != (
         0.0,
         0.0,
@@ -278,10 +245,16 @@ def evaluate_stock_tire_production_candidate(
             identity,
         )
 
+    evidence = (
+        "physically dimension-corroborated Slick reference plus exact native geometry identity"
+        if key == "slick"
+        else "cross-family selector-topology match plus exact native geometry identity"
+    )
     return TireProductionEligibility(
         status="production_trial_eligible",
         detail=(
-            "exact stock FXX/Slick evidence matched; selector 0/1 and width X-scale may proceed to a derived-geometry trial, while selector 2..4 remain zero"
+            f"global stock native tire preview admitted Car ID {int(spec.car_id)} using {model_name}: {evidence}; "
+            "selector 0/1 and width X-scale are applied, selector 2..4 remain zero"
         ),
         policy_revision=TIRE_PRODUCTION_POLICY_REVISION,
         car_id=int(spec.car_id),
