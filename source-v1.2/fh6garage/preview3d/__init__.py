@@ -33,6 +33,7 @@ def _install_native_transform_chain_preview() -> bool:
     from .native_transform_chain_v3 import install_native_transform_chain_v3
     from . import tire_preview_integration as tire_preview_integration
 
+    # Shading is viewer-only and is installed before any geometry/tire conversion.
     install_game_like_material_patch()
     install_native_transform_chain_v3()
     return tire_preview_integration.install_global_stock_native_tire_preview()
