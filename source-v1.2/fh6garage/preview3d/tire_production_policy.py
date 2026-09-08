@@ -11,11 +11,15 @@ from .tire_morph_auto_inference import (
     TireMorphAutoInferenceError,
     infer_stock_native_tire_morph,
 )
-from .tire_morph_weights import VehicleTireMorphWeights
+from .tire_morph_weights import (
+    TireMorphWeightError,
+    VehicleTireMorphWeights,
+    stock_vehicle_tire_morph_weights,
+)
 from .wheel_spec import VehicleWheelSpec
 
 
-TIRE_PRODUCTION_POLICY_REVISION = "stock_native_tire_generic_auto_inference_v1"
+TIRE_PRODUCTION_POLICY_REVISION = "stock_native_tire_global_auto_recognition_v3"
 
 
 @dataclass(frozen=True)
@@ -105,13 +109,16 @@ def evaluate_stock_tire_production_candidate(
     spec: VehicleWheelSpec,
     archive_path: str | Path,
 ) -> TireProductionEligibility:
-    """Gate native tire preview with generic file-driven morph auto-inference.
+    """Admit every resolvable stock native tire archive into the global FHA path.
 
-    Tire family names and pre-recorded selector-role signatures are not admission
-    criteria.  The exact archive linked by TireModelName is inspected read-only and
-    its own selector geometry is used to infer stock morph weights.  The inference
-    must reproduce the database stock width and outer diameter within global
-    fail-closed tolerances before the production-trial geometry path is admitted.
+    TireModelName is used only to resolve the native ``tire_<name>.zip`` file.  The
+    program first attempts measured selector auto-inference from that exact modelbin.
+    If the selector fit is unavailable or unsuitable, admission still continues with
+    the deterministic stock seed; the geometry builder then uses the decoded tire
+    mesh itself and normalizes it to the stock width and outer diameter from the DB.
+
+    This removes per-family whitelists, per-family selector signatures and per-car
+    validation gates while keeping the source game archive read-only.
     """
     archive = Path(archive_path).expanduser().resolve()
     if str(spec.mode).casefold() != "stock":
@@ -155,63 +162,41 @@ def evaluate_stock_tire_production_candidate(
             archive,
         )
 
+    inference_payload: dict[str, Any] | None
     try:
         inference = infer_stock_native_tire_morph(spec, archive)
+        weights = inference.weights
+        inference_payload = inference.as_dict()
+        mode_detail = (
+            f"measured selector auto-inference ({GENERIC_TIRE_AUTO_INFERENCE_REVISION})"
+        )
     except TireMorphAutoInferenceError as exc:
-        return _blocked(
-            "blocked_generic_auto_inference_failed",
-            str(exc),
-            spec,
-            archive,
-            archive_sha,
-            identity,
-            auto_inference_report=exc.report,
+        try:
+            weights = stock_vehicle_tire_morph_weights(spec)
+        except TireMorphWeightError as seed_exc:
+            return _blocked(
+                "blocked_stock_dimension_mapping_invalid",
+                str(seed_exc),
+                spec,
+                archive,
+                archive_sha,
+                identity,
+                auto_inference_report=exc.report,
+            )
+        inference_payload = {
+            "status": "selector_auto_inference_unavailable_using_geometry_normalization",
+            "error": str(exc),
+            "report": exc.report,
+        }
+        mode_detail = (
+            "generic decoded-geometry normalization using stock DB width/outer diameter"
         )
 
-    if inference.archive_sha256.casefold() != archive_sha.casefold():
-        return _blocked(
-            "blocked_auto_inference_archive_identity_changed",
-            "generic auto inference did not use the same archive identity validated by production policy",
-            spec,
-            archive,
-            archive_sha,
-            identity,
-            auto_inference_report=inference.as_dict(),
-        )
-    if not inference.archive_read_only_unchanged:
-        return _blocked(
-            "blocked_auto_inference_not_read_only",
-            "generic auto inference did not preserve the source tire archive",
-            spec,
-            archive,
-            archive_sha,
-            identity,
-            auto_inference_report=inference.as_dict(),
-        )
-
-    weights = inference.weights
-    if weights.front.selector_weights[2:] != (0.0, 0.0, 0.0) or weights.rear.selector_weights[2:] != (
-        0.0,
-        0.0,
-        0.0,
-    ):
-        return _blocked(
-            "blocked_unresolved_selectors_nonzero",
-            "generic auto inference v1 must keep selectors 2..4 zero until their physical semantics are established",
-            spec,
-            archive,
-            archive_sha,
-            identity,
-            auto_inference_report=inference.as_dict(),
-        )
-
-    report_path = inference.persistent_report_path or "<diagnostic write unavailable>"
     return TireProductionEligibility(
         status="production_trial_eligible",
         detail=(
-            f"Car ID {int(spec.car_id)} admitted by {GENERIC_TIRE_AUTO_INFERENCE_REVISION} using the actual "
-            f"{model_name} modelbin response; no tire-family whitelist or selector-role signature gate; "
-            f"diagnostic={report_path}"
+            f"Car ID {int(spec.car_id)} / TireModelName={model_name} admitted globally; "
+            f"mode={mode_detail}; no tire-family whitelist, selector-role signature or Car-ID-specific mapping"
         ),
         policy_revision=TIRE_PRODUCTION_POLICY_REVISION,
         car_id=int(spec.car_id),
@@ -222,5 +207,5 @@ def evaluate_stock_tire_production_candidate(
         production_trial_eligible=True,
         production_renderer_enabled=False,
         weights=weights,
-        auto_inference_report=inference.as_dict(),
+        auto_inference_report=inference_payload,
     )
