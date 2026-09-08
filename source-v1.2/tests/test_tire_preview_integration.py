@@ -179,6 +179,7 @@ class TirePreviewIntegrationTests(unittest.TestCase):
             self.assertEqual(manifest["viewer_matrix_bake"], viewer_bake_payload)
             self.assertEqual(manifest["baked_tire_vertex_count"], 8100)
             self.assertEqual(manifest["baked_tire_triangle_count"], 2700)
+            self.assertIsNone(manifest["failed_stage"])
 
     def test_zero_drawable_bake_falls_back(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -220,9 +221,10 @@ class TirePreviewIntegrationTests(unittest.TestCase):
             self.assertTrue(result.fallback_used)
             self.assertIn("no drawable tire geometry", result.detail)
 
-    def test_global_failure_falls_back_to_existing_glb_and_cleans_trial(self) -> None:
+    def test_global_failure_falls_back_and_preserves_stage_diagnostics(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
+            local_app_data = root / "localappdata"
             asset = _asset(root, car_id=2000, model_code="OTHER")
             glb = root / "vehicle.glb"
             glb.write_bytes(b"glTF-source")
@@ -233,6 +235,7 @@ class TirePreviewIntegrationTests(unittest.TestCase):
             resolver.resolve.return_value = _Spec(2000, "b_Horizon")
 
             with (
+                patch.dict("os.environ", {"LOCALAPPDATA": str(local_app_data)}, clear=False),
                 patch("fh6garage.preview3d.tire_preview_integration.ensure_stock_wheel_database", return_value=root / "db.sqlite"),
                 patch("fh6garage.preview3d.tire_preview_integration.FH6WheelSpecResolver", return_value=resolver),
                 patch("fh6garage.preview3d.tire_preview_integration.resolve_tire_archive", return_value=tire),
@@ -253,7 +256,31 @@ class TirePreviewIntegrationTests(unittest.TestCase):
             self.assertFalse(result.applied)
             self.assertTrue(result.fallback_used)
             self.assertEqual(Path(result.selected_vehicle_glb), glb.resolve())
-            self.assertFalse(trial.exists())
+            self.assertTrue(trial.is_dir())
+
+            temporary_manifest = trial / "native_tire_preview_integration.json"
+            persistent_manifest = (
+                local_app_data
+                / "FH6GarageAnalyzer"
+                / "preview3d_runtime"
+                / "diagnostics"
+                / "native_tire_preview"
+                / "car_2000"
+                / "native_tire_preview_integration.json"
+            )
+            self.assertTrue(temporary_manifest.is_file())
+            self.assertTrue(persistent_manifest.is_file())
+            self.assertEqual(Path(result.manifest_path), persistent_manifest)
+
+            manifest = json.loads(persistent_manifest.read_text(encoding="utf-8"))
+            self.assertEqual(manifest["format"], "fh6_global_stock_native_tire_preview_integration_v3")
+            self.assertEqual(manifest["status"], "fallback_existing_vehicle_glb")
+            self.assertEqual(manifest["failed_stage"], "build_tire_geometry")
+            self.assertEqual(manifest["error_type"], "RuntimeError")
+            self.assertEqual(manifest["error"], "blocked_selector_signature_mismatch")
+            self.assertEqual(manifest["tire_model_name"], "b_Horizon")
+            self.assertEqual(Path(manifest["tire_archive"]), tire)
+            self.assertEqual(Path(manifest["selected_vehicle_glb"]), glb.resolve())
 
     def test_wrapper_replaces_successful_non_fxx_conversion_output_and_records_diagnostics(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
