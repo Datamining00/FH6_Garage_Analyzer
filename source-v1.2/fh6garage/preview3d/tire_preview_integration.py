@@ -9,7 +9,6 @@ from typing import Any, Callable
 import zipfile
 
 from .tire_asset import resolve_tire_archive
-from .tire_morph_boundary_roles import analyze_native_tire_selector_boundary_roles
 from .tire_production_trial_geometry import build_stock_tire_production_trial_geometry
 from .tire_spindle_attachment import build_tire_spindle_attachment_contract
 from .tire_spindle_glb_merge import merge_tire_spindle_trial_glb
@@ -18,12 +17,12 @@ from .wheel_spec import FH6WheelSpecResolver
 from .wheel_spec_database import ensure_stock_wheel_database
 
 
-GLOBAL_NATIVE_TIRE_PREVIEW_REVISION = "stock_native_tire_global_preview_v2"
+GLOBAL_NATIVE_TIRE_PREVIEW_REVISION = "stock_native_tire_global_auto_recognition_v4"
 FXX_NATIVE_TIRE_PREVIEW_REVISION = GLOBAL_NATIVE_TIRE_PREVIEW_REVISION
 _PATCH_MARKER = "_fh6_global_stock_native_tire_preview_patched"
 _LEGACY_PATCH_MARKER = "_fh6_validated_fxx_native_tire_preview_patched"
 _ORIGINAL_CONVERTER = "_fh6_global_stock_native_tire_preview_original_convert_vehicle"
-_DIAGNOSTIC_FORMAT = "fh6_global_stock_native_tire_preview_integration_v3"
+_DIAGNOSTIC_FORMAT = "fh6_global_stock_native_tire_preview_integration_v4"
 _DIAGNOSTIC_FILENAME = "native_tire_preview_integration.json"
 
 
@@ -96,19 +95,6 @@ def _write_manifest_best_effort(path: Path, payload: dict[str, Any]) -> str | No
         return None
 
 
-def _capture_selector_boundary_report(diagnostic: dict[str, Any]) -> None:
-    """Best-effort structural evidence capture for a geometry-stage fallback."""
-    archive_path = diagnostic.get("tire_archive")
-    if not archive_path or diagnostic.get("selector_boundary_report") is not None:
-        return
-    try:
-        report = analyze_native_tire_selector_boundary_roles(archive_path)
-        diagnostic["selector_boundary_report"] = report.as_dict()
-        diagnostic["selector_boundary_report_error"] = None
-    except Exception as exc:
-        diagnostic["selector_boundary_report_error"] = f"{type(exc).__name__}: {exc}"
-
-
 def _passthrough(
     asset: Any,
     vehicle_glb: Path,
@@ -141,7 +127,7 @@ def try_apply_stock_native_tire_preview(
     work_root: str | Path,
     progress: Callable[[str], None] | None = None,
 ) -> TirePreviewIntegrationResult:
-    """Apply stock native tire geometry to any structurally eligible FH6 vehicle."""
+    """Automatically resolve, generate and attach the stock native tire for an FH6 vehicle."""
     source_glb = Path(vehicle_glb).expanduser().resolve()
     car_id = _car_id(asset)
     if car_id <= 0:
@@ -170,8 +156,6 @@ def try_apply_stock_native_tire_preview(
         "tire_archive": None,
         "wheel_spec": None,
         "geometry_report": None,
-        "selector_boundary_report": None,
-        "selector_boundary_report_error": None,
         "attachment_contract": None,
         "attachment_count": 0,
         "merge_report": None,
@@ -187,6 +171,8 @@ def try_apply_stock_native_tire_preview(
         "persistent_manifest_path": str(persistent_manifest_path),
         "fallback_on_failure": True,
         "production_renderer_enabled": False,
+        "tire_selection_mode": "stock_db_tiremodelname_to_native_archive",
+        "geometry_generation_mode": "native_base_geometry_plus_stock_dimension_normalization",
     }
 
     try:
@@ -209,7 +195,7 @@ def try_apply_stock_native_tire_preview(
             raise ValueError(f"selected carbin is not indexed in the vehicle archive: {selected_carbin}")
 
         stage = "resolve_stock_wheel_spec"
-        _notify(progress, "Stock native 타이어 데이터를 확인합니다...")
+        _notify(progress, "Stock 타이어 파일과 규격을 자동 확인합니다...")
         database_path = ensure_stock_wheel_database(progress)
         spec = FH6WheelSpecResolver(database_path).resolve(car_id)
         if int(spec.car_id) != car_id:
@@ -308,11 +294,11 @@ def try_apply_stock_native_tire_preview(
                     f"single_left_side_reuse={side_reuse_count}"
                 ),
                 "limitations": [
-                    "Automatic native tire preview is stock-spec only.",
-                    "Known exact tire geometry identities use the validated fast path; an unlisted family must reproduce the validated selector boundary-role pattern read-only before use.",
-                    "A tireL_-only native family may reuse its canonical geometry on right spindles; the native WheelStyle RF/RR matrices provide side orientation without a procedural geometry mirror.",
-                    "Selector 2..4 remain zero until their game-facing semantics are verified.",
-                    "No arbitrary per-car translation, rotation, or scale correction is applied.",
+                    "Automatic native tire generation currently uses the stock wheel/tire specification resolved from the FH6 database.",
+                    "TireModelName is used only to locate the matching native tire archive; no tire-family whitelist or selector-signature gate is used.",
+                    "Decoded native base geometry is normalized to the stock tire width and outer diameter for every supported vehicle.",
+                    "A tireL_-only native family may reuse its canonical geometry on right spindles; native WheelStyle RF/RR matrices provide side orientation.",
+                    "No per-car translation, rotation, scale table, or vehicle-specific tire exception is applied.",
                 ],
             }
         )
@@ -322,7 +308,7 @@ def try_apply_stock_native_tire_preview(
 
         _notify(
             progress,
-            f"Native stock 타이어({tire_model_name}) 적용 완료: "
+            f"Native stock 타이어({tire_model_name}) 자동 적용 완료: "
             f"4 spindles / {baked_vertices:,} vertices / {baked_triangles:,} triangles"
             + (f" / single-left reuse {side_reuse_count}" if side_reuse_count else ""),
         )
@@ -341,8 +327,6 @@ def try_apply_stock_native_tire_preview(
         )
     except Exception as exc:
         detail = f"{type(exc).__name__}: {exc}"
-        if stage == "build_tire_geometry":
-            _capture_selector_boundary_report(diagnostic)
         diagnostic.update(
             {
                 "status": "fallback_existing_vehicle_glb",
@@ -401,6 +385,8 @@ def make_stock_native_tire_convert_wrapper(original_convert: Callable[..., Any])
             converter_override=converter_override,
         )
 
+        # Explicit external morph/override requests may represent a non-stock setup;
+        # the automatic stock tire path is applied to the normal FHA conversion path.
         if rim_morph_weights is not None or converter_override is not None:
             return result
         car_id = _car_id(asset)
