@@ -84,7 +84,7 @@ class TirePreviewIntegrationTests(unittest.TestCase):
             self.assertEqual(Path(result.selected_vehicle_glb), glb.resolve())
             database.assert_not_called()
 
-    def test_non_fxx_vehicle_can_select_native_tire_preview(self) -> None:
+    def test_non_fxx_vehicle_can_select_drawable_native_tire_preview(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             asset = _asset(root, car_id=1229, model_code="TEST_CAR")
@@ -111,11 +111,12 @@ class TirePreviewIntegrationTests(unittest.TestCase):
                 return _Report({"status": "spindle_tire_trial_glb_ready"}, ready=True)
 
             viewer_bake_payload = {
-                "format": "fh6_native_tire_viewer_matrix_bake_v1",
+                "format": "fh6_native_tire_viewer_matrix_bake_v2",
                 "status": "native_tire_trial_node_matrices_baked",
                 "node_count": 4,
                 "vertex_count": 8100,
-                "kfps_render_coordinate_conversion_applied": True,
+                "triangle_winding_reversed_count": 2700,
+                "kfps_render_space_reflection_applied": True,
                 "procedural_translation_applied": False,
                 "procedural_rotation_applied": False,
                 "procedural_scale_applied": False,
@@ -164,6 +165,8 @@ class TirePreviewIntegrationTests(unittest.TestCase):
             self.assertFalse(result.fallback_used)
             self.assertEqual(result.status, "stock_native_tire_preview_applied")
             self.assertEqual(result.car_id, 1229)
+            self.assertIn("baked_vertices=8100", result.detail)
+            self.assertIn("baked_triangles=2700", result.detail)
             self.assertEqual(captured["carbin"], b"real-carbin-bytes")
             self.assertEqual(glb.read_bytes(), source_before)
             self.assertEqual(Path(result.selected_vehicle_glb).read_bytes(), b"glTF-merged")
@@ -174,6 +177,48 @@ class TirePreviewIntegrationTests(unittest.TestCase):
             self.assertEqual(manifest["status"], "stock_native_tire_preview_applied")
             self.assertEqual(manifest["car_id"], 1229)
             self.assertEqual(manifest["viewer_matrix_bake"], viewer_bake_payload)
+            self.assertEqual(manifest["baked_tire_vertex_count"], 8100)
+            self.assertEqual(manifest["baked_tire_triangle_count"], 2700)
+
+    def test_zero_drawable_bake_falls_back(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            asset = _asset(root, car_id=1229, model_code="TEST_CAR")
+            glb = root / "vehicle.glb"
+            glb.write_bytes(b"glTF-source")
+            tire = root / "tire_slick.zip"
+            tire.write_bytes(b"placeholder")
+            resolver = Mock()
+            resolver.resolve.return_value = _Spec(1229)
+            geometry = _Report({"status": "production_trial_geometry_ready", "car_id": 1229})
+            attachment = _Report({"status": "spindle_attachment_contract_ready", "car_id": 1229})
+
+            def merge(source_glb, contract_payload, output_glb):
+                Path(output_glb).write_bytes(b"glTF-merged")
+                return _Report({"status": "spindle_tire_trial_glb_ready"}, ready=True)
+
+            with (
+                patch("fh6garage.preview3d.tire_preview_integration.ensure_stock_wheel_database", return_value=root / "db.sqlite"),
+                patch("fh6garage.preview3d.tire_preview_integration.FH6WheelSpecResolver", return_value=resolver),
+                patch("fh6garage.preview3d.tire_preview_integration.resolve_tire_archive", return_value=tire),
+                patch("fh6garage.preview3d.tire_preview_integration.build_stock_tire_production_trial_geometry", return_value=geometry),
+                patch("fh6garage.preview3d.tire_preview_integration.build_tire_spindle_attachment_contract", return_value=attachment),
+                patch("fh6garage.preview3d.tire_preview_integration.merge_tire_spindle_trial_glb", side_effect=merge),
+                patch(
+                    "fh6garage.preview3d.tire_preview_integration.bake_native_tire_trial_node_matrices",
+                    return_value={"node_count": 4, "vertex_count": 0, "triangle_winding_reversed_count": 0},
+                ),
+            ):
+                result = try_apply_stock_native_tire_preview(
+                    asset,
+                    carbin_entry="TEST_CAR.carbin",
+                    game_or_cars_path=root,
+                    vehicle_glb=glb,
+                    work_root=root / "trial",
+                )
+            self.assertFalse(result.applied)
+            self.assertTrue(result.fallback_used)
+            self.assertIn("no drawable tire geometry", result.detail)
 
     def test_global_failure_falls_back_to_existing_glb_and_cleans_trial(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -188,18 +233,9 @@ class TirePreviewIntegrationTests(unittest.TestCase):
             resolver.resolve.return_value = _Spec(2000, "b_Horizon")
 
             with (
-                patch(
-                    "fh6garage.preview3d.tire_preview_integration.ensure_stock_wheel_database",
-                    return_value=root / "db.sqlite",
-                ),
-                patch(
-                    "fh6garage.preview3d.tire_preview_integration.FH6WheelSpecResolver",
-                    return_value=resolver,
-                ),
-                patch(
-                    "fh6garage.preview3d.tire_preview_integration.resolve_tire_archive",
-                    return_value=tire,
-                ),
+                patch("fh6garage.preview3d.tire_preview_integration.ensure_stock_wheel_database", return_value=root / "db.sqlite"),
+                patch("fh6garage.preview3d.tire_preview_integration.FH6WheelSpecResolver", return_value=resolver),
+                patch("fh6garage.preview3d.tire_preview_integration.resolve_tire_archive", return_value=tire),
                 patch(
                     "fh6garage.preview3d.tire_preview_integration.build_stock_tire_production_trial_geometry",
                     side_effect=RuntimeError("blocked_selector_signature_mismatch"),
@@ -219,7 +255,7 @@ class TirePreviewIntegrationTests(unittest.TestCase):
             self.assertEqual(Path(result.selected_vehicle_glb), glb.resolve())
             self.assertFalse(trial.exists())
 
-    def test_wrapper_replaces_successful_non_fxx_conversion_output(self) -> None:
+    def test_wrapper_replaces_successful_non_fxx_conversion_output_and_records_diagnostics(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             asset = _asset(root, car_id=1229, model_code="OTHER")
@@ -228,9 +264,7 @@ class TirePreviewIntegrationTests(unittest.TestCase):
             selected = root / "vehicle__native_tires.glb"
             selected.write_bytes(b"merged")
 
-            original = Mock(
-                return_value=_Conversion(str(source), "helper.exe", {"converter": "ok"})
-            )
+            original = Mock(return_value=_Conversion(str(source), "helper.exe", {"converter": "ok"}))
             wrapped = make_stock_native_tire_convert_wrapper(original)
             applied = TirePreviewIntegrationResult(
                 status="stock_native_tire_preview_applied",
@@ -249,15 +283,41 @@ class TirePreviewIntegrationTests(unittest.TestCase):
                 "fh6garage.preview3d.tire_preview_integration.try_apply_stock_native_tire_preview",
                 return_value=applied,
             ) as integrate:
-                result = wrapped(
-                    asset,
-                    carbin_entry="OTHER.carbin",
-                    work_root=root / "geometry",
-                )
+                result = wrapped(asset, carbin_entry="OTHER.carbin", work_root=root / "geometry")
             self.assertEqual(Path(result.output_path), selected.resolve())
             self.assertEqual(result.helper_path, "helper.exe")
-            self.assertEqual(result.diagnostics, {"converter": "ok"})
+            self.assertEqual(result.diagnostics["converter"], "ok")
+            self.assertEqual(result.diagnostics["native_tire_preview"], applied.as_dict())
             integrate.assert_called_once()
+
+    def test_wrapper_records_fallback_reason_without_replacing_base_glb(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            asset = _asset(root, car_id=2000, model_code="OTHER")
+            source = root / "vehicle.glb"
+            source.write_bytes(b"source")
+            original = Mock(return_value=_Conversion(str(source), "helper.exe", {"converter": "ok"}))
+            wrapped = make_stock_native_tire_convert_wrapper(original)
+            fallback = TirePreviewIntegrationResult(
+                status="fallback_existing_vehicle_glb",
+                revision="test",
+                car_id=2000,
+                model_code="OTHER",
+                source_vehicle_glb=str(source),
+                selected_vehicle_glb=str(source),
+                applied=False,
+                fallback_used=True,
+                production_renderer_enabled=False,
+                detail="blocked test family",
+                manifest_path=None,
+            )
+            with patch(
+                "fh6garage.preview3d.tire_preview_integration.try_apply_stock_native_tire_preview",
+                return_value=fallback,
+            ):
+                result = wrapped(asset, carbin_entry="OTHER.carbin", work_root=root / "geometry")
+            self.assertEqual(Path(result.output_path), source.resolve())
+            self.assertEqual(result.diagnostics["native_tire_preview"], fallback.as_dict())
 
     def test_explicit_converter_override_skips_global_native_tire_integration(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
