@@ -20,7 +20,7 @@ class KfpsWheelMorphDiagnosticPatchTests(unittest.TestCase):
         self.assertIn("model.Bundle", text)
         self.assertIn("WheelMorphRuntime.Configure(instances)", text)
 
-    def test_attachment_resolution_uses_carbin_parent_skeleton_without_numeric_cross_fallback(self):
+    def test_attachment_resolution_prefers_local_named_bones_and_fail_closes_cross_namespace_ids(self):
         patcher = PATCHER.read_text(encoding="utf-8")
         audit = AUDIT.read_text(encoding="utf-8")
         self.assertIn("TransformAuditRuntime.ResolveAttachmentBone(model.Bundle, instance)", patcher)
@@ -40,13 +40,12 @@ class KfpsWheelMorphDiagnosticPatchTests(unittest.TestCase):
         self.assertIn('model.SnapToParent ? \\"snap:1\\" : \\"snap:0\\"', patcher)
         self.assertIn('\\"assembly:\\" + (model.AssemblyName ?? \\"\\").ToLowerInvariant()', patcher)
 
-        self.assertIn('"scene_path_name"', audit)
-        self.assertIn('"scene_fallback_name"', audit)
-        self.assertIn('"scene_name_ambiguous"', audit)
-        self.assertIn('"snap_parent_name_not_found"', audit)
         self.assertIn('"child_name"', audit)
-        self.assertIn('"name_not_found"', audit)
-        self.assertIn('"instance_model_bundle"', audit)
+        self.assertIn('"scene_path_name_bone_only"', audit)
+        self.assertIn('"bone_only_scene_name_not_found"', audit)
+        self.assertIn('"named_child_miss_keep_carbin"', audit)
+        self.assertIn('"id_only"', audit)
+        self.assertIn("IsBoneOnlyPlacement(instance)", audit)
         self.assertIn("RequestedSceneSkeletonPath", audit)
         self.assertIn("AuthoritativeSceneSkeletonSource", audit)
         self.assertIn("SceneSkeletonResolutionMode", audit)
@@ -55,17 +54,24 @@ class KfpsWheelMorphDiagnosticPatchTests(unittest.TestCase):
         self.assertIn("SnapToParent", audit)
         self.assertIn("AssemblyName", audit)
 
-        # A named SnapToParent attachment is resolved in the parent/scene
-        # namespace. Its numeric BoneId must never be reinterpreted in the child
-        # model skeleton if the parent name cannot be resolved.
-        named = audit.index("if (!string.IsNullOrWhiteSpace(requestedName))")
-        snap = audit.index("if (instance.SnapToParent)", named)
-        child = audit.index("if (instanceSkeleton is not null && instanceSkeleton.Bones.Count > 0)", snap)
-        snap_segment = audit[snap:child]
-        self.assertIn("_authoritativeSceneSkeleton", snap_segment)
-        self.assertIn("ResolveNamedSceneFallback", snap_segment)
-        self.assertNotIn('"id_only"', snap_segment)
-        self.assertNotIn("instanceSkeleton.Bones[requestedId]", snap_segment)
+        resolver_start = audit.index("public static AttachmentBoneResolution ResolveAttachmentBone")
+        resolver_end = audit.index("private static Matrix4x4 ResolveBoneWorld", resolver_start)
+        resolver = audit[resolver_start:resolver_end]
+        named = resolver.index("if (!string.IsNullOrWhiteSpace(requestedName))")
+        child = resolver.index("var childTarget", named)
+        bone_only = resolver.index("if (IsBoneOnlyPlacement(instance))", child)
+        scene = resolver.index('"scene_path_name_bone_only"', bone_only)
+        no_name = resolver.index("// With no bone name", scene)
+
+        # Named attachments resolve in their own model bundle first. If the name
+        # is absent, the numeric BoneId must not be reinterpreted in that unrelated
+        # local skeleton. A scene-skeleton name is allowed only for a zero-translation
+        # bone-only placement; otherwise the Carbin matrix is preserved unchanged.
+        self.assertLess(child, bone_only)
+        self.assertLess(bone_only, scene)
+        self.assertNotIn("if (instance.SnapToParent)", resolver)
+        self.assertNotIn("instanceSkeleton.Bones[requestedId]", resolver[named:no_name])
+        self.assertIn("instanceSkeleton.Bones[requestedId]", resolver[no_name:])
 
     def test_transform_audit_exposes_instance_local_wheel_geometry(self):
         audit = AUDIT.read_text(encoding="utf-8")
