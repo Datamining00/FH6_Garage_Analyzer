@@ -24,25 +24,8 @@ class _Spec:
         }
 
 
-class _BoundaryReport:
-    def as_dict(self) -> dict[str, object]:
-        return {
-            "format": "fh6_native_tire_selector_boundary_roles_v1",
-            "archive_read_only_unchanged": True,
-            "modelbin_roles": {
-                "tireL_vintage.modelbin": [
-                    {
-                        "selector": 0,
-                        "geometric_role": "mixed_or_unclassified",
-                        "confidence": "low",
-                    }
-                ]
-            },
-        }
-
-
 class TirePreviewStructuralFallbackDiagnosticsTests(unittest.TestCase):
-    def test_geometry_failure_persists_raw_selector_boundary_report(self) -> None:
+    def test_geometry_failure_persists_stage_without_running_per_tire_selector_analysis(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             local_app_data = root / "localappdata"
@@ -65,7 +48,6 @@ class TirePreviewStructuralFallbackDiagnosticsTests(unittest.TestCase):
 
             resolver = Mock()
             resolver.resolve.return_value = _Spec(car_id, "Vintage")
-            boundary_report = _BoundaryReport()
 
             with (
                 patch.dict("os.environ", {"LOCALAPPDATA": str(local_app_data)}, clear=False),
@@ -83,12 +65,8 @@ class TirePreviewStructuralFallbackDiagnosticsTests(unittest.TestCase):
                 ),
                 patch(
                     "fh6garage.preview3d.tire_preview_integration.build_stock_tire_production_trial_geometry",
-                    side_effect=RuntimeError("blocked_family_structural_validation_failed"),
+                    side_effect=RuntimeError("native modelbin geometry decode failed"),
                 ),
-                patch(
-                    "fh6garage.preview3d.tire_preview_integration.analyze_native_tire_selector_boundary_roles",
-                    return_value=boundary_report,
-                ) as analyze,
             ):
                 result = try_apply_stock_native_tire_preview(
                     asset,
@@ -100,17 +78,23 @@ class TirePreviewStructuralFallbackDiagnosticsTests(unittest.TestCase):
 
             self.assertEqual(result.status, "fallback_existing_vehicle_glb")
             self.assertEqual(Path(result.selected_vehicle_glb), vehicle_glb.resolve())
-            analyze.assert_called_once_with(str(tire_archive))
 
             manifest_path = Path(result.manifest_path or "")
             self.assertTrue(manifest_path.is_file())
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             self.assertEqual(manifest["failed_stage"], "build_tire_geometry")
+            self.assertEqual(manifest["error_type"], "RuntimeError")
+            self.assertEqual(manifest["error"], "native modelbin geometry decode failed")
             self.assertEqual(
-                manifest["selector_boundary_report"],
-                boundary_report.as_dict(),
+                manifest["tire_selection_mode"],
+                "stock_db_tiremodelname_to_native_archive",
             )
-            self.assertIsNone(manifest["selector_boundary_report_error"])
+            self.assertEqual(
+                manifest["geometry_generation_mode"],
+                "native_base_geometry_plus_stock_dimension_normalization",
+            )
+            self.assertNotIn("selector_boundary_report", manifest)
+            self.assertNotIn("selector_boundary_report_error", manifest)
 
 
 if __name__ == "__main__":
