@@ -169,11 +169,16 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Patched KFPS diff check failed with exit code $LASTEXITCODE" }
           $program = "kfps-source/tools/livery/chassis-converter/Program.cs"
           if (-not (Select-String -Path $program -SimpleMatch "WheelMorphRuntime.Configure(instances)" -Quiet)) { throw "Patched Program.cs is missing WheelMorphRuntime.Configure." }
-          if (-not (Select-String -Path $program -SimpleMatch "TransformAuditRuntime.Configure(instances)" -Quiet)) { throw "Patched Program.cs is missing TransformAuditRuntime.Configure." }
-          if (-not (Select-String -Path $program -SimpleMatch "TransformAuditRuntime.RegisterSceneSkeleton(rootEntry, rootModel.Bundle)" -Quiet)) { throw "Patched Program.cs is missing stock CarBody scene skeleton registration." }
+          if (-not (Select-String -Path $program -SimpleMatch "TransformAuditRuntime.Configure(instances, carbin.Scene.SkeletonPath)" -Quiet)) { throw "Patched Program.cs is missing scene-aware TransformAuditRuntime.Configure." }
+          if (-not (Select-String -Path $program -SimpleMatch "RegisterAuthoritativeSceneSkeleton" -Quiet)) { throw "Patched Program.cs is missing authoritative Scene.SkeletonPath registration." }
+          if (-not (Select-String -Path $program -SimpleMatch "model.SnapToParent" -Quiet)) { throw "Patched Program.cs is missing SnapToParent propagation." }
+          if (-not (Select-String -Path $program -SimpleMatch "model.AssemblyName" -Quiet)) { throw "Patched Program.cs is missing AssemblyName propagation." }
+          if (-not (Select-String -Path $program -SimpleMatch "TransformAuditRuntime.RegisterSceneSkeleton(rootEntry, rootModel.Bundle)" -Quiet)) { throw "Patched Program.cs is missing stock CarBody scene skeleton fallback registration." }
           if (-not (Select-String -Path $program -SimpleMatch "wheel_morph_applied_meshes = WheelMorphRuntime.AppliedMeshes" -Quiet)) { throw "Patched Program.cs is missing rim morph diagnostics." }
           if (-not (Select-String -Path $program -SimpleMatch "wheel_style_anchors = TransformAuditRuntime.WheelStyleAnchors" -Quiet)) { throw "Patched Program.cs is missing WheelStyle transform diagnostics." }
           if (-not (Select-String -Path $program -SimpleMatch "scene_attachment_skeleton_count = TransformAuditRuntime.SceneSkeletonCount" -Quiet)) { throw "Patched Program.cs is missing scene skeleton diagnostics." }
+          if (-not (Select-String -Path $program -SimpleMatch "scene_skeleton_path = TransformAuditRuntime.RequestedSceneSkeletonPath" -Quiet)) { throw "Patched Program.cs is missing Scene.SkeletonPath diagnostics." }
+          if (-not (Select-String -Path $program -SimpleMatch "authoritative_scene_skeleton_source = TransformAuditRuntime.AuthoritativeSceneSkeletonSource" -Quiet)) { throw "Patched Program.cs is missing authoritative scene skeleton diagnostics." }
           if (-not (Test-Path "kfps-source/tools/livery/chassis-converter/TransformAudit.cs")) { throw "TransformAudit.cs was not staged." }
 
       - name: Publish and stage verified helper
