@@ -10,10 +10,14 @@ from fh6garage.preview3d import wheel_morph_helper as helper
 
 
 class WheelMorphHelperTests(unittest.TestCase):
-    def test_verified_helper_sha_matches_validated_w3_binary(self):
+    def test_verified_helper_sha_matches_transform_chain_binary(self):
         self.assertEqual(
             helper.WHEEL_MORPH_HELPER_SHA256,
-            "c23c6e2b5ee0c81e58f5ed917ea6b1548fd5223f53fc257328ab85f7a9fc933d",
+            "f51bb233514088060fb3ee931612612978c2c76496dba947dbeca42dcbf9375a",
+        )
+        self.assertEqual(
+            helper.WHEEL_MORPH_HELPER_REVISION,
+            "kfps_6f53ca3_w3_transform_chain_v1",
         )
 
     def test_missing_bundled_helper_returns_none(self):
