@@ -11,6 +11,8 @@ bake function is called. This preserves the reviewed geometry logic while making
 the public module use the actual native wire IDs.
 """
 
+from pathlib import Path
+
 from . import tire_morph_geometry_impl as _impl
 
 # ForzaTech Bundle::BlobTag integer IDs (not little-endian byte strings).
@@ -26,3 +28,32 @@ for _name in dir(_impl):
         globals()[_name] = getattr(_impl, _name)
 
 del _name
+
+
+_original_bake_tire_morph_selectors = _impl.bake_tire_morph_selectors
+
+
+def bake_tire_morph_selectors(
+    archive_path: str | Path,
+    output_dir: str | Path | None = None,
+    *,
+    write_glb: bool = True,
+) -> TireSelectorBakeReport:
+    """Bake selector evidence without requiring an output path for read-only runs.
+
+    Structural eligibility checks intentionally request ``write_glb=False`` because
+    they only need AABB evidence. The implementation still normalizes its output
+    directory unconditionally, so a real existing parent directory is supplied in
+    that no-write mode. No files are created or modified by this compatibility path.
+    """
+    if output_dir is None:
+        if write_glb:
+            raise TireMorphGeometryError(
+                "output_dir is required when write_glb=True"
+            )
+        output_dir = Path(archive_path).expanduser().resolve().parent
+    return _original_bake_tire_morph_selectors(
+        archive_path,
+        output_dir,
+        write_glb=write_glb,
+    )
