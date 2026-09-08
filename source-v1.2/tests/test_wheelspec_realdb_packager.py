@@ -15,7 +15,13 @@ class WheelSpecRealDBPackagerTests(unittest.TestCase):
         self.assertIn("validate_wheel_spec_real_db.py", text)
         self.assertIn("README_WheelSpec_RealDB_Diagnostic.txt", text)
         self.assertIn('ROOT / "fh6garage" / "preview3d" / "wheel_spec.py"', text)
-        self.assertIn('make_archive', text)
+        self.assertIn("DIAGNOSTIC_PREVIEW3D_INIT", text)
+        self.assertIn('(preview3d_dir / "__init__.py").write_text', text)
+        self.assertNotIn(
+            'ROOT / "fh6garage" / "preview3d" / "__init__.py"',
+            text,
+        )
+        self.assertIn("make_archive", text)
 
 
 if __name__ == "__main__":
