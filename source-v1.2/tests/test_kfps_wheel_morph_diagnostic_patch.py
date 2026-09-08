@@ -7,6 +7,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 PATCHER = ROOT / "tools" / "patch_kfps_wheel_morph_diagnostic.py"
 HELPER = ROOT / "tools" / "kfps_wheel_morph" / "WheelMorphDiagnostic.cs"
+AUDIT = ROOT / "tools" / "kfps_wheel_morph" / "TransformAudit.cs"
 
 
 class KfpsWheelMorphDiagnosticPatchTests(unittest.TestCase):
@@ -18,6 +19,27 @@ class KfpsWheelMorphDiagnosticPatchTests(unittest.TestCase):
         self.assertLess(morph, transform)
         self.assertIn("model.Bundle", text)
         self.assertIn("WheelMorphRuntime.Configure(instances)", text)
+
+    def test_attachment_resolution_is_name_safe_and_audited(self):
+        patcher = PATCHER.read_text(encoding="utf-8")
+        audit = AUDIT.read_text(encoding="utf-8")
+        self.assertIn("TransformAuditRuntime.ResolveAttachmentBone(model.Bundle, instance)", patcher)
+        self.assertIn("attachmentResolution.World is Matrix4x4 boneWorld", patcher)
+        self.assertIn(
+            "TransformAuditRuntime.RecordInstance(entryName, instance, instanceTransform, attachmentResolution)",
+            patcher,
+        )
+        self.assertIn('"name_not_found"', audit)
+        self.assertIn('"instance_model_bundle"', audit)
+        self.assertIn("AttachmentResolutionMode", audit)
+        self.assertIn("ResolvedAttachmentBoneIndex", audit)
+        # A named attachment that failed to resolve must return immediately; it
+        # must not silently reinterpret the same numeric BoneId in another model skeleton.
+        named_failure = audit.index('"name_not_found"')
+        id_only = audit.index('mode = "id_only"', named_failure)
+        self.assertLess(named_failure, id_only)
+        segment = audit[named_failure:id_only]
+        self.assertIn("return new AttachmentBoneResolution", segment)
 
     def test_runtime_uses_signed_base_vertex_and_selector_indices(self):
         text = HELPER.read_text(encoding="utf-8")

@@ -44,8 +44,8 @@ def patch(kfps_root: Path, helper: Path, audit_helper: Path) -> None:
     text = _replace_exact(
         text,
         """            var instanceTransform = instance.Transform;\n            if (FindBoneWorld(model.Bundle, instance.BoneName, instance.BoneId) is Matrix4x4 boneWorld)\n                instanceTransform = instance.Transform * boneWorld;\n            var before = result.Count;""",
-        """            var instanceTransform = instance.Transform;\n            if (FindBoneWorld(model.Bundle, instance.BoneName, instance.BoneId) is Matrix4x4 boneWorld)\n                instanceTransform = instance.Transform * boneWorld;\n            TransformAuditRuntime.RecordInstance(entryName, instance, instanceTransform);\n            var before = result.Count;""",
-        "record exact KFPS effective instance transform",
+        """            var instanceTransform = instance.Transform;\n            var attachmentResolution = TransformAuditRuntime.ResolveAttachmentBone(model.Bundle, instance);\n            if (attachmentResolution.World is Matrix4x4 boneWorld)\n                instanceTransform = instance.Transform * boneWorld;\n            TransformAuditRuntime.RecordInstance(entryName, instance, instanceTransform, attachmentResolution);\n            var before = result.Count;""",
+        "resolve attachment bone without cross-skeleton numeric fallback and record provenance",
     )
 
     text = _replace_exact(
