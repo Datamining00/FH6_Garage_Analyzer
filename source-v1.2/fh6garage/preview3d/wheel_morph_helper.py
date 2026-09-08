@@ -5,8 +5,8 @@ from pathlib import Path
 import sys
 
 WHEEL_MORPH_HELPER_FILENAME = "Kfps.ChassisConverter.WheelMorph.exe"
-WHEEL_MORPH_HELPER_SHA256 = "58d9de70a6b42376f6e751921a2fe70a4d5333dd78693523b0d356e2ae93d2a8"
-WHEEL_MORPH_HELPER_REVISION = "kfps_6f53ca3_w3_local_first_bone_fallback_v5"
+WHEEL_MORPH_HELPER_SHA256 = "b324bec643270fada663e089c01c03f0ecdb2b6e586e53a5236a1ef1b122fbe1"
+WHEEL_MORPH_HELPER_REVISION = "kfps_6f53ca3_w3_native_material_provenance_v6"
 
 
 class WheelMorphHelperError(RuntimeError):
