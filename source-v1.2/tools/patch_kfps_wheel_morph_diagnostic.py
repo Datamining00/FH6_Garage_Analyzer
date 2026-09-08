@@ -15,28 +15,37 @@ def _replace_exact(text: str, old: str, new: str, label: str, *, count: int = 1)
     return text.replace(old, new, count)
 
 
-def patch(kfps_root: Path, helper: Path) -> None:
+def patch(kfps_root: Path, helper: Path, audit_helper: Path) -> None:
     converter = kfps_root / "tools" / "livery" / "chassis-converter"
     program = converter / "Program.cs"
     if not program.is_file():
         raise RuntimeError(f"Pinned KFPS Program.cs was not found: {program}")
     if not helper.is_file():
         raise RuntimeError(f"WheelMorphDiagnostic.cs was not found: {helper}")
+    if not audit_helper.is_file():
+        raise RuntimeError(f"TransformAudit.cs was not found: {audit_helper}")
 
     text = program.read_text(encoding="utf-8-sig")
 
     text = _replace_exact(
         text,
         """                scene_assembled = sceneAssembled,\n                requested_instance_count = extraction.RequestedInstances,""",
-        """                scene_assembled = sceneAssembled,\n                wheel_morph_mode = WheelMorphRuntime.Mode,\n                wheel_morph_applied_meshes = WheelMorphRuntime.AppliedMeshes,\n                wheel_morph_applied_vertices = WheelMorphRuntime.AppliedVertices,\n                wheel_morph_axle_split_z = WheelMorphRuntime.AxleSplitZ,\n                requested_instance_count = extraction.RequestedInstances,""",
-        "conversion JSON morph diagnostics",
+        """                scene_assembled = sceneAssembled,\n                wheel_morph_mode = WheelMorphRuntime.Mode,\n                wheel_morph_applied_meshes = WheelMorphRuntime.AppliedMeshes,\n                wheel_morph_applied_vertices = WheelMorphRuntime.AppliedVertices,\n                wheel_morph_axle_split_z = WheelMorphRuntime.AxleSplitZ,\n                wheel_style_anchor_count = TransformAuditRuntime.WheelStyleAnchors.Count,\n                wheel_style_anchors = TransformAuditRuntime.WheelStyleAnchors,\n                transform_audit_count = TransformAuditRuntime.MeshTransformAudit.Count,\n                transform_audit = TransformAuditRuntime.MeshTransformAudit,\n                requested_instance_count = extraction.RequestedInstances,""",
+        "conversion JSON morph/transform diagnostics",
     )
 
     text = _replace_exact(
         text,
         """        var instances = SceneModelInstances(carbin.Scene, out var partOptions);\n        if (instances.Count == 0)""",
-        """        var instances = SceneModelInstances(carbin.Scene, out var partOptions);\n        WheelMorphRuntime.Configure(instances);\n        if (instances.Count == 0)""",
-        "configure WheelStyle axle clusters",
+        """        var instances = SceneModelInstances(carbin.Scene, out var partOptions);\n        WheelMorphRuntime.Configure(instances);\n        TransformAuditRuntime.Configure(instances);\n        if (instances.Count == 0)""",
+        "configure WheelStyle morph and transform audit",
+    )
+
+    text = _replace_exact(
+        text,
+        """            var instanceTransform = instance.Transform;\n            if (FindBoneWorld(model.Bundle, instance.BoneName, instance.BoneId) is Matrix4x4 boneWorld)\n                instanceTransform = instance.Transform * boneWorld;\n            var before = result.Count;""",
+        """            var instanceTransform = instance.Transform;\n            if (FindBoneWorld(model.Bundle, instance.BoneName, instance.BoneId) is Matrix4x4 boneWorld)\n                instanceTransform = instance.Transform * boneWorld;\n            TransformAuditRuntime.RecordInstance(entryName, instance, instanceTransform);\n            var before = result.Count;""",
+        "record exact KFPS effective instance transform",
     )
 
     text = _replace_exact(
@@ -63,8 +72,8 @@ def patch(kfps_root: Path, helper: Path) -> None:
     text = _replace_exact(
         text,
         """            var positions = TransformPositions(geometry, instanceTransform);""",
-        """            var positions = TransformPositions(bundle, geometry, instance, instanceTransform);""",
-        "weighted TransformPositions call",
+        """            var positions = TransformPositions(bundle, geometry, instance, instanceTransform);\n            TransformAuditRuntime.RecordGeometry(entryName: sourceEntry, geometry, instance, instanceTransform, positions);""",
+        "weighted TransformPositions and transform-audit call",
     )
 
     text = _replace_exact(
@@ -76,11 +85,12 @@ def patch(kfps_root: Path, helper: Path) -> None:
 
     program.write_text(text, encoding="utf-8")
     shutil.copy2(helper, converter / "WheelMorphDiagnostic.cs")
+    shutil.copy2(audit_helper, converter / "TransformAudit.cs")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Patch the pinned KFPS chassis converter with diagnostic-only weighted wheel morph support."
+        description="Patch the pinned KFPS chassis converter with weighted wheel morph and exact transform-chain diagnostics."
     )
     parser.add_argument("--kfps-root", type=Path, required=True)
     parser.add_argument(
@@ -88,9 +98,14 @@ def main() -> int:
         type=Path,
         default=Path(__file__).resolve().parent / "kfps_wheel_morph" / "WheelMorphDiagnostic.cs",
     )
+    parser.add_argument(
+        "--audit-helper",
+        type=Path,
+        default=Path(__file__).resolve().parent / "kfps_wheel_morph" / "TransformAudit.cs",
+    )
     args = parser.parse_args()
-    patch(args.kfps_root.resolve(), args.helper.resolve())
-    print(f"Patched pinned KFPS wheel morph diagnostic: {args.kfps_root}")
+    patch(args.kfps_root.resolve(), args.helper.resolve(), args.audit_helper.resolve())
+    print(f"Patched pinned KFPS wheel morph/transform diagnostics: {args.kfps_root}")
     return 0
 
 
