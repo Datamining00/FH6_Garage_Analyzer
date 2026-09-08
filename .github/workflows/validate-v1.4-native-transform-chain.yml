@@ -106,10 +106,14 @@ jobs:
           git -C kfps-source diff --check
           if ($LASTEXITCODE -ne 0) { throw "Patched KFPS diff check failed with exit code $LASTEXITCODE" }
           $program = "kfps-source/tools/livery/chassis-converter/Program.cs"
-          if (-not (Select-String -Path $program -SimpleMatch "TransformAuditRuntime.Configure(instances)" -Quiet)) { throw "TransformAuditRuntime.Configure is missing." }
-          if (-not (Select-String -Path $program -SimpleMatch "TransformAuditRuntime.RegisterSceneSkeleton(rootEntry, rootModel.Bundle)" -Quiet)) { throw "Scene CarBody skeleton registration is missing." }
+          if (-not (Select-String -Path $program -SimpleMatch "TransformAuditRuntime.Configure(instances, carbin.Scene.SkeletonPath)" -Quiet)) { throw "Scene-aware TransformAuditRuntime.Configure is missing." }
+          if (-not (Select-String -Path $program -SimpleMatch "RegisterAuthoritativeSceneSkeleton" -Quiet)) { throw "Authoritative Scene.SkeletonPath registration is missing." }
+          if (-not (Select-String -Path $program -SimpleMatch "model.SnapToParent" -Quiet)) { throw "CarRenderModel SnapToParent propagation is missing." }
+          if (-not (Select-String -Path $program -SimpleMatch "model.AssemblyName" -Quiet)) { throw "CarRenderModel AssemblyName propagation is missing." }
+          if (-not (Select-String -Path $program -SimpleMatch "TransformAuditRuntime.RegisterSceneSkeleton(rootEntry, rootModel.Bundle)" -Quiet)) { throw "Scene CarBody fallback skeleton registration is missing." }
           if (-not (Select-String -Path $program -SimpleMatch "wheel_style_anchors = TransformAuditRuntime.WheelStyleAnchors" -Quiet)) { throw "WheelStyle anchor diagnostics are missing." }
-          if (-not (Select-String -Path $program -SimpleMatch "scene_attachment_skeleton_count = TransformAuditRuntime.SceneSkeletonCount" -Quiet)) { throw "Scene skeleton diagnostics are missing." }
+          if (-not (Select-String -Path $program -SimpleMatch "scene_skeleton_path = TransformAuditRuntime.RequestedSceneSkeletonPath" -Quiet)) { throw "Scene.SkeletonPath diagnostics are missing." }
+          if (-not (Select-String -Path $program -SimpleMatch "authoritative_scene_skeleton_source = TransformAuditRuntime.AuthoritativeSceneSkeletonSource" -Quiet)) { throw "Authoritative scene skeleton diagnostics are missing." }
           if (-not (Test-Path "kfps-source/tools/livery/chassis-converter/TransformAudit.cs")) { throw "TransformAudit.cs was not staged." }
       - name: Publish helper and verify pinned SHA-256
         shell: pwsh
