@@ -316,7 +316,7 @@ class TirePreviewIntegrationTests(unittest.TestCase):
                 return_value=fallback,
             ):
                 result = wrapped(asset, carbin_entry="OTHER.carbin", work_root=root / "geometry")
-            self.assertEqual(Path(result.output_path), source.resolve())
+            self.assertEqual(result.output_path, str(source))
             self.assertEqual(result.diagnostics["native_tire_preview"], fallback.as_dict())
 
     def test_explicit_converter_override_skips_global_native_tire_integration(self) -> None:
