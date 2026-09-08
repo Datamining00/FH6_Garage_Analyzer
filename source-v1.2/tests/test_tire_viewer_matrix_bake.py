@@ -116,6 +116,10 @@ class TireViewerMatrixBakeTests(unittest.TestCase):
             # coordinate convention. This specifically prevents LF/RF and LR/RR
             # tires from occupying the opposite lateral side from their rims.
             scene = load_kfps_glb(output, livery=None)
+            self.assertEqual(scene.mesh_count, 4)
+            self.assertEqual(scene.triangle_count, 4)
+            self.assertEqual(len(scene.indices), 12)
+            self.assertEqual(scene.role_counts.get("trim"), 4)
             self.assertEqual(len(scene.positions), 12)
             groups = scene.positions.reshape(4, 3, 3)
             expected_origins = np.asarray(
