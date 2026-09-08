@@ -33,6 +33,7 @@ on:
       - "source-v1.2/tests/test_tire_morph_boundary_roles.py"
       - "source-v1.2/tests/test_tire_morph_geometry.py"
       - "source-v1.2/tests/test_tire_preview_integration.py"
+      - "source-v1.2/tests/test_tire_preview_structural_fallback_diagnostics.py"
       - "source-v1.2/tests/test_tire_production_policy.py"
       - "source-v1.2/tests/test_tire_production_trial_geometry.py"
       - "source-v1.2/tests/test_tire_spindle_attachment.py"
@@ -112,6 +113,7 @@ jobs:
           python -m unittest tests.test_tire_morph_boundary_roles -v
           python -m unittest tests.test_tire_morph_geometry -v
           python -m unittest tests.test_tire_preview_integration -v
+          python -m unittest tests.test_tire_preview_structural_fallback_diagnostics -v
           python -m unittest tests.test_tire_production_policy -v
           python -m unittest tests.test_tire_production_trial_geometry -v
           python -m unittest tests.test_tire_spindle_attachment -v
