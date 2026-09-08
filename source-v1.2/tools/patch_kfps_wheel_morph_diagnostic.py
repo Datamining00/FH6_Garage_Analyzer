@@ -29,23 +29,30 @@ def patch(kfps_root: Path, helper: Path, audit_helper: Path) -> None:
 
     text = _replace_exact(
         text,
+        """internal sealed record ModelInstance(\n    string Path,\n    Matrix4x4 Transform,\n    string BoneName,\n    short BoneId,\n    CCarParts PartType,""",
+        """internal sealed record ModelInstance(\n    string Path,\n    Matrix4x4 Transform,\n    string BoneName,\n    short BoneId,\n    bool SnapToParent,\n    string AssemblyName,\n    CCarParts PartType,""",
+        "preserve CarRenderModel parent-attachment semantics",
+    )
+
+    text = _replace_exact(
+        text,
         """                scene_assembled = sceneAssembled,\n                requested_instance_count = extraction.RequestedInstances,""",
-        """                scene_assembled = sceneAssembled,\n                wheel_morph_mode = WheelMorphRuntime.Mode,\n                wheel_morph_applied_meshes = WheelMorphRuntime.AppliedMeshes,\n                wheel_morph_applied_vertices = WheelMorphRuntime.AppliedVertices,\n                wheel_morph_axle_split_z = WheelMorphRuntime.AxleSplitZ,\n                wheel_style_anchor_count = TransformAuditRuntime.WheelStyleAnchors.Count,\n                wheel_style_anchors = TransformAuditRuntime.WheelStyleAnchors,\n                transform_audit_count = TransformAuditRuntime.MeshTransformAudit.Count,\n                transform_audit = TransformAuditRuntime.MeshTransformAudit,\n                scene_attachment_skeleton_count = TransformAuditRuntime.SceneSkeletonCount,\n                requested_instance_count = extraction.RequestedInstances,""",
+        """                scene_assembled = sceneAssembled,\n                wheel_morph_mode = WheelMorphRuntime.Mode,\n                wheel_morph_applied_meshes = WheelMorphRuntime.AppliedMeshes,\n                wheel_morph_applied_vertices = WheelMorphRuntime.AppliedVertices,\n                wheel_morph_axle_split_z = WheelMorphRuntime.AxleSplitZ,\n                wheel_style_anchor_count = TransformAuditRuntime.WheelStyleAnchors.Count,\n                wheel_style_anchors = TransformAuditRuntime.WheelStyleAnchors,\n                transform_audit_count = TransformAuditRuntime.MeshTransformAudit.Count,\n                transform_audit = TransformAuditRuntime.MeshTransformAudit,\n                scene_attachment_skeleton_count = TransformAuditRuntime.SceneSkeletonCount,\n                scene_skeleton_path = TransformAuditRuntime.RequestedSceneSkeletonPath,\n                scene_skeleton_resolution_mode = TransformAuditRuntime.SceneSkeletonResolutionMode,\n                authoritative_scene_skeleton_source = TransformAuditRuntime.AuthoritativeSceneSkeletonSource,\n                requested_instance_count = extraction.RequestedInstances,""",
         "conversion JSON morph/transform diagnostics",
     )
 
     text = _replace_exact(
         text,
         """        var instances = SceneModelInstances(carbin.Scene, out var partOptions);\n        if (instances.Count == 0)""",
-        """        var instances = SceneModelInstances(carbin.Scene, out var partOptions);\n        WheelMorphRuntime.Configure(instances);\n        TransformAuditRuntime.Configure(instances);\n        if (instances.Count == 0)""",
+        """        var instances = SceneModelInstances(carbin.Scene, out var partOptions);\n        WheelMorphRuntime.Configure(instances);\n        TransformAuditRuntime.Configure(instances, carbin.Scene.SkeletonPath);\n        if (instances.Count == 0)""",
         "configure WheelStyle morph and transform audit",
     )
 
     text = _replace_exact(
         text,
         """        var cache = new Dictionary<string, ImportedModel>(StringComparer.OrdinalIgnoreCase);\n        var result = new List<ChassisMesh>();""",
-        """        var cache = new Dictionary<string, ImportedModel>(StringComparer.OrdinalIgnoreCase);\n\n        // CarRenderModel BoneName values can refer to the scene/chassis skeleton\n        // rather than the child part model skeleton. Register every resolvable\n        // stock CarBody skeleton before any part instance is transformed so named\n        // attachments can be resolved in the correct namespace without a Car ID\n        // or part-name exception. Ambiguous scene skeleton names remain fail-closed.\n        foreach (var rootInstance in instances.Where(instance => instance.StockPart && instance.PartType == CCarParts.CarBody))\n        {\n            var rootEntry = ResolveModelEntry(rootInstance.Path, mediaName, available);\n            if (rootEntry is null || rootEntry.Contains(\"__slod\", StringComparison.OrdinalIgnoreCase))\n                continue;\n            if (!cache.TryGetValue(rootEntry, out var rootModel))\n            {\n                rootModel = LoadModel(available[rootEntry], rootEntry);\n                cache[rootEntry] = rootModel;\n            }\n            TransformAuditRuntime.RegisterSceneSkeleton(rootEntry, rootModel.Bundle);\n        }\n\n        var result = new List<ChassisMesh>();""",
-        "register stock CarBody scene skeletons before part transforms",
+        """        var cache = new Dictionary<string, ImportedModel>(StringComparer.OrdinalIgnoreCase);\n\n        // Scene.SkeletonPath is the Carbin-declared parent/chassis skeleton.  It\n        // is authoritative for SnapToParent attachments when it resolves.  This\n        // is structural scene metadata, not a vehicle/model-specific exception.\n        if (!string.IsNullOrWhiteSpace(carbin.Scene.SkeletonPath))\n        {\n            var sceneSkeletonEntry = ResolveModelEntry(carbin.Scene.SkeletonPath, mediaName, available);\n            if (sceneSkeletonEntry is null)\n            {\n                TransformAuditRuntime.RecordSceneSkeletonResolutionFailure(\"scene_skeleton_path_unresolved\");\n            }\n            else\n            {\n                try\n                {\n                    if (!cache.TryGetValue(sceneSkeletonEntry, out var sceneSkeletonModel))\n                    {\n                        sceneSkeletonModel = LoadModel(available[sceneSkeletonEntry], sceneSkeletonEntry);\n                        cache[sceneSkeletonEntry] = sceneSkeletonModel;\n                    }\n                    if (!TransformAuditRuntime.RegisterAuthoritativeSceneSkeleton(\n                            sceneSkeletonEntry, sceneSkeletonModel.Bundle))\n                    {\n                        TransformAuditRuntime.RecordSceneSkeletonResolutionFailure(\n                            \"scene_skeleton_path_has_no_skeleton\");\n                    }\n                }\n                catch (Exception error)\n                {\n                    TransformAuditRuntime.RecordSceneSkeletonResolutionFailure(\n                        $\"scene_skeleton_path_load_failed:{error.GetType().Name}\");\n                }\n            }\n        }\n\n        // Keep resolvable stock CarBody skeletons only as exact-name fallback\n        // namespaces when the authoritative Scene.SkeletonPath cannot satisfy a\n        // named attachment.  Ambiguous fallback names remain fail-closed.\n        foreach (var rootInstance in instances.Where(instance => instance.StockPart && instance.PartType == CCarParts.CarBody))\n        {\n            var rootEntry = ResolveModelEntry(rootInstance.Path, mediaName, available);\n            if (rootEntry is null || rootEntry.Contains(\"__slod\", StringComparison.OrdinalIgnoreCase))\n                continue;\n            if (!cache.TryGetValue(rootEntry, out var rootModel))\n            {\n                rootModel = LoadModel(available[rootEntry], rootEntry);\n                cache[rootEntry] = rootModel;\n            }\n            TransformAuditRuntime.RegisterSceneSkeleton(rootEntry, rootModel.Bundle);\n        }\n\n        var result = new List<ChassisMesh>();""",
+        "register authoritative scene skeleton and stock CarBody fallbacks before part transforms",
     )
 
     text = _replace_exact(
@@ -64,9 +71,30 @@ def patch(kfps_root: Path, helper: Path, audit_helper: Path) -> None:
 
     text = _replace_exact(
         text,
+        """            var instance = new ModelInstance(\n                requestedName,\n                Matrix4x4.Identity,\n                \"\",\n                -1,\n                CCarParts.CarBody,""",
+        """            var instance = new ModelInstance(\n                requestedName,\n                Matrix4x4.Identity,\n                \"\",\n                -1,\n                false,\n                \"\",\n                CCarParts.CarBody,""",
+        "loose ModelInstance parent-attachment defaults",
+    )
+
+    text = _replace_exact(
+        text,
         """            AppendMeshes(\n                result,\n                model.Imported,""",
         """            AppendMeshes(\n                result,\n                model.Bundle,\n                model.Imported,""",
         "pass model bundle into loose AppendMeshes",
+    )
+
+    text = _replace_exact(
+        text,
+        """            output.Add(new ModelInstance(\n                model.Path,\n                model.Transform,\n                model.BoneName ?? \"\",\n                model.BoneId,\n                partType,""",
+        """            output.Add(new ModelInstance(\n                model.Path,\n                model.Transform,\n                model.BoneName ?? \"\",\n                model.BoneId,\n                model.SnapToParent,\n                model.AssemblyName ?? \"\",\n                partType,""",
+        "preserve scene ModelInstance SnapToParent and AssemblyName",
+    )
+
+    text = _replace_exact(
+        text,
+        """            (model.BoneName ?? \"\").ToLowerInvariant(),\n            model.BoneId.ToString(),\n            ((uint)partType).ToString(),""",
+        """            (model.BoneName ?? \"\").ToLowerInvariant(),\n            model.BoneId.ToString(),\n            model.SnapToParent ? \"snap:1\" : \"snap:0\",\n            \"assembly:\" + (model.AssemblyName ?? \"\").ToLowerInvariant(),\n            ((uint)partType).ToString(),""",
+        "include parent/assembly semantics in ModelInstance identity",
     )
 
     text = _replace_exact(
