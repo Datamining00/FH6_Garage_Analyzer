@@ -39,14 +39,15 @@ class KfpsWheelMorphDiagnosticPatchTests(unittest.TestCase):
         self.assertIn("AttachmentResolutionMode", audit)
         self.assertIn("ResolvedAttachmentBoneIndex", audit)
         # Named attachments search the child skeleton and then the registered
-        # scene CarBody skeletons. They never fall through to a numeric BoneId in
-        # another skeleton namespace.
+        # scene CarBody skeletons. The numeric id-only path begins only after the
+        # named branch has returned/closed, so a failed named lookup cannot be
+        # silently reinterpreted in another skeleton namespace.
         named = audit.index("if (!string.IsNullOrWhiteSpace(requestedName))")
-        id_only = audit.index('"id_only"', named)
-        segment = audit[named:id_only]
+        id_only_guard = audit.index("if (instanceSkeleton is not null\n            && requestedId >= 0", named)
+        segment = audit[named:id_only_guard]
         self.assertIn("sceneMatches", segment)
         self.assertIn('"name_not_found"', segment)
-        self.assertNotIn("requestedId >= 0", segment)
+        self.assertTrue(segment.rstrip().endswith("}"))
 
     def test_transform_audit_exposes_instance_local_wheel_geometry(self):
         audit = AUDIT.read_text(encoding="utf-8")
