@@ -52,15 +52,22 @@ class KfpsWheelMorphDiagnosticPatchTests(unittest.TestCase):
         self.assertIn("VerifiedFloat4Format = 10", text)
         self.assertNotIn("MathF.Abs(mesh.IndexedVertexOffset)", text)
 
-    def test_runtime_classifies_axle_from_wheelstyle_carbin_z_not_asset_name(self):
+    def test_runtime_prefers_front_wheel_semantics_and_keeps_coordinate_fallback(self):
         text = HELPER.read_text(encoding="utf-8")
         self.assertIn("WheelStylePartType = 44", text)
+        self.assertIn("_namedFrontInstances", text)
+        self.assertIn("IsNamedFrontWheel(instance.BoneName)", text)
+        self.assertIn("_namedFrontInstances.Contains(instance.Identity)", text)
         self.assertIn("instance.Transform.M43", text)
         self.assertIn("_axleSplitZ", text)
+        self.assertIn(": z > _axleSplitZ", text)
+        # The helper must remain structural/semantic, not vehicle- or asset-specific.
         self.assertNotIn("wheelLF", text)
         self.assertNotIn("wheelLR", text)
         self.assertNotIn("spindleLF", text)
         self.assertNotIn("spindleLR", text)
+        self.assertNotIn("FER_FXX", text)
+        self.assertNotIn("TOY_2000GT", text)
 
     def test_runtime_has_no_arbitrary_wheel_scale_or_tire_morph(self):
         text = HELPER.read_text(encoding="utf-8")
