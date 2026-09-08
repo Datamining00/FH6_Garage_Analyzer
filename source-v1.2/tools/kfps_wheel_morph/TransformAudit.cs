@@ -225,14 +225,11 @@ internal static class TransformAuditRuntime
                     if (authoritative is not null)
                         return authoritative;
                 }
-                var scene = ResolveNamedSceneFallback(
+                return ResolveNamedSceneFallback(
                     requestedName,
                     requestedId,
                     "scene_fallback_name",
                     "snap_parent_name_not_found");
-                if (scene.World is not null || scene.Mode == "scene_name_ambiguous")
-                    return scene;
-                return scene;
             }
 
             if (instanceSkeleton is not null && instanceSkeleton.Bones.Count > 0)
@@ -422,7 +419,6 @@ internal static class TransformAuditRuntime
                 : transformed;
             if (!float.IsFinite(local.X) || !float.IsFinite(local.Y) || !float.IsFinite(local.Z))
                 throw new InvalidDataException($"{instance.Identity}/{geometry.Name} local AABB contains a non-finite point.");
-            localMinimum = Vector3.Min(localMinimum, point: localMinimum);
             localMinimum = Vector3.Min(localMinimum, local);
             localMaximum = Vector3.Max(localMaximum, local);
         }
