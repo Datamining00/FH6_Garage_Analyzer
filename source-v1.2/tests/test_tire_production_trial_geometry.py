@@ -57,6 +57,10 @@ def _span(item) -> tuple[float, float, float]:
     return tuple(float(value) for value in item.aabb["span"])
 
 
+def _center(item) -> tuple[float, float, float]:
+    return tuple(float(value) for value in item.aabb["center"])
+
+
 class TireProductionTrialGeometryTests(unittest.TestCase):
     def test_unlabelled_single_modelbin_is_auto_recognized_as_canonical_left(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -93,6 +97,10 @@ class TireProductionTrialGeometryTests(unittest.TestCase):
                 self.assertAlmostEqual(span[0], target_width, places=6)
                 self.assertAlmostEqual(span[1], target_outer, places=6)
                 self.assertAlmostEqual(span[2], target_outer, places=6)
+                center = _center(item)
+                self.assertAlmostEqual(center[0], 0.0, places=6)
+                self.assertAlmostEqual(center[1], 0.0, places=6)
+                self.assertAlmostEqual(center[2], 0.0, places=6)
 
     def test_native_left_right_pair_is_preserved_without_family_mapping(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -127,6 +135,12 @@ class TireProductionTrialGeometryTests(unittest.TestCase):
                 ),
                 4,
             )
+            for axle in (report.front, report.rear):
+                for item in axle.modelbins:
+                    center = _center(item)
+                    self.assertAlmostEqual(center[0], 0.0, places=6)
+                    self.assertAlmostEqual(center[1], 0.0, places=6)
+                    self.assertAlmostEqual(center[2], 0.0, places=6)
 
     def test_blocked_nonstock_candidate_creates_no_output_directory(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
