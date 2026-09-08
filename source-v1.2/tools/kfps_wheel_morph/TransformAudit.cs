@@ -52,6 +52,9 @@ internal sealed record MeshTransformAuditDiagnostic(
     float[] CarbinTransformRowMajor,
     float[] EffectiveInstanceTransformRowMajor,
     float[] RigidBoneTransformRowMajor,
+    int VertexCount,
+    float[] LocalAabbMin,
+    float[] LocalAabbMax,
     float[] RenderAabbMin,
     float[] RenderAabbMax);
 
@@ -95,7 +98,7 @@ internal static class TransformAuditRuntime
                 bone => string.Equals(bone.Name, requestedName, StringComparison.OrdinalIgnoreCase));
             if (target < 0)
             {
-                // A BoneId belongs to a specific skeleton namespace.  Never silently
+                // A BoneId belongs to a specific skeleton namespace. Never silently
                 // reinterpret a named Carbin attachment as the same numeric index in
                 // a different/child model skeleton when its name did not resolve.
                 return new AttachmentBoneResolution(
@@ -188,14 +191,36 @@ internal static class TransformAuditRuntime
         ValidateFinite(effectiveTransform, $"{instance.Identity} effective transform");
         ValidateFinite(geometry.BoneTransform, $"{instance.Identity}/{geometry.Name} rigid-bone transform");
 
-        var minimum = new Vector3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity);
-        var maximum = new Vector3(float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
+        var renderMinimum = new Vector3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity);
+        var renderMaximum = new Vector3(float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
+        var localMinimum = new Vector3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity);
+        var localMaximum = new Vector3(float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
+        var hasInstanceTransform = effectiveTransform != Matrix4x4.Identity;
+        Matrix4x4 inverseInstance = Matrix4x4.Identity;
+        if (hasInstanceTransform && !Matrix4x4.Invert(effectiveTransform, out inverseInstance))
+            throw new InvalidDataException(
+                $"{instance.Identity}/{geometry.Name} effective instance transform is not invertible.");
+
         foreach (var point in renderPositions)
         {
             if (!float.IsFinite(point.X) || !float.IsFinite(point.Y) || !float.IsFinite(point.Z))
                 throw new InvalidDataException($"{instance.Identity}/{geometry.Name} render AABB contains a non-finite point.");
-            minimum = Vector3.Min(minimum, point);
-            maximum = Vector3.Max(maximum, point);
+            renderMinimum = Vector3.Min(renderMinimum, point);
+            renderMaximum = Vector3.Max(renderMaximum, point);
+
+            // TransformPositions writes KFPS render space as (-x, y, z). Undo
+            // that reflection and then the exact effective instance transform to
+            // recover the post-morph/post-rigid-bone geometry in WheelStyle/model
+            // instance-local coordinates. This gives the tire pipeline the same
+            // physical rim frame that the converter actually rendered.
+            var transformed = new Vector3(-point.X, point.Y, point.Z);
+            var local = hasInstanceTransform
+                ? Vector3.Transform(transformed, inverseInstance)
+                : transformed;
+            if (!float.IsFinite(local.X) || !float.IsFinite(local.Y) || !float.IsFinite(local.Z))
+                throw new InvalidDataException($"{instance.Identity}/{geometry.Name} local AABB contains a non-finite point.");
+            localMinimum = Vector3.Min(localMinimum, local);
+            localMaximum = Vector3.Max(localMaximum, local);
         }
 
         if (!_attachmentResolutions.TryGetValue(instance.Identity, out var attachment))
@@ -222,8 +247,11 @@ internal static class TransformAuditRuntime
             MatrixValues(instance.Transform),
             MatrixValues(effectiveTransform),
             MatrixValues(geometry.BoneTransform),
-            [minimum.X, minimum.Y, minimum.Z],
-            [maximum.X, maximum.Y, maximum.Z]));
+            renderPositions.Count,
+            [localMinimum.X, localMinimum.Y, localMinimum.Z],
+            [localMaximum.X, localMaximum.Y, localMaximum.Z],
+            [renderMinimum.X, renderMinimum.Y, renderMinimum.Z],
+            [renderMaximum.X, renderMaximum.Y, renderMaximum.Z]));
     }
 
     private static float[] MatrixValues(Matrix4x4 value) =>
