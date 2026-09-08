@@ -6,6 +6,10 @@ from pathlib import Path
 from typing import Any
 import zipfile
 
+from .tire_morph_boundary_roles import (
+    TireMorphBoundaryRoleError,
+    analyze_native_tire_selector_boundary_roles,
+)
 from .tire_morph_weights import (
     TireMorphWeightError,
     VehicleTireMorphWeights,
@@ -14,15 +18,12 @@ from .tire_morph_weights import (
 from .wheel_spec import VehicleWheelSpec
 
 
-TIRE_PRODUCTION_POLICY_REVISION = "stock_native_tire_global_preview_v1"
+TIRE_PRODUCTION_POLICY_REVISION = "stock_native_tire_global_preview_v2"
 
-# Native tire-family geometry identities captured from the user's FH6 installation.
-# Slick has the strongest evidence because selector 0/1 were also checked against
-# real FER_FXX_05 stock dimensions.  The other approved families reproduced the
-# same selector topology/sign pattern in the cross-family diagnostic.  Global
-# preview is therefore permitted for stock specs only when the exact known native
-# geometry identity is present.  b_Horizon remains excluded because its selector
-# signature was structurally different.
+# Exact identities already observed in the user's FH6 installation remain the
+# fastest/strongest admission path. Unknown family names are no longer rejected
+# solely because they were outside the original cross-family sample; they can be
+# admitted after an in-process read-only structural selector-role validation.
 _VALIDATED_SLICK_GEOMETRY_IDENTITY = (
     "c8a210f9cc9f09bd2cef658ebd5afb1630d7fe780c0e1b61d285591d31f9c9f1"
 )
@@ -35,6 +36,13 @@ _TOPOLOGY_COMPATIBLE_IDENTITIES = {
 _STRUCTURAL_MISMATCH_IDENTITIES = {
     "b_horizon": "00e625ca8a299237f948e8794ec34e76b0e1b8852e1d7055feeba33a5f43a840",
 }
+_EXPECTED_SELECTOR_ROLE_PATTERN = (
+    "radial_expansion_dominant",
+    "radial_expansion_dominant",
+    "mixed_x_expansion_radial_contraction",
+    "positive_x_boundary_expansion",
+    "negative_x_boundary_expansion",
+)
 
 
 @dataclass(frozen=True)
@@ -122,19 +130,55 @@ def _expected_identity(model_name: str) -> str | None:
     return _TOPOLOGY_COMPATIBLE_IDENTITIES.get(key)
 
 
+def _runtime_selector_structure_is_compatible(
+    archive: Path,
+    archive_sha256: str,
+) -> tuple[bool, str]:
+    """Validate an unlisted tire family from its actual selector geometry read-only."""
+    try:
+        report = analyze_native_tire_selector_boundary_roles(archive)
+    except (TireMorphBoundaryRoleError, OSError, ValueError) as exc:
+        return False, f"selector boundary-role analysis failed: {type(exc).__name__}: {exc}"
+
+    if not report.archive_read_only_unchanged:
+        return False, "selector boundary-role analysis did not preserve the source archive"
+    if report.archive_sha256.casefold() != archive_sha256.casefold():
+        return False, "archive identity changed between eligibility and selector-role analysis"
+
+    modelbin_roles = report.modelbin_roles
+    if len(modelbin_roles) not in (1, 2):
+        return False, f"expected one or two native tire modelbins, found {len(modelbin_roles)}"
+    if len(modelbin_roles) == 2 and report.left_right_role_match is not True:
+        return False, "left/right native tire modelbins do not share the same selector-role pattern"
+
+    for entry, roles in modelbin_roles.items():
+        role_pattern = tuple(item.geometric_role for item in roles)
+        if role_pattern != _EXPECTED_SELECTOR_ROLE_PATTERN:
+            return False, (
+                f"{entry}: selector-role pattern {role_pattern!r} does not match "
+                f"the validated pattern {_EXPECTED_SELECTOR_ROLE_PATTERN!r}"
+            )
+        low_confidence = [item.selector for item in roles if item.confidence == "low"]
+        if low_confidence:
+            return False, f"{entry}: low-confidence selector role(s): {low_confidence}"
+
+    return True, (
+        "runtime read-only selector-boundary validation matched the validated five-role tire pattern"
+    )
+
+
 def evaluate_stock_tire_production_candidate(
     spec: VehicleWheelSpec,
     archive_path: str | Path,
 ) -> TireProductionEligibility:
-    """Gate the global stock native-tire preview using exact native-family evidence.
+    """Gate global stock native-tire preview using exact or runtime structural evidence.
 
-    Vehicle-specific FXX restrictions are intentionally removed after successful
-    FXX wheel/rim/brake/tire visual validation.  The preview remains fail-closed at
-    the tire-family level: only exact known geometry identities whose selector
-    topology matches the validated Slick layout are admitted.  b_Horizon and
-    unknown/changed families remain on FHA's existing vehicle-GLB path.
-
-    Selector 2..4 remain literal zero for every admitted family.
+    Stock tire dimensions continue to drive only selector 0/1 plus the established
+    width X-scale. Selectors 2..4 remain literal zero. Known exact family identities
+    use the prevalidated fast path. A previously unseen TireModelName may be admitted
+    only if its actual modelbin selector AABB response reproduces the full validated
+    five-role pattern read-only. This removes the original family-name whitelist as
+    a global-coverage bottleneck without guessing unknown selector semantics.
     """
     archive = Path(archive_path).expanduser().resolve()
     if str(spec.mode).casefold() != "stock":
@@ -192,7 +236,7 @@ def evaluate_stock_tire_production_candidate(
             )
         return _blocked(
             "blocked_selector_signature_mismatch",
-            "this native tire family has a different selector-role signature and is excluded from global automatic preview",
+            "this native tire family has a different selector-role signature and is excluded from automatic preview",
             spec,
             archive,
             archive_sha,
@@ -200,24 +244,35 @@ def evaluate_stock_tire_production_candidate(
         )
 
     expected_identity = _expected_identity(model_name)
-    if expected_identity is None:
-        return _blocked(
-            "blocked_family_not_evidence_approved",
-            "this TireModelName has not been verified as selector-topology compatible with the global native tire preview",
-            spec,
-            archive,
-            archive_sha,
-            identity,
+    if expected_identity is not None:
+        if identity != expected_identity:
+            return _blocked(
+                "blocked_geometry_identity_mismatch",
+                "native tire modelbin identity differs from the verified family sample",
+                spec,
+                archive,
+                archive_sha,
+                identity,
+            )
+        evidence = (
+            "physically dimension-corroborated Slick reference plus exact native geometry identity"
+            if key == "slick"
+            else "cross-family selector-topology match plus exact native geometry identity"
         )
-    if identity != expected_identity:
-        return _blocked(
-            "blocked_geometry_identity_mismatch",
-            "native tire modelbin identity differs from the verified family sample",
-            spec,
-            archive,
-            archive_sha,
-            identity,
+    else:
+        compatible, structural_detail = _runtime_selector_structure_is_compatible(
+            archive, archive_sha
         )
+        if not compatible:
+            return _blocked(
+                "blocked_family_structural_validation_failed",
+                structural_detail,
+                spec,
+                archive,
+                archive_sha,
+                identity,
+            )
+        evidence = structural_detail
 
     try:
         weights = stock_vehicle_tire_morph_weights(spec)
@@ -245,11 +300,6 @@ def evaluate_stock_tire_production_candidate(
             identity,
         )
 
-    evidence = (
-        "physically dimension-corroborated Slick reference plus exact native geometry identity"
-        if key == "slick"
-        else "cross-family selector-topology match plus exact native geometry identity"
-    )
     return TireProductionEligibility(
         status="production_trial_eligible",
         detail=(
