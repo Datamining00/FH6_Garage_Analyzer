@@ -20,7 +20,7 @@ class KfpsWheelMorphDiagnosticPatchTests(unittest.TestCase):
         self.assertIn("model.Bundle", text)
         self.assertIn("WheelMorphRuntime.Configure(instances)", text)
 
-    def test_attachment_resolution_uses_scene_body_namespace_without_numeric_cross_fallback(self):
+    def test_attachment_resolution_uses_carbin_parent_skeleton_without_numeric_cross_fallback(self):
         patcher = PATCHER.read_text(encoding="utf-8")
         audit = AUDIT.read_text(encoding="utf-8")
         self.assertIn("TransformAuditRuntime.ResolveAttachmentBone(model.Bundle, instance)", patcher)
@@ -29,25 +29,41 @@ class KfpsWheelMorphDiagnosticPatchTests(unittest.TestCase):
             "TransformAuditRuntime.RecordInstance(entryName, instance, instanceTransform, attachmentResolution)",
             patcher,
         )
+        self.assertIn("carbin.Scene.SkeletonPath", patcher)
+        self.assertIn("TransformAuditRuntime.RegisterAuthoritativeSceneSkeleton", patcher)
         self.assertIn("TransformAuditRuntime.RegisterSceneSkeleton(rootEntry, rootModel.Bundle)", patcher)
         self.assertIn("instance.PartType == CCarParts.CarBody", patcher)
-        self.assertIn('"scene_name"', audit)
+        self.assertIn("model.SnapToParent", patcher)
+        self.assertIn("model.AssemblyName", patcher)
+        self.assertIn('model.SnapToParent ? "snap:1" : "snap:0"', patcher)
+        self.assertIn('"assembly:" + (model.AssemblyName ?? "").ToLowerInvariant()', patcher)
+
+        self.assertIn('"scene_path_name"', audit)
+        self.assertIn('"scene_fallback_name"', audit)
         self.assertIn('"scene_name_ambiguous"', audit)
+        self.assertIn('"snap_parent_name_not_found"', audit)
+        self.assertIn('"child_name"', audit)
         self.assertIn('"name_not_found"', audit)
         self.assertIn('"instance_model_bundle"', audit)
-        self.assertIn("SceneSkeletonCount", audit)
+        self.assertIn("RequestedSceneSkeletonPath", audit)
+        self.assertIn("AuthoritativeSceneSkeletonSource", audit)
+        self.assertIn("SceneSkeletonResolutionMode", audit)
         self.assertIn("AttachmentResolutionMode", audit)
         self.assertIn("ResolvedAttachmentBoneIndex", audit)
-        # Named attachments search the child skeleton and then the registered
-        # scene CarBody skeletons. The numeric id-only path begins only after the
-        # named branch has returned/closed, so a failed named lookup cannot be
-        # silently reinterpreted in another skeleton namespace.
+        self.assertIn("SnapToParent", audit)
+        self.assertIn("AssemblyName", audit)
+
+        # A named SnapToParent attachment is resolved in the parent/scene
+        # namespace. Its numeric BoneId must never be reinterpreted in the child
+        # model skeleton if the parent name cannot be resolved.
         named = audit.index("if (!string.IsNullOrWhiteSpace(requestedName))")
-        id_only_guard = audit.index("if (instanceSkeleton is not null\n            && requestedId >= 0", named)
-        segment = audit[named:id_only_guard]
-        self.assertIn("sceneMatches", segment)
-        self.assertIn('"name_not_found"', segment)
-        self.assertTrue(segment.rstrip().endswith("}"))
+        snap = audit.index("if (instance.SnapToParent)", named)
+        child = audit.index("if (instanceSkeleton is not null && instanceSkeleton.Bones.Count > 0)", snap)
+        snap_segment = audit[snap:child]
+        self.assertIn("_authoritativeSceneSkeleton", snap_segment)
+        self.assertIn("ResolveNamedSceneFallback", snap_segment)
+        self.assertNotIn('"id_only"', snap_segment)
+        self.assertNotIn("instanceSkeleton.Bones[requestedId]", snap_segment)
 
     def test_transform_audit_exposes_instance_local_wheel_geometry(self):
         audit = AUDIT.read_text(encoding="utf-8")
