@@ -14,6 +14,7 @@ on:
       - "source-v1.2/fh6garage/preview3d/glb_parser.py"
       - "source-v1.2/fh6garage/preview3d/native_transform_chain_patch.py"
       - "source-v1.2/fh6garage/preview3d/native_transform_chain_v2.py"
+      - "source-v1.2/fh6garage/preview3d/native_transform_chain_v3.py"
       - "source-v1.2/fh6garage/preview3d/tire_asset.py"
       - "source-v1.2/fh6garage/preview3d/tire_morph_boundary_roles.py"
       - "source-v1.2/fh6garage/preview3d/tire_morph_geometry.py"
@@ -36,6 +37,7 @@ on:
       - "source-v1.2/tests/test_kfps_wheel_morph_diagnostic_patch.py"
       - "source-v1.2/tests/test_native_transform_chain_patch.py"
       - "source-v1.2/tests/test_native_transform_chain_v2.py"
+      - "source-v1.2/tests/test_native_transform_chain_v3.py"
       - "source-v1.2/tests/test_tire_morph_boundary_roles.py"
       - "source-v1.2/tests/test_tire_morph_geometry.py"
       - "source-v1.2/tests/test_tire_preview_integration.py"
@@ -106,6 +108,7 @@ jobs:
           python -m py_compile fh6garage/preview3d/chassis_converter.py
           python -m py_compile fh6garage/preview3d/native_transform_chain_patch.py
           python -m py_compile fh6garage/preview3d/native_transform_chain_v2.py
+          python -m py_compile fh6garage/preview3d/native_transform_chain_v3.py
           python -m py_compile fh6garage/preview3d/tire_morph_boundary_roles.py
           python -m py_compile fh6garage/preview3d/tire_morph_geometry.py
           python -m py_compile fh6garage/preview3d/tire_morph_geometry_impl.py
@@ -123,6 +126,7 @@ jobs:
           python -m unittest tests.test_kfps_wheel_morph_diagnostic_patch -v
           python -m unittest tests.test_native_transform_chain_patch -v
           python -m unittest tests.test_native_transform_chain_v2 -v
+          python -m unittest tests.test_native_transform_chain_v3 -v
           python -m unittest tests.test_tire_morph_boundary_roles -v
           python -m unittest tests.test_tire_morph_geometry -v
           python -m unittest tests.test_tire_preview_integration -v
@@ -166,8 +170,10 @@ jobs:
           $program = "kfps-source/tools/livery/chassis-converter/Program.cs"
           if (-not (Select-String -Path $program -SimpleMatch "WheelMorphRuntime.Configure(instances)" -Quiet)) { throw "Patched Program.cs is missing WheelMorphRuntime.Configure." }
           if (-not (Select-String -Path $program -SimpleMatch "TransformAuditRuntime.Configure(instances)" -Quiet)) { throw "Patched Program.cs is missing TransformAuditRuntime.Configure." }
+          if (-not (Select-String -Path $program -SimpleMatch "TransformAuditRuntime.RegisterSceneSkeleton(rootEntry, rootModel.Bundle)" -Quiet)) { throw "Patched Program.cs is missing stock CarBody scene skeleton registration." }
           if (-not (Select-String -Path $program -SimpleMatch "wheel_morph_applied_meshes = WheelMorphRuntime.AppliedMeshes" -Quiet)) { throw "Patched Program.cs is missing rim morph diagnostics." }
           if (-not (Select-String -Path $program -SimpleMatch "wheel_style_anchors = TransformAuditRuntime.WheelStyleAnchors" -Quiet)) { throw "Patched Program.cs is missing WheelStyle transform diagnostics." }
+          if (-not (Select-String -Path $program -SimpleMatch "scene_attachment_skeleton_count = TransformAuditRuntime.SceneSkeletonCount" -Quiet)) { throw "Patched Program.cs is missing scene skeleton diagnostics." }
           if (-not (Test-Path "kfps-source/tools/livery/chassis-converter/TransformAudit.cs")) { throw "TransformAudit.cs was not staged." }
 
       - name: Publish and stage verified helper
@@ -197,6 +203,7 @@ jobs:
           if (-not ($listing -match "Kfps\.ChassisConverter\.WheelMorph\.exe")) { throw "Standard OneFile does not contain the wheel morph helper." }
           if (-not ($listing -match "fh6garage\.preview3d\.native_transform_chain_patch")) { throw "Standard OneFile does not contain the native transform-chain v1 module." }
           if (-not ($listing -match "fh6garage\.preview3d\.native_transform_chain_v2")) { throw "Standard OneFile does not contain the native transform-chain v2 module." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_transform_chain_v3")) { throw "Standard OneFile does not contain the rendered-rim native transform-chain v3 module." }
 
       - name: Build Portable OneDir
         shell: pwsh
@@ -214,6 +221,7 @@ jobs:
           $listing = python -m PyInstaller.utils.cliutils.archive_viewer -l -r $portableExe
           if ($LASTEXITCODE -ne 0) { throw "Could not recursively inspect Portable archive." }
           if (-not ($listing -match "fh6garage\.preview3d\.native_transform_chain_v2")) { throw "Portable OneDir does not contain the native transform-chain v2 module." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_transform_chain_v3")) { throw "Portable OneDir does not contain the rendered-rim native transform-chain v3 module." }
 
       - name: Upload W3 build candidates
         uses: actions/upload-artifact@v4
