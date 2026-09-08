@@ -8,14 +8,7 @@ from pathlib import Path
 from typing import Any, Sequence
 import zipfile
 
-from .modelbin_morph import (
-    MESH_TAG,
-    ModelbinMorphError,
-    _iter_bundle_blobs,
-    apply_weighted_morph,
-    parse_modelbin_morph_inventory,
-)
-from .tire_morph_auto_inference import GENERIC_TIRE_AUTO_INFERENCE_REVISION
+from .modelbin_morph import MESH_TAG, ModelbinMorphError, _iter_bundle_blobs
 from .tire_morph_geometry import (
     INDEX_BUFFER_TAG,
     INPUT_LAYOUT_TAG,
@@ -169,13 +162,7 @@ def _select_native_modelbins(
     bundle: zipfile.ZipFile,
     model_name: str,
 ) -> tuple[tuple[str, str, bytes], ...]:
-    """Select tire modelbins without any family-specific table.
-
-    Exact tireL_/tireR_ names linked to TireModelName are preferred.  Otherwise a
-    generic tireL_/tireR_ pair is used.  If the archive exposes no side label, the
-    first modelbin becomes the canonical left source and native right-spindle
-    transforms reuse it, matching the existing single-left assembly contract.
-    """
+    """Automatically choose native tire modelbins without family-specific rules."""
     entries = sorted(
         (
             item
@@ -189,7 +176,6 @@ def _select_native_modelbins(
 
     wanted_left = f"tirel_{model_name}.modelbin".casefold()
     wanted_right = f"tirer_{model_name}.modelbin".casefold()
-
     exact_left = [item for item in entries if Path(item.filename).name.casefold() == wanted_left]
     exact_right = [item for item in entries if Path(item.filename).name.casefold() == wanted_right]
     generic_left = [
@@ -222,8 +208,8 @@ def _select_native_modelbins(
     if selected:
         return tuple(selected)
 
-    # No explicit side identity: use one native geometry source as canonical left.
-    # The existing WheelStyle spindle matrices provide left/right placement.
+    # No side label exists.  Treat the first modelbin as the canonical source and
+    # let the native WheelStyle left/right spindle matrices provide side placement.
     first = entries[0]
     return (
         (
@@ -313,23 +299,14 @@ def _build_modelbin_geometry(
         )
         by_buffer_blob = {item.blob_index: item for item in buffers}
         meshes = tuple(_parse_mesh(data, blob) for blob in blobs if blob.tag == MESH_TAG)
-        inventory = parse_modelbin_morph_inventory(data)
     except (ModelbinMorphError, TireMorphGeometryError) as exc:
         raise TireProductionTrialGeometryError(f"{source_entry}: {exc}") from exc
 
-    morph_buffers = {item.blob_index: item for item in inventory.morph_buffers}
-    morph_resolutions = {item.mesh_blob_index: item for item in inventory.resolutions}
     aggregate_positions: list[tuple[float, float, float]] = []
     aggregate_indices: list[int] = []
     selected_mesh_count = 0
-    morphed_mesh_count = 0
-    morph_fallback_mesh_count = 0
+    weighted_mesh_count = 0
     static_mesh_count = 0
-
-    # Only measured file-driven inference is allowed to deform the source mesh.
-    # If inference was unavailable, the native base geometry is retained and the
-    # final stock-dimension normalization below supplies the universal fallback.
-    use_inferred_morph = str(weights.mapping_revision) == GENERIC_TIRE_AUTO_INFERENCE_REVISION
 
     for mesh in meshes:
         if (mesh.lod_flags & 3) == 0 or mesh.index_count <= 0:
@@ -344,50 +321,19 @@ def _build_modelbin_geometry(
             base_positions, _position_format, _vb_resolution = _decode_positions(
                 mesh, layout, buffers, by_buffer_blob, min_index, max_index
             )
+            compact_positions, compact_indices = _compact_geometry(
+                base_positions, source_indices, min_index
+            )
         except TireMorphGeometryError as exc:
             raise TireProductionTrialGeometryError(
                 f"{source_entry}: mesh {mesh.blob_index}: {exc}"
             ) from exc
 
         selected_mesh_count += 1
-        positions: Sequence[Sequence[float]] = base_positions
-        attempted_weighted = mesh.morph_target_count > 0 and not mesh.is_morph_damage
-        if attempted_weighted and use_inferred_morph and mesh.morph_target_count == 5:
-            resolution = morph_resolutions.get(mesh.blob_index)
-            morph_buffer = (
-                morph_buffers.get(resolution.morph_buffer_blob_index)
-                if resolution is not None and resolution.morph_buffer_blob_index is not None
-                else None
-            )
-            if morph_buffer is not None:
-                try:
-                    positions, _ = apply_weighted_morph(
-                        base_positions,
-                        morph_buffer,
-                        mesh.indexed_vertex_offset,
-                        mesh.morph_target_count,
-                        weights.selector_weights,
-                        min_vertex_index=min_index,
-                    )
-                    morphed_mesh_count += 1
-                except ModelbinMorphError:
-                    positions = base_positions
-                    morph_fallback_mesh_count += 1
-            else:
-                morph_fallback_mesh_count += 1
-        elif attempted_weighted:
-            morph_fallback_mesh_count += 1
+        if mesh.morph_target_count > 0 and not mesh.is_morph_damage:
+            weighted_mesh_count += 1
         else:
             static_mesh_count += 1
-
-        try:
-            compact_positions, compact_indices = _compact_geometry(
-                positions, source_indices, min_index
-            )
-        except TireMorphGeometryError as exc:
-            raise TireProductionTrialGeometryError(
-                f"{source_entry}: mesh {mesh.blob_index}: {exc}"
-            ) from exc
         vertex_base = len(aggregate_positions)
         aggregate_positions.extend(compact_positions)
         aggregate_indices.extend(vertex_base + index for index in compact_indices)
@@ -414,19 +360,14 @@ def _build_modelbin_geometry(
             ) from exc
         glb_path = str(path)
 
-    morph_mode = (
-        "measured_selector_morph_plus_stock_dimension_normalization"
-        if morphed_mesh_count > 0
-        else "native_base_geometry_plus_stock_dimension_normalization"
-    )
     return ModelbinProductionTrialGeometry(
         axle=str(axle_spec.axle),
         entry=entry.replace("\\", "/"),
         source_entry=source_entry.replace("\\", "/"),
         modelbin_sha256=hashlib.sha256(data).hexdigest(),
         selected_mesh_count=selected_mesh_count,
-        morphed_mesh_count=morphed_mesh_count,
-        morph_fallback_mesh_count=morph_fallback_mesh_count,
+        morphed_mesh_count=0,
+        morph_fallback_mesh_count=weighted_mesh_count,
         static_mesh_count=static_mesh_count,
         vertex_count=len(normalized_positions),
         index_count=len(aggregate_indices),
@@ -435,7 +376,7 @@ def _build_modelbin_geometry(
         normalization_scale_xyz=scales,
         target_width_m=float(axle_spec.tire_width_mm) / 1000.0,
         target_outer_diameter_m=float(axle_spec.tire_outer_diameter_mm) / 1000.0,
-        morph_mode=morph_mode,
+        morph_mode="native_base_geometry_plus_stock_dimension_normalization",
         pre_normalization_aabb=before_aabb,
         aabb=after_aabb,
         glb_path=glb_path,
@@ -480,13 +421,12 @@ def build_stock_tire_production_trial_geometry(
     *,
     write_glb: bool = True,
 ) -> TireProductionTrialGeometryReport:
-    """Build stock tire geometry for every decodable native tire archive.
+    """Generate stock tire geometry globally from the automatically resolved archive.
 
-    Tire selection is automatic from the stock DB's TireModelName.  The native ZIP
-    stays read-only.  Family-specific whitelists are not used.  Measured selector
-    inference is used when available; otherwise native base geometry is retained.
-    In both cases the final decoded geometry is centered and normalized directly to
-    the stock width and outer diameter before attachment to native WheelStyle spindles.
+    The program uses TireModelName only to locate the correct native ZIP, decodes its
+    base LOD0 geometry, selects a left/right source automatically, and normalizes that
+    geometry to the stock width and outer diameter from the game DB.  No tire-family
+    selector mapping or per-car calibration is required.
     """
     archive = Path(archive_path).expanduser().resolve()
     destination = Path(output_dir).expanduser().resolve()
