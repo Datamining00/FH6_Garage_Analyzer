@@ -199,6 +199,19 @@ internal static class TransformAuditRuntime
             null);
     }
 
+    private static bool IsBoneOnlyPlacement(ModelInstance instance)
+    {
+        var requestedName = instance.BoneName ?? "";
+        if (string.IsNullOrWhiteSpace(requestedName)
+            || string.Equals(requestedName, "<root>", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        const float zeroTranslationTolerance = 0.000001f;
+        return MathF.Abs(instance.Transform.M41) < zeroTranslationTolerance
+            && MathF.Abs(instance.Transform.M42) < zeroTranslationTolerance
+            && MathF.Abs(instance.Transform.M43) < zeroTranslationTolerance;
+    }
+
     public static AttachmentBoneResolution ResolveAttachmentBone(Bundle bundle, ModelInstance instance)
     {
         const string instanceSkeletonSource = "instance_model_bundle";
@@ -208,30 +221,9 @@ internal static class TransformAuditRuntime
 
         if (!string.IsNullOrWhiteSpace(requestedName))
         {
-            if (instance.SnapToParent)
-            {
-                // SnapToParent explicitly identifies the parent/scene attachment
-                // namespace. Prefer the Carbin Scene.SkeletonPath skeleton, then
-                // exact-name stock CarBody scene skeletons. Never reinterpret the
-                // numeric BoneId in the child model's unrelated skeleton.
-                if (_authoritativeSceneSkeleton is not null)
-                {
-                    var authoritative = ResolveNamed(
-                        _authoritativeSceneSkeleton,
-                        requestedName,
-                        requestedId,
-                        "scene_path_name",
-                        "scene_skeleton_path");
-                    if (authoritative is not null)
-                        return authoritative;
-                }
-                return ResolveNamedSceneFallback(
-                    requestedName,
-                    requestedId,
-                    "scene_fallback_name",
-                    "snap_parent_name_not_found");
-            }
-
+            // A named attachment belongs to the model bundle first.  This is the
+            // original KFPS placement namespace and is required by WheelStyle and
+            // other parts whose local skeleton contains the requested bone.
             if (instanceSkeleton is not null && instanceSkeleton.Bones.Count > 0)
             {
                 var childTarget = instanceSkeleton.Bones.FindIndex(
@@ -249,59 +241,51 @@ internal static class TransformAuditRuntime
                 }
             }
 
-            if (_authoritativeSceneSkeleton is not null)
+            // Do not reinterpret a named attachment's numeric BoneId inside an
+            // unrelated local skeleton.  When the Carbin transform has zero
+            // translation, the model is structurally placed by its named car bone;
+            // only then may the declared Scene.SkeletonPath namespace be used.
+            if (IsBoneOnlyPlacement(instance))
             {
-                var authoritative = ResolveNamed(
-                    _authoritativeSceneSkeleton,
-                    requestedName,
-                    requestedId,
-                    "scene_path_name_fallback",
-                    "scene_skeleton_path");
-                if (authoritative is not null)
-                    return authoritative;
-            }
-            var fallback = ResolveNamedSceneFallback(
-                requestedName,
-                requestedId,
-                "scene_fallback_name",
-                "name_not_found");
-            if (fallback.World is not null || fallback.Mode == "scene_name_ambiguous")
-                return fallback;
-            return new AttachmentBoneResolution(
-                "name_not_found",
-                requestedName,
-                requestedId,
-                "",
-                -1,
-                instanceSkeleton is null ? fallback.SkeletonSource : instanceSkeletonSource,
-                null);
-        }
-
-        if (instance.SnapToParent)
-        {
-            if (_authoritativeSceneSkeleton is not null
-                && requestedId >= 0
-                && requestedId < _authoritativeSceneSkeleton.Skeleton.Bones.Count)
-            {
+                if (_authoritativeSceneSkeleton is not null)
+                {
+                    var authoritative = ResolveNamed(
+                        _authoritativeSceneSkeleton,
+                        requestedName,
+                        requestedId,
+                        "scene_path_name_bone_only",
+                        "scene_skeleton_path");
+                    if (authoritative is not null)
+                        return authoritative;
+                }
                 return new AttachmentBoneResolution(
-                    "scene_path_id",
+                    "bone_only_scene_name_not_found",
                     requestedName,
                     requestedId,
-                    _authoritativeSceneSkeleton.Skeleton.Bones[requestedId].Name ?? "",
-                    requestedId,
-                    $"scene_skeleton_path:{_authoritativeSceneSkeleton.SourceEntry}",
-                    ResolveBoneWorld(_authoritativeSceneSkeleton.Skeleton, requestedId));
+                    "",
+                    -1,
+                    _authoritativeSceneSkeleton is null
+                        ? "scene_skeleton_unavailable"
+                        : $"scene_skeleton_path:{_authoritativeSceneSkeleton.SourceEntry}",
+                    null);
             }
+
+            // The Carbin matrix already carries a placement.  If its named local
+            // bone cannot be resolved, preserve that matrix rather than applying a
+            // same-number bone from another namespace or forcing a scene bone.
             return new AttachmentBoneResolution(
-                "snap_parent_id_unresolved",
+                "named_child_miss_keep_carbin",
                 requestedName,
                 requestedId,
                 "",
                 -1,
-                "scene_skeleton",
+                instanceSkeleton is null ? "no_instance_skeleton" : instanceSkeletonSource,
                 null);
         }
 
+        // With no bone name, a valid numeric ID is local to the instance model
+        // bundle, matching the original KFPS resolver. SnapToParent remains
+        // preserved as Carbin metadata/audit data; it does not override namespace.
         if (instanceSkeleton is not null
             && requestedId >= 0
             && requestedId < instanceSkeleton.Bones.Count)
