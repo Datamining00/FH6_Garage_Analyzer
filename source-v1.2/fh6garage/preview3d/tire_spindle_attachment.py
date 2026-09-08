@@ -9,7 +9,7 @@ from typing import Any, Iterable, Mapping, Sequence
 from .carbin_structural import CarbinStructuralError, parse_fh6_carbin
 
 
-TIRE_SPINDLE_ATTACHMENT_REVISION = "native_carbin_wheelstyle_spindle_contract_v2"
+TIRE_SPINDLE_ATTACHMENT_REVISION = "native_carbin_wheelstyle_spindle_contract_v3"
 _WHEEL_STYLE_PART_TYPE = 44
 _EXPECTED_SPINDLES: dict[str, tuple[str, str]] = {
     "spindleLF": ("front", "left"),
@@ -32,6 +32,8 @@ class TireSpindleAttachment:
     carbin_transform_matrix_row_major: tuple[float, ...]
     derived_tire_entry: str
     derived_tire_glb_path: str
+    derived_tire_source_side: str
+    side_source_mode: str
 
     def as_dict(self) -> dict[str, object]:
         payload = asdict(self)
@@ -64,7 +66,7 @@ class TireSpindleAttachmentContract:
 
     def as_dict(self) -> dict[str, object]:
         return {
-            "format": "fh6_native_tire_spindle_attachment_contract_v2",
+            "format": "fh6_native_tire_spindle_attachment_contract_v3",
             "status": self.status,
             "revision": self.revision,
             "car_id": self.car_id,
@@ -118,7 +120,7 @@ def _stock_models_from_wheelstyle_part(part: Mapping[str, Any]) -> Iterable[Mapp
     ]
     if len(upgrades) != 1:
         raise TireSpindleAttachmentError(
-            "CCarParts_WheelStyle must have exactly one stock upgrade for the first production trial"
+            "CCarParts_WheelStyle must have exactly one stock upgrade for the native tire preview"
         )
     stock = upgrades[0]
     stock_part_id = int(stock.get("part_id", -1))
@@ -183,6 +185,16 @@ def _entry_side(entry: str) -> str:
 def _trial_geometry_by_axle_side(
     trial_geometry: Mapping[str, Any],
 ) -> dict[tuple[str, str], Mapping[str, Any]]:
+    """Resolve front/rear tire derivatives to four vehicle sides.
+
+    FH6 tire libraries use two native layouts observed in the actual files:
+    (1) explicit tireL_ + tireR_ modelbins, and (2) a single tireL_ modelbin.
+    Public ForzaTech extraction code likewise resolves the native tire asset through
+    tireL_<TireModelName>.modelbin.  For layout (2), the same native derivative is
+    therefore attached to both sides and the existing right-side WheelStyle spindle
+    matrix supplies the native mirror/orientation.  No procedural geometry mirror,
+    translation, rotation, or scale is introduced here.
+    """
     if str(trial_geometry.get("format") or "") != "fh6_native_tire_production_trial_geometry_v1":
         raise TireSpindleAttachmentError("unsupported or missing production-trial geometry format")
     if str(trial_geometry.get("status") or "") != "production_trial_geometry_ready":
@@ -199,14 +211,13 @@ def _trial_geometry_by_axle_side(
         axle_payload = trial_geometry.get(axle)
         if not isinstance(axle_payload, Mapping):
             raise TireSpindleAttachmentError(f"trial geometry is missing {axle} axle data")
-        modelbins = axle_payload.get("modelbins") or ()
-        for modelbin in modelbins:
+        side_models: dict[str, Mapping[str, Any]] = {}
+        for modelbin in axle_payload.get("modelbins") or ():
             if not isinstance(modelbin, Mapping):
                 continue
             entry = str(modelbin.get("entry") or "")
             side = _entry_side(entry)
-            key = (axle, side)
-            if key in result:
+            if side in side_models:
                 raise TireSpindleAttachmentError(
                     f"trial geometry has more than one {axle}/{side} native tire modelbin"
                 )
@@ -215,15 +226,30 @@ def _trial_geometry_by_axle_side(
                 raise TireSpindleAttachmentError(
                     f"trial geometry {axle}/{side} has no derived GLB path"
                 )
-            result[key] = modelbin
+            side_models[side] = modelbin
 
-    required = {(axle, side) for axle in ("front", "rear") for side in ("left", "right")}
-    missing = sorted(required - set(result))
-    if missing:
+        if set(side_models) == {"left", "right"}:
+            result[(axle, "left")] = side_models["left"]
+            result[(axle, "right")] = side_models["right"]
+            continue
+
+        # Native one-model tire families observed in FH6 and in the public
+        # extractor use tireL_ as the canonical geometry source.  The right-side
+        # WheelStyle spindle matrix performs the side transform; geometry is not
+        # mirrored or offset procedurally by FHA.
+        if set(side_models) == {"left"}:
+            result[(axle, "left")] = side_models["left"]
+            result[(axle, "right")] = side_models["left"]
+            continue
+
+        if set(side_models) == {"right"}:
+            raise TireSpindleAttachmentError(
+                f"trial geometry has only {axle}/right native tire modelbin; single-right reuse is not evidence-backed"
+            )
         raise TireSpindleAttachmentError(
-            "trial geometry is missing axle/side derivative(s): "
-            + ", ".join(f"{axle}/{side}" for axle, side in missing)
+            f"trial geometry is missing native tire modelbin data for {axle} axle"
         )
+
     return result
 
 
@@ -231,15 +257,7 @@ def resolve_tire_spindle_attachment_contract(
     parsed_carbin: Mapping[str, Any],
     trial_geometry: Mapping[str, Any],
 ) -> TireSpindleAttachmentContract:
-    """Resolve a fail-closed tire attachment contract from native WheelStyle transforms.
-
-    No placement formula is evaluated here. For the first production trial, only
-    exact stock CCarParts_WheelStyle models bound to spindleLF/RF/LR/RR are
-    accepted. Their serialized 4x4 matrices are preserved verbatim for the later
-    GLB merge stage. This matches the real FER_FXX_05 carbin structure, where the
-    WheelStyle part owns the four wheel spindle transforms while TireCompound is
-    not serialized in the carbin scene.
-    """
+    """Resolve native tire attachments using only stock WheelStyle spindle transforms."""
     scene = parsed_carbin.get("scene")
     if not isinstance(scene, Mapping):
         raise TireSpindleAttachmentError("parsed carbin has no scene metadata")
@@ -262,6 +280,13 @@ def resolve_tire_spindle_attachment_contract(
                 f"{bone}: stock WheelStyle model has no native resource path"
             )
         derivative = trial_by_side[(axle, side)]
+        entry = str(derivative.get("entry") or "").replace("\\", "/")
+        source_side = _entry_side(entry)
+        source_mode = (
+            "exact_side_model"
+            if source_side == side
+            else "single_left_model_reused_by_native_spindle"
+        )
         attachments.append(
             TireSpindleAttachment(
                 spindle_bone=bone,
@@ -269,8 +294,10 @@ def resolve_tire_spindle_attachment_contract(
                 side=side,
                 carbin_resource_path=resource_path.replace("\\", "/"),
                 carbin_transform_matrix_row_major=matrix,
-                derived_tire_entry=str(derivative.get("entry") or "").replace("\\", "/"),
+                derived_tire_entry=entry,
                 derived_tire_glb_path=str(derivative.get("glb_path") or ""),
+                derived_tire_source_side=source_side,
+                side_source_mode=source_mode,
             )
         )
 
@@ -288,9 +315,10 @@ def resolve_tire_spindle_attachment_contract(
         spindle_attachment_applied=False,
         production_renderer_enabled=False,
         limitations=(
-            "This contract validates native WheelStyle attachment transforms but does not yet merge the derived tire GLBs into the vehicle GLB.",
-            "The first production trial uses exact stock WheelStyle spindle matrices; brake-rotor, track-spacing, tire-spacer, and TireCompound placement formulas are intentionally not substituted for these native transforms.",
-            "Visual left/right orientation and wheel-arch alignment remain to be verified after the derived-GLB merge stage.",
+            "Exact tireL_/tireR_ pairs are preserved when both native side models exist.",
+            "A native tireL_-only family reuses that derivative on the right spindle because FH6/public extraction evidence uses tireL_ as the canonical single-model tire source; the native right WheelStyle matrix supplies side orientation.",
+            "No procedural tire translation, rotation, scale, or geometry mirror is introduced.",
+            "Brake-rotor, track-spacing, tire-spacer, and TireCompound placement formulas are not substituted for native WheelStyle transforms.",
         ),
     )
 
