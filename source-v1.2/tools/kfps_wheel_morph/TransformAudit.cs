@@ -20,6 +20,8 @@ internal sealed record WheelStyleAnchorDiagnostic(
     string ResourcePath,
     string BoneName,
     short BoneId,
+    bool SnapToParent,
+    string AssemblyName,
     bool StockPart,
     string AttachmentResolutionMode,
     string ResolvedAttachmentBoneName,
@@ -41,6 +43,8 @@ internal sealed record MeshTransformAuditDiagnostic(
     string PartType,
     string AttachmentBoneName,
     short AttachmentBoneId,
+    bool SnapToParent,
+    string AssemblyName,
     bool StockPart,
     string AttachmentResolutionMode,
     string ResolvedAttachmentBoneName,
@@ -58,7 +62,7 @@ internal sealed record MeshTransformAuditDiagnostic(
     float[] RenderAabbMin,
     float[] RenderAabbMax);
 
-internal sealed record SceneSkeletonCandidate(string SourceEntry, SkeletonBlob Skeleton);
+internal sealed record SceneSkeletonCandidate(string SourceEntry, SkeletonBlob Skeleton, bool Authoritative);
 
 internal static class TransformAuditRuntime
 {
@@ -70,12 +74,18 @@ internal static class TransformAuditRuntime
     private static readonly HashSet<string> _wheelIdentities = new(StringComparer.Ordinal);
     private static readonly Dictionary<string, AttachmentBoneResolution> _attachmentResolutions =
         new(StringComparer.Ordinal);
+    private static SceneSkeletonCandidate? _authoritativeSceneSkeleton;
+    private static string _requestedSceneSkeletonPath = "";
+    private static string _sceneSkeletonResolutionMode = "not_configured";
 
     public static IReadOnlyList<WheelStyleAnchorDiagnostic> WheelStyleAnchors => _wheelAnchors;
     public static IReadOnlyList<MeshTransformAuditDiagnostic> MeshTransformAudit => _meshAudit;
-    public static int SceneSkeletonCount => _sceneSkeletons.Count;
+    public static int SceneSkeletonCount => _sceneSkeletons.Count + (_authoritativeSceneSkeleton is null ? 0 : 1);
+    public static string RequestedSceneSkeletonPath => _requestedSceneSkeletonPath;
+    public static string AuthoritativeSceneSkeletonSource => _authoritativeSceneSkeleton?.SourceEntry ?? "";
+    public static string SceneSkeletonResolutionMode => _sceneSkeletonResolutionMode;
 
-    public static void Configure(IReadOnlyList<ModelInstance> instances)
+    public static void Configure(IReadOnlyList<ModelInstance> instances, string? sceneSkeletonPath)
     {
         _wheelAnchors.Clear();
         _meshAudit.Clear();
@@ -83,6 +93,32 @@ internal static class TransformAuditRuntime
         _sceneSkeletonSources.Clear();
         _wheelIdentities.Clear();
         _attachmentResolutions.Clear();
+        _authoritativeSceneSkeleton = null;
+        _requestedSceneSkeletonPath = sceneSkeletonPath ?? "";
+        _sceneSkeletonResolutionMode = string.IsNullOrWhiteSpace(_requestedSceneSkeletonPath)
+            ? "not_declared"
+            : "unresolved";
+    }
+
+    public static bool RegisterAuthoritativeSceneSkeleton(string sourceEntry, Bundle bundle)
+    {
+        var skeleton = bundle.Blobs.OfType<SkeletonBlob>().FirstOrDefault();
+        if (skeleton is null || skeleton.Bones.Count == 0)
+        {
+            _sceneSkeletonResolutionMode = "resolved_entry_without_skeleton";
+            return false;
+        }
+        _authoritativeSceneSkeleton = new SceneSkeletonCandidate(sourceEntry, skeleton, true);
+        _sceneSkeletonSources.Add(sourceEntry);
+        _sceneSkeletonResolutionMode = "scene_skeleton_path";
+        return true;
+    }
+
+    public static void RecordSceneSkeletonResolutionFailure(string mode)
+    {
+        if (_authoritativeSceneSkeleton is not null)
+            return;
+        _sceneSkeletonResolutionMode = string.IsNullOrWhiteSpace(mode) ? "unresolved" : mode;
     }
 
     public static void RegisterSceneSkeleton(string sourceEntry, Bundle bundle)
@@ -92,7 +128,75 @@ internal static class TransformAuditRuntime
             return;
         if (!_sceneSkeletonSources.Add(sourceEntry))
             return;
-        _sceneSkeletons.Add(new SceneSkeletonCandidate(sourceEntry, skeleton));
+        _sceneSkeletons.Add(new SceneSkeletonCandidate(sourceEntry, skeleton, false));
+    }
+
+    private static AttachmentBoneResolution? ResolveNamed(
+        SceneSkeletonCandidate candidate,
+        string requestedName,
+        short requestedId,
+        string mode,
+        string sourcePrefix)
+    {
+        var target = candidate.Skeleton.Bones.FindIndex(
+            bone => string.Equals(bone.Name, requestedName, StringComparison.OrdinalIgnoreCase));
+        if (target < 0)
+            return null;
+        return new AttachmentBoneResolution(
+            mode,
+            requestedName,
+            requestedId,
+            candidate.Skeleton.Bones[target].Name ?? "",
+            target,
+            $"{sourcePrefix}:{candidate.SourceEntry}",
+            ResolveBoneWorld(candidate.Skeleton, target));
+    }
+
+    private static AttachmentBoneResolution ResolveNamedSceneFallback(
+        string requestedName,
+        short requestedId,
+        string successMode,
+        string missingMode)
+    {
+        var sceneMatches = new List<(SceneSkeletonCandidate Candidate, int Index)>();
+        foreach (var candidate in _sceneSkeletons)
+        {
+            var index = candidate.Skeleton.Bones.FindIndex(
+                bone => string.Equals(bone.Name, requestedName, StringComparison.OrdinalIgnoreCase));
+            if (index >= 0)
+                sceneMatches.Add((candidate, index));
+        }
+        if (sceneMatches.Count == 1)
+        {
+            var match = sceneMatches[0];
+            return new AttachmentBoneResolution(
+                successMode,
+                requestedName,
+                requestedId,
+                match.Candidate.Skeleton.Bones[match.Index].Name ?? "",
+                match.Index,
+                $"scene_stock_carbody:{match.Candidate.SourceEntry}",
+                ResolveBoneWorld(match.Candidate.Skeleton, match.Index));
+        }
+        if (sceneMatches.Count > 1)
+        {
+            return new AttachmentBoneResolution(
+                "scene_name_ambiguous",
+                requestedName,
+                requestedId,
+                "",
+                -1,
+                "scene_stock_carbody",
+                null);
+        }
+        return new AttachmentBoneResolution(
+            missingMode,
+            requestedName,
+            requestedId,
+            "",
+            -1,
+            "scene_skeleton",
+            null);
     }
 
     public static AttachmentBoneResolution ResolveAttachmentBone(Bundle bundle, ModelInstance instance)
@@ -104,6 +208,33 @@ internal static class TransformAuditRuntime
 
         if (!string.IsNullOrWhiteSpace(requestedName))
         {
+            if (instance.SnapToParent)
+            {
+                // SnapToParent explicitly identifies the parent/scene attachment
+                // namespace. Prefer the Carbin Scene.SkeletonPath skeleton, then
+                // exact-name stock CarBody scene skeletons. Never reinterpret the
+                // numeric BoneId in the child model's unrelated skeleton.
+                if (_authoritativeSceneSkeleton is not null)
+                {
+                    var authoritative = ResolveNamed(
+                        _authoritativeSceneSkeleton,
+                        requestedName,
+                        requestedId,
+                        "scene_path_name",
+                        "scene_skeleton_path");
+                    if (authoritative is not null)
+                        return authoritative;
+                }
+                var scene = ResolveNamedSceneFallback(
+                    requestedName,
+                    requestedId,
+                    "scene_fallback_name",
+                    "snap_parent_name_not_found");
+                if (scene.World is not null || scene.Mode == "scene_name_ambiguous")
+                    return scene;
+                return scene;
+            }
+
             if (instanceSkeleton is not null && instanceSkeleton.Bones.Count > 0)
             {
                 var childTarget = instanceSkeleton.Bones.FindIndex(
@@ -111,7 +242,7 @@ internal static class TransformAuditRuntime
                 if (childTarget >= 0)
                 {
                     return new AttachmentBoneResolution(
-                        "name",
+                        "child_name",
                         requestedName,
                         requestedId,
                         instanceSkeleton.Bones[childTarget].Name ?? "",
@@ -121,49 +252,56 @@ internal static class TransformAuditRuntime
                 }
             }
 
-            // A named Carbin attachment may refer to the scene/chassis skeleton,
-            // not the child part model's own skeleton. Resolve that namespace only
-            // when the name identifies exactly one registered stock CarBody
-            // skeleton. Never reinterpret the numeric BoneId across namespaces.
-            var sceneMatches = new List<(SceneSkeletonCandidate Candidate, int Index)>();
-            foreach (var candidate in _sceneSkeletons)
+            if (_authoritativeSceneSkeleton is not null)
             {
-                var index = candidate.Skeleton.Bones.FindIndex(
-                    bone => string.Equals(bone.Name, requestedName, StringComparison.OrdinalIgnoreCase));
-                if (index >= 0)
-                    sceneMatches.Add((candidate, index));
-            }
-            if (sceneMatches.Count == 1)
-            {
-                var match = sceneMatches[0];
-                return new AttachmentBoneResolution(
-                    "scene_name",
+                var authoritative = ResolveNamed(
+                    _authoritativeSceneSkeleton,
                     requestedName,
                     requestedId,
-                    match.Candidate.Skeleton.Bones[match.Index].Name ?? "",
-                    match.Index,
-                    $"scene_stock_carbody:{match.Candidate.SourceEntry}",
-                    ResolveBoneWorld(match.Candidate.Skeleton, match.Index));
+                    "scene_path_name_fallback",
+                    "scene_skeleton_path");
+                if (authoritative is not null)
+                    return authoritative;
             }
-            if (sceneMatches.Count > 1)
-            {
-                return new AttachmentBoneResolution(
-                    "scene_name_ambiguous",
-                    requestedName,
-                    requestedId,
-                    "",
-                    -1,
-                    "scene_stock_carbody",
-                    null);
-            }
-
+            var fallback = ResolveNamedSceneFallback(
+                requestedName,
+                requestedId,
+                "scene_fallback_name",
+                "name_not_found");
+            if (fallback.World is not null || fallback.Mode == "scene_name_ambiguous")
+                return fallback;
             return new AttachmentBoneResolution(
                 "name_not_found",
                 requestedName,
                 requestedId,
                 "",
                 -1,
-                instanceSkeleton is null ? "no_instance_or_scene_match" : instanceSkeletonSource,
+                instanceSkeleton is null ? fallback.SkeletonSource : instanceSkeletonSource,
+                null);
+        }
+
+        if (instance.SnapToParent)
+        {
+            if (_authoritativeSceneSkeleton is not null
+                && requestedId >= 0
+                && requestedId < _authoritativeSceneSkeleton.Skeleton.Bones.Count)
+            {
+                return new AttachmentBoneResolution(
+                    "scene_path_id",
+                    requestedName,
+                    requestedId,
+                    _authoritativeSceneSkeleton.Skeleton.Bones[requestedId].Name ?? "",
+                    requestedId,
+                    $"scene_skeleton_path:{_authoritativeSceneSkeleton.SourceEntry}",
+                    ResolveBoneWorld(_authoritativeSceneSkeleton.Skeleton, requestedId));
+            }
+            return new AttachmentBoneResolution(
+                "snap_parent_id_unresolved",
+                requestedName,
+                requestedId,
+                "",
+                -1,
+                "scene_skeleton",
                 null);
         }
 
@@ -231,6 +369,8 @@ internal static class TransformAuditRuntime
             instance.Path,
             instance.BoneName,
             instance.BoneId,
+            instance.SnapToParent,
+            instance.AssemblyName,
             instance.StockPart,
             attachment.Mode,
             attachment.ResolvedName,
@@ -276,15 +416,13 @@ internal static class TransformAuditRuntime
             renderMinimum = Vector3.Min(renderMinimum, point);
             renderMaximum = Vector3.Max(renderMaximum, point);
 
-            // TransformPositions writes KFPS render space as (-x, y, z). Undo
-            // that reflection and then the exact effective instance transform to
-            // recover post-morph/post-rigid-bone geometry in instance-local space.
             var transformed = new Vector3(-point.X, point.Y, point.Z);
             var local = hasInstanceTransform
                 ? Vector3.Transform(transformed, inverseInstance)
                 : transformed;
             if (!float.IsFinite(local.X) || !float.IsFinite(local.Y) || !float.IsFinite(local.Z))
                 throw new InvalidDataException($"{instance.Identity}/{geometry.Name} local AABB contains a non-finite point.");
+            localMinimum = Vector3.Min(localMinimum, point: localMinimum);
             localMinimum = Vector3.Min(localMinimum, local);
             localMaximum = Vector3.Max(localMaximum, local);
         }
@@ -302,6 +440,8 @@ internal static class TransformAuditRuntime
             instance.PartType.ToString(),
             instance.BoneName,
             instance.BoneId,
+            instance.SnapToParent,
+            instance.AssemblyName,
             instance.StockPart,
             attachment.Mode,
             attachment.ResolvedName,
