@@ -29,9 +29,11 @@ else:
 # global native transform-chain path, then let the existing global installer wrap
 # integration's convert_vehicle exactly once.
 def _install_native_transform_chain_preview() -> bool:
+    from .material_appearance_patch import install_game_like_material_patch
     from .native_transform_chain_v3 import install_native_transform_chain_v3
     from . import tire_preview_integration as tire_preview_integration
 
+    install_game_like_material_patch()
     install_native_transform_chain_v3()
     return tire_preview_integration.install_global_stock_native_tire_preview()
 
