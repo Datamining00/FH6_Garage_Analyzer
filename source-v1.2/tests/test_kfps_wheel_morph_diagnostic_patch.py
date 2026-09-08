@@ -20,7 +20,7 @@ class KfpsWheelMorphDiagnosticPatchTests(unittest.TestCase):
         self.assertIn("model.Bundle", text)
         self.assertIn("WheelMorphRuntime.Configure(instances)", text)
 
-    def test_attachment_resolution_is_name_safe_and_audited(self):
+    def test_attachment_resolution_uses_scene_body_namespace_without_numeric_cross_fallback(self):
         patcher = PATCHER.read_text(encoding="utf-8")
         audit = AUDIT.read_text(encoding="utf-8")
         self.assertIn("TransformAuditRuntime.ResolveAttachmentBone(model.Bundle, instance)", patcher)
@@ -29,18 +29,32 @@ class KfpsWheelMorphDiagnosticPatchTests(unittest.TestCase):
             "TransformAuditRuntime.RecordInstance(entryName, instance, instanceTransform, attachmentResolution)",
             patcher,
         )
+        self.assertIn("TransformAuditRuntime.RegisterSceneSkeleton(rootEntry, rootModel.Bundle)", patcher)
+        self.assertIn("instance.PartType == CCarParts.CarBody", patcher)
+        self.assertIn('"scene_name"', audit)
+        self.assertIn('"scene_name_ambiguous"', audit)
         self.assertIn('"name_not_found"', audit)
         self.assertIn('"instance_model_bundle"', audit)
+        self.assertIn("SceneSkeletonCount", audit)
         self.assertIn("AttachmentResolutionMode", audit)
         self.assertIn("ResolvedAttachmentBoneIndex", audit)
-        # A named attachment that failed to resolve must return immediately; it
-        # must not silently reinterpret the same numeric BoneId in another model skeleton.
-        name_branch = audit.index("if (target < 0)")
-        id_only = audit.index('mode = "id_only"', name_branch)
-        self.assertLess(name_branch, id_only)
-        segment = audit[name_branch:id_only]
-        self.assertIn("return new AttachmentBoneResolution", segment)
+        # Named attachments search the child skeleton and then the registered
+        # scene CarBody skeletons. They never fall through to a numeric BoneId in
+        # another skeleton namespace.
+        named = audit.index("if (!string.IsNullOrWhiteSpace(requestedName))")
+        id_only = audit.index('"id_only"', named)
+        segment = audit[named:id_only]
+        self.assertIn("sceneMatches", segment)
         self.assertIn('"name_not_found"', segment)
+        self.assertNotIn("requestedId >= 0", segment)
+
+    def test_transform_audit_exposes_instance_local_wheel_geometry(self):
+        audit = AUDIT.read_text(encoding="utf-8")
+        self.assertIn("VertexCount", audit)
+        self.assertIn("LocalAabbMin", audit)
+        self.assertIn("LocalAabbMax", audit)
+        self.assertIn("Matrix4x4.Invert(effectiveTransform", audit)
+        self.assertIn("new Vector3(-point.X, point.Y, point.Z)", audit)
 
     def test_runtime_uses_signed_base_vertex_and_selector_indices(self):
         text = HELPER.read_text(encoding="utf-8")
