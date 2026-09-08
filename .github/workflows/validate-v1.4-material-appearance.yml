@@ -1,0 +1,48 @@
+name: Validate FH6 Assistant v1.4 material appearance
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - v1.4-rc1-wheel-morph-w3
+    paths:
+      - "source-v1.2/fh6garage/preview3d/material_appearance_patch.py"
+      - "source-v1.2/fh6garage/preview3d/glb_viewer.py"
+      - "source-v1.2/fh6garage/preview3d/glb_parser.py"
+      - "source-v1.2/fh6garage/preview3d/__init__.py"
+      - "source-v1.2/tests/test_material_appearance_patch.py"
+      - ".github/workflows/validate-v1.4-material-appearance.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v14-material-appearance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Python ${{ matrix.python-version }} material appearance contract
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+
+    steps:
+      - name: Checkout W3 branch
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Compile appearance bridge
+        run: |
+          python -m py_compile source-v1.2/fh6garage/preview3d/material_appearance_patch.py
+          python -m py_compile source-v1.2/tests/test_material_appearance_patch.py
+
+      - name: Validate shading contract
+        working-directory: source-v1.2
+        run: python -m unittest tests.test_material_appearance_patch -v
