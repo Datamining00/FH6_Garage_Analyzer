@@ -210,7 +210,7 @@ jobs:
           Copy-Item "source-v1.2\tools\Run_FER_FXX_05_Wheel_Morph_Bake_Diagnostic.cmd" $pkg
           Copy-Item "source-v1.2\tools\README_FER_FXX_05_Wheel_Morph_Bake_Diagnostic.txt" $pkg
           Copy-Item "source-v1.2\fh6garage\__init__.py" (Join-Path $pkg "fh6garage\")
-          Copy-Item "source-v1.2\fh6garage\preview3d\__init__.py" (Join-Path $pkg "fh6garage\preview3d\")
+          Set-Content -Encoding UTF8 (Join-Path $pkg "fh6garage\preview3d\__init__.py") "# Minimal diagnostic package: production preview3d initialization intentionally omitted."
           Copy-Item "source-v1.2\fh6garage\preview3d\wheel_visibility.py" (Join-Path $pkg "fh6garage\preview3d\")
           Copy-Item "source-v1.2\fh6garage\preview3d\wheel_mesh_diagnostic.py" (Join-Path $pkg "fh6garage\preview3d\")
           if (-not (Test-Path (Join-Path $pkg "Kfps.ChassisConverter.exe"))) { throw "Packaged diagnostic converter is missing." }
@@ -247,7 +247,7 @@ jobs:
           Copy-Item "source-v1.2\tools\Run_FH6_Wheel_Morph_Diagnostic.cmd" (Join-Path $pkg "tools\")
           Copy-Item "source-v1.2\tools\inspect_vehicle_morph.py" (Join-Path $pkg "tools\")
           Copy-Item "source-v1.2\fh6garage\__init__.py" (Join-Path $pkg "fh6garage\")
-          Copy-Item "source-v1.2\fh6garage\preview3d\__init__.py" (Join-Path $pkg "fh6garage\preview3d\")
+          Set-Content -Encoding UTF8 (Join-Path $pkg "fh6garage\preview3d\__init__.py") "# Minimal diagnostic package: production preview3d initialization intentionally omitted."
           Copy-Item "source-v1.2\fh6garage\preview3d\vehicle_index.py" (Join-Path $pkg "fh6garage\preview3d\")
           Copy-Item "source-v1.2\fh6garage\preview3d\near_lod_archive.py" (Join-Path $pkg "fh6garage\preview3d\")
           Copy-Item "source-v1.2\fh6garage\preview3d\modelbin_morph.py" (Join-Path $pkg "fh6garage\preview3d\")
