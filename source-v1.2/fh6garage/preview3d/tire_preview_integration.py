@@ -16,8 +16,7 @@ from .wheel_spec import FH6WheelSpecResolver
 from .wheel_spec_database import ensure_stock_wheel_database
 
 
-GLOBAL_NATIVE_TIRE_PREVIEW_REVISION = "stock_native_tire_global_preview_v1"
-# Compatibility constant retained for older diagnostics/tests.
+GLOBAL_NATIVE_TIRE_PREVIEW_REVISION = "stock_native_tire_global_preview_v2"
 FXX_NATIVE_TIRE_PREVIEW_REVISION = GLOBAL_NATIVE_TIRE_PREVIEW_REVISION
 _PATCH_MARKER = "_fh6_global_stock_native_tire_preview_patched"
 _LEGACY_PATCH_MARKER = "_fh6_validated_fxx_native_tire_preview_patched"
@@ -89,14 +88,7 @@ def try_apply_stock_native_tire_preview(
     work_root: str | Path,
     progress: Callable[[str], None] | None = None,
 ) -> TirePreviewIntegrationResult:
-    """Apply the supported native stock-tire preview to any eligible FH6 vehicle.
-
-    Eligibility is global at the vehicle level and fail-closed at the native tire
-    family/geometry level.  Unsupported or structurally mismatched tire families,
-    missing WheelStyle spindle evidence, archive changes, or any merge/bake failure
-    leave the already valid converter GLB selected.  Native FH6 files are read only.
-    """
-
+    """Apply stock native tire geometry to any structurally eligible FH6 vehicle."""
     source_glb = Path(vehicle_glb).expanduser().resolve()
     car_id = _car_id(asset)
     if car_id <= 0:
@@ -136,8 +128,6 @@ def try_apply_stock_native_tire_preview(
 
         tire_archive = resolve_tire_archive(game_or_cars_path, tire_model_name)
 
-        # Derived preview-only workspace.  Source vehicle/tire archives and the
-        # converter's base GLB are never overwritten.
         shutil.rmtree(trial_root, ignore_errors=True)
         trial_root.mkdir(parents=True, exist_ok=False)
 
@@ -161,26 +151,37 @@ def try_apply_stock_native_tire_preview(
             geometry_report.as_dict(),
             output_path=contract_path,
         )
+        attachment_payload = attachment.as_dict()
+        side_reuse_count = sum(
+            1
+            for item in attachment_payload.get("attachments", [])
+            if isinstance(item, dict)
+            and item.get("side_source_mode") == "single_left_model_reused_by_native_spindle"
+        )
 
         output_glb = trial_root / f"{source_glb.stem}__native_tires.glb"
         merge_report = merge_tire_spindle_trial_glb(
             source_glb,
-            attachment.as_dict(),
+            attachment_payload,
             output_glb,
         )
         if not merge_report.trial_vehicle_glb_ready or not output_glb.is_file():
             raise RuntimeError("native tire merge did not produce a ready trial vehicle GLB")
 
-        # KFPS converter emits already-world-positioned geometry in render space
-        # after its X-axis handedness conversion.  Apply the exact same conversion
-        # to the four native tire derivatives before FinalVerify1 consumes them.
         viewer_matrix_bake = bake_native_tire_trial_node_matrices(output_glb)
-        if int(viewer_matrix_bake.get("node_count", 0)) != 4:
+        baked_nodes = int(viewer_matrix_bake.get("node_count", 0))
+        baked_vertices = int(viewer_matrix_bake.get("vertex_count", 0))
+        baked_triangles = int(viewer_matrix_bake.get("triangle_winding_reversed_count", 0))
+        if baked_nodes != 4:
             raise RuntimeError("native tire viewer matrix bake did not process four spindle nodes")
+        if baked_vertices <= 0 or baked_triangles <= 0:
+            raise RuntimeError(
+                "native tire viewer matrix bake produced no drawable tire geometry"
+            )
 
         manifest_path = trial_root / "native_tire_preview_integration.json"
         manifest = {
-            "format": "fh6_global_stock_native_tire_preview_integration_v1",
+            "format": "fh6_global_stock_native_tire_preview_integration_v2",
             "revision": GLOBAL_NATIVE_TIRE_PREVIEW_REVISION,
             "status": "stock_native_tire_preview_applied",
             "car_id": car_id,
@@ -192,17 +193,20 @@ def try_apply_stock_native_tire_preview(
             "tire_archive": str(tire_archive),
             "wheel_spec": spec.as_dict(),
             "geometry_report": geometry_report.as_dict(),
-            "attachment_contract": attachment.as_dict(),
+            "attachment_contract": attachment_payload,
             "merge_report": merge_report.as_dict(),
             "viewer_matrix_bake": viewer_matrix_bake,
+            "baked_tire_vertex_count": baked_vertices,
+            "baked_tire_triangle_count": baked_triangles,
+            "single_left_side_reuse_count": side_reuse_count,
             "fallback_on_failure": True,
             "production_renderer_enabled": False,
             "limitations": [
                 "Automatic native tire preview is stock-spec only.",
-                "Only exact native tire-family geometry identities admitted by the global preview policy are used; unsupported or structurally mismatched families fall back to the base vehicle GLB.",
+                "Known exact tire geometry identities use the validated fast path; an unlisted family must reproduce the validated selector boundary-role pattern read-only before use.",
+                "A tireL_-only native family may reuse its canonical geometry on right spindles; the native WheelStyle RF/RR matrices provide side orientation without a procedural geometry mirror.",
                 "Selector 2..4 remain zero until their game-facing semantics are verified.",
                 "No arbitrary per-car translation, rotation, or scale correction is applied.",
-                "WheelStyle spindle matrices and the KFPS render-space handedness conversion are used for placement.",
             ],
         }
         manifest_path.write_text(
@@ -211,7 +215,9 @@ def try_apply_stock_native_tire_preview(
         )
         _notify(
             progress,
-            f"Native stock 타이어({tire_model_name})를 WheelStyle spindle에 적용했습니다.",
+            f"Native stock 타이어({tire_model_name}) 적용 완료: "
+            f"4 spindles / {baked_vertices:,} vertices / {baked_triangles:,} triangles"
+            + (f" / single-left reuse {side_reuse_count}" if side_reuse_count else ""),
         )
         return TirePreviewIntegrationResult(
             status="stock_native_tire_preview_applied",
@@ -224,21 +230,30 @@ def try_apply_stock_native_tire_preview(
             fallback_used=False,
             production_renderer_enabled=False,
             detail=(
-                f"stock native tire preview selected for Car ID {car_id} "
-                f"using TireModelName={tire_model_name}"
+                f"TireModelName={tire_model_name}; spindles=4; "
+                f"baked_vertices={baked_vertices}; baked_triangles={baked_triangles}; "
+                f"single_left_side_reuse={side_reuse_count}"
             ),
             manifest_path=str(manifest_path),
         )
     except Exception as exc:
-        # Global native tire preview must never make a previously valid 3D preview fail.
         shutil.rmtree(trial_root, ignore_errors=True)
         detail = f"{type(exc).__name__}: {exc}"
         _notify(
             progress,
-            "Native stock tire preview를 적용하지 못해 기존 차량 GLB로 계속합니다 "
-            f"({detail}).",
+            "Native stock tire preview FALLBACK: 기존 차량 GLB를 사용합니다. "
+            f"원인={detail}",
         )
         return _passthrough(asset, source_glb, "fallback_existing_vehicle_glb", detail)
+
+
+def _with_tire_diagnostics(result: Any, integration: TirePreviewIntegrationResult) -> Any:
+    try:
+        diagnostics = dict(getattr(result, "diagnostics", {}) or {})
+        diagnostics["native_tire_preview"] = integration.as_dict()
+        return replace(result, diagnostics=diagnostics)
+    except (TypeError, AttributeError):
+        return result
 
 
 def make_stock_native_tire_convert_wrapper(original_convert: Callable[..., Any]) -> Callable[..., Any]:
@@ -262,8 +277,6 @@ def make_stock_native_tire_convert_wrapper(original_convert: Callable[..., Any])
             converter_override=converter_override,
         )
 
-        # Explicit diagnostic/converter overrides stay byte-for-byte on their
-        # existing path.  Global native tire integration belongs to normal FHA 3D.
         if rim_morph_weights is not None or converter_override is not None:
             return result
         car_id = _car_id(asset)
@@ -294,9 +307,13 @@ def make_stock_native_tire_convert_wrapper(original_convert: Callable[..., Any])
             work_root=tire_root,
             progress=progress,
         )
+        result_with_diagnostics = _with_tire_diagnostics(result, integration)
         if not integration.applied:
-            return result
-        return replace(result, output_path=str(Path(integration.selected_vehicle_glb).resolve()))
+            return result_with_diagnostics
+        return replace(
+            result_with_diagnostics,
+            output_path=str(Path(integration.selected_vehicle_glb).resolve()),
+        )
 
     convert_with_stock_native_tires.__name__ = getattr(
         original_convert,
@@ -309,7 +326,6 @@ def make_stock_native_tire_convert_wrapper(original_convert: Callable[..., Any])
 
 def install_global_stock_native_tire_preview() -> bool:
     """Lazily install the global stock native-tire wrapper into preview3d.integration."""
-
     from . import integration as preview_integration
 
     if bool(getattr(preview_integration, _PATCH_MARKER, False)):
@@ -320,13 +336,10 @@ def install_global_stock_native_tire_preview() -> bool:
     setattr(preview_integration, _ORIGINAL_CONVERTER, original)
     preview_integration.convert_vehicle = make_stock_native_tire_convert_wrapper(original)
     setattr(preview_integration, _PATCH_MARKER, True)
-    # Retain the old marker so older code cannot install a second wrapper.
     setattr(preview_integration, _LEGACY_PATCH_MARKER, True)
     return True
 
 
-# Compatibility APIs retained so FinalVerify1 and older diagnostic scripts do not
-# need a synchronized import-name migration.  Their behavior is now global.
 def try_apply_validated_fxx_native_tire_preview(*args: Any, **kwargs: Any) -> TirePreviewIntegrationResult:
     return try_apply_stock_native_tire_preview(*args, **kwargs)
 
