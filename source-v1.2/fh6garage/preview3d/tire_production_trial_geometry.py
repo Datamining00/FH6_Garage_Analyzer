@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 import hashlib
 import json
+import math
 from pathlib import Path
 from typing import Any, Sequence
 import zipfile
@@ -14,6 +15,7 @@ from .modelbin_morph import (
     apply_weighted_morph,
     parse_modelbin_morph_inventory,
 )
+from .tire_morph_auto_inference import GENERIC_TIRE_AUTO_INFERENCE_REVISION
 from .tire_morph_geometry import (
     INDEX_BUFFER_TAG,
     INPUT_LAYOUT_TAG,
@@ -36,31 +38,39 @@ from .tire_production_policy import (
     TireProductionEligibility,
     evaluate_stock_tire_production_candidate,
 )
-from .wheel_spec import VehicleWheelSpec
+from .wheel_spec import AxleWheelSpec, VehicleWheelSpec
 
 
 class TireProductionTrialGeometryError(RuntimeError):
-    """Raised when the gated native tire production-trial geometry cannot be built."""
+    """Raised when native tire geometry cannot be decoded for FHA assembly."""
 
 
 @dataclass(frozen=True)
 class ModelbinProductionTrialGeometry:
     axle: str
     entry: str
+    source_entry: str
     modelbin_sha256: str
     selected_mesh_count: int
     morphed_mesh_count: int
+    morph_fallback_mesh_count: int
     static_mesh_count: int
     vertex_count: int
     index_count: int
     selector_weights: tuple[float, float, float, float, float]
     scale_x: float
+    normalization_scale_xyz: tuple[float, float, float]
+    target_width_m: float
+    target_outer_diameter_m: float
+    morph_mode: str
+    pre_normalization_aabb: dict[str, object]
     aabb: dict[str, object]
     glb_path: str | None
 
     def as_dict(self) -> dict[str, object]:
         payload = asdict(self)
         payload["selector_weights"] = list(self.selector_weights)
+        payload["normalization_scale_xyz"] = list(self.normalization_scale_xyz)
         return payload
 
 
@@ -69,6 +79,8 @@ class AxleProductionTrialGeometry:
     axle: str
     selector_weights: tuple[float, float, float, float, float]
     scale_x: float
+    target_width_m: float
+    target_outer_diameter_m: float
     modelbins: tuple[ModelbinProductionTrialGeometry, ...]
 
     def as_dict(self) -> dict[str, object]:
@@ -76,6 +88,8 @@ class AxleProductionTrialGeometry:
             "axle": self.axle,
             "selector_weights": list(self.selector_weights),
             "scale_x": self.scale_x,
+            "target_width_m": self.target_width_m,
+            "target_outer_diameter_m": self.target_outer_diameter_m,
             "modelbins": [item.as_dict() for item in self.modelbins],
         }
 
@@ -136,11 +150,7 @@ def _require_eligible(
     eligibility = evaluate_stock_tire_production_candidate(spec, archive)
     if not eligibility.production_trial_eligible or eligibility.weights is None:
         raise TireProductionTrialGeometryError(
-            f"native tire production trial blocked: {eligibility.status}: {eligibility.detail}"
-        )
-    if eligibility.production_renderer_enabled:
-        raise TireProductionTrialGeometryError(
-            "production policy unexpectedly enabled the renderer before spindle integration review"
+            f"native tire production blocked: {eligibility.status}: {eligibility.detail}"
         )
     return eligibility
 
@@ -149,25 +159,147 @@ def _safe_stem(entry: str) -> str:
     return Path(entry.replace("\\", "/")).stem
 
 
+def _canonical_side_entry(model_name: str, side: str) -> str:
+    prefix = "tireL" if side == "left" else "tireR"
+    safe_model = model_name or "auto"
+    return f"{prefix}_{safe_model}.modelbin"
+
+
+def _select_native_modelbins(
+    bundle: zipfile.ZipFile,
+    model_name: str,
+) -> tuple[tuple[str, str, bytes], ...]:
+    """Select tire modelbins without any family-specific table.
+
+    Exact tireL_/tireR_ names linked to TireModelName are preferred.  Otherwise a
+    generic tireL_/tireR_ pair is used.  If the archive exposes no side label, the
+    first modelbin becomes the canonical left source and native right-spindle
+    transforms reuse it, matching the existing single-left assembly contract.
+    """
+    entries = sorted(
+        (
+            item
+            for item in bundle.infolist()
+            if not item.is_dir() and item.filename.casefold().endswith(".modelbin")
+        ),
+        key=lambda item: item.filename.casefold(),
+    )
+    if not entries:
+        raise TireProductionTrialGeometryError("native tire archive contains no modelbin")
+
+    wanted_left = f"tirel_{model_name}.modelbin".casefold()
+    wanted_right = f"tirer_{model_name}.modelbin".casefold()
+
+    exact_left = [item for item in entries if Path(item.filename).name.casefold() == wanted_left]
+    exact_right = [item for item in entries if Path(item.filename).name.casefold() == wanted_right]
+    generic_left = [
+        item for item in entries if Path(item.filename).stem.casefold().startswith("tirel_")
+    ]
+    generic_right = [
+        item for item in entries if Path(item.filename).stem.casefold().startswith("tirer_")
+    ]
+
+    left = exact_left[0] if exact_left else (generic_left[0] if generic_left else None)
+    right = exact_right[0] if exact_right else (generic_right[0] if generic_right else None)
+
+    selected: list[tuple[str, str, bytes]] = []
+    if left is not None:
+        selected.append(
+            (
+                _canonical_side_entry(model_name, "left"),
+                left.filename.replace("\\", "/"),
+                bundle.read(left),
+            )
+        )
+    if right is not None:
+        selected.append(
+            (
+                _canonical_side_entry(model_name, "right"),
+                right.filename.replace("\\", "/"),
+                bundle.read(right),
+            )
+        )
+    if selected:
+        return tuple(selected)
+
+    # No explicit side identity: use one native geometry source as canonical left.
+    # The existing WheelStyle spindle matrices provide left/right placement.
+    first = entries[0]
+    return (
+        (
+            _canonical_side_entry(model_name, "left"),
+            first.filename.replace("\\", "/"),
+            bundle.read(first),
+        ),
+    )
+
+
+def _normalize_positions_to_stock_dimensions(
+    positions: Sequence[Sequence[float]],
+    axle_spec: AxleWheelSpec,
+) -> tuple[
+    tuple[tuple[float, float, float], ...],
+    tuple[float, float, float],
+    dict[str, object],
+    dict[str, object],
+]:
+    try:
+        before = _aabb(positions)
+    except TireMorphGeometryError as exc:
+        raise TireProductionTrialGeometryError(str(exc)) from exc
+
+    target_width = float(axle_spec.tire_width_mm) / 1000.0
+    target_outer = float(axle_spec.tire_outer_diameter_mm) / 1000.0
+    spans = tuple(float(value) for value in before.span)
+    if not all(math.isfinite(value) and value > 1.0e-9 for value in spans):
+        raise TireProductionTrialGeometryError(
+            f"{axle_spec.axle}: decoded tire geometry has invalid span {spans!r}"
+        )
+    if not all(math.isfinite(value) and value > 0.0 for value in (target_width, target_outer)):
+        raise TireProductionTrialGeometryError(
+            f"{axle_spec.axle}: stock tire target dimensions are invalid"
+        )
+
+    sx = target_width / spans[0]
+    sy = target_outer / spans[1]
+    sz = target_outer / spans[2]
+    scales = (sx, sy, sz)
+    if not all(math.isfinite(value) and value > 0.0 for value in scales):
+        raise TireProductionTrialGeometryError(
+            f"{axle_spec.axle}: automatic tire normalization produced invalid scale {scales!r}"
+        )
+
+    cx, cy, cz = (float(value) for value in before.center)
+    normalized = tuple(
+        (
+            cx + (float(point[0]) - cx) * sx,
+            cy + (float(point[1]) - cy) * sy,
+            cz + (float(point[2]) - cz) * sz,
+        )
+        for point in positions
+    )
+    try:
+        after = _aabb(normalized)
+    except TireMorphGeometryError as exc:
+        raise TireProductionTrialGeometryError(str(exc)) from exc
+    return normalized, scales, before.as_dict(), after.as_dict()
+
+
 def _build_modelbin_geometry(
     data: bytes,
     *,
     entry: str,
-    axle: str,
+    source_entry: str,
+    axle_spec: AxleWheelSpec,
     weights: AxleTireMorphWeights,
     output_dir: Path,
     write_glb: bool,
 ) -> ModelbinProductionTrialGeometry:
-    if weights.selector_weights[2:] != (0.0, 0.0, 0.0):
-        raise TireProductionTrialGeometryError(
-            f"{axle}: selector 2..4 must stay zero in the first production trial"
-        )
-
     try:
         _bundle_major, _bundle_minor, blobs = _iter_bundle_blobs(data)
         index_blobs = [blob for blob in blobs if blob.tag == INDEX_BUFFER_TAG]
         if not index_blobs:
-            raise TireProductionTrialGeometryError(f"{entry}: modelbin has no IndB")
+            raise TireProductionTrialGeometryError(f"{source_entry}: modelbin has no IndB")
         index_raw, _index_stride = _parse_global_indices(data, index_blobs[0])
         layouts = tuple(
             _parse_layout(data, blob)
@@ -183,7 +315,7 @@ def _build_modelbin_geometry(
         meshes = tuple(_parse_mesh(data, blob) for blob in blobs if blob.tag == MESH_TAG)
         inventory = parse_modelbin_morph_inventory(data)
     except (ModelbinMorphError, TireMorphGeometryError) as exc:
-        raise TireProductionTrialGeometryError(f"{entry}: {exc}") from exc
+        raise TireProductionTrialGeometryError(f"{source_entry}: {exc}") from exc
 
     morph_buffers = {item.blob_index: item for item in inventory.morph_buffers}
     morph_resolutions = {item.mesh_blob_index: item for item in inventory.resolutions}
@@ -191,7 +323,13 @@ def _build_modelbin_geometry(
     aggregate_indices: list[int] = []
     selected_mesh_count = 0
     morphed_mesh_count = 0
+    morph_fallback_mesh_count = 0
     static_mesh_count = 0
+
+    # Only measured file-driven inference is allowed to deform the source mesh.
+    # If inference was unavailable, the native base geometry is retained and the
+    # final stock-dimension normalization below supplies the universal fallback.
+    use_inferred_morph = str(weights.mapping_revision) == GENERIC_TIRE_AUTO_INFERENCE_REVISION
 
     for mesh in meshes:
         if (mesh.lod_flags & 3) == 0 or mesh.index_count <= 0:
@@ -208,55 +346,47 @@ def _build_modelbin_geometry(
             )
         except TireMorphGeometryError as exc:
             raise TireProductionTrialGeometryError(
-                f"{entry}: mesh {mesh.blob_index}: {exc}"
+                f"{source_entry}: mesh {mesh.blob_index}: {exc}"
             ) from exc
 
         selected_mesh_count += 1
         positions: Sequence[Sequence[float]] = base_positions
-        if mesh.morph_target_count > 0 and not mesh.is_morph_damage:
-            if mesh.morph_target_count != 5:
-                raise TireProductionTrialGeometryError(
-                    f"{entry}: mesh {mesh.blob_index} has {mesh.morph_target_count} "
-                    "weighted targets; production trial refuses to guess"
-                )
+        attempted_weighted = mesh.morph_target_count > 0 and not mesh.is_morph_damage
+        if attempted_weighted and use_inferred_morph and mesh.morph_target_count == 5:
             resolution = morph_resolutions.get(mesh.blob_index)
-            if resolution is None or resolution.morph_buffer_blob_index is None:
-                raise TireProductionTrialGeometryError(
-                    f"{entry}: mesh {mesh.blob_index} weighted morph buffer cannot be resolved"
-                )
-            morph_buffer = morph_buffers.get(resolution.morph_buffer_blob_index)
-            if morph_buffer is None:
-                raise TireProductionTrialGeometryError(
-                    f"{entry}: mesh {mesh.blob_index} resolved morph buffer is missing"
-                )
-            try:
-                positions, _ = apply_weighted_morph(
-                    base_positions,
-                    morph_buffer,
-                    mesh.indexed_vertex_offset,
-                    mesh.morph_target_count,
-                    weights.selector_weights,
-                    min_vertex_index=min_index,
-                )
-            except ModelbinMorphError as exc:
-                raise TireProductionTrialGeometryError(
-                    f"{entry}: mesh {mesh.blob_index} stock morph failed: {exc}"
-                ) from exc
-            morphed_mesh_count += 1
+            morph_buffer = (
+                morph_buffers.get(resolution.morph_buffer_blob_index)
+                if resolution is not None and resolution.morph_buffer_blob_index is not None
+                else None
+            )
+            if morph_buffer is not None:
+                try:
+                    positions, _ = apply_weighted_morph(
+                        base_positions,
+                        morph_buffer,
+                        mesh.indexed_vertex_offset,
+                        mesh.morph_target_count,
+                        weights.selector_weights,
+                        min_vertex_index=min_index,
+                    )
+                    morphed_mesh_count += 1
+                except ModelbinMorphError:
+                    positions = base_positions
+                    morph_fallback_mesh_count += 1
+            else:
+                morph_fallback_mesh_count += 1
+        elif attempted_weighted:
+            morph_fallback_mesh_count += 1
         else:
             static_mesh_count += 1
 
-        scaled_positions = tuple(
-            (float(point[0]) * weights.scale_x, float(point[1]), float(point[2]))
-            for point in positions
-        )
         try:
             compact_positions, compact_indices = _compact_geometry(
-                scaled_positions, source_indices, min_index
+                positions, source_indices, min_index
             )
         except TireMorphGeometryError as exc:
             raise TireProductionTrialGeometryError(
-                f"{entry}: mesh {mesh.blob_index}: {exc}"
+                f"{source_entry}: mesh {mesh.blob_index}: {exc}"
             ) from exc
         vertex_base = len(aggregate_positions)
         aggregate_positions.extend(compact_positions)
@@ -264,46 +394,58 @@ def _build_modelbin_geometry(
 
     if not aggregate_positions or not aggregate_indices or selected_mesh_count <= 0:
         raise TireProductionTrialGeometryError(
-            f"{entry}: modelbin has no decodable LOD0 tire geometry"
+            f"{source_entry}: modelbin has no decodable LOD0 tire geometry"
         )
 
-    try:
-        bounds = _aabb(aggregate_positions)
-    except TireMorphGeometryError as exc:
-        raise TireProductionTrialGeometryError(f"{entry}: {exc}") from exc
+    normalized_positions, scales, before_aabb, after_aabb = _normalize_positions_to_stock_dimensions(
+        aggregate_positions,
+        axle_spec,
+    )
 
     glb_path: str | None = None
     if write_glb:
         output_dir.mkdir(parents=True, exist_ok=True)
-        path = output_dir / f"{axle}__{_safe_stem(entry)}__stock_trial.glb"
+        path = output_dir / f"{axle_spec.axle}__{_safe_stem(entry)}__stock_auto.glb"
         try:
-            path.write_bytes(_glb_bytes(aggregate_positions, aggregate_indices))
+            path.write_bytes(_glb_bytes(normalized_positions, aggregate_indices))
         except (OSError, TireMorphGeometryError) as exc:
             raise TireProductionTrialGeometryError(
-                f"could not write derived {axle} tire GLB for {entry}: {exc}"
+                f"could not write derived {axle_spec.axle} tire GLB for {source_entry}: {exc}"
             ) from exc
         glb_path = str(path)
 
+    morph_mode = (
+        "measured_selector_morph_plus_stock_dimension_normalization"
+        if morphed_mesh_count > 0
+        else "native_base_geometry_plus_stock_dimension_normalization"
+    )
     return ModelbinProductionTrialGeometry(
-        axle=axle,
+        axle=str(axle_spec.axle),
         entry=entry.replace("\\", "/"),
+        source_entry=source_entry.replace("\\", "/"),
         modelbin_sha256=hashlib.sha256(data).hexdigest(),
         selected_mesh_count=selected_mesh_count,
         morphed_mesh_count=morphed_mesh_count,
+        morph_fallback_mesh_count=morph_fallback_mesh_count,
         static_mesh_count=static_mesh_count,
-        vertex_count=len(aggregate_positions),
+        vertex_count=len(normalized_positions),
         index_count=len(aggregate_indices),
         selector_weights=weights.selector_weights,
-        scale_x=float(weights.scale_x),
-        aabb=bounds.as_dict(),
+        scale_x=float(scales[0]),
+        normalization_scale_xyz=scales,
+        target_width_m=float(axle_spec.tire_width_mm) / 1000.0,
+        target_outer_diameter_m=float(axle_spec.tire_outer_diameter_mm) / 1000.0,
+        morph_mode=morph_mode,
+        pre_normalization_aabb=before_aabb,
+        aabb=after_aabb,
         glb_path=glb_path,
     )
 
 
 def _build_axle(
-    modelbins: Sequence[tuple[str, bytes]],
+    modelbins: Sequence[tuple[str, str, bytes]],
     *,
-    axle: str,
+    axle_spec: AxleWheelSpec,
     weights: AxleTireMorphWeights,
     output_dir: Path,
     write_glb: bool,
@@ -311,18 +453,22 @@ def _build_axle(
     reports = tuple(
         _build_modelbin_geometry(
             data,
-            entry=entry,
-            axle=axle,
+            entry=logical_entry,
+            source_entry=source_entry,
+            axle_spec=axle_spec,
             weights=weights,
             output_dir=output_dir,
             write_glb=write_glb,
         )
-        for entry, data in modelbins
+        for logical_entry, source_entry, data in modelbins
     )
+    scale_x = reports[0].scale_x if reports else 1.0
     return AxleProductionTrialGeometry(
-        axle=axle,
+        axle=str(axle_spec.axle),
         selector_weights=weights.selector_weights,
-        scale_x=float(weights.scale_x),
+        scale_x=float(scale_x),
+        target_width_m=float(axle_spec.tire_width_mm) / 1000.0,
+        target_outer_diameter_m=float(axle_spec.tire_outer_diameter_mm) / 1000.0,
         modelbins=reports,
     )
 
@@ -334,11 +480,13 @@ def build_stock_tire_production_trial_geometry(
     *,
     write_glb: bool = True,
 ) -> TireProductionTrialGeometryReport:
-    """Build derived native tire GLBs only after the evidence-backed production gate.
+    """Build stock tire geometry for every decodable native tire archive.
 
-    The source ZIP remains read-only. The output geometry is intentionally detached
-    from vehicle spindles: this stage validates that the exact approved stock FXX/Slick
-    mapping can create renderer-ready front/rear geometry without enabling assembly.
+    Tire selection is automatic from the stock DB's TireModelName.  The native ZIP
+    stays read-only.  Family-specific whitelists are not used.  Measured selector
+    inference is used when available; otherwise native base geometry is retained.
+    In both cases the final decoded geometry is centered and normalized directly to
+    the stock width and outer diameter before attachment to native WheelStyle spindles.
     """
     archive = Path(archive_path).expanduser().resolve()
     destination = Path(output_dir).expanduser().resolve()
@@ -349,24 +497,13 @@ def build_stock_tire_production_trial_geometry(
     before = _sha256(archive)
     if eligibility.archive_sha256 is not None and before != eligibility.archive_sha256:
         raise TireProductionTrialGeometryError(
-            "native tire archive changed after production eligibility validation"
+            "native tire archive changed after automatic recognition"
         )
 
+    model_name = str(spec.tire_model_name or "").strip()
     try:
         with zipfile.ZipFile(archive, "r") as bundle:
-            entries = [
-                item
-                for item in bundle.infolist()
-                if not item.is_dir() and item.filename.casefold().endswith(".modelbin")
-            ]
-            if not entries:
-                raise TireProductionTrialGeometryError(
-                    "native tire archive contains no modelbin"
-                )
-            modelbins = tuple(
-                (item.filename.replace("\\", "/"), bundle.read(item))
-                for item in sorted(entries, key=lambda item: item.filename.casefold())
-            )
+            modelbins = _select_native_modelbins(bundle, model_name)
     except (OSError, zipfile.BadZipFile) as exc:
         raise TireProductionTrialGeometryError(
             f"could not read native tire archive: {exc}"
@@ -375,14 +512,14 @@ def build_stock_tire_production_trial_geometry(
     destination.mkdir(parents=True, exist_ok=True)
     front = _build_axle(
         modelbins,
-        axle="front",
+        axle_spec=spec.front,
         weights=weights.front,
         output_dir=destination,
         write_glb=write_glb,
     )
     rear = _build_axle(
         modelbins,
-        axle="rear",
+        axle_spec=spec.rear,
         weights=weights.rear,
         output_dir=destination,
         write_glb=write_glb,
@@ -391,7 +528,7 @@ def build_stock_tire_production_trial_geometry(
     after = _sha256(archive)
     if before != after:
         raise TireProductionTrialGeometryError(
-            "read-only production trial changed the native tire archive"
+            "read-only global tire generation changed the native tire archive"
         )
 
     manifest_path = destination / "native_tire_production_trial_geometry.json"
@@ -420,6 +557,6 @@ def build_stock_tire_production_trial_geometry(
         )
     except OSError as exc:
         raise TireProductionTrialGeometryError(
-            f"could not write production-trial manifest: {exc}"
+            f"could not write production tire manifest: {exc}"
         ) from exc
     return report
