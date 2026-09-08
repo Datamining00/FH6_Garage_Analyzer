@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
+from types import SimpleNamespace
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -39,6 +40,22 @@ def _write_archive(path: Path, *modelbins: bytes) -> str:
             archive.writestr(f"tire{index}.modelbin", payload)
     hashes = sorted(hashlib.sha256(payload).hexdigest() for payload in modelbins)
     return hashlib.sha256("\n".join(hashes).encode("ascii")).hexdigest()
+
+
+def _structural_report(archive: Path, *, compatible: bool = True):
+    pattern = list(policy._EXPECTED_SELECTOR_ROLE_PATTERN)
+    if not compatible:
+        pattern[0] = "mixed_or_unclassified"
+    roles = tuple(
+        SimpleNamespace(selector=index, geometric_role=role, confidence="high")
+        for index, role in enumerate(pattern)
+    )
+    return SimpleNamespace(
+        archive_read_only_unchanged=True,
+        archive_sha256=hashlib.sha256(archive.read_bytes()).hexdigest(),
+        modelbin_roles={"tireL_unknown.modelbin": roles},
+        left_right_role_match=None,
+    )
 
 
 class TireProductionPolicyTests(unittest.TestCase):
@@ -89,6 +106,41 @@ class TireProductionPolicyTests(unittest.TestCase):
         self.assertTrue(result.production_trial_eligible)
         self.assertIn("selector-topology", result.detail)
 
+    def test_unlisted_structurally_compatible_family_is_admitted_runtime(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            archive = Path(directory) / "tire_unknown.zip"
+            _write_archive(archive, b"unknown")
+            report = _structural_report(archive, compatible=True)
+            with patch.object(
+                policy,
+                "analyze_native_tire_selector_boundary_roles",
+                return_value=report,
+            ) as analyze:
+                result = evaluate_stock_tire_production_candidate(
+                    _spec(car_id=4000, model="unknown"), archive
+                )
+        self.assertEqual(result.status, "production_trial_eligible")
+        self.assertTrue(result.production_trial_eligible)
+        self.assertIn("runtime read-only selector-boundary validation", result.detail)
+        analyze.assert_called_once()
+
+    def test_unlisted_structural_role_mismatch_is_blocked(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            archive = Path(directory) / "tire_unknown.zip"
+            _write_archive(archive, b"unknown")
+            report = _structural_report(archive, compatible=False)
+            with patch.object(
+                policy,
+                "analyze_native_tire_selector_boundary_roles",
+                return_value=report,
+            ):
+                result = evaluate_stock_tire_production_candidate(
+                    _spec(model="unknown"), archive
+                )
+        self.assertEqual(result.status, "blocked_family_structural_validation_failed")
+        self.assertFalse(result.production_trial_eligible)
+        self.assertIn("does not match", result.detail)
+
     def test_nonstock_spec_fails_closed_before_archive_use(self) -> None:
         result = evaluate_stock_tire_production_candidate(
             _spec(mode="effective"),
@@ -120,17 +172,6 @@ class TireProductionPolicyTests(unittest.TestCase):
                     archive,
                 )
         self.assertEqual(result.status, "blocked_selector_signature_mismatch")
-        self.assertFalse(result.production_trial_eligible)
-
-    def test_unknown_family_is_blocked(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            archive = Path(directory) / "tire_unknown.zip"
-            _write_archive(archive, b"unknown")
-            result = evaluate_stock_tire_production_candidate(
-                _spec(model="unknown"),
-                archive,
-            )
-        self.assertEqual(result.status, "blocked_family_not_evidence_approved")
         self.assertFalse(result.production_trial_eligible)
 
     def test_stock_dimension_variation_uses_vehicle_specific_width(self) -> None:
