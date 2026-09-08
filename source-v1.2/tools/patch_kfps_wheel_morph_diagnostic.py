@@ -18,14 +18,27 @@ def _replace_exact(text: str, old: str, new: str, label: str, *, count: int = 1)
 def patch(kfps_root: Path, helper: Path, audit_helper: Path) -> None:
     converter = kfps_root / "tools" / "livery" / "chassis-converter"
     program = converter / "Program.cs"
+    glb_writer = converter / "GlbWriter.cs"
+    material_helper = audit_helper.with_name("MaterialAppearanceDiagnostic.cs")
     if not program.is_file():
         raise RuntimeError(f"Pinned KFPS Program.cs was not found: {program}")
+    if not glb_writer.is_file():
+        raise RuntimeError(f"Pinned KFPS GlbWriter.cs was not found: {glb_writer}")
     if not helper.is_file():
         raise RuntimeError(f"WheelMorphDiagnostic.cs was not found: {helper}")
     if not audit_helper.is_file():
         raise RuntimeError(f"TransformAudit.cs was not found: {audit_helper}")
+    if not material_helper.is_file():
+        raise RuntimeError(f"MaterialAppearanceDiagnostic.cs was not found: {material_helper}")
 
     text = program.read_text(encoding="utf-8-sig")
+
+    text = _replace_exact(
+        text,
+        """    int ProjectionSides,\n    ulong MaterialBindingHash,\n    Vector3[] Positions,""",
+        """    int ProjectionSides,\n    ulong MaterialBindingHash,\n    MaterialAppearanceDiagnostic MaterialAppearance,\n    Vector3[] Positions,""",
+        "preserve material appearance provenance in ChassisMesh",
+    )
 
     text = _replace_exact(
         text,
@@ -113,19 +126,46 @@ def patch(kfps_root: Path, helper: Path, audit_helper: Path) -> None:
 
     text = _replace_exact(
         text,
+        """            var role = ClassifyRole(\n                identity,\n                hasUv3,\n                instance.WindowHint,\n                geometry.Name,\n                geometry.MaterialName ?? \"\",\n                materialBindingHash);\n            var actualBytes = checked(""",
+        """            var role = ClassifyRole(\n                identity,\n                hasUv3,\n                instance.WindowHint,\n                geometry.Name,\n                geometry.MaterialName ?? \"\",\n                materialBindingHash);\n            var materialAppearance = MaterialAppearanceRuntime.Resolve(\n                bundle, geometry.MaterialName ?? \"\");\n            var actualBytes = checked(""",
+        "resolve embedded MaterialBlob shader parameters per mesh",
+    )
+
+    text = _replace_exact(
+        text,
+        """                ProjectionLiverySides(role, geometry.Name, instance.PartType),\n                materialBindingHash,\n                positions,""",
+        """                ProjectionLiverySides(role, geometry.Name, instance.PartType),\n                materialBindingHash,\n                materialAppearance,\n                positions,""",
+        "attach material appearance provenance to ChassisMesh",
+    )
+
+    text = _replace_exact(
+        text,
         """    private static Vector3[] TransformPositions(ForzaGeometryData geometry, Matrix4x4 instanceTransform)\n    {\n        var mesh = geometry.SourceMesh;\n        var output = new Vector3[geometry.RawPositions.Length];\n        for (var index = 0; index < output.Length; index++)\n        {\n            var raw = geometry.RawPositions[index];\n            var local = new Vector3(\n                raw.X * mesh.PositionScale.X + mesh.PositionTranslate.X,\n                raw.Y * mesh.PositionScale.Y + mesh.PositionTranslate.Y,\n                raw.Z * mesh.PositionScale.Z + mesh.PositionTranslate.Z);\n            var transformed = geometry.BoneTransform == Matrix4x4.Identity\n                ? local\n                : Vector3.Transform(local, geometry.BoneTransform);\n            if (instanceTransform != Matrix4x4.Identity)\n                transformed = Vector3.Transform(transformed, instanceTransform);\n            output[index] = new Vector3(-transformed.X, transformed.Y, transformed.Z);\n        }\n        return output;\n    }""",
         """    private static Vector3[] TransformPositions(\n        Bundle bundle,\n        ForzaGeometryData geometry,\n        ModelInstance instance,\n        Matrix4x4 instanceTransform)\n    {\n        var mesh = geometry.SourceMesh;\n        var output = new Vector3[geometry.RawPositions.Length];\n        var morph = WheelMorphRuntime.CreateContext(bundle, geometry, instance);\n        for (var index = 0; index < output.Length; index++)\n        {\n            var raw = geometry.RawPositions[index];\n            var local = new Vector3(\n                raw.X * mesh.PositionScale.X + mesh.PositionTranslate.X,\n                raw.Y * mesh.PositionScale.Y + mesh.PositionTranslate.Y,\n                raw.Z * mesh.PositionScale.Z + mesh.PositionTranslate.Z);\n            if (morph is not null)\n                local += WheelMorphRuntime.DecodePositionDelta(morph, index);\n            var transformed = geometry.BoneTransform == Matrix4x4.Identity\n                ? local\n                : Vector3.Transform(local, geometry.BoneTransform);\n            if (instanceTransform != Matrix4x4.Identity)\n                transformed = Vector3.Transform(transformed, instanceTransform);\n            output[index] = new Vector3(-transformed.X, transformed.Y, transformed.Z);\n        }\n        if (morph is not null) WheelMorphRuntime.RecordVertices(output.Length);\n        return output;\n    }""",
         "apply weighted morph before KFPS transforms",
     )
 
+    writer_text = glb_writer.read_text(encoding="utf-8-sig")
+    writer_text = _replace_exact(
+        writer_text,
+        """                    [\"kfps_material_binding_hash\"] = mesh.MaterialBindingHash.ToString(\"X16\"),\n                };""",
+        """                    [\"kfps_material_binding_hash\"] = mesh.MaterialBindingHash.ToString(\"X16\"),\n                    [\"kfps_material_appearance\"] = mesh.MaterialAppearance,\n                };""",
+        "write material appearance provenance into GLB extras",
+    )
+
     program.write_text(text, encoding="utf-8")
+    glb_writer.write_text(writer_text, encoding="utf-8")
     shutil.copy2(helper, converter / "WheelMorphDiagnostic.cs")
     shutil.copy2(audit_helper, converter / "TransformAudit.cs")
+    shutil.copy2(material_helper, converter / "MaterialAppearanceDiagnostic.cs")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Patch the pinned KFPS chassis converter with weighted wheel morph and exact transform-chain diagnostics."
+        description=(
+            "Patch the pinned KFPS chassis converter with weighted wheel morph, "
+            "exact transform-chain diagnostics, and embedded material provenance."
+        )
     )
     parser.add_argument("--kfps-root", type=Path, required=True)
     parser.add_argument(
@@ -140,7 +180,7 @@ def main() -> int:
     )
     args = parser.parse_args()
     patch(args.kfps_root.resolve(), args.helper.resolve(), args.audit_helper.resolve())
-    print(f"Patched pinned KFPS wheel morph/transform diagnostics: {args.kfps_root}")
+    print(f"Patched pinned KFPS wheel morph/transform/material diagnostics: {args.kfps_root}")
     return 0
 
 
