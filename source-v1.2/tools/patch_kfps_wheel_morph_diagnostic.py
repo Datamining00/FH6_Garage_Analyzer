@@ -72,7 +72,7 @@ def patch(kfps_root: Path, helper: Path, audit_helper: Path) -> None:
     text = _replace_exact(
         text,
         """            var positions = TransformPositions(geometry, instanceTransform);""",
-        """            var positions = TransformPositions(bundle, geometry, instance, instanceTransform);\n            TransformAuditRuntime.RecordGeometry(entryName: sourceEntry, geometry, instance, instanceTransform, positions);""",
+        """            var positions = TransformPositions(bundle, geometry, instance, instanceTransform);\n            TransformAuditRuntime.RecordGeometry(sourceEntry, geometry, instance, instanceTransform, positions);""",
         "weighted TransformPositions and transform-audit call",
     )
 
