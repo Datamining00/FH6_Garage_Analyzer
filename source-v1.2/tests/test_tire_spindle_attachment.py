@@ -56,17 +56,28 @@ def _trial() -> dict:
         "production_renderer_enabled": False,
         "front": {
             "modelbins": [
-                {"entry": "tirel_slick.modelbin", "glb_path": "front_left.glb"},
+                {"entry": "tireL_slick.modelbin", "glb_path": "front_left.glb"},
                 {"entry": "tireR_slick.modelbin", "glb_path": "front_right.glb"},
             ]
         },
         "rear": {
             "modelbins": [
-                {"entry": "tirel_slick.modelbin", "glb_path": "rear_left.glb"},
+                {"entry": "tireL_slick.modelbin", "glb_path": "rear_left.glb"},
                 {"entry": "tireR_slick.modelbin", "glb_path": "rear_right.glb"},
             ]
         },
     }
+
+
+def _single_left_trial() -> dict:
+    trial = _trial()
+    trial["front"]["modelbins"] = [
+        {"entry": "tireL_a.modelbin", "glb_path": "front_left_only.glb"}
+    ]
+    trial["rear"]["modelbins"] = [
+        {"entry": "tireL_a.modelbin", "glb_path": "rear_left_only.glb"}
+    ]
+    return trial
 
 
 class TireSpindleAttachmentTests(unittest.TestCase):
@@ -77,6 +88,7 @@ class TireSpindleAttachmentTests(unittest.TestCase):
         self.assertEqual(contract.status, "spindle_attachment_contract_ready")
         self.assertEqual(contract.attachment_part_type, 44)
         self.assertEqual(contract.tire_part_type, 44)
+        self.assertEqual(contract.as_dict()["format"], "fh6_native_tire_spindle_attachment_contract_v2")
         self.assertTrue(contract.native_carbin_transform_only)
         self.assertFalse(contract.procedural_translation_applied)
         self.assertFalse(contract.procedural_rotation_applied)
@@ -103,6 +115,37 @@ class TireSpindleAttachmentTests(unittest.TestCase):
         )
         self.assertEqual(contract.attachments[0].derived_tire_glb_path, "front_left.glb")
         self.assertEqual(contract.attachments[3].derived_tire_glb_path, "rear_right.glb")
+        self.assertTrue(
+            all(item.side_source_mode == "exact_side_model" for item in contract.attachments)
+        )
+
+    def test_single_left_native_model_is_reused_on_right_native_spindles(self) -> None:
+        contract = resolve_tire_spindle_attachment_contract(
+            _parsed_standard(), _single_left_trial()
+        )
+        self.assertEqual(len(contract.attachments), 4)
+        lf, rf, lr, rr = contract.attachments
+        self.assertEqual(lf.derived_tire_glb_path, "front_left_only.glb")
+        self.assertEqual(rf.derived_tire_glb_path, "front_left_only.glb")
+        self.assertEqual(lr.derived_tire_glb_path, "rear_left_only.glb")
+        self.assertEqual(rr.derived_tire_glb_path, "rear_left_only.glb")
+        self.assertEqual(lf.derived_tire_source_side, "left")
+        self.assertEqual(rf.derived_tire_source_side, "left")
+        self.assertEqual(rf.side_source_mode, "single_left_model_reused_by_native_spindle")
+        self.assertEqual(rr.side_source_mode, "single_left_model_reused_by_native_spindle")
+        self.assertEqual(rf.carbin_transform_matrix_row_major, tuple(_matrix(0.976900, mirrored=True)))
+        self.assertEqual(rr.carbin_transform_matrix_row_major, tuple(_matrix(0.996900, mirrored=True)))
+        self.assertFalse(contract.procedural_translation_applied)
+        self.assertFalse(contract.procedural_rotation_applied)
+        self.assertFalse(contract.procedural_scale_applied)
+
+    def test_single_right_native_model_fails_closed(self) -> None:
+        trial = _single_left_trial()
+        trial["front"]["modelbins"] = [
+            {"entry": "tireR_a.modelbin", "glb_path": "front_right_only.glb"}
+        ]
+        with self.assertRaisesRegex(TireSpindleAttachmentError, "single-right reuse"):
+            resolve_tire_spindle_attachment_contract(_parsed_standard(), trial)
 
     def test_upgradable_wheelstyle_uses_only_stock_shared_models(self) -> None:
         parsed = {
