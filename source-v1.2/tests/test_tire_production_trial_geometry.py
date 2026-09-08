@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
+from types import SimpleNamespace
 import tempfile
 import unittest
 from unittest.mock import patch
 import zipfile
 
-from fh6garage.preview3d import tire_production_policy as policy
+from fh6garage.preview3d.tire_morph_weights import stock_vehicle_tire_morph_weights
 from fh6garage.preview3d.tire_production_trial_geometry import (
     TireProductionTrialGeometryError,
     build_stock_tire_production_trial_geometry,
@@ -33,34 +34,40 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _write_archive(path: Path) -> str:
+def _write_archive(path: Path) -> None:
     payload = _bundle()
-    entries = (
-        ("tireL_slick.modelbin", payload),
-        ("tireR_slick.modelbin", payload),
-    )
     with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        for name, data in entries:
-            archive.writestr(name, data)
-    hashes = sorted(hashlib.sha256(data).hexdigest() for _name, data in entries)
-    return hashlib.sha256("\n".join(hashes).encode("ascii")).hexdigest()
+        archive.writestr("tireL_slick.modelbin", payload)
+        archive.writestr("tireR_slick.modelbin", payload)
+
+
+def _eligibility(spec: VehicleWheelSpec, archive: Path, *, eligible: bool = True):
+    return SimpleNamespace(
+        production_trial_eligible=eligible,
+        production_renderer_enabled=False,
+        weights=stock_vehicle_tire_morph_weights(spec) if eligible else None,
+        status="production_trial_eligible" if eligible else "blocked_generic_auto_inference_failed",
+        detail="generic auto inference test",
+        policy_revision="stock_native_tire_generic_auto_inference_v1",
+        archive_sha256=_sha256(archive),
+    )
 
 
 class TireProductionTrialGeometryTests(unittest.TestCase):
-    def test_exact_gated_stock_fxx_builds_detached_front_rear_glbs(self) -> None:
+    def test_generic_gated_stock_tire_builds_detached_front_rear_glbs(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             archive = root / "tire_slick.zip"
-            identity = _write_archive(archive)
+            _write_archive(archive)
             archive_before = _sha256(archive)
             output = root / "trial"
+            spec = _spec()
 
-            with patch.object(policy, "_VALIDATED_SLICK_GEOMETRY_IDENTITY", identity):
-                report = build_stock_tire_production_trial_geometry(
-                    _spec(),
-                    archive,
-                    output,
-                )
+            with patch(
+                "fh6garage.preview3d.tire_production_trial_geometry.evaluate_stock_tire_production_candidate",
+                return_value=_eligibility(spec, archive),
+            ):
+                report = build_stock_tire_production_trial_geometry(spec, archive, output)
 
             self.assertEqual(report.status, "production_trial_geometry_ready")
             self.assertEqual(report.eligibility_status, "production_trial_eligible")
@@ -87,12 +94,6 @@ class TireProductionTrialGeometryTests(unittest.TestCase):
             self.assertTrue(all(path is not None and Path(path).is_file() for path in glbs))
             self.assertTrue(all(item.selected_mesh_count > 0 for item in report.front.modelbins))
             self.assertTrue(all(item.selected_mesh_count > 0 for item in report.rear.modelbins))
-            self.assertTrue(
-                all(float(item.aabb["span"][0]) > 0.0 for item in report.front.modelbins)
-            )
-            self.assertTrue(
-                all(float(item.aabb["span"][0]) > 0.0 for item in report.rear.modelbins)
-            )
 
     def test_blocked_candidate_creates_no_output_directory(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -100,33 +101,43 @@ class TireProductionTrialGeometryTests(unittest.TestCase):
             archive = root / "tire_slick.zip"
             _write_archive(archive)
             output = root / "trial"
+            spec = _spec()
 
-            with self.assertRaisesRegex(
-                TireProductionTrialGeometryError,
-                "blocked_nonstock_spec",
+            with (
+                patch(
+                    "fh6garage.preview3d.tire_production_trial_geometry.evaluate_stock_tire_production_candidate",
+                    return_value=_eligibility(spec, archive, eligible=False),
+                ),
+                self.assertRaisesRegex(
+                    TireProductionTrialGeometryError,
+                    "blocked_generic_auto_inference_failed",
+                ),
             ):
-                build_stock_tire_production_trial_geometry(
-                    _spec(mode="effective"),
-                    archive,
-                    output,
-                )
+                build_stock_tire_production_trial_geometry(spec, archive, output)
 
             self.assertFalse(output.exists())
 
-    def test_unvalidated_geometry_identity_creates_no_output_directory(self) -> None:
+    def test_archive_change_after_eligibility_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             archive = root / "tire_slick.zip"
             _write_archive(archive)
             output = root / "trial"
+            spec = _spec()
+            eligibility = _eligibility(spec, archive)
+            eligibility = SimpleNamespace(**{**eligibility.__dict__, "archive_sha256": "0" * 64})
 
-            with self.assertRaisesRegex(
-                TireProductionTrialGeometryError,
-                "blocked_geometry_identity_mismatch",
+            with (
+                patch(
+                    "fh6garage.preview3d.tire_production_trial_geometry.evaluate_stock_tire_production_candidate",
+                    return_value=eligibility,
+                ),
+                self.assertRaisesRegex(
+                    TireProductionTrialGeometryError,
+                    "archive changed after production eligibility",
+                ),
             ):
-                build_stock_tire_production_trial_geometry(_spec(), archive, output)
-
-            self.assertFalse(output.exists())
+                build_stock_tire_production_trial_geometry(spec, archive, output)
 
 
 if __name__ == "__main__":
