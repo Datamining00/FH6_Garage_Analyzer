@@ -22,7 +22,9 @@ FXX_NATIVE_TIRE_PREVIEW_REVISION = GLOBAL_NATIVE_TIRE_PREVIEW_REVISION
 _PATCH_MARKER = "_fh6_global_stock_native_tire_preview_patched"
 _LEGACY_PATCH_MARKER = "_fh6_validated_fxx_native_tire_preview_patched"
 _ORIGINAL_CONVERTER = "_fh6_global_stock_native_tire_preview_original_convert_vehicle"
-_DIAGNOSTIC_FORMAT = "fh6_global_stock_native_tire_preview_integration_v4"
+# Keep the existing manifest schema identifier for compatibility. New global
+# auto-recognition behavior is versioned by the revision field above.
+_DIAGNOSTIC_FORMAT = "fh6_global_stock_native_tire_preview_integration_v3"
 _DIAGNOSTIC_FILENAME = "native_tire_preview_integration.json"
 
 
@@ -77,14 +79,10 @@ def _persistent_diagnostic_manifest_path(car_id: int) -> Path:
 
 
 def _write_manifest_best_effort(path: Path, payload: dict[str, Any]) -> str | None:
-    """Persist diagnostics without ever turning a diagnostic I/O error into preview failure."""
     temp = path.with_suffix(path.suffix + ".tmp")
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        temp.write_text(
-            json.dumps(payload, indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
+        temp.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
         temp.replace(path)
         return str(path)
     except (OSError, TypeError, ValueError):
@@ -131,12 +129,7 @@ def try_apply_stock_native_tire_preview(
     source_glb = Path(vehicle_glb).expanduser().resolve()
     car_id = _car_id(asset)
     if car_id <= 0:
-        return _passthrough(
-            asset,
-            source_glb,
-            "not_applicable",
-            "vehicle has no valid positive Car ID",
-        )
+        return _passthrough(asset, source_glb, "not_applicable", "vehicle has no valid positive Car ID")
 
     trial_root = Path(work_root).expanduser().resolve()
     trial_manifest_path = trial_root / _DIAGNOSTIC_FILENAME
@@ -199,9 +192,7 @@ def try_apply_stock_native_tire_preview(
         database_path = ensure_stock_wheel_database(progress)
         spec = FH6WheelSpecResolver(database_path).resolve(car_id)
         if int(spec.car_id) != car_id:
-            raise ValueError(
-                f"stock wheel database returned unexpected Car ID {spec.car_id}; expected {car_id}"
-            )
+            raise ValueError(f"stock wheel database returned unexpected Car ID {spec.car_id}; expected {car_id}")
         diagnostic["wheel_spec"] = spec.as_dict()
         tire_model_name = str(spec.tire_model_name or "").strip()
         diagnostic["tire_model_name"] = tire_model_name
@@ -218,9 +209,7 @@ def try_apply_stock_native_tire_preview(
 
         stage = "build_tire_geometry"
         geometry_report = build_stock_tire_production_trial_geometry(
-            spec,
-            tire_archive,
-            trial_root / "tire_geometry",
+            spec, tire_archive, trial_root / "tire_geometry"
         )
         diagnostic["geometry_report"] = geometry_report.as_dict()
 
@@ -236,9 +225,7 @@ def try_apply_stock_native_tire_preview(
         stage = "build_spindle_attachment"
         contract_path = trial_root / "native_tire_spindle_attachment_contract.json"
         attachment = build_tire_spindle_attachment_contract(
-            carbin_data,
-            geometry_report.as_dict(),
-            output_path=contract_path,
+            carbin_data, geometry_report.as_dict(), output_path=contract_path
         )
         attachment_payload = attachment.as_dict()
         diagnostic["attachment_contract"] = attachment_payload
@@ -256,11 +243,7 @@ def try_apply_stock_native_tire_preview(
         stage = "merge_tire_glb"
         output_glb = trial_root / f"{source_glb.stem}__native_tires.glb"
         diagnostic["selected_vehicle_glb"] = str(output_glb)
-        merge_report = merge_tire_spindle_trial_glb(
-            source_glb,
-            attachment_payload,
-            output_glb,
-        )
+        merge_report = merge_tire_spindle_trial_glb(source_glb, attachment_payload, output_glb)
         diagnostic["merge_report"] = merge_report.as_dict()
         if not merge_report.trial_vehicle_glb_ready or not output_glb.is_file():
             raise RuntimeError("native tire merge did not produce a ready trial vehicle GLB")
@@ -278,9 +261,7 @@ def try_apply_stock_native_tire_preview(
         if baked_nodes != 4:
             raise RuntimeError("native tire viewer matrix bake did not process four spindle nodes")
         if baked_vertices <= 0 or baked_triangles <= 0:
-            raise RuntimeError(
-                "native tire viewer matrix bake produced no drawable tire geometry"
-            )
+            raise RuntimeError("native tire viewer matrix bake produced no drawable tire geometry")
 
         diagnostic.update(
             {
@@ -385,8 +366,6 @@ def make_stock_native_tire_convert_wrapper(original_convert: Callable[..., Any])
             converter_override=converter_override,
         )
 
-        # Explicit external morph/override requests may represent a non-stock setup;
-        # the automatic stock tire path is applied to the normal FHA conversion path.
         if rim_morph_weights is not None or converter_override is not None:
             return result
         car_id = _car_id(asset)
@@ -425,17 +404,12 @@ def make_stock_native_tire_convert_wrapper(original_convert: Callable[..., Any])
             output_path=str(Path(integration.selected_vehicle_glb).resolve()),
         )
 
-    convert_with_stock_native_tires.__name__ = getattr(
-        original_convert,
-        "__name__",
-        "convert_vehicle",
-    )
+    convert_with_stock_native_tires.__name__ = getattr(original_convert, "__name__", "convert_vehicle")
     convert_with_stock_native_tires.__doc__ = getattr(original_convert, "__doc__", None)
     return convert_with_stock_native_tires
 
 
 def install_global_stock_native_tire_preview() -> bool:
-    """Lazily install the global stock native-tire wrapper into preview3d.integration."""
     from . import integration as preview_integration
 
     if bool(getattr(preview_integration, _PATCH_MARKER, False)):
