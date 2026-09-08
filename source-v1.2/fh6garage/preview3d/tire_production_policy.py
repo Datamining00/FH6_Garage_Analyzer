@@ -6,43 +6,16 @@ from pathlib import Path
 from typing import Any
 import zipfile
 
-from .tire_morph_boundary_roles import (
-    TireMorphBoundaryRoleError,
-    analyze_native_tire_selector_boundary_roles,
+from .tire_morph_auto_inference import (
+    GENERIC_TIRE_AUTO_INFERENCE_REVISION,
+    TireMorphAutoInferenceError,
+    infer_stock_native_tire_morph,
 )
-from .tire_morph_weights import (
-    TireMorphWeightError,
-    VehicleTireMorphWeights,
-    stock_vehicle_tire_morph_weights,
-)
+from .tire_morph_weights import VehicleTireMorphWeights
 from .wheel_spec import VehicleWheelSpec
 
 
-TIRE_PRODUCTION_POLICY_REVISION = "stock_native_tire_global_preview_v2"
-
-# Exact identities already observed in the user's FH6 installation remain the
-# fastest/strongest admission path. Unknown family names are no longer rejected
-# solely because they were outside the original cross-family sample; they can be
-# admitted after an in-process read-only structural selector-role validation.
-_VALIDATED_SLICK_GEOMETRY_IDENTITY = (
-    "c8a210f9cc9f09bd2cef658ebd5afb1630d7fe780c0e1b61d285591d31f9c9f1"
-)
-_TOPOLOGY_COMPATIBLE_IDENTITIES = {
-    "a": "d8e6c0ca112e99775f731515637ab9f91fff705ee0b7bb786917dfd30d277435",
-    "b": "627b8ee10019649dee3e353699ed660e3b6602abc9e414b7b696261790647b10",
-    "b_dmack": "d9ff20f7be8fb9cb06729bf2966a594d3655f804b181f6bb79973ea105491fad",
-    "b_horizonedition": "62764f28f167896a2e409b5678545b52089ec6925acc0aa48e9ae9e323f62221",
-}
-_STRUCTURAL_MISMATCH_IDENTITIES = {
-    "b_horizon": "00e625ca8a299237f948e8794ec34e76b0e1b8852e1d7055feeba33a5f43a840",
-}
-_EXPECTED_SELECTOR_ROLE_PATTERN = (
-    "radial_expansion_dominant",
-    "radial_expansion_dominant",
-    "mixed_x_expansion_radial_contraction",
-    "positive_x_boundary_expansion",
-    "negative_x_boundary_expansion",
-)
+TIRE_PRODUCTION_POLICY_REVISION = "stock_native_tire_generic_auto_inference_v1"
 
 
 @dataclass(frozen=True)
@@ -58,6 +31,7 @@ class TireProductionEligibility:
     production_trial_eligible: bool
     production_renderer_enabled: bool
     weights: VehicleTireMorphWeights | None
+    auto_inference_report: dict[str, Any] | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -72,6 +46,7 @@ class TireProductionEligibility:
             "production_trial_eligible": self.production_trial_eligible,
             "production_renderer_enabled": self.production_renderer_enabled,
             "weights": self.weights.as_dict() if self.weights is not None else None,
+            "auto_inference_report": self.auto_inference_report,
         }
 
 
@@ -84,6 +59,7 @@ def _sha256(path: Path) -> str:
 
 
 def _geometry_identity(archive: Path) -> tuple[str, str]:
+    """Return archive and aggregate modelbin identities for diagnostics only."""
     before = _sha256(archive)
     with zipfile.ZipFile(archive, "r") as bundle:
         hashes = sorted(
@@ -107,6 +83,7 @@ def _blocked(
     archive: Path,
     archive_sha256: str | None = None,
     geometry_identity: str | None = None,
+    auto_inference_report: dict[str, Any] | None = None,
 ) -> TireProductionEligibility:
     return TireProductionEligibility(
         status=status,
@@ -120,50 +97,7 @@ def _blocked(
         production_trial_eligible=False,
         production_renderer_enabled=False,
         weights=None,
-    )
-
-
-def _expected_identity(model_name: str) -> str | None:
-    key = model_name.casefold()
-    if key == "slick":
-        return _VALIDATED_SLICK_GEOMETRY_IDENTITY
-    return _TOPOLOGY_COMPATIBLE_IDENTITIES.get(key)
-
-
-def _runtime_selector_structure_is_compatible(
-    archive: Path,
-    archive_sha256: str,
-) -> tuple[bool, str]:
-    """Validate an unlisted tire family from its actual selector geometry read-only."""
-    try:
-        report = analyze_native_tire_selector_boundary_roles(archive)
-    except (TireMorphBoundaryRoleError, OSError, ValueError) as exc:
-        return False, f"selector boundary-role analysis failed: {type(exc).__name__}: {exc}"
-
-    if not report.archive_read_only_unchanged:
-        return False, "selector boundary-role analysis did not preserve the source archive"
-    if report.archive_sha256.casefold() != archive_sha256.casefold():
-        return False, "archive identity changed between eligibility and selector-role analysis"
-
-    modelbin_roles = report.modelbin_roles
-    if len(modelbin_roles) not in (1, 2):
-        return False, f"expected one or two native tire modelbins, found {len(modelbin_roles)}"
-    if len(modelbin_roles) == 2 and report.left_right_role_match is not True:
-        return False, "left/right native tire modelbins do not share the same selector-role pattern"
-
-    for entry, roles in modelbin_roles.items():
-        role_pattern = tuple(item.geometric_role for item in roles)
-        if role_pattern != _EXPECTED_SELECTOR_ROLE_PATTERN:
-            return False, (
-                f"{entry}: selector-role pattern {role_pattern!r} does not match "
-                f"the validated pattern {_EXPECTED_SELECTOR_ROLE_PATTERN!r}"
-            )
-        low_confidence = [item.selector for item in roles if item.confidence == "low"]
-        if low_confidence:
-            return False, f"{entry}: low-confidence selector role(s): {low_confidence}"
-
-    return True, (
-        "runtime read-only selector-boundary validation matched the validated five-role tire pattern"
+        auto_inference_report=auto_inference_report,
     )
 
 
@@ -171,14 +105,13 @@ def evaluate_stock_tire_production_candidate(
     spec: VehicleWheelSpec,
     archive_path: str | Path,
 ) -> TireProductionEligibility:
-    """Gate global stock native-tire preview using exact or runtime structural evidence.
+    """Gate native tire preview with generic file-driven morph auto-inference.
 
-    Stock tire dimensions continue to drive only selector 0/1 plus the established
-    width X-scale. Selectors 2..4 remain literal zero. Known exact family identities
-    use the prevalidated fast path. A previously unseen TireModelName may be admitted
-    only if its actual modelbin selector AABB response reproduces the full validated
-    five-role pattern read-only. This removes the original family-name whitelist as
-    a global-coverage bottleneck without guessing unknown selector semantics.
+    Tire family names and pre-recorded selector-role signatures are not admission
+    criteria.  The exact archive linked by TireModelName is inspected read-only and
+    its own selector geometry is used to infer stock morph weights.  The inference
+    must reproduce the database stock width and outer diameter within global
+    fail-closed tolerances before the production-trial geometry path is admitted.
     """
     archive = Path(archive_path).expanduser().resolve()
     if str(spec.mode).casefold() != "stock":
@@ -222,70 +155,41 @@ def evaluate_stock_tire_production_candidate(
             archive,
         )
 
-    key = model_name.casefold()
-    mismatch_identity = _STRUCTURAL_MISMATCH_IDENTITIES.get(key)
-    if mismatch_identity is not None:
-        if identity != mismatch_identity:
-            return _blocked(
-                "blocked_geometry_identity_mismatch",
-                "known structurally different TireModelName has an unexpected modelbin identity",
-                spec,
-                archive,
-                archive_sha,
-                identity,
-            )
-        return _blocked(
-            "blocked_selector_signature_mismatch",
-            "this native tire family has a different selector-role signature and is excluded from automatic preview",
-            spec,
-            archive,
-            archive_sha,
-            identity,
-        )
-
-    expected_identity = _expected_identity(model_name)
-    if expected_identity is not None:
-        if identity != expected_identity:
-            return _blocked(
-                "blocked_geometry_identity_mismatch",
-                "native tire modelbin identity differs from the verified family sample",
-                spec,
-                archive,
-                archive_sha,
-                identity,
-            )
-        evidence = (
-            "physically dimension-corroborated Slick reference plus exact native geometry identity"
-            if key == "slick"
-            else "cross-family selector-topology match plus exact native geometry identity"
-        )
-    else:
-        compatible, structural_detail = _runtime_selector_structure_is_compatible(
-            archive, archive_sha
-        )
-        if not compatible:
-            return _blocked(
-                "blocked_family_structural_validation_failed",
-                structural_detail,
-                spec,
-                archive,
-                archive_sha,
-                identity,
-            )
-        evidence = structural_detail
-
     try:
-        weights = stock_vehicle_tire_morph_weights(spec)
-    except TireMorphWeightError as exc:
+        inference = infer_stock_native_tire_morph(spec, archive)
+    except TireMorphAutoInferenceError as exc:
         return _blocked(
-            "blocked_weight_mapping_invalid",
+            "blocked_generic_auto_inference_failed",
             str(exc),
             spec,
             archive,
             archive_sha,
             identity,
+            auto_inference_report=exc.report,
         )
 
+    if inference.archive_sha256.casefold() != archive_sha.casefold():
+        return _blocked(
+            "blocked_auto_inference_archive_identity_changed",
+            "generic auto inference did not use the same archive identity validated by production policy",
+            spec,
+            archive,
+            archive_sha,
+            identity,
+            auto_inference_report=inference.as_dict(),
+        )
+    if not inference.archive_read_only_unchanged:
+        return _blocked(
+            "blocked_auto_inference_not_read_only",
+            "generic auto inference did not preserve the source tire archive",
+            spec,
+            archive,
+            archive_sha,
+            identity,
+            auto_inference_report=inference.as_dict(),
+        )
+
+    weights = inference.weights
     if weights.front.selector_weights[2:] != (0.0, 0.0, 0.0) or weights.rear.selector_weights[2:] != (
         0.0,
         0.0,
@@ -293,18 +197,21 @@ def evaluate_stock_tire_production_candidate(
     ):
         return _blocked(
             "blocked_unresolved_selectors_nonzero",
-            "selector 2..4 must remain zero until their game-facing semantics are verified",
+            "generic auto inference v1 must keep selectors 2..4 zero until their physical semantics are established",
             spec,
             archive,
             archive_sha,
             identity,
+            auto_inference_report=inference.as_dict(),
         )
 
+    report_path = inference.persistent_report_path or "<diagnostic write unavailable>"
     return TireProductionEligibility(
         status="production_trial_eligible",
         detail=(
-            f"global stock native tire preview admitted Car ID {int(spec.car_id)} using {model_name}: {evidence}; "
-            "selector 0/1 and width X-scale are applied, selector 2..4 remain zero"
+            f"Car ID {int(spec.car_id)} admitted by {GENERIC_TIRE_AUTO_INFERENCE_REVISION} using the actual "
+            f"{model_name} modelbin response; no tire-family whitelist or selector-role signature gate; "
+            f"diagnostic={report_path}"
         ),
         policy_revision=TIRE_PRODUCTION_POLICY_REVISION,
         car_id=int(spec.car_id),
@@ -315,4 +222,5 @@ def evaluate_stock_tire_production_candidate(
         production_trial_eligible=True,
         production_renderer_enabled=False,
         weights=weights,
+        auto_inference_report=inference.as_dict(),
     )
