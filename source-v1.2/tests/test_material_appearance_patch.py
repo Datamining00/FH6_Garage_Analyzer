@@ -45,6 +45,12 @@ class MaterialAppearancePatchTests(unittest.TestCase):
         self.assertIn("fh6ShadeMaterial", upgraded)
         self.assertIn("vMaterialParams", upgraded)
         self.assertIn("vMaterialAux", upgraded)
+        self.assertIn("vMaterialF0", upgraded)
+        self.assertIn("vMaterialCoatF0", upgraded)
+        self.assertIn("vMaterialEmission", upgraded)
+        self.assertIn("nativeF0.w > 0.5", upgraded)
+        self.assertIn("nativeCoatF0.w > 0.5", upgraded)
+        self.assertIn("nativeEmission.w > 0.5", upgraded)
         self.assertIn("decalLinear", upgraded)
         self.assertIn("albedo = mix(albedo, decalLinear, decal.a)", upgraded)
         self.assertIn("clearcoat", upgraded)
@@ -57,8 +63,14 @@ class MaterialAppearancePatchTests(unittest.TestCase):
         upgraded = appearance.upgrade_vertex_shader(self._vertex_shader())
         self.assertIn("layout(location=7) in vec4 inMaterialParams", upgraded)
         self.assertIn("layout(location=8) in vec4 inMaterialAux", upgraded)
+        self.assertIn("layout(location=9) in vec4 inMaterialF0", upgraded)
+        self.assertIn("layout(location=10) in vec4 inMaterialCoatF0", upgraded)
+        self.assertIn("layout(location=11) in vec4 inMaterialEmission", upgraded)
         self.assertIn("vMaterialParams = inMaterialParams", upgraded)
         self.assertIn("vMaterialAux = inMaterialAux", upgraded)
+        self.assertIn("vMaterialF0 = inMaterialF0", upgraded)
+        self.assertIn("vMaterialCoatF0 = inMaterialCoatF0", upgraded)
+        self.assertIn("vMaterialEmission = inMaterialEmission", upgraded)
 
     def test_upgrade_is_idempotent(self):
         once = appearance.upgrade_fragment_shader(self._flat_shader())
@@ -86,6 +98,43 @@ class MaterialAppearancePatchTests(unittest.TestCase):
         self.assertTrue(used)
         np.testing.assert_allclose(params, [0.76, 0.18, 1.0, 0.10], atol=1e-6)
         np.testing.assert_allclose(aux, [0.0, 0.12, 0.25, 0.50], atol=1e-6)
+
+    def test_native_f0_clearcoat_f0_and_emissive_are_preserved(self):
+        f0, coat_f0, emission, used = appearance.material_optical_values_for_primitive(
+            {
+                "resolutionMode": "embedded_material_shader_parameters",
+                "f0": [0.13, 0.22, 0.31, 1.0],
+                "clearCoatF0": [0.04, 0.05, 0.06, 1.0],
+                "emissiveColor": [0.50, 0.25, 0.10, 1.0],
+                "emissiveIntensity": 2.0,
+            }
+        )
+        self.assertTrue(used)
+        np.testing.assert_allclose(f0, [0.13, 0.22, 0.31, 1.0], atol=1e-6)
+        np.testing.assert_allclose(coat_f0, [0.04, 0.05, 0.06, 1.0], atol=1e-6)
+        np.testing.assert_allclose(emission, [1.0, 0.5, 0.2, 1.0], atol=1e-6)
+
+    def test_emissive_requires_both_native_color_and_intensity(self):
+        _f0, _coat_f0, emission, used = appearance.material_optical_values_for_primitive(
+            {
+                "resolutionMode": "embedded_material_shader_parameters",
+                "emissiveColor": [1.0, 0.5, 0.25, 1.0],
+            }
+        )
+        self.assertFalse(used)
+        np.testing.assert_allclose(emission, [0.0, 0.0, 0.0, 0.0], atol=1e-6)
+
+    def test_native_f0_values_are_bounded_to_reflectance_range(self):
+        f0, coat_f0, _emission, used = appearance.material_optical_values_for_primitive(
+            {
+                "resolutionMode": "embedded_material_shader_parameters",
+                "f0": [-2.0, 0.4, 3.0, 1.0],
+                "clearCoatF0": [1.5, -0.5, 0.2, 1.0],
+            }
+        )
+        self.assertTrue(used)
+        np.testing.assert_allclose(f0, [0.0, 0.4, 1.0, 1.0], atol=1e-6)
+        np.testing.assert_allclose(coat_f0, [1.0, 0.0, 0.2, 1.0], atol=1e-6)
 
     def test_gloss_converts_to_microfacet_roughness(self):
         params, _aux, used = appearance.material_values_for_primitive(
@@ -119,6 +168,13 @@ class MaterialAppearancePatchTests(unittest.TestCase):
         self.assertFalse(used)
         np.testing.assert_allclose(params, [0.0, 0.08, 0.35, 0.05], atol=1e-6)
         self.assertAlmostEqual(float(aux[0]), 0.72, places=6)
+        f0, coat_f0, emission, optical_used = appearance.material_optical_values_for_primitive(
+            {"resolutionMode": "embedded_material_not_found"}
+        )
+        self.assertFalse(optical_used)
+        np.testing.assert_allclose(f0, [0.0, 0.0, 0.0, 0.0], atol=1e-6)
+        np.testing.assert_allclose(coat_f0, [0.0, 0.0, 0.0, 0.0], atol=1e-6)
+        np.testing.assert_allclose(emission, [0.0, 0.0, 0.0, 0.0], atol=1e-6)
 
     def test_no_vehicle_specific_material_tuning(self):
         text = MODULE_PATH.read_text(encoding="utf-8")
