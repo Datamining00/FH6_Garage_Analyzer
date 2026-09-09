@@ -65,11 +65,22 @@ class MaterialRuntimeWiringPatchTests(unittest.TestCase):
         init_text = (root / "fh6garage" / "preview3d" / "__init__.py").read_text(encoding="utf-8")
         material_pos = init_text.index("install_game_like_material_patch()")
         wiring_pos = init_text.index("install_material_runtime_wiring_patch()")
+        texture_pos = init_text.index("install_native_material_texture_patch()")
         transform_pos = init_text.index("install_native_transform_chain_v3()")
         self.assertLess(material_pos, wiring_pos)
-        self.assertLess(wiring_pos, transform_pos)
+        self.assertLess(wiring_pos, texture_pos)
+        self.assertLess(texture_pos, transform_pos)
         integration_text = (root / "fh6garage" / "preview3d" / "integration.py").read_text(encoding="utf-8")
         self.assertIn("viewer = CarOpenGLWidget(scene, self.textures, parent=self.dialog)", integration_text)
+
+    def test_finalverify_installs_patches_before_importing_preview_controller(self):
+        root = Path(__file__).resolve().parents[1]
+        preview_text = (root / "fh6garage" / "v1_4_finalverify1_preview_patch.py").read_text(
+            encoding="utf-8"
+        )
+        installer_call = preview_text.index("install_validated_fxx_native_tire_preview()")
+        controller_import = preview_text.index("from .preview3d.integration import Preview3DController")
+        self.assertLess(installer_call, controller_import)
 
 
 if __name__ == "__main__":
