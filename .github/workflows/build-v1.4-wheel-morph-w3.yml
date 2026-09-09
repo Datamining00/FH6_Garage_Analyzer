@@ -22,6 +22,9 @@ on:
       - "source-v1.2/fh6garage/preview3d/manufacturer_colors.py"
       - "source-v1.2/fh6garage/preview3d/manufacturer_overlay_diagnostics.py"
       - "source-v1.2/fh6garage/preview3d/manufacturer_overlay_texture_diagnostics.py"
+      - "source-v1.2/fh6garage/preview3d/exact_game_asset.py"
+      - "source-v1.2/fh6garage/preview3d/materialbin_reference_helper.py"
+      - "source-v1.2/fh6garage/preview3d/manufacturer_materialbin_diagnostics.py"
       - "source-v1.2/fh6garage/preview3d/native_dds.py"
       - "source-v1.2/fh6garage/preview3d/native_material_gl.py"
       - "source-v1.2/fh6garage/preview3d/native_material_render_plan.py"
@@ -63,6 +66,9 @@ on:
       - "source-v1.2/tests/test_manufacturer_colors.py"
       - "source-v1.2/tests/test_manufacturer_overlay_diagnostics.py"
       - "source-v1.2/tests/test_manufacturer_overlay_texture_diagnostics.py"
+      - "source-v1.2/tests/test_exact_game_asset.py"
+      - "source-v1.2/tests/test_materialbin_reference_helper_source.py"
+      - "source-v1.2/tests/test_manufacturer_materialbin_diagnostics.py"
       - "source-v1.2/tests/test_native_dds.py"
       - "source-v1.2/tests/test_native_material_gl.py"
       - "source-v1.2/tests/test_native_material_render_plan.py"
@@ -89,9 +95,12 @@ on:
       - "source-v1.2/tests/test_wheel_spec_database.py"
       - "source-v1.2/tools/analyze_manufacturer_overlay.py"
       - "source-v1.2/tools/analyze_manufacturer_overlay_texture.py"
+      - "source-v1.2/tools/analyze_manufacturer_materialbin.py"
       - "source-v1.2/tools/patch_kfps_wheel_morph_diagnostic.py"
+      - "source-v1.2/tools/patch_kfps_materialbin_diagnostic.py"
       - "source-v1.2/tools/kfps_wheel_morph/MaterialAppearanceDiagnostic.cs"
       - "source-v1.2/tools/kfps_wheel_morph/NativeSwatchbinDecoder.cs"
+      - "source-v1.2/tools/kfps_wheel_morph/MaterialbinReferenceDiagnostic.cs"
       - "source-v1.2/tools/kfps_wheel_morph/WheelMorphDiagnostic.cs"
       - "source-v1.2/tools/kfps_wheel_morph/TransformAudit.cs"
       - ".github/workflows/build-v1.4-wheel-morph-w3.yml"
@@ -152,8 +161,12 @@ jobs:
           python -m py_compile fh6garage/preview3d/manufacturer_colors.py
           python -m py_compile fh6garage/preview3d/manufacturer_overlay_diagnostics.py
           python -m py_compile fh6garage/preview3d/manufacturer_overlay_texture_diagnostics.py
+          python -m py_compile fh6garage/preview3d/exact_game_asset.py
+          python -m py_compile fh6garage/preview3d/materialbin_reference_helper.py
+          python -m py_compile fh6garage/preview3d/manufacturer_materialbin_diagnostics.py
           python -m py_compile tools/analyze_manufacturer_overlay.py
           python -m py_compile tools/analyze_manufacturer_overlay_texture.py
+          python -m py_compile tools/analyze_manufacturer_materialbin.py
           python -m py_compile fh6garage/preview3d/native_dds.py
           python -m py_compile fh6garage/preview3d/native_material_gl.py
           python -m py_compile fh6garage/preview3d/native_material_render_plan.py
@@ -188,6 +201,9 @@ jobs:
           python -m unittest tests.test_manufacturer_colors -v
           python -m unittest tests.test_manufacturer_overlay_diagnostics -v
           python -m unittest tests.test_manufacturer_overlay_texture_diagnostics -v
+          python -m unittest tests.test_exact_game_asset -v
+          python -m unittest tests.test_materialbin_reference_helper_source -v
+          python -m unittest tests.test_manufacturer_materialbin_diagnostics -v
           python -m unittest tests.test_native_dds -v
           python -m unittest tests.test_native_material_gl -v
           python -m unittest tests.test_native_material_render_plan -v
@@ -237,11 +253,15 @@ jobs:
           $actual = (git -C kfps-source rev-parse HEAD).Trim()
           if ($actual -ne "6f53ca3c584d78659d06d4b4a39561db67d79345") { throw "Pinned KFPS commit mismatch: $actual" }
 
-      - name: Apply verified W3 rim morph transform-chain and material patch
+      - name: Apply canonical W3 rim morph transform-chain material and P3F patches
         shell: pwsh
         run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
           python source-v1.2/tools/patch_kfps_wheel_morph_diagnostic.py --kfps-root kfps-source
           if ($LASTEXITCODE -ne 0) { throw "Wheel morph/transform/material patcher failed with exit code $LASTEXITCODE" }
+          python source-v1.2/tools/patch_kfps_materialbin_diagnostic.py --kfps-root kfps-source
+          if ($LASTEXITCODE -ne 0) { throw "P3F materialbin patcher failed with exit code $LASTEXITCODE" }
           git -C kfps-source diff --check
           if ($LASTEXITCODE -ne 0) { throw "Patched KFPS diff check failed with exit code $LASTEXITCODE" }
           $program = "kfps-source/tools/livery/chassis-converter/Program.cs"
@@ -259,11 +279,14 @@ jobs:
           if (-not (Select-String -Path $program -SimpleMatch "authoritative_scene_skeleton_source = TransformAuditRuntime.AuthoritativeSceneSkeletonSource" -Quiet)) { throw "Patched Program.cs is missing authoritative scene skeleton diagnostics." }
           if (-not (Select-String -Path $program -SimpleMatch "MaterialAppearanceRuntime.Resolve" -Quiet)) { throw "Patched Program.cs is missing embedded material provenance resolution." }
           if (-not (Select-String -Path $program -SimpleMatch "--decode-swatchbin" -Quiet)) { throw "Patched Program.cs is missing native swatchbin decode mode." }
+          if (-not (Select-String -Path $program -SimpleMatch "--diagnose-materialbin" -Quiet)) { throw "Patched Program.cs is missing P3F materialbin diagnostic mode." }
+          if (-not (Select-String -Path $program -SimpleMatch "MaterialbinReferenceRuntime.Diagnose" -Quiet)) { throw "Patched Program.cs is missing P3F materialbin diagnostic invocation." }
           if (-not (Select-String -Path $writer -SimpleMatch "kfps_material_appearance" -Quiet)) { throw "Patched GlbWriter.cs is missing material appearance extras." }
           if (-not (Select-String -Path $writer -SimpleMatch 'mesh.MaterialBindingHash.ToString("X16")' -Quiet)) { throw "GlbWriter.cs material binding hash is not exact unprefixed X16." }
           if (-not (Test-Path "kfps-source/tools/livery/chassis-converter/TransformAudit.cs")) { throw "TransformAudit.cs was not staged." }
           if (-not (Test-Path "kfps-source/tools/livery/chassis-converter/MaterialAppearanceDiagnostic.cs")) { throw "MaterialAppearanceDiagnostic.cs was not staged." }
           if (-not (Test-Path "kfps-source/tools/livery/chassis-converter/NativeSwatchbinDecoder.cs")) { throw "NativeSwatchbinDecoder.cs was not staged." }
+          if (-not (Test-Path "kfps-source/tools/livery/chassis-converter/MaterialbinReferenceDiagnostic.cs")) { throw "MaterialbinReferenceDiagnostic.cs was not staged." }
           if (-not (Select-String -Path "kfps-source/tools/livery/chassis-converter/MaterialAppearanceDiagnostic.cs" -SimpleMatch "TextureBindings" -Quiet)) { throw "TextureBindings provenance is missing." }
           if (-not (Select-String -Path "kfps-source/tools/livery/chassis-converter/MaterialAppearanceDiagnostic.cs" -SimpleMatch "UvTilingVectorHashes" -Quiet)) { throw "Material UV tiling provenance is missing." }
 
@@ -301,6 +324,9 @@ jobs:
           if (-not ($listing -match "fh6garage\.preview3d\.manufacturer_colors")) { throw "Standard OneFile does not contain FH6 manufacturer color provenance/resolution." }
           if (-not ($listing -match "fh6garage\.preview3d\.manufacturer_overlay_diagnostics")) { throw "Standard OneFile does not contain exact Paint P3D manufacturer overlay diagnostics." }
           if (-not ($listing -match "fh6garage\.preview3d\.manufacturer_overlay_texture_diagnostics")) { throw "Standard OneFile does not contain exact Paint P3E manufacturer overlay texture diagnostics." }
+          if (-not ($listing -match "fh6garage\.preview3d\.exact_game_asset")) { throw "Standard OneFile does not contain exact P3F game asset resolution." }
+          if (-not ($listing -match "fh6garage\.preview3d\.materialbin_reference_helper")) { throw "Standard OneFile does not contain the P3F materialbin helper bridge." }
+          if (-not ($listing -match "fh6garage\.preview3d\.manufacturer_materialbin_diagnostics")) { throw "Standard OneFile does not contain P3F materialbin traversal diagnostics." }
           if (-not ($listing -match "fh6garage\.preview3d\.native_dds")) { throw "Standard OneFile does not contain native DDS parsing." }
           if (-not ($listing -match "fh6garage\.preview3d\.native_material_gl")) { throw "Standard OneFile does not contain native DDS OpenGL upload." }
           if (-not ($listing -match "fh6garage\.preview3d\.native_material_render_plan")) { throw "Standard OneFile does not contain native material render planning." }
@@ -336,6 +362,9 @@ jobs:
           if (-not ($listing -match "fh6garage\.preview3d\.manufacturer_colors")) { throw "Portable OneDir does not contain FH6 manufacturer color provenance/resolution." }
           if (-not ($listing -match "fh6garage\.preview3d\.manufacturer_overlay_diagnostics")) { throw "Portable OneDir does not contain exact Paint P3D manufacturer overlay diagnostics." }
           if (-not ($listing -match "fh6garage\.preview3d\.manufacturer_overlay_texture_diagnostics")) { throw "Portable OneDir does not contain exact Paint P3E manufacturer overlay texture diagnostics." }
+          if (-not ($listing -match "fh6garage\.preview3d\.exact_game_asset")) { throw "Portable OneDir does not contain exact P3F game asset resolution." }
+          if (-not ($listing -match "fh6garage\.preview3d\.materialbin_reference_helper")) { throw "Portable OneDir does not contain the P3F materialbin helper bridge." }
+          if (-not ($listing -match "fh6garage\.preview3d\.manufacturer_materialbin_diagnostics")) { throw "Portable OneDir does not contain P3F materialbin traversal diagnostics." }
           if (-not ($listing -match "fh6garage\.preview3d\.native_dds")) { throw "Portable OneDir does not contain native DDS parsing." }
           if (-not ($listing -match "fh6garage\.preview3d\.native_material_gl")) { throw "Portable OneDir does not contain native DDS OpenGL upload." }
           if (-not ($listing -match "fh6garage\.preview3d\.native_material_render_plan")) { throw "Portable OneDir does not contain native material render planning." }
