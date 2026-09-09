@@ -10,9 +10,11 @@ on:
       - "source-v1.2/fh6garage/preview3d/chassis_converter.py"
       - "source-v1.2/fh6garage/preview3d/native_material_textures.py"
       - "source-v1.2/fh6garage/preview3d/native_texture_semantics.py"
+      - "source-v1.2/fh6garage/preview3d/native_dds.py"
       - "source-v1.2/fh6garage/preview3d/wheel_morph_helper.py"
       - "source-v1.2/tests/test_native_material_textures.py"
       - "source-v1.2/tests/test_native_texture_semantics.py"
+      - "source-v1.2/tests/test_native_dds.py"
       - "source-v1.2/tests/test_native_swatchbin_decoder_source.py"
       - "source-v1.2/tests/test_material_provenance_bridge.py"
       - "source-v1.2/tools/patch_kfps_wheel_morph_diagnostic.py"
@@ -65,9 +67,11 @@ jobs:
           Set-Location source-v1.2
           python -m py_compile fh6garage/preview3d/native_material_textures.py
           python -m py_compile fh6garage/preview3d/native_texture_semantics.py
+          python -m py_compile fh6garage/preview3d/native_dds.py
           python -m py_compile fh6garage/preview3d/chassis_converter.py
           python -m unittest tests.test_native_material_textures -v
           python -m unittest tests.test_native_texture_semantics -v
+          python -m unittest tests.test_native_dds -v
           python -m unittest tests.test_native_swatchbin_decoder_source -v
           python -m unittest tests.test_material_provenance_bridge -v
 
