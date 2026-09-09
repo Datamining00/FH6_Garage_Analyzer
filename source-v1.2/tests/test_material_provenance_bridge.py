@@ -55,6 +55,21 @@ class MaterialProvenanceBridgeTests(unittest.TestCase):
         self.assertIn("float.IsFinite(value) && MathF.Abs(value) > 1e-6f", text)
         self.assertIn("[uvTiling.X, uvTiling.Y]", text)
 
+    def test_material_uv_tiling_matches_forzatechstudio_overwrite_scope(self):
+        text = MATERIAL_HELPER.read_text(encoding="utf-8")
+        # ForzaTechStudio resolves a material-wide viewport tiling by walking all
+        # shader parameters in order. It does not narrow the vector candidates to
+        # diffuse/base-color only, so later published UVTiling/TilingOverride
+        # parameters are allowed to replace earlier values.
+        self.assertIn("foreach (var blob in parameterBlobs)", text)
+        self.assertIn("foreach (var parameter in blob.Parameters)", text)
+        self.assertIn("0x8BAB96B3", text)  # RoughMetalAOTilingOverride
+        self.assertIn("0xF383EB56", text)  # NormalTilingOverride
+        self.assertIn("0x4CCD7F85", text)  # AlphaTilingOverride
+        self.assertIn("0xADBA1134", text)  # UVTiling_9
+        self.assertIn("uvTiling.X = SanitizeTilingValue(vector.X)", text)
+        self.assertIn("uvTiling.Y = SanitizeTilingValue(vector.Y)", text)
+
     def test_shader_semantics_are_global_not_vehicle_specific(self):
         text = MATERIAL_HELPER.read_text(encoding="utf-8")
         self.assertIn("0xA05F6E3F", text)  # Roughness
