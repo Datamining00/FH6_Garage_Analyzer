@@ -8,7 +8,7 @@ from .manufacturer_colors import CUSTOM_COLOR_SELECTOR, resolve_manufacturer_sel
 
 
 LIVERY_PAINT_SECONDARY_DIAGNOSTICS_FORMAT = "fh6_livery_paint_secondary_diagnostics_v1"
-LIVERY_PAINT_SECONDARY_DIAGNOSTICS_REVISION = 1
+LIVERY_PAINT_SECONDARY_DIAGNOSTICS_REVISION = 2
 
 
 def _u64(value: Any) -> int | None:
@@ -102,19 +102,29 @@ def _manufacturer_secondary(report: Any, selector: int) -> dict[str, Any]:
     return result
 
 
+def _suppressed_manufacturer_secondary(selector: int) -> dict[str, Any]:
+    return {
+        "status": "manufacturer_secondary_suppressed_by_global_custom_paint",
+        "selector": selector,
+        "group_index": None,
+        "entry_count": 0,
+        "secondary_enabled": False,
+        "secondary_linear_rgb": None,
+    }
+
+
 def build_livery_paint_secondary_diagnostics(
     paint_provenance: Any,
     manufacturer_colors: Any = None,
 ) -> dict[str, Any]:
     """Preserve secondary/finish provenance without enabling two-tone rendering.
 
-    Public ForzaLiveryStudio evidence establishes only the ordering needed here:
-    a resolved manufacturer secondary is assigned first, then an enabled C_livery
-    secondary overrides it. The later secondary mix is finish/material dependent,
-    and FLS explicitly labels its hardcoded fallback as an approximation. P3C
-    therefore records the exact available secondary source and raw finish code but
-    does not choose a mix factor, flake model, finish shader, material entry path,
-    or UV channel.
+    Public ForzaLiveryStudio evidence shows that manufacturer paint is available
+    only while the livery has no explicit custom primary. Within that uncustomised
+    state, a manufacturer secondary is assigned before an enabled C_livery
+    secondary replaces it. The later secondary mix remains finish/material
+    dependent and FLS explicitly labels its hardcoded fallback as an approximation.
+    P3C therefore preserves source precedence and raw finish codes only.
     """
     report: dict[str, Any] = {
         "format": LIVERY_PAINT_SECONDARY_DIAGNOSTICS_FORMAT,
@@ -123,14 +133,17 @@ def build_livery_paint_secondary_diagnostics(
         "rendering_enabled": False,
         "rendering_applied": False,
         "game_data_modified": False,
+        "global_custom_primary_active": False,
+        "manufacturer_global_gate": "unknown",
         "record_count": 0,
         "duplicate_material_identifiers": [],
         "records": [],
         "issues": [],
         "interpretation_boundary": (
-            "Paint P3C diagnoses custom/manufacturer secondary-color precedence and preserves raw finish codes only. "
-            "No secondary mixing, two-tone/flake shading, finish-code semantic mapping, entry Path/material targeting, "
-            "or UV4 overlay is enabled until an FH6 engine-equivalent contract is proven."
+            "Paint P3C diagnoses secondary-color provenance under the same fail-closed global custom-paint gate as "
+            "P3B and preserves raw finish codes only. No secondary mixing, two-tone/flake shading, finish-code "
+            "semantic mapping, entry Path/material targeting, or UV4 overlay is enabled until an FH6 "
+            "engine-equivalent contract is proven."
         ),
     }
     if not isinstance(paint_provenance, dict) or paint_provenance.get("status") != "paint_descriptor_parsed":
@@ -138,6 +151,12 @@ def build_livery_paint_secondary_diagnostics(
         return report
 
     records = [record for record in (paint_provenance.get("records") or []) if isinstance(record, dict)]
+    global_custom_primary_active = any(bool(record.get("primary_color_enabled")) for record in records)
+    report["global_custom_primary_active"] = global_custom_primary_active
+    report["manufacturer_global_gate"] = (
+        "suppressed_by_explicit_custom_primary" if global_custom_primary_active else "manufacturer_secondary_allowed"
+    )
+
     material_values = [_u64(record.get("material_identifier_u64_le")) for record in records]
     counts = Counter(value for value in material_values if value is not None)
     duplicates = sorted(value for value, count in counts.items() if count > 1)
@@ -153,7 +172,11 @@ def build_livery_paint_secondary_diagnostics(
 
         manufacturer = None
         if selector is not None and selector != CUSTOM_COLOR_SELECTOR:
-            manufacturer = _manufacturer_secondary(manufacturer_colors, selector)
+            manufacturer = (
+                _suppressed_manufacturer_secondary(selector)
+                if global_custom_primary_active
+                else _manufacturer_secondary(manufacturer_colors, selector)
+            )
 
         secondary_source = "none"
         secondary_status = "secondary_not_selected"
@@ -167,12 +190,11 @@ def build_livery_paint_secondary_diagnostics(
                 secondary_status = "custom_secondary_preserved_deferred"
                 selected_linear_rgb = _display_rgba_to_linear_rgb(custom_rgba)
         elif manufacturer is not None:
+            secondary_source = "manufacturer_group_trailer"
             if manufacturer.get("status") == "manufacturer_secondary_linear_preserved":
-                secondary_source = "manufacturer_group_trailer"
                 secondary_status = "manufacturer_secondary_preserved_deferred"
                 selected_linear_rgb = list(manufacturer.get("secondary_linear_rgb") or [])
             else:
-                secondary_source = "manufacturer_group_trailer"
                 secondary_status = str(manufacturer.get("status") or "manufacturer_secondary_unresolved")
 
         output_records.append(
