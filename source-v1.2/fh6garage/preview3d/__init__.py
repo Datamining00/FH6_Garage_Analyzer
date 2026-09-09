@@ -32,16 +32,20 @@ def _install_native_transform_chain_preview() -> bool:
     from .material_appearance_patch import install_game_like_material_patch
     from .material_runtime_wiring_patch import install_material_runtime_wiring_patch
     from .native_material_texture_patch import install_native_material_texture_patch
+    from .native_normal_texture_patch import install_native_normal_texture_patch
     from .native_transform_chain_v3 import install_native_transform_chain_v3
     from . import tire_preview_integration as tire_preview_integration
 
     # Viewer patches are installed before integration.py imports its load_kfps_glb
     # / CarOpenGLWidget symbols. Native material scalars/optics are wired first;
     # verified Texture2D sampling then layers onto that PBR shader without taking
-    # authority away from dynamic car paint or the livery composite.
+    # authority away from dynamic car paint or the livery composite. The narrow
+    # BC5 normal stage is installed after native Texture2D so it can reuse the
+    # verified render plan and per-primitive draw interception contract.
     install_game_like_material_patch()
     install_material_runtime_wiring_patch()
     install_native_material_texture_patch()
+    install_native_normal_texture_patch()
     install_native_transform_chain_v3()
     return tire_preview_integration.install_global_stock_native_tire_preview()
 
