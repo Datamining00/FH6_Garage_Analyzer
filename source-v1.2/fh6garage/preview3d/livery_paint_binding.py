@@ -9,13 +9,16 @@ import numpy as np
 from .material_appearance_patch import _read_glb_document
 
 
-LIVERY_PAINT_BINDING_REVISION = 1
-_CANONICAL_BINDING_HASH = re.compile(r"^0x([0-9A-Fa-f]{16})$")
+LIVERY_PAINT_BINDING_REVISION = 2
+# Pinned KFPS GlbWriter.cs emits MaterialBindingHash.ToString("X16"): exactly
+# sixteen hexadecimal digits with no 0x prefix. Keep this parser identical to
+# that exporter contract instead of accepting broader human-readable forms.
+_CANONICAL_BINDING_HASH = re.compile(r"^([0-9A-Fa-f]{16})$")
 _CUSTOM_COLOR_SELECTOR = 0xFFFFFFFF
 
 
 def _canonical_binding_hash(value: Any) -> int | None:
-    """Accept only the canonical 64-bit provenance emitted by the KFPS helper."""
+    """Accept only the exact 16-digit X16 provenance emitted by KFPS."""
     if not isinstance(value, str):
         return None
     match = _CANONICAL_BINDING_HASH.fullmatch(value.strip())
@@ -100,8 +103,9 @@ def apply_exact_livery_paint_to_aux_stream(
 
     Paint P2 intentionally has no mesh-name, filename, material-name, panel, or
     vehicle-specific fallback. A GLB primitive must declare role=paint and carry
-    the canonical `kfps_material_binding_hash`; that exact 64-bit value must match
-    one unique C_livery paint record whose custom primary color is enabled.
+    the exact unprefixed 16-digit `kfps_material_binding_hash` emitted by pinned
+    KFPS GlbWriter.cs; that 64-bit value must match one unique C_livery paint
+    record whose custom primary color is enabled.
 
     Manufacturer palettes, secondary/two-tone color, finish materials, and
     inheritance across related body paint groups remain deferred.
@@ -118,6 +122,7 @@ def apply_exact_livery_paint_to_aux_stream(
     output = np.ascontiguousarray(aux_stream.copy(), dtype=np.float32)
     report: dict[str, Any] = {
         "format": "fh6_livery_paint_binding_v1",
+        "binding_format": "kfps_material_binding_hash_x16_unprefixed",
         "status": "paint_binding_unavailable" if not records and not ambiguous_hashes else "paint_binding_evaluated",
         "rendering_applied": False,
         "game_data_modified": False,
