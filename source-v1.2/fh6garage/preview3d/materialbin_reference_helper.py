@@ -19,6 +19,21 @@ class MaterialbinReferenceHelperError(RuntimeError):
     pass
 
 
+def _explicit_game_data_unmodified(report: dict[str, Any]) -> bool:
+    """Accept the helper's native snake_case safety field and legacy camelCase only.
+
+    The patched KFPS helper serializes with JsonNamingPolicy.SnakeCaseLower, so the
+    C# ``GameDataModified`` field is emitted as ``game_data_modified``.  Keep the
+    older camelCase spelling for compatibility, but require an explicit boolean
+    false from either spelling; absence, null, or true remains fail-closed.
+    """
+    if "game_data_modified" in report:
+        return report.get("game_data_modified") is False
+    if "gameDataModified" in report:
+        return report.get("gameDataModified") is False
+    return False
+
+
 def diagnose_materialbin_references(
     materialbin_path: str | Path,
     *,
@@ -84,8 +99,8 @@ def diagnose_materialbin_references(
         raise MaterialbinReferenceHelperError(
             f"Unexpected materialbin helper revision: {report.get('revision')!r}"
         )
-    if report.get("gameDataModified") is not False:
+    if not _explicit_game_data_unmodified(report):
         raise MaterialbinReferenceHelperError(
-            "Materialbin helper did not explicitly report gameDataModified=false."
+            "Materialbin helper did not explicitly report game_data_modified=false."
         )
     return report
