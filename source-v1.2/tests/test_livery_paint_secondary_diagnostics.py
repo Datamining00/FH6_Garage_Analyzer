@@ -10,11 +10,13 @@ from fh6garage.preview3d.livery_paint_secondary_diagnostics import (
 
 
 BODY = 0xF7DBE8A7C839A675
+HOOD = 0x6AC1E9D87FE5D953
 
 
 def _record(
     *,
     material_hash=BODY,
+    primary_enabled=False,
     secondary_enabled=True,
     secondary_rgba=(32, 64, 128, 255),
     selector=0xFFFFFFFF,
@@ -22,6 +24,7 @@ def _record(
 ):
     return {
         "material_identifier_u64_le": material_hash,
+        "primary_color_enabled": bool(primary_enabled),
         "secondary_color_enabled": bool(secondary_enabled),
         "secondary_rgba": list(secondary_rgba),
         "manufacturer_color_selector": selector,
@@ -54,7 +57,7 @@ def _palette(*, secondary=(0.7, 0.8, 0.9), secondary_present=True):
 
 
 class LiveryPaintSecondaryDiagnosticsTests(unittest.TestCase):
-    def test_custom_secondary_overrides_manufacturer_secondary_diagnostically_only(self):
+    def test_custom_secondary_replaces_manufacturer_secondary_diagnostically_only_when_factory_gate_is_open(self):
         report = build_livery_paint_secondary_diagnostics(
             _report([_record(selector=0, secondary_enabled=True, secondary_rgba=(32, 64, 128, 255))]),
             _palette(secondary=(0.7, 0.8, 0.9)),
@@ -62,6 +65,8 @@ class LiveryPaintSecondaryDiagnosticsTests(unittest.TestCase):
         row = report["records"][0]
         expected = np.power(np.asarray([32, 64, 128], dtype=np.float64) / 255.0, 2.2)
         np.testing.assert_allclose(row["secondary_linear_rgb_candidate"], expected, atol=1e-12)
+        self.assertFalse(report["global_custom_primary_active"])
+        self.assertEqual(report["manufacturer_global_gate"], "manufacturer_secondary_allowed")
         self.assertEqual(row["secondary_source_precedence"], "custom_secondary_override")
         self.assertEqual(row["secondary_status"], "custom_secondary_preserved_deferred")
         self.assertEqual(row["manufacturer_secondary"]["status"], "manufacturer_secondary_linear_preserved")
@@ -80,6 +85,44 @@ class LiveryPaintSecondaryDiagnosticsTests(unittest.TestCase):
         self.assertEqual(row["manufacturer_secondary"]["group_index"], 0)
         self.assertEqual(row["manufacturer_secondary"]["entry_count"], 2)
         self.assertFalse(row["rendering_enabled"])
+
+    def test_any_explicit_custom_primary_globally_suppresses_manufacturer_secondary(self):
+        report = build_livery_paint_secondary_diagnostics(
+            _report([
+                _record(material_hash=BODY, primary_enabled=True, secondary_enabled=False, selector=0xFFFFFFFF),
+                _record(material_hash=HOOD, primary_enabled=False, secondary_enabled=False, selector=0),
+            ]),
+            _palette(secondary=(0.15, 0.25, 0.35)),
+        )
+        row = report["records"][1]
+        self.assertTrue(report["global_custom_primary_active"])
+        self.assertEqual(report["manufacturer_global_gate"], "suppressed_by_explicit_custom_primary")
+        self.assertEqual(row["secondary_source_precedence"], "manufacturer_group_trailer")
+        self.assertEqual(row["secondary_status"], "manufacturer_secondary_suppressed_by_global_custom_paint")
+        self.assertIsNone(row["secondary_linear_rgb_candidate"])
+        self.assertEqual(
+            row["manufacturer_secondary"]["status"],
+            "manufacturer_secondary_suppressed_by_global_custom_paint",
+        )
+        self.assertFalse(report["rendering_enabled"])
+
+    def test_custom_secondary_remains_preserved_when_manufacturer_is_globally_suppressed(self):
+        report = build_livery_paint_secondary_diagnostics(
+            _report([
+                _record(material_hash=BODY, primary_enabled=True, secondary_enabled=False),
+                _record(material_hash=HOOD, secondary_enabled=True, secondary_rgba=(10, 20, 30, 255), selector=0),
+            ]),
+            _palette(),
+        )
+        row = report["records"][1]
+        expected = np.power(np.asarray([10, 20, 30], dtype=np.float64) / 255.0, 2.2)
+        np.testing.assert_allclose(row["secondary_linear_rgb_candidate"], expected, atol=1e-12)
+        self.assertEqual(row["secondary_source_precedence"], "custom_secondary_override")
+        self.assertEqual(row["secondary_status"], "custom_secondary_preserved_deferred")
+        self.assertEqual(
+            row["manufacturer_secondary"]["status"],
+            "manufacturer_secondary_suppressed_by_global_custom_paint",
+        )
 
     def test_invalid_enabled_custom_secondary_does_not_fall_back_to_manufacturer(self):
         report = build_livery_paint_secondary_diagnostics(
@@ -117,6 +160,7 @@ class LiveryPaintSecondaryDiagnosticsTests(unittest.TestCase):
         )
         self.assertEqual(report["status"], "secondary_finish_provenance_unavailable")
         self.assertEqual(report["records"], [])
+        self.assertEqual(report["manufacturer_global_gate"], "unknown")
         self.assertFalse(report["rendering_enabled"])
         self.assertFalse(report["rendering_applied"])
 
