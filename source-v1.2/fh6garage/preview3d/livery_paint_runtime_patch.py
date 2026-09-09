@@ -5,20 +5,53 @@ from functools import wraps
 from pathlib import Path
 
 from .livery_paint_provenance import diagnose_livery_paint
+from .manufacturer_colors import diagnose_manufacturer_colors_archive
 
 
-LIVERY_PAINT_RUNTIME_PATCH_REVISION = 2
+LIVERY_PAINT_RUNTIME_PATCH_REVISION = 3
 _PATCH_MARKER = "_fh6_livery_paint_provenance_runtime_patched"
 _TEXTURE_PATCH_MARKER = "_fh6_livery_paint_provenance_texture_patched"
+
+
+def _manufacturer_palette_report(asset) -> dict:
+    archive_path = getattr(asset, "archive_path", None)
+    if not archive_path:
+        return {
+            "format": "fh6_manufacturer_colors_v1",
+            "status": "manufacturer_colors_archive_unavailable",
+            "rendering_applied": False,
+            "game_data_modified": False,
+            "groups": [],
+            "issues": ["Vehicle asset has no archive_path for ManufacturerColors.bin lookup."],
+        }
+    try:
+        return diagnose_manufacturer_colors_archive(archive_path)
+    except Exception as exc:
+        return {
+            "format": "fh6_manufacturer_colors_v1",
+            "status": "manufacturer_colors_unresolved",
+            "rendering_applied": False,
+            "game_data_modified": False,
+            "archive_file": str(archive_path),
+            "groups": [],
+            "issues": [f"{type(exc).__name__}: {exc}"],
+            "interpretation_boundary": (
+                "Manufacturer color provenance is non-fatal and never changes existing paint/livery rendering."
+            ),
+        }
 
 
 def install_livery_paint_provenance_runtime_patch() -> bool:
     """Attach read-only paint provenance to the established C_livery render path.
 
-    Paint P1 still performs only descriptor inventory. Paint P2 additionally
-    carries that derived report into DirectLiveryTextures as transient Python
-    state so the viewer may exact-match GLB material binding hashes. Neither
-    wrapper modifies game/save files, rendered livery pixels, or GLB bytes.
+    Paint P1 inventories C_livery descriptors. Paint P2 carries that report into
+    DirectLiveryTextures for exact GLB material-hash matching. Paint P3A also
+    inventories the selected vehicle archive's ManufacturerColors.bin and carries
+    the full group/entry structure as transient state. P3A does not apply palette
+    colors, material-specific entries, UV4 overlays, or finish semantics.
+
+    None of these wrappers modifies game/save files, rendered livery pixels, or
+    GLB bytes.
     """
     from . import direct_livery
     from . import kfps_render_backend as backend
@@ -81,6 +114,10 @@ def install_livery_paint_provenance_runtime_patch() -> bool:
                 # derived state only; no constructor/API change is required and
                 # rerendered textures naturally receive the current C_livery report.
                 object.__setattr__(textures, "_fh6_paint_provenance", report)
+
+            asset = args[0] if args else kwargs.get("asset")
+            palette_report = _manufacturer_palette_report(asset)
+            object.__setattr__(textures, "_fh6_manufacturer_colors", palette_report)
             return textures
 
         setattr(wrapped_build_direct_livery_textures, _TEXTURE_PATCH_MARKER, True)
