@@ -1,0 +1,96 @@
+name: Validate FH6 Assistant v1.4 native material textures
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - v1.4-rc1-wheel-morph-w3
+    paths:
+      - "source-v1.2/fh6garage/preview3d/chassis_converter.py"
+      - "source-v1.2/fh6garage/preview3d/native_material_textures.py"
+      - "source-v1.2/fh6garage/preview3d/wheel_morph_helper.py"
+      - "source-v1.2/tests/test_native_material_textures.py"
+      - "source-v1.2/tests/test_native_swatchbin_decoder_source.py"
+      - "source-v1.2/tests/test_material_provenance_bridge.py"
+      - "source-v1.2/tools/patch_kfps_wheel_morph_diagnostic.py"
+      - "source-v1.2/tools/kfps_wheel_morph/MaterialAppearanceDiagnostic.cs"
+      - "source-v1.2/tools/kfps_wheel_morph/NativeSwatchbinDecoder.cs"
+      - ".github/workflows/validate-v1.4-native-material-textures.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v14-native-material-textures-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Native Texture2D provenance and swatchbin decoder
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout W3 branch
+        uses: actions/checkout@v6
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Set up .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Validate Python resolver contracts
+        shell: pwsh
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          Set-Location source-v1.2
+          python -m py_compile fh6garage/preview3d/native_material_textures.py
+          python -m py_compile fh6garage/preview3d/chassis_converter.py
+          python -m unittest tests.test_native_material_textures -v
+          python -m unittest tests.test_native_swatchbin_decoder_source -v
+          python -m unittest tests.test_material_provenance_bridge -v
+
+      - name: Checkout pinned KFPS source
+        shell: pwsh
+        run: |
+          git clone --filter=blob:none https://github.com/heyitshestia/kloudys-forza-painter-suite.git kfps-source
+          if ($LASTEXITCODE -ne 0) { throw "KFPS clone failed with exit code $LASTEXITCODE" }
+          git -C kfps-source checkout --detach 6f53ca3c584d78659d06d4b4a39561db67d79345
+          if ($LASTEXITCODE -ne 0) { throw "Pinned KFPS checkout failed with exit code $LASTEXITCODE" }
+          $actual = (git -C kfps-source rev-parse HEAD).Trim()
+          if ($actual -ne "6f53ca3c584d78659d06d4b4a39561db67d79345") { throw "Pinned KFPS commit mismatch: $actual" }
+
+      - name: Apply material texture patch
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          python source-v1.2/tools/patch_kfps_wheel_morph_diagnostic.py --kfps-root kfps-source
+          if ($LASTEXITCODE -ne 0) { throw "KFPS patcher failed with exit code $LASTEXITCODE" }
+          git -C kfps-source diff --check
+          if ($LASTEXITCODE -ne 0) { throw "Patched KFPS diff check failed" }
+          $program = "kfps-source/tools/livery/chassis-converter/Program.cs"
+          if (-not (Select-String -Path $program -SimpleMatch "--decode-swatchbin" -Quiet)) { throw "Program.cs is missing native swatchbin decode mode." }
+          if (-not (Select-String -Path $program -SimpleMatch "NativeSwatchbinDecoder.Decode" -Quiet)) { throw "Program.cs is missing NativeSwatchbinDecoder invocation." }
+          if (-not (Test-Path "kfps-source/tools/livery/chassis-converter/NativeSwatchbinDecoder.cs")) { throw "NativeSwatchbinDecoder.cs was not staged." }
+          if (-not (Select-String -Path "kfps-source/tools/livery/chassis-converter/MaterialAppearanceDiagnostic.cs" -SimpleMatch "TextureBindings" -Quiet)) { throw "TextureBindings provenance is missing." }
+
+      - name: Compile helper and verify integrity pin
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          dotnet publish kfps-source/tools/livery/chassis-converter/Kfps.ChassisConverter.csproj -c Release -o native-material-converter
+          if ($LASTEXITCODE -ne 0) { throw "Native material helper publish failed with exit code $LASTEXITCODE" }
+          $built = Resolve-Path "native-material-converter/Kfps.ChassisConverter.exe"
+          $actual = (Get-FileHash $built -Algorithm SHA256).Hash.ToLower()
+          $expected = (python -c "import runpy; print(runpy.run_path(r'source-v1.2/fh6garage/preview3d/wheel_morph_helper.py')['WHEEL_MORPH_HELPER_SHA256'])").Trim()
+          Write-Host "Native material helper SHA-256: $actual"
+          if ($actual -ne $expected) { throw "Native material helper SHA-256 mismatch: expected $expected, got $actual" }
