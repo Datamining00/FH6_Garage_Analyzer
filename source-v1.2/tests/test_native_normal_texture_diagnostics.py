@@ -150,6 +150,19 @@ class NativeNormalTextureDiagnosticsTests(unittest.TestCase):
         self.assertNotIn("uNativeNormal", text)
         self.assertNotIn("_NORMAL_TEXTURE_UNIT", text)
 
+    def test_converter_records_normal_candidates_without_making_them_geometry_validity(self):
+        root = Path(__file__).resolve().parents[1]
+        text = (root / "fh6garage" / "preview3d" / "chassis_converter.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("native_normal_texture_diagnostics_revision", text)
+        self.assertIn("build_native_material_render_plan(output)", text)
+        self.assertIn("build_native_normal_texture_diagnostics(native_render_plan)", text)
+        self.assertIn("native_normal_texture_status", text)
+        self.assertIn("rendering_enabled\": False", text)
+        self.assertIn("game_data_modified\": False", text)
+        self.assertNotIn("raise ChassisConverterError(\n            \"Native normal", text)
+
 
 if __name__ == "__main__":
     unittest.main()
