@@ -61,7 +61,7 @@ class LiveryPaintRuntimePatchTests(unittest.TestCase):
             self.assertEqual(diagnostic.name, "paint_provenance.json")
             stored = json.loads(diagnostic.read_text(encoding="utf-8"))
             self.assertEqual(stored, report)
-            self.assertTrue(any("Paint P1 provenance" in line for line in logs))
+            self.assertTrue(any("Paint provenance" in line for line in logs))
 
     def test_provenance_and_manufacturer_palette_are_carried_as_transient_texture_state(self):
         result = _Result(Path("C_livery"), Path("."))
