@@ -102,14 +102,17 @@ class _FakeGl:
 
 
 class NativeMaterialGlTests(unittest.TestCase):
-    def test_dxgi_mapping_is_explicit_and_signed_bc4_stays_closed(self):
+    def test_dxgi_mapping_is_explicit_and_signed_rgtc_stays_closed(self):
         self.assertEqual(native_gl_texture_spec(99).family, "bc7_srgb")
         self.assertTrue(native_gl_texture_spec(72).compressed)
         self.assertEqual(native_gl_texture_spec(80).internal_format, 0x8DBB)
+        self.assertEqual(native_gl_texture_spec(83).internal_format, 0x8DBD)
         self.assertEqual(native_gl_texture_spec(61).internal_format, 0x8229)
         self.assertFalse(native_gl_texture_spec(61).compressed)
         with self.assertRaises(NativeMaterialGlError):
             native_gl_texture_spec(81)  # signed BC4 has no [0,1] roughness contract
+        with self.assertRaises(NativeMaterialGlError):
+            native_gl_texture_spec(84)  # signed BC5 normal interpretation remains deferred
 
     def test_bc7_requires_bptc_and_uploads_exact_payload(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -150,6 +153,26 @@ class NativeMaterialGlTests(unittest.TestCase):
             call = gl.compressed_calls[0]
             self.assertEqual(call[2], 0x8DBB)
             self.assertEqual(call[6], 8)
+            self.assertEqual(call[7], payload)
+
+    def test_bc5_uses_exact_unsigned_two_channel_rgtc_payload(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "normal_bc5.dds"
+            payload = bytes(range(16))
+            _write_dds(path, 83, payload)
+            texture = parse_native_dds(path)
+            self.assertEqual(texture.compression_family, "bc5")
+
+            unsupported = _FakeGl(version=b"2.1", extensions=())
+            with self.assertRaisesRegex(NativeMaterialGlError, "rgtc"):
+                upload_native_dds_2d(unsupported, texture)
+
+            gl = _FakeGl(version=b"3.0", extensions=())
+            self.assertEqual(upload_native_dds_2d(gl, texture), 7)
+            self.assertEqual(len(gl.compressed_calls), 1)
+            call = gl.compressed_calls[0]
+            self.assertEqual(call[2], 0x8DBD)  # GL_COMPRESSED_RG_RGTC2
+            self.assertEqual(call[6], 16)
             self.assertEqual(call[7], payload)
 
     def test_r8_upload_uses_red_channel_without_swizzle(self):
