@@ -1,4 +1,5 @@
 using System.Numerics;
+using ForzaTechStudio.Services;
 using ForzaTools.Bundles;
 using ForzaTools.Bundles.Blobs;
 using ForzaTools.Bundles.Metadata;
@@ -35,6 +36,10 @@ internal sealed record MaterialAppearanceDiagnostic(
     string EmissiveColorParameterHash,
     float? EmissiveIntensity,
     string EmissiveIntensityParameterHash,
+    float[] UvTiling,
+    string UvTilingUParameterHash,
+    string UvTilingVParameterHash,
+    string UvTilingVectorParameterHash,
     string[] TexturePaths,
     MaterialTextureBindingDiagnostic[] TextureBindings);
 
@@ -99,6 +104,21 @@ internal static class MaterialAppearanceRuntime
         0x074CCD8C, 0x9421C781, 0xD78943E8, 0x4C6E94DA, 0x22F9702D,
     ];
 
+    // ForzaTechStudio viewport material UV tiling contract. KFPS already bakes
+    // MeshBlob.TexCoordTransforms plus the source V flip into exported UVs;
+    // these material-level multipliers are the remaining transform.
+    private static readonly HashSet<uint> UTilingHashes =
+    [
+        0x19A7D8F1, // U_Tiling
+        0xB01AEE8E, // U_Tiling observed in shaderbin parameter tables
+    ];
+
+    private static readonly HashSet<uint> VTilingHashes =
+    [
+        0x4A3D8375, // V_Tiling
+        0x3E95E96D, // V_Tiling observed in shaderbin parameter tables
+    ];
+
     public static MaterialAppearanceDiagnostic Resolve(Bundle modelBundle, string materialName)
     {
         var requestedName = (materialName ?? string.Empty).Trim();
@@ -151,6 +171,10 @@ internal static class MaterialAppearanceRuntime
         var emissiveColorHash = string.Empty;
         float? emissiveIntensity = null;
         var emissiveIntensityHash = string.Empty;
+        var uvTiling = new Vector2(1.0f, 1.0f);
+        var uvTilingUHash = string.Empty;
+        var uvTilingVHash = string.Empty;
+        var uvTilingVectorHash = string.Empty;
         var texturePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var textureBindings = new Dictionary<string, MaterialTextureBindingDiagnostic>(StringComparer.OrdinalIgnoreCase);
         var parameterCount = 0;
@@ -162,9 +186,25 @@ internal static class MaterialAppearanceRuntime
                 parameterCount++;
                 var hash = parameter.NameHash;
                 var hashText = $"{hash:X8}";
+                var parameterName = NameHashService.Instance.GetName(hash) ?? string.Empty;
 
-                if (parameter.Value is Vector4 vector)
+                if (parameter.Value is Vector2 vector2)
                 {
+                    if (IsUvTilingVectorParameter(parameterName))
+                    {
+                        uvTiling.X = SanitizeTilingValue(vector2.X);
+                        uvTiling.Y = SanitizeTilingValue(vector2.Y);
+                        uvTilingVectorHash = hashText;
+                    }
+                }
+                else if (parameter.Value is Vector4 vector)
+                {
+                    if (IsUvTilingVectorParameter(parameterName))
+                    {
+                        uvTiling.X = SanitizeTilingValue(vector.X);
+                        uvTiling.Y = SanitizeTilingValue(vector.Y);
+                        uvTilingVectorHash = hashText;
+                    }
                     if (DiffuseColorHashes.Contains(hash))
                     {
                         baseColor = VectorValues(vector);
@@ -188,7 +228,19 @@ internal static class MaterialAppearanceRuntime
                 }
                 else if (parameter.Value is float scalar && float.IsFinite(scalar))
                 {
-                    if (RoughnessHashes.Contains(hash))
+                    if (UTilingHashes.Contains(hash)
+                        || parameterName.Equals("U_Tiling", StringComparison.OrdinalIgnoreCase))
+                    {
+                        uvTiling.X = SanitizeTilingValue(scalar);
+                        uvTilingUHash = hashText;
+                    }
+                    else if (VTilingHashes.Contains(hash)
+                        || parameterName.Equals("V_Tiling", StringComparison.OrdinalIgnoreCase))
+                    {
+                        uvTiling.Y = SanitizeTilingValue(scalar);
+                        uvTilingVHash = hashText;
+                    }
+                    else if (RoughnessHashes.Contains(hash))
                     {
                         roughness = scalar;
                         roughnessHash = hashText;
@@ -258,6 +310,10 @@ internal static class MaterialAppearanceRuntime
             emissiveColorHash,
             emissiveIntensity,
             emissiveIntensityHash,
+            [uvTiling.X, uvTiling.Y],
+            uvTilingUHash,
+            uvTilingVHash,
+            uvTilingVectorHash,
             texturePaths.OrderBy(value => value, StringComparer.OrdinalIgnoreCase).Take(32).ToArray(),
             textureBindings.Values
                 .OrderBy(value => value.ParameterHash, StringComparer.OrdinalIgnoreCase)
@@ -268,6 +324,15 @@ internal static class MaterialAppearanceRuntime
     }
 
     private static float[] VectorValues(Vector4 value) => [value.X, value.Y, value.Z, value.W];
+
+    private static bool IsUvTilingVectorParameter(string parameterName) =>
+        parameterName.Contains("uvtiling", StringComparison.OrdinalIgnoreCase)
+        || parameterName.Contains("tilingoverride", StringComparison.OrdinalIgnoreCase)
+        || parameterName.Equals("BaseColorAlphaTilingOverride", StringComparison.OrdinalIgnoreCase)
+        || parameterName.Equals("BaseColorTilingOverride", StringComparison.OrdinalIgnoreCase);
+
+    private static float SanitizeTilingValue(float value) =>
+        float.IsFinite(value) && MathF.Abs(value) > 1e-6f ? value : 1.0f;
 
     private static MaterialAppearanceDiagnostic Empty(string mode, string materialName) =>
         new(
@@ -285,8 +350,6 @@ internal static class MaterialAppearanceRuntime
             null,
             "",
             null,
-            "",
-            null,
             null,
             "",
             null,
@@ -294,6 +357,10 @@ internal static class MaterialAppearanceRuntime
             null,
             "",
             null,
+            "",
+            [1.0f, 1.0f],
+            "",
+            "",
             "",
             [],
             []);
