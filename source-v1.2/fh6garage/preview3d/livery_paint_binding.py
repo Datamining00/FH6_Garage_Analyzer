@@ -10,7 +10,7 @@ from .manufacturer_colors import resolve_manufacturer_group_linear_paint
 from .material_appearance_patch import _read_glb_document
 
 
-LIVERY_PAINT_BINDING_REVISION = 5
+LIVERY_PAINT_BINDING_REVISION = 6
 # Pinned KFPS GlbWriter.cs emits MaterialBindingHash.ToString("X16"): exactly
 # sixteen hexadecimal digits with no 0x prefix. Keep this parser identical to
 # that exporter contract instead of accepting broader human-readable forms.
@@ -180,8 +180,19 @@ def apply_exact_livery_paint_to_aux_stream(
         )
 
     records, ambiguous_hashes, record_issues = _paint_record_index(paint_provenance)
+    raw_records = (
+        paint_provenance.get("records") or []
+        if isinstance(paint_provenance, dict)
+        else []
+    )
+    # The global manufacturer gate must observe the entire parsed paint state,
+    # including duplicate/ambiguous material identifiers. Ambiguity may prevent a
+    # record from being rendered, but it must never make manufacturer paint appear
+    # safe when an explicit custom primary is present somewhere in the source.
     global_custom_primary_active = any(
-        bool(record.get("primary_color_enabled")) for record in records.values()
+        bool(record.get("primary_color_enabled"))
+        for record in raw_records
+        if isinstance(record, dict)
     )
     output = np.ascontiguousarray(aux_stream.copy(), dtype=np.float32)
     report: dict[str, Any] = {
