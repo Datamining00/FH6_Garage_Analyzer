@@ -197,6 +197,17 @@ class NativeMaterialTexturePatchTests(unittest.TestCase):
         self.assertIn("ambiguous", issues[0])
         self.assertIsNone(ranges[0].surface_dds_path)
 
+    def test_valid_surface_binding_is_disabled_if_same_mesh_has_invalid_surface_binding(self):
+        plan = _plan(
+            _selection(1, "rough.dds", "roughness", dxgi_format=80, is_srgb=False),
+            _selection(1, "rough_bc7.dds", "roughness", dxgi_format=99, is_srgb=True),
+        )
+        ranges, issues = build_native_base_color_draw_ranges(_scene(), plan)
+        self.assertEqual(len(issues), 1)
+        self.assertIn("single-channel", issues[0])
+        self.assertIsNone(ranges[0].surface_dds_path)
+        self.assertIsNone(ranges[0].surface_mode)
+
     def test_draw_range_mismatch_is_rejected(self):
         scene = SimpleNamespace(
             indices=np.zeros(6, dtype=np.uint32),
