@@ -15,7 +15,9 @@ from .material_appearance_patch import _read_glb_document
 
 
 MANUFACTURER_OVERLAY_DIAGNOSTICS_FORMAT = "fh6_manufacturer_overlay_diagnostics_v1"
-MANUFACTURER_OVERLAY_DIAGNOSTICS_REVISION = 1
+MANUFACTURER_OVERLAY_DIAGNOSTICS_REVISION = 2
+_BUILTIN_MANUFACTURER_MATERIAL_NAMES = frozenset({"carpaint", "carpaint_secondary"})
+_MAX_GROUP_INVENTORY_ENTRIES = 64
 
 
 def _u32(value: Any) -> int | None:
@@ -49,6 +51,23 @@ def _exact_material_entry_matches(group: Any, material_name: str) -> list[dict[s
     return matches
 
 
+def _group_entries(group: Any) -> list[dict[str, Any]]:
+    if not isinstance(group, dict):
+        return []
+    return [entry for entry in (group.get("entries") or []) if isinstance(entry, dict)]
+
+
+def _entry_path_kind(value: Any) -> str:
+    path = str(value or "").strip().replace("\\", "/").casefold()
+    if not path:
+        return "missing"
+    if path.endswith(".swatchbin"):
+        return "swatchbin"
+    if path.endswith(".materialbin"):
+        return "materialbin"
+    return "other"
+
+
 def _preview_rgb(value: Any) -> list[float] | None:
     if not isinstance(value, (list, tuple)) or len(value) < 3:
         return None
@@ -64,6 +83,47 @@ def _preview_rgb(value: Any) -> list[float] | None:
             return None
         output.append(number)
     return output
+
+
+def _group_inventory(group: Any) -> dict[str, Any] | None:
+    if not isinstance(group, dict):
+        return None
+    try:
+        group_index = int(group.get("index"))
+    except (TypeError, ValueError):
+        group_index = None
+    entries = _group_entries(group)
+    rows: list[dict[str, Any]] = []
+    for entry in entries[:_MAX_GROUP_INVENTORY_ENTRIES]:
+        try:
+            entry_index = int(entry.get("index"))
+        except (TypeError, ValueError):
+            entry_index = None
+        names = entry.get("material_names") or []
+        material_names = [
+            str(name)
+            for name in names
+            if isinstance(name, str) and name.strip()
+        ] if isinstance(names, (list, tuple)) else []
+        path = str(entry.get("path") or "").strip()
+        rows.append(
+            {
+                "index": entry_index,
+                "material_names": material_names,
+                "path": path or None,
+                "path_kind": _entry_path_kind(path),
+                "preview_color": _preview_rgb(entry.get("preview_color")),
+            }
+        )
+    return {
+        "group_index": group_index,
+        "entry_count": len(entries),
+        "entries_reported": len(rows),
+        "entries_truncated": len(entries) > len(rows),
+        "primary_group_preview_color": _preview_rgb(group.get("primary_group_preview_color")),
+        "secondary_group_preview_color": _preview_rgb(group.get("secondary_group_preview_color")),
+        "entries": rows,
+    }
 
 
 def _uv4_contract(
@@ -148,20 +208,18 @@ def build_manufacturer_overlay_diagnostics(
     paint_provenance: Any,
     manufacturer_colors: Any,
 ) -> dict[str, Any]:
-    """Diagnose the exact FH6 manufacturer swatch overlay boundary without rendering.
+    """Diagnose the FH6 manufacturer swatch overlay boundary without rendering.
 
-    P3D deliberately narrows the public ForzaTechStudio behavior. FTS may broaden
-    manufacturer targeting with material/path token matching; FH6 Assistant does
-    not copy that heuristic. A candidate exists only when the KFPS mesh is role
-    ``paint``, its exact unprefixed X16 material binding resolves to one unique
-    C_livery paint record, that record selects one manufacturer group, exactly one
-    entry in that group names the exact KFPS ``kfps_material_name``
-    (OrdinalIgnoreCase semantics), and the primitive exports a valid float VEC2
-    ``TEXCOORD_4`` accessor with the same vertex count as POSITION.
+    Exact entry material-name matching remains the primary contract. ForzaTechStudio
+    also treats ``carpaint`` and ``carpaint_secondary`` as built-in manufacturer
+    color materials. FH6 Assistant mirrors that built-in eligibility only when the
+    selected manufacturer group has exactly one entry, so there is no entry/path
+    ambiguity. Multi-entry groups remain fail-closed unless an exact material-name
+    match identifies one unique entry.
 
-    Entry Path is preserved only as provenance. Texture resolution, Durango detile,
-    swatch material semantics, UV4 texture sampling, tint composition, and actual
-    rendering remain disabled.
+    A candidate still requires an exact C_livery material binding, a resolved
+    manufacturer group/entry, and a valid native float VEC2 ``TEXCOORD_4`` accessor
+    whose vertex count matches POSITION. No UV coordinates are synthesized.
     """
     records, ambiguous_hashes, record_issues = _paint_record_index(paint_provenance)
     raw_records = (
@@ -183,7 +241,7 @@ def build_manufacturer_overlay_diagnostics(
         "rendering_applied": False,
         "game_data_modified": False,
         "binding_format": "kfps_material_binding_hash_x16_unprefixed",
-        "material_match_contract": "exact_kfps_material_name_to_fh6_v2_entry_material_names_case_insensitive",
+        "material_match_contract": "exact_entry_material_name_or_fts_builtin_unique_group_entry",
         "uv_contract": "exact_kfps_texcoord_4_float_vec2_position_count_match",
         "global_custom_primary_active": global_custom_primary_active,
         "manufacturer_global_gate": (
@@ -199,13 +257,16 @@ def build_manufacturer_overlay_diagnostics(
         "ambiguous_entry_count": 0,
         "missing_material_name_count": 0,
         "unmatched_entry_count": 0,
+        "builtin_unique_entry_match_count": 0,
         "missing_or_invalid_uv4_count": 0,
+        "resolved_group_inventory": {},
         "candidates": [],
         "issues": list(record_issues),
         "interpretation_boundary": (
-            "Paint P3D inventories exact manufacturer overlay candidates only. It does not resolve/decode entry Path "
-            "swatchbins, infer material targets from mesh names or path substrings, sample UV4, apply manufacturer "
-            "tint/alpha, emulate finish shaders, or alter FH6 game/save data."
+            "Paint P3D inventories manufacturer overlay candidates without rendering. Exact entry material-name "
+            "matching is preferred; FTS built-in carpaint eligibility is used only when the resolved group has one "
+            "unambiguous entry. It does not infer entries from mesh/path substrings, synthesize UV4, sample UV4, "
+            "apply manufacturer tint/alpha, emulate finish shaders, or alter FH6 game/save data."
         ),
     }
     if not isinstance(paint_provenance, dict) or paint_provenance.get("status") != "paint_descriptor_parsed":
@@ -259,6 +320,7 @@ def build_manufacturer_overlay_diagnostics(
                 "role": "paint",
                 "material_hash": f"0x{binding_hash:016X}" if binding_hash is not None else None,
                 "material_name": material_name or None,
+                "material_match_mode": None,
                 "selector": None,
                 "group_index": None,
                 "entry_index": None,
@@ -313,6 +375,10 @@ def build_manufacturer_overlay_diagnostics(
                     row["group_index"] = int(group.get("index"))
                 except (TypeError, ValueError):
                     row["group_index"] = None
+                inventory = _group_inventory(group)
+                if inventory is not None:
+                    key = str(row["group_index"] if row["group_index"] is not None else selector)
+                    report["resolved_group_inventory"].setdefault(key, inventory)
 
             if not material_name:
                 report["missing_material_name_count"] += 1
@@ -321,17 +387,28 @@ def build_manufacturer_overlay_diagnostics(
                 continue
 
             matches = _exact_material_entry_matches(group, material_name)
-            if not matches:
-                report["unmatched_entry_count"] += 1
-                row["status"] = "manufacturer_entry_not_targeted_by_exact_material_name"
-                rows.append(row)
-                continue
-            if len(matches) != 1:
+            if len(matches) == 1:
+                row["material_match_mode"] = "exact_entry_material_name"
+            elif len(matches) > 1:
                 report["ambiguous_entry_count"] += 1
                 row["status"] = "manufacturer_entry_material_name_ambiguous"
                 row["matching_entry_indices"] = [entry.get("index") for entry in matches]
                 rows.append(row)
                 continue
+            else:
+                group_entries = _group_entries(group)
+                if (
+                    material_name.casefold() in _BUILTIN_MANUFACTURER_MATERIAL_NAMES
+                    and len(group_entries) == 1
+                ):
+                    matches = [group_entries[0]]
+                    row["material_match_mode"] = "fts_builtin_carpaint_unique_group_entry"
+                    report["builtin_unique_entry_match_count"] += 1
+                else:
+                    report["unmatched_entry_count"] += 1
+                    row["status"] = "manufacturer_entry_not_targeted_by_exact_material_name"
+                    rows.append(row)
+                    continue
 
             entry = matches[0]
             try:
