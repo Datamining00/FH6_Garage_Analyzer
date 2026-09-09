@@ -1,9 +1,14 @@
-"""Production viewer bridge for verified native FH6 base-colour Texture2D maps.
+"""Production viewer bridge for verified native FH6 Texture2D maps.
 
-This first rendering stage intentionally enables only standard non-car-paint
-base-colour textures.  It preserves the existing livery/paint albedo authority,
-uses exact TEXCOORD_0 + material tiling provenance, uploads DDS payloads without
-CPU reinterpretation, and fails closed per texture/mesh when evidence is absent.
+The rendering bridge enables two evidence-closed stages:
+* standard non-car-paint base-colour textures;
+* standard non-car-paint single-channel roughness/gloss textures.
+
+It preserves the existing livery/paint albedo authority, uses exact TEXCOORD_0
+plus material-wide tiling provenance, uploads DDS payloads without CPU
+reinterpretation, and fails closed per texture/mesh when evidence is absent.
+Packed RoughMetalAO, AO, normal, flake and clear-coat maps remain deferred until
+their channel/tangent contracts are explicit.
 """
 
 from __future__ import annotations
@@ -26,9 +31,13 @@ from .native_material_render_plan import (
 )
 
 _PATCH_MARKER = "_fh6_native_base_color_texture_rendering_patched"
-_TEXTURE_UNIT = 4
+_BASE_TEXTURE_UNIT = 4
+_SURFACE_TEXTURE_UNIT = 5
 _VERTEX_LOCATION = 12
 _BASE_SEMANTICS = {"base_color", "base_color_alpha"}
+_SURFACE_SEMANTICS = {"roughness", "gloss"}
+_BASE_COLOR_DXGI = {71, 72, 74, 75, 77, 78, 98, 99, 28, 29, 87}
+_SINGLE_CHANNEL_SURFACE_DXGI = {80, 61}  # BC4_UNORM, R8_UNORM
 
 
 @dataclass(frozen=True)
@@ -39,6 +48,8 @@ class NativeBaseColorDrawRange:
     dds_path: str | None
     uv_tiling_u: float
     uv_tiling_v: float
+    surface_dds_path: str | None = None
+    surface_mode: str | None = None
 
 
 def upgrade_native_texture_vertex_shader(vertex: str) -> str:
@@ -76,6 +87,12 @@ def upgrade_native_texture_fragment_shader(fragment: str) -> str:
                     : pow(clamp(vColor, 0.0, 1.0), vec3(2.2));
                 albedo = mix(albedo, decalLinear, decal.a);
 """
+    pbr_call_marker = """                vec3 shaded = fh6ShadeMaterial(
+                    albedo,
+                    N,
+                    V,
+                    vMaterialParams,
+"""
     if input_marker not in fragment or uniform_marker not in fragment or albedo_marker not in fragment:
         return fragment
     upgraded = fragment.replace(
@@ -88,7 +105,11 @@ def upgrade_native_texture_fragment_shader(fragment: str) -> str:
         uniform_marker
         + "            uniform bool uNativeBaseColorEnabled;\n"
         + "            uniform sampler2D uNativeBaseColor;\n"
-        + "            uniform vec2 uNativeBaseColorTiling;\n",
+        + "            uniform vec2 uNativeBaseColorTiling;\n"
+        + "            uniform bool uNativeSurfaceRoughnessEnabled;\n"
+        + "            uniform sampler2D uNativeSurfaceRoughness;\n"
+        + "            uniform vec2 uNativeSurfaceRoughnessTiling;\n"
+        + "            uniform int uNativeSurfaceRoughnessMode;\n",
         1,
     )
     replacement = """                vec3 albedo = vMaterialAux.y >= 0.0
@@ -99,7 +120,26 @@ def upgrade_native_texture_fragment_shader(fragment: str) -> str:
                 }
                 albedo = mix(albedo, decalLinear, decal.a);
 """
-    return upgraded.replace(albedo_marker, replacement, 1)
+    upgraded = upgraded.replace(albedo_marker, replacement, 1)
+    if pbr_call_marker in upgraded:
+        surface_replacement = """                vec4 effectiveMaterialParams = vMaterialParams;
+                if (uNativeSurfaceRoughnessEnabled) {
+                    float nativeSurfaceValue = texture(
+                        uNativeSurfaceRoughness,
+                        vMaterialUV * uNativeSurfaceRoughnessTiling).r;
+                    float nativeRoughness = uNativeSurfaceRoughnessMode == 2
+                        ? 1.0 - nativeSurfaceValue
+                        : nativeSurfaceValue;
+                    effectiveMaterialParams.y = clamp(nativeRoughness, 0.025, 1.0);
+                }
+                vec3 shaded = fh6ShadeMaterial(
+                    albedo,
+                    N,
+                    V,
+                    effectiveMaterialParams,
+"""
+        upgraded = upgraded.replace(pbr_call_marker, surface_replacement, 1)
+    return upgraded
 
 
 def build_native_material_uv0_stream(glb_path: str | Path, scene_data: Any) -> np.ndarray:
@@ -143,7 +183,9 @@ def build_native_material_uv0_stream(glb_path: str | Path, scene_data: Any) -> n
     return stream
 
 
-def _base_selection_by_mesh(plan: NativeMaterialRenderPlan) -> tuple[dict[int, NativeMaterialTextureSelection], dict[int, str]]:
+def _base_selection_by_mesh(
+    plan: NativeMaterialRenderPlan,
+) -> tuple[dict[int, NativeMaterialTextureSelection], dict[int, str]]:
     grouped: dict[int, list[NativeMaterialTextureSelection]] = {}
     for selection in plan.selections:
         if selection.semantic in _BASE_SEMANTICS:
@@ -151,13 +193,49 @@ def _base_selection_by_mesh(plan: NativeMaterialRenderPlan) -> tuple[dict[int, N
     resolved: dict[int, NativeMaterialTextureSelection] = {}
     issues: dict[int, str] = {}
     for mesh_index, values in grouped.items():
+        supported = [value for value in values if int(value.dxgi_format) in _BASE_COLOR_DXGI]
+        if len(supported) != len(values):
+            issues[mesh_index] = "base-color DDS format is not enabled for RGB material sampling"
         by_path: dict[str, NativeMaterialTextureSelection] = {}
-        for value in values:
+        for value in supported:
             by_path.setdefault(str(Path(value.dds_path).expanduser().resolve()).casefold(), value)
         if len(by_path) == 1:
             resolved[mesh_index] = next(iter(by_path.values()))
-        elif by_path:
+        elif len(by_path) > 1:
             issues[mesh_index] = "multiple base-color semantics resolve to different DDS derivatives"
+    return resolved, issues
+
+
+def _surface_selection_by_mesh(
+    plan: NativeMaterialRenderPlan,
+) -> tuple[dict[int, NativeMaterialTextureSelection], dict[int, str]]:
+    grouped: dict[int, list[NativeMaterialTextureSelection]] = {}
+    issues: dict[int, str] = {}
+    for selection in plan.selections:
+        if selection.semantic not in _SURFACE_SEMANTICS:
+            continue
+        mesh_index = int(selection.mesh_index)
+        if str(selection.mesh_role or "").casefold() == "paint":
+            issues[mesh_index] = "paint roughness/gloss texture is deferred until the car-paint map contract is explicit"
+            continue
+        if int(selection.dxgi_format) not in _SINGLE_CHANNEL_SURFACE_DXGI or bool(selection.is_srgb):
+            issues[mesh_index] = "roughness/gloss texture is not an unsigned linear single-channel BC4/R8 DDS"
+            continue
+        grouped.setdefault(mesh_index, []).append(selection)
+
+    resolved: dict[int, NativeMaterialTextureSelection] = {}
+    for mesh_index, values in grouped.items():
+        unique: dict[tuple[str, str], NativeMaterialTextureSelection] = {}
+        for value in values:
+            key = (
+                str(value.semantic),
+                str(Path(value.dds_path).expanduser().resolve()).casefold(),
+            )
+            unique.setdefault(key, value)
+        if len(unique) == 1:
+            resolved[mesh_index] = next(iter(unique.values()))
+        elif len(unique) > 1:
+            issues[mesh_index] = "multiple roughness/gloss bindings are ambiguous for one mesh"
     return resolved, issues
 
 
@@ -165,24 +243,40 @@ def build_native_base_color_draw_ranges(
     scene_data: Any,
     plan: NativeMaterialRenderPlan,
 ) -> tuple[tuple[NativeBaseColorDrawRange, ...], tuple[str, ...]]:
-    selections, selection_issues = _base_selection_by_mesh(plan)
+    base_selections, base_issues = _base_selection_by_mesh(plan)
+    surface_selections, surface_issues = _surface_selection_by_mesh(plan)
     ranges: list[NativeBaseColorDrawRange] = []
-    issues = [f"mesh {mesh}: {detail}" for mesh, detail in sorted(selection_issues.items())]
+    merged_issues = dict(base_issues)
+    for mesh_index, detail in surface_issues.items():
+        if mesh_index in merged_issues:
+            merged_issues[mesh_index] = merged_issues[mesh_index] + "; " + detail
+        else:
+            merged_issues[mesh_index] = detail
+    issues = [f"mesh {mesh}: {detail}" for mesh, detail in sorted(merged_issues.items())]
     first_index = 0
     for diagnostic in tuple(getattr(scene_data, "primitive_diagnostics", ()) or ()):
         index_count = int(diagnostic.get("triangle_count", 0)) * 3
         if index_count < 0:
             raise ValueError("native material draw range has a negative index count")
         mesh_index = int(diagnostic.get("mesh_index", -1))
-        selection = selections.get(mesh_index)
-        if selection is None:
+        base = base_selections.get(mesh_index)
+        surface = surface_selections.get(mesh_index)
+        if base is None:
             dds_path = None
             tiling_u = 1.0
             tiling_v = 1.0
         else:
-            dds_path = str(Path(selection.dds_path).expanduser().resolve())
-            tiling_u = float(selection.uv_tiling_u)
-            tiling_v = float(selection.uv_tiling_v)
+            dds_path = str(Path(base.dds_path).expanduser().resolve())
+            tiling_u = float(base.uv_tiling_u)
+            tiling_v = float(base.uv_tiling_v)
+        surface_path = (
+            str(Path(surface.dds_path).expanduser().resolve()) if surface is not None else None
+        )
+        # FTS applies one material-wide tiling to all standard material maps. If
+        # there is no base map, preserve the surface selection's same contract.
+        if base is None and surface is not None:
+            tiling_u = float(surface.uv_tiling_u)
+            tiling_v = float(surface.uv_tiling_v)
         ranges.append(
             NativeBaseColorDrawRange(
                 first_index=first_index,
@@ -191,6 +285,8 @@ def build_native_base_color_draw_ranges(
                 dds_path=dds_path,
                 uv_tiling_u=tiling_u,
                 uv_tiling_v=tiling_v,
+                surface_dds_path=surface_path,
+                surface_mode=str(surface.semantic) if surface is not None else None,
             )
         )
         first_index += index_count
@@ -248,7 +344,7 @@ def _copy_native_texture_sidecar(source_glb: str | Path, selected_glb: str | Pat
 
 
 def install_native_material_texture_patch() -> bool:
-    """Install the first production native Texture2D rendering stage exactly once."""
+    """Install the verified production native Texture2D rendering stages exactly once."""
     from . import glb_viewer, tire_preview_integration
     from .material_appearance_patch import upgrade_fragment_shader, upgrade_vertex_shader
 
@@ -264,8 +360,6 @@ def install_native_material_texture_patch() -> bool:
     original_tire_apply = tire_preview_integration.try_apply_stock_native_tire_preview
 
     def _make_program_with_native_texture(cls, vertex: str, fragment: str) -> int:
-        # Normalize to the PBR shader first. The existing material wrapper is
-        # idempotent, so delegating through it afterward remains safe.
         vertex = upgrade_vertex_shader(vertex)
         fragment = upgrade_fragment_shader(fragment)
         vertex = upgrade_native_texture_vertex_shader(vertex)
@@ -311,17 +405,20 @@ def install_native_material_texture_patch() -> bool:
 
         texture_ids: dict[str, int] = {}
         errors: list[str] = []
+        paths: list[str] = []
         for draw_range in tuple(getattr(self, "_fh6_native_base_draw_ranges", ()) or ()):
-            if not draw_range.dds_path or draw_range.dds_path in texture_ids:
-                continue
+            for candidate in (draw_range.dds_path, draw_range.surface_dds_path):
+                if candidate and candidate not in paths:
+                    paths.append(candidate)
+        for dds_path in paths:
             try:
-                texture = parse_native_dds(draw_range.dds_path)
-                texture_ids[draw_range.dds_path] = upload_native_dds_2d(GL, texture)
-            except (OSError, NativeMaterialGlError, Exception) as exc:
+                texture = parse_native_dds(dds_path)
+                texture_ids[dds_path] = upload_native_dds_2d(GL, texture)
+            except Exception as exc:
                 # Keep geometry/PBR/livery rendering alive if this GPU cannot
                 # sample one native compression family.
-                texture_ids[draw_range.dds_path] = 0
-                errors.append(f"{Path(draw_range.dds_path).name}: {type(exc).__name__}: {exc}")
+                texture_ids[dds_path] = 0
+                errors.append(f"{Path(dds_path).name}: {type(exc).__name__}: {exc}")
         self._fh6_native_texture_ids = texture_ids
         if errors:
             self._fh6_native_texture_status = "partial_gpu_upload"
@@ -343,12 +440,27 @@ def install_native_material_texture_patch() -> bool:
             original_paint(self)
             return
 
-        enabled_loc = GL.glGetUniformLocation(self._program, "uNativeBaseColorEnabled")
-        sampler_loc = GL.glGetUniformLocation(self._program, "uNativeBaseColor")
-        tiling_loc = GL.glGetUniformLocation(self._program, "uNativeBaseColorTiling")
-        if min(int(enabled_loc), int(sampler_loc), int(tiling_loc)) < 0:
+        base_enabled_loc = GL.glGetUniformLocation(self._program, "uNativeBaseColorEnabled")
+        base_sampler_loc = GL.glGetUniformLocation(self._program, "uNativeBaseColor")
+        base_tiling_loc = GL.glGetUniformLocation(self._program, "uNativeBaseColorTiling")
+        if min(int(base_enabled_loc), int(base_sampler_loc), int(base_tiling_loc)) < 0:
             original_paint(self)
             return
+
+        surface_enabled_loc = GL.glGetUniformLocation(
+            self._program, "uNativeSurfaceRoughnessEnabled"
+        )
+        surface_sampler_loc = GL.glGetUniformLocation(self._program, "uNativeSurfaceRoughness")
+        surface_tiling_loc = GL.glGetUniformLocation(
+            self._program, "uNativeSurfaceRoughnessTiling"
+        )
+        surface_mode_loc = GL.glGetUniformLocation(self._program, "uNativeSurfaceRoughnessMode")
+        surface_uniforms_ready = min(
+            int(surface_enabled_loc),
+            int(surface_sampler_loc),
+            int(surface_tiling_loc),
+            int(surface_mode_loc),
+        ) >= 0
 
         real_draw = GL.glDrawElements
         intercepted = False
@@ -365,20 +477,41 @@ def install_native_material_texture_patch() -> bool:
                 return real_draw(mode, count, index_type, pointer)
             intercepted = True
             for item in ranges:
-                texture_id = int(texture_ids.get(item.dds_path or "", 0) or 0)
-                GL.glUniform1i(enabled_loc, 1 if texture_id else 0)
-                GL.glUniform2f(tiling_loc, float(item.uv_tiling_u), float(item.uv_tiling_v))
-                if texture_id:
-                    GL.glActiveTexture(GL.GL_TEXTURE0 + _TEXTURE_UNIT)
-                    GL.glBindTexture(GL.GL_TEXTURE_2D, texture_id)
-                    GL.glUniform1i(sampler_loc, _TEXTURE_UNIT)
+                base_texture_id = int(texture_ids.get(item.dds_path or "", 0) or 0)
+                GL.glUniform1i(base_enabled_loc, 1 if base_texture_id else 0)
+                GL.glUniform2f(
+                    base_tiling_loc, float(item.uv_tiling_u), float(item.uv_tiling_v)
+                )
+                if base_texture_id:
+                    GL.glActiveTexture(GL.GL_TEXTURE0 + _BASE_TEXTURE_UNIT)
+                    GL.glBindTexture(GL.GL_TEXTURE_2D, base_texture_id)
+                    GL.glUniform1i(base_sampler_loc, _BASE_TEXTURE_UNIT)
+
+                if surface_uniforms_ready:
+                    surface_texture_id = int(
+                        texture_ids.get(item.surface_dds_path or "", 0) or 0
+                    )
+                    surface_mode = 1 if item.surface_mode == "roughness" else 2 if item.surface_mode == "gloss" else 0
+                    surface_enabled = bool(surface_texture_id and surface_mode)
+                    GL.glUniform1i(surface_enabled_loc, 1 if surface_enabled else 0)
+                    GL.glUniform2f(
+                        surface_tiling_loc, float(item.uv_tiling_u), float(item.uv_tiling_v)
+                    )
+                    GL.glUniform1i(surface_mode_loc, surface_mode)
+                    if surface_enabled:
+                        GL.glActiveTexture(GL.GL_TEXTURE0 + _SURFACE_TEXTURE_UNIT)
+                        GL.glBindTexture(GL.GL_TEXTURE_2D, surface_texture_id)
+                        GL.glUniform1i(surface_sampler_loc, _SURFACE_TEXTURE_UNIT)
+
                 real_draw(
                     mode,
                     int(item.index_count),
                     index_type,
                     GL.GLvoidp(int(item.first_index) * 4),
                 )
-            GL.glUniform1i(enabled_loc, 0)
+            GL.glUniform1i(base_enabled_loc, 0)
+            if surface_uniforms_ready:
+                GL.glUniform1i(surface_enabled_loc, 0)
             return None
 
         GL.glDrawElements = _draw_ranges
@@ -387,8 +520,9 @@ def install_native_material_texture_patch() -> bool:
         finally:
             GL.glDrawElements = real_draw
             try:
-                GL.glActiveTexture(GL.GL_TEXTURE0 + _TEXTURE_UNIT)
-                GL.glBindTexture(GL.GL_TEXTURE_2D, 0)
+                for unit in (_BASE_TEXTURE_UNIT, _SURFACE_TEXTURE_UNIT):
+                    GL.glActiveTexture(GL.GL_TEXTURE0 + unit)
+                    GL.glBindTexture(GL.GL_TEXTURE_2D, 0)
                 GL.glActiveTexture(GL.GL_TEXTURE0)
             except Exception:
                 pass
