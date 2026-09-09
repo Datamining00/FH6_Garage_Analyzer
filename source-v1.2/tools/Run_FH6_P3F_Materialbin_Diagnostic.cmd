@@ -10,6 +10,38 @@ if not exist "%APP%" (
   exit /b 2
 )
 
+if defined LOCALAPPDATA (
+  set "OUTDIR=%LOCALAPPDATA%\FH6 Assistant\Diagnostics"
+) else (
+  set "OUTDIR=%TEMP%\FH6 Assistant\Diagnostics"
+)
+set "CACHE=%OUTDIR%\P3FCache"
+if not exist "%OUTDIR%" mkdir "%OUTDIR%" >nul 2>&1
+if not exist "%CACHE%" mkdir "%CACHE%" >nul 2>&1
+set "SELFCHECK=%OUTDIR%\p3f_packaged_self_check.json"
+
+start "" /wait "%APP%" --p3f-materialbin-diagnostic --self-check --output "%SELFCHECK%"
+set "RC=%ERRORLEVEL%"
+if not "%RC%"=="0" (
+  echo ERROR: Packaged Paint P3F self-check failed with exit code %RC%.
+  if exist "%SELFCHECK%" echo Self-check: %SELFCHECK%
+  echo The diagnostic will not inspect FH6 inputs with an unavailable or unverified helper.
+  pause
+  exit /b %RC%
+)
+if not exist "%SELFCHECK%" (
+  echo ERROR: Packaged Paint P3F self-check produced no JSON evidence.
+  pause
+  exit /b 3
+)
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$r = Get-Content -LiteralPath $env:SELFCHECK -Raw | ConvertFrom-Json; if ($r.status -ne 'packaged_p3f_self_check_passed' -or $r.validation_status -ne 'packaged_contract_ready') { exit 4 }"
+if errorlevel 1 (
+  echo ERROR: Packaged Paint P3F self-check JSON did not report a ready contract.
+  pause
+  exit /b 4
+)
+
 set "GLB=%~1"
 if not defined GLB call :pick_glb
 if not defined GLB exit /b 1
@@ -40,14 +72,6 @@ if not exist "%VEHICLE%" (
   exit /b 2
 )
 
-if defined LOCALAPPDATA (
-  set "OUTDIR=%LOCALAPPDATA%\FH6 Assistant\Diagnostics"
-) else (
-  set "OUTDIR=%TEMP%\FH6 Assistant\Diagnostics"
-)
-set "CACHE=%OUTDIR%\P3FCache"
-if not exist "%OUTDIR%" mkdir "%OUTDIR%" >nul 2>&1
-if not exist "%CACHE%" mkdir "%CACHE%" >nul 2>&1
 for %%F in ("%GLB%") do set "STEM=%%~nF"
 set "OUTPUT=%OUTDIR%\%STEM%_manufacturer_materialbin_p3f.json"
 
