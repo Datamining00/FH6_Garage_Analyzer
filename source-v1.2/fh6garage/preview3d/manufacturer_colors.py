@@ -9,7 +9,7 @@ from typing import Any
 
 
 MANUFACTURER_COLORS_FORMAT = "fh6_manufacturer_colors_v1"
-MANUFACTURER_COLORS_REVISION = 1
+MANUFACTURER_COLORS_REVISION = 2
 BUNDLE_TAG = 0x47727562  # "Grub"
 MANUFACTURER_COLORS_BLOB_TAG = 0x4D4E434C
 BLOB_INFO_SIZE = 0x18
@@ -276,9 +276,9 @@ def parse_manufacturer_colors_bundle(raw: bytes) -> dict[str, Any]:
         "groups": groups,
         "blob_trailing": _trailing_summary(trailing),
         "interpretation_boundary": (
-            "Paint P3A preserves the FH6 manufacturer palette structure and selector-to-group indexing only. "
-            "Material-specific entry selection, UV4 swatch overlays, secondary/two-tone application, and finish "
-            "shader semantics are not rendered at this stage."
+            "Paint P3A preserves every FH6 manufacturer palette group/entry. Paint P3B may consume only a "
+            "resolved group's 27-byte trailer primary RGB as linear paint color; material-specific entry paths, "
+            "UV4 overlays, secondary/two-tone mixing, flake, and finish shader semantics remain deferred."
         ),
     }
 
@@ -302,6 +302,91 @@ def resolve_manufacturer_selector(report: Any, selector: Any) -> dict[str, Any]:
     if not isinstance(group, dict) or not (group.get("entries") or []):
         return {"status": "manufacturer_selector_empty_group", "selector": value, "group": group}
     return {"status": "manufacturer_group_resolved", "selector": value, "group": group}
+
+
+def _normalized_linear_rgb(value: Any) -> list[float] | None:
+    if not isinstance(value, (list, tuple)) or len(value) < 3:
+        return None
+    output: list[float] = []
+    for component in value[:3]:
+        if isinstance(component, bool):
+            return None
+        try:
+            number = float(component)
+        except (TypeError, ValueError):
+            return None
+        if not math.isfinite(number):
+            return None
+        # ForzaLiveryStudio clamps the FH6 group trailer values to [0, 1] before
+        # converting them from linear to display RGB. Our PBR aux stream is already
+        # linear, so the equivalent contract is to clamp and retain the linear value.
+        output.append(max(0.0, min(1.0, number)))
+    return output
+
+
+def resolve_manufacturer_group_linear_paint(report: Any, selector: Any) -> dict[str, Any]:
+    """Resolve the safe P3B subset of one FH6 manufacturer paint group.
+
+    Cross-project evidence is intentionally narrow here. ForzaLiveryStudio treats
+    a non-FFFFFFFF C_livery manufacturer selector as a selected paint independently
+    of the custom primary-color enable bit, indexes ManufacturerColors by that
+    selector, overwrites its group primary from the FH6 27-byte trailer, and
+    converts that primary from linear to display RGB for its display-space shader.
+    FH6 Assistant's material aux stream is linear, so P3B can consume the trailer
+    primary directly after the same [0, 1] clamp. Secondary mixing and all entry
+    Path/material semantics remain deferred.
+    """
+    resolved = resolve_manufacturer_selector(report, selector)
+    result: dict[str, Any] = {
+        "status": resolved.get("status"),
+        "selector": resolved.get("selector"),
+        "group_index": None,
+        "primary_linear_rgb": None,
+        "secondary_enabled": False,
+        "secondary_linear_rgb": None,
+        "entry_count": 0,
+        "rendering_contract": "fh6_group_trailer_primary_linear_only",
+    }
+    if resolved.get("status") != "manufacturer_group_resolved":
+        return result
+
+    group = resolved.get("group")
+    if not isinstance(group, dict):
+        result["status"] = "manufacturer_group_invalid"
+        return result
+    try:
+        result["group_index"] = int(group.get("index"))
+        result["entry_count"] = int(group.get("entry_count", len(group.get("entries") or [])))
+    except (TypeError, ValueError):
+        result["status"] = "manufacturer_group_invalid"
+        return result
+
+    # Be stricter than the reference viewer: if the FH6 trailer explicitly marks
+    # the primary preview absent, do not consume stale bytes as paint color.
+    if not bool(group.get("primary_group_preview_present")):
+        result["status"] = "manufacturer_primary_trailer_absent"
+        return result
+
+    primary = _normalized_linear_rgb(group.get("primary_group_preview_color"))
+    if primary is None:
+        result["status"] = "manufacturer_primary_trailer_invalid"
+        return result
+    result["primary_linear_rgb"] = primary
+
+    if bool(group.get("secondary_group_preview_present")):
+        result["secondary_enabled"] = True
+        result["secondary_linear_rgb"] = _normalized_linear_rgb(group.get("secondary_group_preview_color"))
+        if result["secondary_linear_rgb"] is None:
+            result["secondary_enabled"] = False
+            result["secondary_linear_rgb"] = None
+            result["secondary_status"] = "manufacturer_secondary_trailer_invalid_deferred"
+        else:
+            result["secondary_status"] = "manufacturer_secondary_trailer_preserved_deferred"
+    else:
+        result["secondary_status"] = "manufacturer_secondary_not_present"
+
+    result["status"] = "manufacturer_primary_linear_resolved"
+    return result
 
 
 def diagnose_manufacturer_colors_archive(archive: str | Path) -> dict[str, Any]:
