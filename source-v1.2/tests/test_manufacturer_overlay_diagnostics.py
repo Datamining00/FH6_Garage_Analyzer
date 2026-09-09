@@ -122,11 +122,13 @@ class ManufacturerOverlayDiagnosticsTests(unittest.TestCase):
             )
 
             self.assertEqual(report["status"], "manufacturer_overlay_candidates_diagnosed")
+            self.assertEqual(report["revision"], 2)
             self.assertEqual(report["exact_candidate_count"], 1)
             self.assertFalse(report["rendering_enabled"])
             self.assertFalse(report["rendering_applied"])
             row = report["candidates"][0]
             self.assertEqual(row["status"], "exact_manufacturer_overlay_candidate_diagnosed")
+            self.assertEqual(row["material_match_mode"], "exact_entry_material_name")
             self.assertEqual(row["entry_index"], 0)
             self.assertEqual(row["entry_path"], "factory.swatchbin")
             self.assertEqual(row["uv4"]["status"], "uv4_exact_kfps_accessor")
@@ -136,15 +138,57 @@ class ManufacturerOverlayDiagnosticsTests(unittest.TestCase):
     def test_material_name_matching_does_not_use_substring_or_path_guessing(self):
         with tempfile.TemporaryDirectory() as temp:
             glb = Path(temp) / "car.glb"
-            _write_glb(glb, material_name="carpaint_secondary", uv4="valid")
+            _write_glb(glb, material_name="paint_secondary_custom", uv4="valid")
             report = build_manufacturer_overlay_diagnostics(
                 glb,
                 _paint([_record(BODY)]),
-                _palette([_entry(0, names=("carpaint",), path="carpaint_secondary.swatchbin")]),
+                _palette([_entry(0, names=("carpaint",), path="paint_secondary_custom.swatchbin")]),
             )
 
             self.assertEqual(report["exact_candidate_count"], 0)
             self.assertEqual(report["unmatched_entry_count"], 1)
+            self.assertEqual(
+                report["candidates"][0]["status"],
+                "manufacturer_entry_not_targeted_by_exact_material_name",
+            )
+
+    def test_fts_builtin_carpaint_can_select_only_one_unambiguous_group_entry(self):
+        with tempfile.TemporaryDirectory() as temp:
+            glb = Path(temp) / "car.glb"
+            _write_glb(glb, material_name="carPaint", uv4="valid")
+            report = build_manufacturer_overlay_diagnostics(
+                glb,
+                _paint([_record(BODY)]),
+                _palette([_entry(7, names=("body_factory",), path="factory.materialbin")]),
+            )
+
+            self.assertEqual(report["exact_candidate_count"], 0)
+            self.assertEqual(report["builtin_unique_entry_match_count"], 1)
+            row = report["candidates"][0]
+            self.assertEqual(row["material_match_mode"], "fts_builtin_carpaint_unique_group_entry")
+            self.assertEqual(row["entry_index"], 7)
+            self.assertEqual(row["entry_path"], "factory.materialbin")
+            self.assertEqual(row["status"], "manufacturer_entry_path_not_swatchbin")
+            inventory = report["resolved_group_inventory"]["0"]
+            self.assertEqual(inventory["entry_count"], 1)
+            self.assertEqual(inventory["entries"][0]["path_kind"], "materialbin")
+
+    def test_fts_builtin_carpaint_stays_fail_closed_for_multi_entry_group_without_exact_match(self):
+        with tempfile.TemporaryDirectory() as temp:
+            glb = Path(temp) / "car.glb"
+            _write_glb(glb, material_name="carpaint", uv4="valid")
+            report = build_manufacturer_overlay_diagnostics(
+                glb,
+                _paint([_record(BODY)]),
+                _palette([
+                    _entry(0, names=("body_a",), path="a.materialbin"),
+                    _entry(1, names=("body_b",), path="b.materialbin"),
+                ]),
+            )
+
+            self.assertEqual(report["builtin_unique_entry_match_count"], 0)
+            self.assertEqual(report["unmatched_entry_count"], 1)
+            self.assertEqual(report["resolved_group_inventory"]["0"]["entry_count"], 2)
             self.assertEqual(
                 report["candidates"][0]["status"],
                 "manufacturer_entry_not_targeted_by_exact_material_name",
