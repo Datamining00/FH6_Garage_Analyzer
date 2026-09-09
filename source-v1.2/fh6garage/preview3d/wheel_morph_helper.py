@@ -9,8 +9,8 @@ import sys
 # material UV-tiling provenance, and the TXCB/TXCH native swatchbin-to-DDS
 # decoder consumed by the 3D viewer pipeline.
 WHEEL_MORPH_HELPER_FILENAME = "Kfps.ChassisConverter.WheelMorph.exe"
-WHEEL_MORPH_HELPER_SHA256 = "44125004933816e31ed67f8652235f28c5013b46c6bc60f77bccdbc49568108c"
-WHEEL_MORPH_HELPER_REVISION = "kfps_6f53ca3_w3_native_material_texture_uv_v10"
+WHEEL_MORPH_HELPER_SHA256 = "bb2ab7b0344fd008968b0dacb74e7698e32c011890cd72f2ea0e9d274bbb05d2"
+WHEEL_MORPH_HELPER_REVISION = "kfps_6f53ca3_w3_native_material_texture_uv_complete_v11"
 
 
 class WheelMorphHelperError(RuntimeError):
