@@ -4,15 +4,17 @@ import hashlib
 import json
 import os
 import struct
+import subprocess
 import tempfile
 import zipfile
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Iterable
 
-NATIVE_MATERIAL_TEXTURE_RESOLUTION_REVISION = 1
+NATIVE_MATERIAL_TEXTURE_RESOLUTION_REVISION = 2
 _BUNDLE_TAG = 0x47727562  # Grub bundle tag used by .swatchbin
+_DDS_MAGIC = b"DDS "
 _JSON_CHUNK_TYPE = 0x4E4F534A
 
 
@@ -32,6 +34,17 @@ class NativeTexturePayload:
     payload_size: int | None = None
     cache_path: str | None = None
     detail: str | None = None
+    decode_status: str = "not_requested"
+    dds_path: str | None = None
+    dds_sha256: str | None = None
+    dds_size: int | None = None
+    width: int | None = None
+    height: int | None = None
+    depth: int | None = None
+    mip_levels: int | None = None
+    dxgi_format: int | None = None
+    dxgi_format_name: str | None = None
+    decoder_detail: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -41,11 +54,15 @@ class NativeTexturePayload:
 class NativeMaterialTextureReport:
     revision: int
     status: str
+    decode_status: str
     reference_count: int
     unique_reference_count: int
     resolved_count: int
     unresolved_count: int
     located_unreadable_count: int
+    decoded_count: int
+    decode_failed_count: int
+    decoder_unavailable_count: int
     manifest_path: str
     game_namespace_root: str | None
     textures: tuple[NativeTexturePayload, ...]
@@ -196,6 +213,10 @@ def _safe_loose_path(namespace_root: Path, relative_path: str) -> Path | None:
 
 def _valid_swatch_payload(payload: bytes) -> bool:
     return len(payload) >= 4 and struct.unpack_from("<I", payload, 0)[0] == _BUNDLE_TAG
+
+
+def _valid_dds_payload(payload: bytes) -> bool:
+    return len(payload) >= 148 and payload[:4] == _DDS_MAGIC
 
 
 def _read_zip_entry(
@@ -524,11 +545,201 @@ def resolve_native_texture_reference(
     )
 
 
+def _decoder_value(diagnostic: dict[str, Any], *names: str) -> Any:
+    for name in names:
+        if name in diagnostic:
+            return diagnostic[name]
+    lowered = {str(key).casefold(): value for key, value in diagnostic.items()}
+    for name in names:
+        key = name.casefold()
+        if key in lowered:
+            return lowered[key]
+    return None
+
+
+def _parse_decoder_diagnostic(stdout: str) -> dict[str, Any] | None:
+    text = str(stdout or "").strip()
+    if not text:
+        return None
+    try:
+        candidate = json.loads(text)
+    except json.JSONDecodeError:
+        candidate = None
+        first = text.find("{")
+        last = text.rfind("}")
+        if first >= 0 and last > first:
+            try:
+                candidate = json.loads(text[first : last + 1])
+            except json.JSONDecodeError:
+                candidate = None
+    return candidate if isinstance(candidate, dict) else None
+
+
+def _decode_resolved_payload(
+    item: NativeTexturePayload,
+    decoder_helper: Path | None,
+    cache_root: Path,
+) -> NativeTexturePayload:
+    if item.status != "resolved_payload" or not item.cache_path or not item.payload_sha256:
+        return item
+    if decoder_helper is None:
+        return replace(item, decode_status="decoder_unavailable")
+    try:
+        helper = decoder_helper.expanduser().resolve()
+    except OSError as exc:
+        return replace(
+            item,
+            decode_status="decoder_unavailable",
+            decoder_detail=f"Decoder path could not be resolved: {exc}",
+        )
+    if not helper.is_file():
+        return replace(
+            item,
+            decode_status="decoder_unavailable",
+            decoder_detail=f"Verified decoder helper does not exist: {helper}",
+        )
+
+    swatch = Path(item.cache_path).expanduser().resolve()
+    directory = cache_root / "native_material_textures"
+    directory.mkdir(parents=True, exist_ok=True)
+    dds = directory / f"{item.payload_sha256}.dds"
+
+    if dds.is_file():
+        try:
+            cached = dds.read_bytes()
+        except OSError:
+            cached = b""
+        if _valid_dds_payload(cached):
+            return replace(
+                item,
+                decode_status="decoded_dds_cached",
+                dds_path=str(dds),
+                dds_sha256=hashlib.sha256(cached).hexdigest(),
+                dds_size=len(cached),
+            )
+        try:
+            dds.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+    try:
+        completed = subprocess.run(
+            [str(helper), "--decode-swatchbin", str(swatch), str(dds)],
+            cwd=str(directory),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=120,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    except subprocess.TimeoutExpired:
+        return replace(
+            item,
+            decode_status="decode_failed",
+            decoder_detail="Native swatchbin decode exceeded the 120-second timeout.",
+        )
+    except OSError as exc:
+        return replace(
+            item,
+            decode_status="decode_failed",
+            decoder_detail=f"Could not start verified native texture decoder: {exc}",
+        )
+
+    if completed.returncode != 0:
+        try:
+            dds.unlink(missing_ok=True)
+        except OSError:
+            pass
+        details = (completed.stderr or completed.stdout or "Unknown decoder failure").strip()
+        return replace(
+            item,
+            decode_status="decode_failed",
+            decoder_detail=details[:2000],
+        )
+
+    diagnostic = _parse_decoder_diagnostic(completed.stdout)
+    if not dds.is_file():
+        return replace(
+            item,
+            decode_status="decode_failed",
+            decoder_detail="Native decoder reported success but no DDS derivative was created.",
+        )
+    try:
+        dds_bytes = dds.read_bytes()
+    except OSError as exc:
+        return replace(
+            item,
+            decode_status="decode_failed",
+            decoder_detail=f"Decoded DDS derivative could not be reopened: {exc}",
+        )
+    if not _valid_dds_payload(dds_bytes):
+        try:
+            dds.unlink(missing_ok=True)
+        except OSError:
+            pass
+        return replace(
+            item,
+            decode_status="decode_failed",
+            decoder_detail="Native decoder output is not a valid DDS DX10 container.",
+        )
+
+    actual_sha = hashlib.sha256(dds_bytes).hexdigest()
+    if diagnostic is not None:
+        reported_sha = _decoder_value(diagnostic, "ddsSha256", "DdsSha256")
+        if isinstance(reported_sha, str) and reported_sha and reported_sha.casefold() != actual_sha.casefold():
+            try:
+                dds.unlink(missing_ok=True)
+            except OSError:
+                pass
+            return replace(
+                item,
+                decode_status="decode_failed",
+                decoder_detail=(
+                    "Decoder DDS SHA-256 diagnostic does not match the derivative bytes: "
+                    f"reported={reported_sha}, actual={actual_sha}."
+                ),
+            )
+
+    def integer_value(*names: str) -> int | None:
+        if diagnostic is None:
+            return None
+        value = _decoder_value(diagnostic, *names)
+        if isinstance(value, bool):
+            return None
+        try:
+            return int(value) if value is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    format_name = None
+    if diagnostic is not None:
+        value = _decoder_value(diagnostic, "dxgiFormatName", "DxgiFormatName")
+        if isinstance(value, str) and value:
+            format_name = value
+
+    return replace(
+        item,
+        decode_status="decoded_dds",
+        dds_path=str(dds),
+        dds_sha256=actual_sha,
+        dds_size=len(dds_bytes),
+        width=integer_value("width", "Width"),
+        height=integer_value("height", "Height"),
+        depth=integer_value("depth", "Depth"),
+        mip_levels=integer_value("mipLevels", "MipLevels"),
+        dxgi_format=integer_value("dxgiFormat", "DxgiFormat"),
+        dxgi_format_name=format_name,
+    )
+
+
 def resolve_native_material_textures(
     glb_path: str | Path,
     vehicle_archive: str | Path,
     *,
     cache_root: str | Path | None = None,
+    decoder_helper: str | Path | None = None,
 ) -> NativeMaterialTextureReport:
     glb = Path(glb_path).expanduser().resolve()
     source_archive = Path(vehicle_archive).expanduser().resolve()
@@ -540,13 +751,23 @@ def resolve_native_material_textures(
     target_root.mkdir(parents=True, exist_ok=True)
 
     texture_paths = collect_native_texture_paths(glb)
-    results = tuple(
+    resolved_items = tuple(
         resolve_native_texture_reference(path, source_archive, target_root)
         for path in texture_paths
     )
+    decoder_path = Path(decoder_helper) if decoder_helper is not None else None
+    results = tuple(
+        _decode_resolved_payload(item, decoder_path, target_root)
+        for item in resolved_items
+    )
+
     resolved = sum(item.status == "resolved_payload" for item in results)
     unreadable = sum(item.status == "payload_located_unreadable" for item in results)
     unresolved = len(results) - resolved
+    decoded = sum(item.decode_status in {"decoded_dds", "decoded_dds_cached"} for item in results)
+    decode_failed = sum(item.decode_status == "decode_failed" for item in results)
+    decoder_unavailable = sum(item.decode_status == "decoder_unavailable" for item in results)
+
     if not results:
         status = "no_texture_references"
     elif resolved == len(results):
@@ -556,23 +777,40 @@ def resolve_native_material_textures(
     else:
         status = "unresolved"
 
+    if decoder_helper is None:
+        decode_status = "not_requested"
+    elif resolved == 0:
+        decode_status = "no_resolved_payloads"
+    elif decoded == resolved:
+        decode_status = "decoded_all"
+    elif decoded:
+        decode_status = "decoded_partial"
+    elif decoder_unavailable == resolved:
+        decode_status = "decoder_unavailable"
+    else:
+        decode_status = "decode_failed"
+
     namespace_root, _media_root = _game_namespace_root(source_archive)
     manifest = glb.with_suffix(glb.suffix + ".native_textures.json")
     report = NativeMaterialTextureReport(
         revision=NATIVE_MATERIAL_TEXTURE_RESOLUTION_REVISION,
         status=status,
+        decode_status=decode_status,
         reference_count=len(texture_paths),
         unique_reference_count=len(texture_paths),
         resolved_count=resolved,
         unresolved_count=unresolved,
         located_unreadable_count=unreadable,
+        decoded_count=decoded,
+        decode_failed_count=decode_failed,
+        decoder_unavailable_count=decoder_unavailable,
         manifest_path=str(manifest),
         game_namespace_root=str(namespace_root) if namespace_root is not None else None,
         textures=results,
         game_data_modified=False,
     )
     payload = report.as_dict()
-    payload["format"] = "fh6_native_material_texture_resolution_v1"
+    payload["format"] = "fh6_native_material_texture_resolution_v2"
     temp = manifest.with_suffix(manifest.suffix + ".tmp")
     temp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     temp.replace(manifest)
