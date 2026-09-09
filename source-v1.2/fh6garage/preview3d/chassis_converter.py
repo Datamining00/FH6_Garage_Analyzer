@@ -19,6 +19,11 @@ from .near_lod_archive import (
     discard_near_lod_archive,
     prepare_near_lod_archive,
 )
+from .native_material_textures import (
+    NATIVE_MATERIAL_TEXTURE_RESOLUTION_REVISION,
+    NativeMaterialTextureError,
+    resolve_native_material_textures,
+)
 
 from .neutral_geometry import NEUTRAL_GEOMETRY_REVISION, NeutralGeometryError, annotate_neutral_geometry
 from .wheel_morph_auto import resolve_automatic_stock_rim_morph
@@ -495,6 +500,36 @@ def convert_vehicle(
     diagnostics["automatic_rim_morph_source_revision"] = (
         automatic_rim_morph.source_revision if automatic_rim_morph is not None else None
     )
+
+    # Native Texture2D resolution is an appearance enhancement, not a geometry
+    # validity condition. Resolve only exact/unique provenance and keep a valid
+    # GLB when a proprietary archive payload cannot yet be decoded.
+    diagnostics["native_material_texture_resolution_revision"] = (
+        NATIVE_MATERIAL_TEXTURE_RESOLUTION_REVISION
+    )
+    try:
+        native_texture_report = resolve_native_material_textures(
+            output,
+            source_archive,
+            cache_root=transient_root,
+        )
+        diagnostics["native_material_texture_status"] = native_texture_report.status
+        diagnostics["native_material_texture_resolution"] = native_texture_report.as_dict()
+        if progress and native_texture_report.reference_count:
+            progress(
+                "Native Texture2D payloads: "
+                f"{native_texture_report.resolved_count}/"
+                f"{native_texture_report.reference_count} resolved."
+            )
+    except (OSError, ValueError, NativeMaterialTextureError) as exc:
+        diagnostics["native_material_texture_status"] = "resolver_error"
+        diagnostics["native_material_texture_resolution"] = {
+            "revision": NATIVE_MATERIAL_TEXTURE_RESOLUTION_REVISION,
+            "status": "resolver_error",
+            "error": f"{type(exc).__name__}: {exc}",
+            "game_data_modified": False,
+        }
+
     if progress:
         progress(f"Transient GLB created: {output}")
     return ConversionResult(str(output), str(helper), diagnostics)
