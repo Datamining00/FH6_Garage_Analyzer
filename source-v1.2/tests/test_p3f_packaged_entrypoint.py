@@ -22,6 +22,15 @@ class P3fPackagedEntrypointTests(unittest.TestCase):
         self.assertLess(dispatch, patches)
         self.assertIn("run_manufacturer_materialbin_diagnostic", text)
 
+    def test_launcher_self_checks_packaged_helper_before_collecting_game_inputs(self):
+        text = LAUNCHER.read_text(encoding="utf-8")
+        self_check = text.index("--p3f-materialbin-diagnostic --self-check")
+        glb = text.index('set "GLB=%~1"')
+        self.assertLess(self_check, glb)
+        self.assertIn("p3f_packaged_self_check.json", text)
+        self.assertIn("packaged_p3f_self_check_passed", text)
+        self.assertIn("packaged_contract_ready", text)
+
     def test_launcher_uses_packaged_exe_and_localappdata_diagnostic_outputs(self):
         text = LAUNCHER.read_text(encoding="utf-8")
         self.assertIn("--p3f-materialbin-diagnostic", text)
