@@ -1,0 +1,266 @@
+name: Validate FH6 Assistant v1.4 packaged Paint P3F diagnostic
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - v1.4-rc1-wheel-morph-w3
+    paths:
+      - "source-v1.2/app.py"
+      - "source-v1.2/FH6_Assistant_v1.4.spec"
+      - "source-v1.2/FH6_Assistant_v1.4_portable.spec"
+      - "source-v1.2/fh6garage/preview3d/exact_game_asset.py"
+      - "source-v1.2/fh6garage/preview3d/livery_paint_provenance.py"
+      - "source-v1.2/fh6garage/preview3d/livery_paint_binding.py"
+      - "source-v1.2/fh6garage/preview3d/manufacturer_colors.py"
+      - "source-v1.2/fh6garage/preview3d/manufacturer_overlay_diagnostics.py"
+      - "source-v1.2/fh6garage/preview3d/manufacturer_materialbin_diagnostics.py"
+      - "source-v1.2/fh6garage/preview3d/manufacturer_materialbin_cli.py"
+      - "source-v1.2/fh6garage/preview3d/materialbin_reference_helper.py"
+      - "source-v1.2/fh6garage/preview3d/native_material_textures.py"
+      - "source-v1.2/fh6garage/preview3d/wheel_morph_helper.py"
+      - "source-v1.2/tests/test_exact_game_asset.py"
+      - "source-v1.2/tests/test_manufacturer_overlay_diagnostics.py"
+      - "source-v1.2/tests/test_manufacturer_materialbin_diagnostics.py"
+      - "source-v1.2/tests/test_manufacturer_materialbin_cli.py"
+      - "source-v1.2/tests/test_materialbin_reference_helper_source.py"
+      - "source-v1.2/tests/test_p3f_packaged_entrypoint.py"
+      - "source-v1.2/tools/analyze_manufacturer_materialbin.py"
+      - "source-v1.2/tools/Run_FH6_P3F_Materialbin_Diagnostic.cmd"
+      - "source-v1.2/tools/patch_kfps_wheel_morph_diagnostic.py"
+      - "source-v1.2/tools/patch_kfps_materialbin_diagnostic.py"
+      - "source-v1.2/tools/kfps_wheel_morph/MaterialAppearanceDiagnostic.cs"
+      - "source-v1.2/tools/kfps_wheel_morph/NativeSwatchbinDecoder.cs"
+      - "source-v1.2/tools/kfps_wheel_morph/MaterialbinReferenceDiagnostic.cs"
+      - ".github/workflows/validate-v1.4-p3f-packaged-diagnostic.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v14-p3f-packaged-diagnostic-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python ${{ matrix.python-version }} Paint P3F contracts
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+
+    steps:
+      - name: Checkout W3 branch
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: source-v1.2/requirements.txt
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          Set-Location source-v1.2
+          python -m pip install --disable-pip-version-check -r requirements.txt
+
+      - name: Compile Paint P3F packaged path
+        shell: pwsh
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          Set-Location source-v1.2
+          python -m py_compile app.py
+          python -m py_compile fh6garage/preview3d/exact_game_asset.py
+          python -m py_compile fh6garage/preview3d/manufacturer_overlay_diagnostics.py
+          python -m py_compile fh6garage/preview3d/materialbin_reference_helper.py
+          python -m py_compile fh6garage/preview3d/manufacturer_materialbin_diagnostics.py
+          python -m py_compile fh6garage/preview3d/manufacturer_materialbin_cli.py
+          python -m py_compile tools/analyze_manufacturer_materialbin.py
+
+      - name: Run Paint P3F targeted contracts
+        shell: pwsh
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          Set-Location source-v1.2
+          python -m unittest tests.test_exact_game_asset -v
+          python -m unittest tests.test_manufacturer_overlay_diagnostics -v
+          python -m unittest tests.test_materialbin_reference_helper_source -v
+          python -m unittest tests.test_manufacturer_materialbin_diagnostics -v
+          python -m unittest tests.test_manufacturer_materialbin_cli -v
+          python -m unittest tests.test_p3f_packaged_entrypoint -v
+
+      - name: Run full regression suite
+        shell: pwsh
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          Set-Location source-v1.2
+          python -m unittest discover -s tests -v
+
+  package:
+    name: Standard and Portable Paint P3F packaged self-check
+    runs-on: windows-latest
+    needs: python
+
+    steps:
+      - name: Checkout W3 branch
+        uses: actions/checkout@v6
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: source-v1.2/requirements.txt
+
+      - name: Set up .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Install build dependencies
+        shell: pwsh
+        run: |
+          Set-Location source-v1.2
+          python -m pip install --disable-pip-version-check -r requirements.txt
+          python -m pip install --disable-pip-version-check --upgrade pyinstaller
+
+      - name: Validate P3F source contracts before packaging
+        shell: pwsh
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          Set-Location source-v1.2
+          python -m py_compile app.py
+          python -m py_compile fh6garage/preview3d/manufacturer_materialbin_cli.py
+          python -m unittest tests.test_manufacturer_materialbin_cli -v
+          python -m unittest tests.test_p3f_packaged_entrypoint -v
+
+      - name: Checkout pinned KFPS source
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          git clone --filter=blob:none https://github.com/heyitshestia/kloudys-forza-painter-suite.git kfps-source
+          if ($LASTEXITCODE -ne 0) { throw "KFPS clone failed with exit code $LASTEXITCODE" }
+          git -C kfps-source checkout --detach 6f53ca3c584d78659d06d4b4a39561db67d79345
+          if ($LASTEXITCODE -ne 0) { throw "Pinned KFPS checkout failed with exit code $LASTEXITCODE" }
+          $actual = (git -C kfps-source rev-parse HEAD).Trim()
+          if ($actual -ne "6f53ca3c584d78659d06d4b4a39561db67d79345") { throw "Pinned KFPS commit mismatch: $actual" }
+
+      - name: Apply canonical W3 and Paint P3F helper patches
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          python source-v1.2/tools/patch_kfps_wheel_morph_diagnostic.py --kfps-root kfps-source
+          if ($LASTEXITCODE -ne 0) { throw "KFPS base patcher failed with exit code $LASTEXITCODE" }
+          python source-v1.2/tools/patch_kfps_materialbin_diagnostic.py --kfps-root kfps-source
+          if ($LASTEXITCODE -ne 0) { throw "KFPS P3F patcher failed with exit code $LASTEXITCODE" }
+          git -C kfps-source diff --check
+          if ($LASTEXITCODE -ne 0) { throw "Patched KFPS diff check failed" }
+          $program = "kfps-source/tools/livery/chassis-converter/Program.cs"
+          if (-not (Select-String -Path $program -SimpleMatch "--diagnose-materialbin" -Quiet)) { throw "P3F materialbin CLI was not staged." }
+          if (-not (Select-String -Path $program -SimpleMatch "MaterialbinReferenceRuntime.Diagnose" -Quiet)) { throw "P3F materialbin runtime was not staged." }
+          if (-not (Test-Path "kfps-source/tools/livery/chassis-converter/MaterialbinReferenceDiagnostic.cs")) { throw "MaterialbinReferenceDiagnostic.cs was not staged." }
+
+      - name: Publish and verify bundled helper v12
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          dotnet publish kfps-source/tools/livery/chassis-converter/Kfps.ChassisConverter.csproj -c Release -o p3f-converter
+          if ($LASTEXITCODE -ne 0) { throw "P3F helper publish failed with exit code $LASTEXITCODE" }
+          $built = Resolve-Path "p3f-converter/Kfps.ChassisConverter.exe"
+          $actual = (Get-FileHash $built -Algorithm SHA256).Hash.ToLower()
+          $expected = (python -c "import runpy; print(runpy.run_path(r'source-v1.2/fh6garage/preview3d/wheel_morph_helper.py')['WHEEL_MORPH_HELPER_SHA256'])").Trim()
+          if ($actual -ne $expected) { throw "P3F helper SHA-256 mismatch: expected $expected, got $actual" }
+          New-Item -ItemType Directory -Force "source-v1.2/runtime" | Out-Null
+          Copy-Item $built "source-v1.2/runtime/Kfps.ChassisConverter.WheelMorph.exe" -Force
+          Write-Host "Verified Paint P3F helper SHA-256: $actual"
+
+      - name: Build Standard OneFile and run packaged self-check
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          Set-Location source-v1.2
+          python -m PyInstaller --clean --noconfirm .\FH6_Assistant_v1.4.spec
+          if ($LASTEXITCODE -ne 0) { throw "Standard PyInstaller build failed with exit code $LASTEXITCODE" }
+          $exe = Resolve-Path "dist\FH6 Assistant v1.4.exe"
+          $listing = python -m PyInstaller.utils.cliutils.archive_viewer -l -r $exe
+          if ($LASTEXITCODE -ne 0) { throw "Could not inspect Standard archive." }
+          if (-not ($listing -match "fh6garage\.preview3d\.manufacturer_materialbin_cli")) { throw "Standard OneFile does not contain packaged Paint P3F CLI." }
+          if (-not ($listing -match "Kfps\.ChassisConverter\.WheelMorph\.exe")) { throw "Standard OneFile does not contain verified helper." }
+          $check = Resolve-Path "dist" | ForEach-Object { Join-Path $_ "P3F_SelfCheck_Standard.json" }
+          $process = Start-Process -FilePath $exe -ArgumentList @("--p3f-materialbin-diagnostic", "--self-check", "--output", $check) -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Standard packaged P3F self-check failed with exit code $($process.ExitCode)" }
+          if (-not (Test-Path $check)) { throw "Standard packaged P3F self-check JSON was not created." }
+          $report = Get-Content -LiteralPath $check -Raw | ConvertFrom-Json
+          $expected = (python -c "import runpy; print(runpy.run_path(r'fh6garage/preview3d/wheel_morph_helper.py')['WHEEL_MORPH_HELPER_SHA256'])").Trim()
+          if ($report.status -ne "packaged_p3f_self_check_passed") { throw "Standard self-check status mismatch: $($report.status)" }
+          if ($report.validation_status -ne "packaged_contract_ready") { throw "Standard self-check contract is not ready." }
+          if ($report.helper_sha256 -ne $expected) { throw "Standard self-check helper SHA mismatch." }
+          if ($report.game_data_modified -ne $false) { throw "Standard self-check did not report game_data_modified=false." }
+
+      - name: Build Portable OneDir and run packaged self-check
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          Set-Location source-v1.2
+          python -m PyInstaller --clean --noconfirm .\FH6_Assistant_v1.4_portable.spec
+          if ($LASTEXITCODE -ne 0) { throw "Portable PyInstaller build failed with exit code $LASTEXITCODE" }
+          $exe = Resolve-Path "dist\FH6 Assistant v1.4 Portable\FH6 Assistant v1.4.exe"
+          $helper = Resolve-Path "dist\FH6 Assistant v1.4 Portable\_internal\runtime\Kfps.ChassisConverter.WheelMorph.exe"
+          $expected = (python -c "import runpy; print(runpy.run_path(r'fh6garage/preview3d/wheel_morph_helper.py')['WHEEL_MORPH_HELPER_SHA256'])").Trim()
+          $helperSha = (Get-FileHash $helper -Algorithm SHA256).Hash.ToLower()
+          if ($helperSha -ne $expected) { throw "Portable helper SHA mismatch: expected $expected, got $helperSha" }
+          $listing = python -m PyInstaller.utils.cliutils.archive_viewer -l -r $exe
+          if ($LASTEXITCODE -ne 0) { throw "Could not inspect Portable archive." }
+          if (-not ($listing -match "fh6garage\.preview3d\.manufacturer_materialbin_cli")) { throw "Portable OneDir does not contain packaged Paint P3F CLI." }
+          $check = Resolve-Path "dist" | ForEach-Object { Join-Path $_ "P3F_SelfCheck_Portable.json" }
+          $process = Start-Process -FilePath $exe -ArgumentList @("--p3f-materialbin-diagnostic", "--self-check", "--output", $check) -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Portable packaged P3F self-check failed with exit code $($process.ExitCode)" }
+          if (-not (Test-Path $check)) { throw "Portable packaged P3F self-check JSON was not created." }
+          $report = Get-Content -LiteralPath $check -Raw | ConvertFrom-Json
+          if ($report.status -ne "packaged_p3f_self_check_passed") { throw "Portable self-check status mismatch: $($report.status)" }
+          if ($report.validation_status -ne "packaged_contract_ready") { throw "Portable self-check contract is not ready." }
+          if ($report.helper_sha256 -ne $expected) { throw "Portable self-check helper SHA mismatch." }
+          if ($report.game_data_modified -ne $false) { throw "Portable self-check did not report game_data_modified=false." }
+
+      - name: Stage user-facing Paint P3F launchers
+        shell: pwsh
+        run: |
+          Copy-Item "source-v1.2/tools/Run_FH6_P3F_Materialbin_Diagnostic.cmd" "source-v1.2/dist/Run_FH6_P3F_Materialbin_Diagnostic.cmd" -Force
+          Copy-Item "source-v1.2/tools/Run_FH6_P3F_Materialbin_Diagnostic.cmd" "source-v1.2/dist/FH6 Assistant v1.4 Portable/Run_FH6_P3F_Materialbin_Diagnostic.cmd" -Force
+
+      - name: Upload packaged Paint P3F validation builds
+        uses: actions/upload-artifact@v4
+        with:
+          name: FH6-Assistant-v1.4-P3F-RealData-Diagnostic
+          path: |
+            source-v1.2/dist/FH6 Assistant v1.4.exe
+            source-v1.2/dist/Run_FH6_P3F_Materialbin_Diagnostic.cmd
+            source-v1.2/dist/FH6 Assistant v1.4 Portable
+            source-v1.2/dist/P3F_SelfCheck_Standard.json
+            source-v1.2/dist/P3F_SelfCheck_Portable.json
+          retention-days: 14
+          if-no-files-found: error
