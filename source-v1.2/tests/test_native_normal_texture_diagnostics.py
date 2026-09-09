@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 
 from fh6garage.preview3d.native_material_render_plan import (
     NativeMaterialRenderPlan,
@@ -138,6 +139,16 @@ class NativeNormalTextureDiagnosticsTests(unittest.TestCase):
         self.assertEqual(report.unresolved_issue_count, 1)
         self.assertEqual(report.issues[0].status, "ambiguous_semantic_bindings")
         self.assertEqual(report.issues[0].texture_paths, ("A.swatchbin", "B.swatchbin"))
+
+    def test_production_widget_prepares_diagnostics_without_enabling_rendering(self):
+        root = Path(__file__).resolve().parents[1]
+        text = (root / "fh6garage" / "preview3d" / "native_material_texture_patch.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("build_native_normal_texture_diagnostics(plan)", text)
+        self.assertIn("_fh6_native_normal_texture_diagnostics", text)
+        self.assertNotIn("uNativeNormal", text)
+        self.assertNotIn("_NORMAL_TEXTURE_UNIT", text)
 
 
 if __name__ == "__main__":
