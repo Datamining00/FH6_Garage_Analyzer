@@ -15,9 +15,10 @@ from .material_appearance_patch import _read_glb_document
 
 
 MANUFACTURER_OVERLAY_DIAGNOSTICS_FORMAT = "fh6_manufacturer_overlay_diagnostics_v1"
-MANUFACTURER_OVERLAY_DIAGNOSTICS_REVISION = 2
+MANUFACTURER_OVERLAY_DIAGNOSTICS_REVISION = 3
 _BUILTIN_MANUFACTURER_MATERIAL_NAMES = frozenset({"carpaint", "carpaint_secondary"})
 _MAX_GROUP_INVENTORY_ENTRIES = 64
+_PREVIEW_MATCH_ABS_TOLERANCE = 1e-6
 
 
 def _u32(value: Any) -> int | None:
@@ -83,6 +84,60 @@ def _preview_rgb(value: Any) -> list[float] | None:
             return None
         output.append(number)
     return output
+
+
+def _preview_rgb_equal(left: Any, right: Any) -> bool:
+    a = _preview_rgb(left)
+    b = _preview_rgb(right)
+    if a is None or b is None:
+        return False
+    return all(
+        math.isclose(x, y, rel_tol=0.0, abs_tol=_PREVIEW_MATCH_ABS_TOLERANCE)
+        for x, y in zip(a, b)
+    )
+
+
+def _preview_entry_matches(group: Any, *, secondary: bool) -> list[dict[str, Any]]:
+    if not isinstance(group, dict):
+        return []
+    present_key = (
+        "secondary_group_preview_present"
+        if secondary
+        else "primary_group_preview_present"
+    )
+    color_key = (
+        "secondary_group_preview_color"
+        if secondary
+        else "primary_group_preview_color"
+    )
+    if not bool(group.get(present_key)):
+        return []
+    target = group.get(color_key)
+    if _preview_rgb(target) is None:
+        return []
+    return [
+        entry
+        for entry in _group_entries(group)
+        if _preview_rgb_equal(entry.get("preview_color"), target)
+    ]
+
+
+def _same_path_preview_match(
+    entries: list[dict[str, Any]],
+) -> tuple[dict[str, Any] | None, list[Any]]:
+    """Return one representative only when all preview matches share one exact path."""
+    if not entries:
+        return None, []
+    paths: dict[str, list[dict[str, Any]]] = {}
+    for entry in entries:
+        raw_path = str(entry.get("path") or "").strip()
+        if not raw_path:
+            return None, [item.get("index") for item in entries]
+        normalized = raw_path.replace("\\", "/").casefold()
+        paths.setdefault(normalized, []).append(entry)
+    if len(paths) != 1:
+        return None, [item.get("index") for item in entries]
+    return entries[0], [item.get("index") for item in entries]
 
 
 def _group_inventory(group: Any) -> dict[str, Any] | None:
@@ -212,14 +267,14 @@ def build_manufacturer_overlay_diagnostics(
 
     Exact entry material-name matching remains the primary contract. ForzaTechStudio
     also treats ``carpaint`` and ``carpaint_secondary`` as built-in manufacturer
-    color materials. FH6 Assistant mirrors that built-in eligibility only when the
-    selected manufacturer group has exactly one entry, so there is no entry/path
-    ambiguity. Multi-entry groups remain fail-closed unless an exact material-name
-    match identifies one unique entry.
+    color materials. For a multi-entry FH6 manufacturer group, those built-ins may
+    resolve only through the group's native primary/secondary preview color when it
+    identifies one entry, or multiple entries that all share one exact path. This
+    preserves the group scheme semantics without guessing from mesh/path substrings.
 
     A candidate still requires an exact C_livery material binding, a resolved
-    manufacturer group/entry, and a valid native float VEC2 ``TEXCOORD_4`` accessor
-    whose vertex count matches POSITION. No UV coordinates are synthesized.
+    manufacturer group/entry path, and a valid native float VEC2 ``TEXCOORD_4``
+    accessor whose vertex count matches POSITION. No UV coordinates are synthesized.
     """
     records, ambiguous_hashes, record_issues = _paint_record_index(paint_provenance)
     raw_records = (
@@ -241,7 +296,7 @@ def build_manufacturer_overlay_diagnostics(
         "rendering_applied": False,
         "game_data_modified": False,
         "binding_format": "kfps_material_binding_hash_x16_unprefixed",
-        "material_match_contract": "exact_entry_material_name_or_fts_builtin_unique_group_entry",
+        "material_match_contract": "exact_entry_material_name_or_fts_builtin_group_preview_path",
         "uv_contract": "exact_kfps_texcoord_4_float_vec2_position_count_match",
         "global_custom_primary_active": global_custom_primary_active,
         "manufacturer_global_gate": (
@@ -258,15 +313,19 @@ def build_manufacturer_overlay_diagnostics(
         "missing_material_name_count": 0,
         "unmatched_entry_count": 0,
         "builtin_unique_entry_match_count": 0,
+        "builtin_primary_preview_match_count": 0,
+        "builtin_secondary_preview_match_count": 0,
+        "builtin_preview_same_path_match_count": 0,
         "missing_or_invalid_uv4_count": 0,
         "resolved_group_inventory": {},
         "candidates": [],
         "issues": list(record_issues),
         "interpretation_boundary": (
             "Paint P3D inventories manufacturer overlay candidates without rendering. Exact entry material-name "
-            "matching is preferred; FTS built-in carpaint eligibility is used only when the resolved group has one "
-            "unambiguous entry. It does not infer entries from mesh/path substrings, synthesize UV4, sample UV4, "
-            "apply manufacturer tint/alpha, emulate finish shaders, or alter FH6 game/save data."
+            "matching is preferred. FTS built-in carpaint eligibility may use an FH6 group primary/secondary preview "
+            "only when it resolves one entry or one shared exact path. It does not infer entries from mesh/path "
+            "substrings, synthesize UV4, sample UV4, apply manufacturer tint/alpha, emulate finish shaders, or alter "
+            "FH6 game/save data."
         ),
     }
     if not isinstance(paint_provenance, dict) or paint_provenance.get("status") != "paint_descriptor_parsed":
@@ -324,6 +383,7 @@ def build_manufacturer_overlay_diagnostics(
                 "selector": None,
                 "group_index": None,
                 "entry_index": None,
+                "matching_entry_indices": [],
                 "entry_material_names": [],
                 "entry_path": None,
                 "entry_preview_color": None,
@@ -397,13 +457,53 @@ def build_manufacturer_overlay_diagnostics(
                 continue
             else:
                 group_entries = _group_entries(group)
-                if (
-                    material_name.casefold() in _BUILTIN_MANUFACTURER_MATERIAL_NAMES
-                    and len(group_entries) == 1
-                ):
+                builtin_name = material_name.casefold()
+                if builtin_name in _BUILTIN_MANUFACTURER_MATERIAL_NAMES and len(group_entries) == 1:
                     matches = [group_entries[0]]
                     row["material_match_mode"] = "fts_builtin_carpaint_unique_group_entry"
                     report["builtin_unique_entry_match_count"] += 1
+                elif builtin_name in _BUILTIN_MANUFACTURER_MATERIAL_NAMES:
+                    secondary = builtin_name == "carpaint_secondary"
+                    preview_matches = _preview_entry_matches(group, secondary=secondary)
+                    if len(preview_matches) == 1:
+                        matches = preview_matches
+                        row["material_match_mode"] = (
+                            "fts_builtin_carpaint_secondary_preview_entry"
+                            if secondary
+                            else "fts_builtin_carpaint_primary_preview_entry"
+                        )
+                        if secondary:
+                            report["builtin_secondary_preview_match_count"] += 1
+                        else:
+                            report["builtin_primary_preview_match_count"] += 1
+                    elif len(preview_matches) > 1:
+                        representative, matching_indices = _same_path_preview_match(preview_matches)
+                        row["matching_entry_indices"] = matching_indices
+                        if representative is None:
+                            report["ambiguous_entry_count"] += 1
+                            row["status"] = (
+                                "manufacturer_entry_secondary_preview_ambiguous"
+                                if secondary
+                                else "manufacturer_entry_primary_preview_ambiguous"
+                            )
+                            rows.append(row)
+                            continue
+                        matches = [representative]
+                        row["material_match_mode"] = (
+                            "fts_builtin_carpaint_secondary_preview_same_path"
+                            if secondary
+                            else "fts_builtin_carpaint_primary_preview_same_path"
+                        )
+                        report["builtin_preview_same_path_match_count"] += 1
+                        if secondary:
+                            report["builtin_secondary_preview_match_count"] += 1
+                        else:
+                            report["builtin_primary_preview_match_count"] += 1
+                    else:
+                        report["unmatched_entry_count"] += 1
+                        row["status"] = "manufacturer_entry_not_targeted_by_exact_material_name"
+                        rows.append(row)
+                        continue
                 else:
                     report["unmatched_entry_count"] += 1
                     row["status"] = "manufacturer_entry_not_targeted_by_exact_material_name"
@@ -415,6 +515,8 @@ def build_manufacturer_overlay_diagnostics(
                 row["entry_index"] = int(entry.get("index"))
             except (TypeError, ValueError):
                 row["entry_index"] = None
+            if not row["matching_entry_indices"] and row["entry_index"] is not None:
+                row["matching_entry_indices"] = [row["entry_index"]]
             names = entry.get("material_names") or []
             row["entry_material_names"] = [str(value) for value in names if isinstance(value, str)]
             entry_path = str(entry.get("path") or "").strip()
