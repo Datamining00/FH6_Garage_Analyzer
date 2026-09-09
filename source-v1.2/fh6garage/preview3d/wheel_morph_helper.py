@@ -5,10 +5,11 @@ from pathlib import Path
 import sys
 
 # This verified helper carries the established wheel/transform chain plus the
-# read-only embedded MaterialBlob shader-provenance exporter consumed by the 3D viewer.
+# read-only embedded MaterialBlob shader and Texture2D binding-provenance exporter
+# consumed by the 3D viewer/native texture resolver.
 WHEEL_MORPH_HELPER_FILENAME = "Kfps.ChassisConverter.WheelMorph.exe"
-WHEEL_MORPH_HELPER_SHA256 = "92b255baadc43a3087d55e434a826bea5297cada8c1d7b148435c848fb779053"
-WHEEL_MORPH_HELPER_REVISION = "kfps_6f53ca3_w3_native_material_optical_v7"
+WHEEL_MORPH_HELPER_SHA256 = "11e9f10ec6a2242a35afb1596044832065126d11c24e2f749dce2452fa9b54ee"
+WHEEL_MORPH_HELPER_REVISION = "kfps_6f53ca3_w3_native_material_texture_bindings_v8"
 
 
 class WheelMorphHelperError(RuntimeError):
