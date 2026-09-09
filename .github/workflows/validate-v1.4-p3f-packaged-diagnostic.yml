@@ -24,10 +24,13 @@ on:
       - "source-v1.2/tests/test_manufacturer_materialbin_diagnostics.py"
       - "source-v1.2/tests/test_manufacturer_materialbin_cli.py"
       - "source-v1.2/tests/test_materialbin_reference_helper_source.py"
+      - "source-v1.2/tests/test_p3d_breakdown.py"
+      - "source-v1.2/tests/test_kfps_uv4_passthrough_patch.py"
       - "source-v1.2/tests/test_p3f_packaged_entrypoint.py"
       - "source-v1.2/tools/analyze_manufacturer_materialbin.py"
       - "source-v1.2/tools/Run_FH6_P3F_Materialbin_Diagnostic.cmd"
       - "source-v1.2/tools/patch_kfps_wheel_morph_diagnostic.py"
+      - "source-v1.2/tools/patch_kfps_uv4_passthrough.py"
       - "source-v1.2/tools/patch_kfps_materialbin_diagnostic.py"
       - "source-v1.2/tools/kfps_wheel_morph/MaterialAppearanceDiagnostic.cs"
       - "source-v1.2/tools/kfps_wheel_morph/NativeSwatchbinDecoder.cs"
@@ -83,6 +86,7 @@ jobs:
           python -m py_compile fh6garage/preview3d/manufacturer_materialbin_diagnostics.py
           python -m py_compile fh6garage/preview3d/manufacturer_materialbin_cli.py
           python -m py_compile tools/analyze_manufacturer_materialbin.py
+          python -m py_compile tools/patch_kfps_uv4_passthrough.py
 
       - name: Run Paint P3F targeted contracts
         shell: pwsh
@@ -98,6 +102,8 @@ jobs:
           python -m unittest tests.test_materialbin_reference_helper_source -v
           python -m unittest tests.test_manufacturer_materialbin_diagnostics -v
           python -m unittest tests.test_manufacturer_materialbin_cli -v
+          python -m unittest tests.test_p3d_breakdown -v
+          python -m unittest tests.test_kfps_uv4_passthrough_patch -v
           python -m unittest tests.test_p3f_packaged_entrypoint -v
 
       - name: Run full regression suite
@@ -151,6 +157,8 @@ jobs:
           python -m py_compile app.py
           python -m py_compile fh6garage/preview3d/manufacturer_materialbin_cli.py
           python -m unittest tests.test_manufacturer_materialbin_cli -v
+          python -m unittest tests.test_p3d_breakdown -v
+          python -m unittest tests.test_kfps_uv4_passthrough_patch -v
           python -m unittest tests.test_p3f_packaged_entrypoint -v
 
       - name: Checkout pinned KFPS source
@@ -165,23 +173,27 @@ jobs:
           $actual = (git -C kfps-source rev-parse HEAD).Trim()
           if ($actual -ne "6f53ca3c584d78659d06d4b4a39561db67d79345") { throw "Pinned KFPS commit mismatch: $actual" }
 
-      - name: Apply canonical W3 and Paint P3F helper patches
+      - name: Apply canonical W3, native UV4, and Paint P3F helper patches
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           $PSNativeCommandUseErrorActionPreference = $true
           python source-v1.2/tools/patch_kfps_wheel_morph_diagnostic.py --kfps-root kfps-source
           if ($LASTEXITCODE -ne 0) { throw "KFPS base patcher failed with exit code $LASTEXITCODE" }
+          python source-v1.2/tools/patch_kfps_uv4_passthrough.py --kfps-root kfps-source
+          if ($LASTEXITCODE -ne 0) { throw "KFPS UV4 pass-through patcher failed with exit code $LASTEXITCODE" }
           python source-v1.2/tools/patch_kfps_materialbin_diagnostic.py --kfps-root kfps-source
           if ($LASTEXITCODE -ne 0) { throw "KFPS P3F patcher failed with exit code $LASTEXITCODE" }
           git -C kfps-source diff --check
           if ($LASTEXITCODE -ne 0) { throw "Patched KFPS diff check failed" }
           $program = "kfps-source/tools/livery/chassis-converter/Program.cs"
+          if (-not (Select-String -Path $program -SimpleMatch "item.Key is >= 0 and <= 4" -Quiet)) { throw "UV4 size-accounting contract was not staged." }
+          if (-not (Select-String -Path $program -SimpleMatch "channel is < 0 or > 4" -Quiet)) { throw "UV4 transform pass-through contract was not staged." }
           if (-not (Select-String -Path $program -SimpleMatch "--diagnose-materialbin" -Quiet)) { throw "P3F materialbin CLI was not staged." }
           if (-not (Select-String -Path $program -SimpleMatch "MaterialbinReferenceRuntime.Diagnose" -Quiet)) { throw "P3F materialbin runtime was not staged." }
           if (-not (Test-Path "kfps-source/tools/livery/chassis-converter/MaterialbinReferenceDiagnostic.cs")) { throw "MaterialbinReferenceDiagnostic.cs was not staged." }
 
-      - name: Publish and verify bundled helper v12
+      - name: Publish and verify bundled helper v13
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
