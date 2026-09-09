@@ -10,7 +10,7 @@ from .manufacturer_colors import resolve_manufacturer_group_linear_paint
 from .material_appearance_patch import _read_glb_document
 
 
-LIVERY_PAINT_BINDING_REVISION = 4
+LIVERY_PAINT_BINDING_REVISION = 5
 # Pinned KFPS GlbWriter.cs emits MaterialBindingHash.ToString("X16"): exactly
 # sixteen hexadecimal digits with no 0x prefix. Keep this parser identical to
 # that exporter contract instead of accepting broader human-readable forms.
@@ -87,14 +87,19 @@ def _custom_primary_linear_rgb(record: dict[str, Any]) -> tuple[np.ndarray | Non
 def _record_primary_linear_rgb(
     record: dict[str, Any],
     manufacturer_colors: Any,
+    *,
+    manufacturer_allowed: bool,
 ) -> tuple[np.ndarray | None, str, dict[str, Any] | None]:
-    """Resolve the public-reference primary-paint precedence used by P3B.
+    """Resolve the conservative P3B primary-paint contract.
 
-    ForzaLiveryStudio first resolves the manufacturer selector/group, then applies
-    C_livery primary bytes when primary.enabled is true. Therefore an enabled
-    custom primary overrides the manufacturer group primary even when the selector
-    is not FFFFFFFF. The selector still remains relevant to secondary/material
-    semantics, which this stage preserves diagnostically but does not render.
+    Public ForzaLiveryStudio evidence has two relevant layers. On an uncustomised
+    paint state it resolves a manufacturer selector/group and then allows an
+    enabled C_livery primary to replace that color. More importantly, once any
+    visible paint record has an explicit primary, FLS treats the whole livery as
+    custom-painted and does not resolve manufacturer colors for blank records.
+    That global gate prevents an all-zero/blank selector from being interpreted as
+    palette slot 0. P3B mirrors the fail-closed part of that behavior but does not
+    copy FLS's nearest-panel color inheritance heuristic.
     """
     try:
         selector = int(record.get("manufacturer_color_selector"))
@@ -103,21 +108,26 @@ def _record_primary_linear_rgb(
     if selector < 0 or selector > 0xFFFFFFFF:
         return None, "manufacturer_selector_invalid", None
 
-    manufacturer_result: dict[str, Any] | None = None
-    if selector != _CUSTOM_COLOR_SELECTOR:
-        manufacturer_result = resolve_manufacturer_group_linear_paint(manufacturer_colors, selector)
-
     custom_rgb, custom_state = _custom_primary_linear_rgb(record)
     if bool(record.get("primary_color_enabled")):
         if custom_rgb is None:
-            return None, custom_state, manufacturer_result
-        if manufacturer_result is not None:
-            manufacturer_result = dict(manufacturer_result)
-            manufacturer_result["primary_output"] = "custom_primary_override"
-        return custom_rgb, "custom_primary_override_ready" if manufacturer_result is not None else "custom_primary_ready", manufacturer_result
+            return None, custom_state, None
+        return custom_rgb, "custom_primary_ready", None
 
-    if manufacturer_result is None:
+    if selector == _CUSTOM_COLOR_SELECTOR:
         return None, "primary_color_disabled", None
+    if not manufacturer_allowed:
+        return None, "manufacturer_primary_suppressed_by_global_custom_paint", {
+            "status": "manufacturer_primary_suppressed_by_global_custom_paint",
+            "selector": selector,
+            "group_index": None,
+            "entry_count": 0,
+            "primary_output": "suppressed_global_custom_paint",
+            "secondary_enabled": False,
+            "secondary_status": "manufacturer_secondary_suppressed_by_global_custom_paint",
+        }
+
+    manufacturer_result = resolve_manufacturer_group_linear_paint(manufacturer_colors, selector)
     if manufacturer_result.get("status") != "manufacturer_primary_linear_resolved":
         return None, str(manufacturer_result.get("status") or "manufacturer_primary_unresolved"), manufacturer_result
     rgb = manufacturer_result.get("primary_linear_rgb")
@@ -155,11 +165,11 @@ def apply_exact_livery_paint_to_aux_stream(
     must match one unique C_livery paint record. No mesh/material-name or vehicle
     heuristic is used.
 
-    Primary precedence follows the public FLS draw path: resolve manufacturer group
-    first, then let enabled C_livery primary bytes override it. When custom primary
-    is disabled, a non-FFFFFFFF selector may supply the FH6 group-trailer primary,
-    retained as linear RGB in the existing linear aux stream. Secondary/two-tone,
-    entry Path/material targeting, UV4 overlays, flake, and finish remain deferred.
+    Exact custom primary records remain authoritative. Manufacturer group-trailer
+    primaries are consumed only when the entire parsed paint state has no explicit
+    custom primary. This mirrors the fail-closed global manufacturer gate in the
+    public FLS viewer and avoids palette-slot-0 bleed from blank records. FLS's
+    nearest-panel inheritance workaround is deliberately not reproduced.
     """
     if not isinstance(aux_stream, np.ndarray) or aux_stream.ndim != 2 or aux_stream.shape[1] != 4:
         raise ValueError("Paint binding requires an Nx4 material aux stream.")
@@ -170,6 +180,9 @@ def apply_exact_livery_paint_to_aux_stream(
         )
 
     records, ambiguous_hashes, record_issues = _paint_record_index(paint_provenance)
+    global_custom_primary_active = any(
+        bool(record.get("primary_color_enabled")) for record in records.values()
+    )
     output = np.ascontiguousarray(aux_stream.copy(), dtype=np.float32)
     report: dict[str, Any] = {
         "format": "fh6_livery_paint_binding_v1",
@@ -178,6 +191,10 @@ def apply_exact_livery_paint_to_aux_stream(
         "status": "paint_binding_unavailable" if not records and not ambiguous_hashes else "paint_binding_evaluated",
         "rendering_applied": False,
         "game_data_modified": False,
+        "global_custom_primary_active": global_custom_primary_active,
+        "manufacturer_global_gate": (
+            "suppressed_by_explicit_custom_primary" if global_custom_primary_active else "manufacturer_primary_allowed"
+        ),
         "matched_primitives": 0,
         "matched_vertices": 0,
         "matched_custom_primitives": 0,
@@ -185,7 +202,7 @@ def apply_exact_livery_paint_to_aux_stream(
         "exact_record_count": len(records),
         "ambiguous_record_count": len(ambiguous_hashes),
         "manufacturer_matched_hashes": [],
-        "manufacturer_overridden_hashes": [],
+        "manufacturer_globally_suppressed_hashes": [],
         "deferred_manufacturer_hashes": [],
         "manufacturer_selector_results": [],
         "disabled_primary_hashes": [],
@@ -193,9 +210,10 @@ def apply_exact_livery_paint_to_aux_stream(
         "malformed_binding_primitives": [],
         "issues": list(record_issues),
         "interpretation_boundary": (
-            "Paint P3B applies exact-hash custom primaries with FLS custom-over-manufacturer precedence, or the "
-            "resolved FH6 manufacturer group-trailer primary when custom primary is disabled. Secondary/two-tone "
-            "mixing, entry Path/material targeting, UV4 overlays, flake, finish materials, and paint-group inheritance "
+            "Paint P3B applies unique exact-hash custom primaries. FH6 manufacturer group-trailer primaries are "
+            "allowed only when no parsed paint record has an explicit custom primary, preventing blank selector-0 "
+            "records from leaking a factory tint into a custom-painted livery. FLS nearest-panel inheritance, "
+            "secondary/two-tone mixing, entry Path/material targeting, UV4 overlays, flake, and finish materials "
             "remain deferred."
         ),
     }
@@ -219,7 +237,7 @@ def apply_exact_livery_paint_to_aux_stream(
     offset = 0
     unmatched: set[int] = set()
     matched_manufacturer: set[int] = set()
-    overridden_manufacturer: set[int] = set()
+    globally_suppressed_manufacturer: set[int] = set()
     deferred_manufacturer: set[int] = set()
     disabled_primary: set[int] = set()
     manufacturer_results: dict[int, dict[str, Any]] = {}
@@ -261,7 +279,11 @@ def apply_exact_livery_paint_to_aux_stream(
                 if record is None:
                     unmatched.add(binding_hash)
                 else:
-                    linear_rgb, state, manufacturer_result = _record_primary_linear_rgb(record, manufacturer_colors)
+                    linear_rgb, state, manufacturer_result = _record_primary_linear_rgb(
+                        record,
+                        manufacturer_colors,
+                        manufacturer_allowed=not global_custom_primary_active,
+                    )
                     if manufacturer_result is not None:
                         manufacturer_results[binding_hash] = _manufacturer_result_summary(binding_hash, manufacturer_result)
                     if linear_rgb is not None:
@@ -273,8 +295,8 @@ def apply_exact_livery_paint_to_aux_stream(
                             matched_manufacturer.add(binding_hash)
                         else:
                             report["matched_custom_primitives"] += 1
-                            if state == "custom_primary_override_ready":
-                                overridden_manufacturer.add(binding_hash)
+                    elif state == "manufacturer_primary_suppressed_by_global_custom_paint":
+                        globally_suppressed_manufacturer.add(binding_hash)
                     elif manufacturer_result is not None:
                         deferred_manufacturer.add(binding_hash)
                     elif state == "primary_color_disabled":
@@ -291,7 +313,9 @@ def apply_exact_livery_paint_to_aux_stream(
         )
 
     report["manufacturer_matched_hashes"] = [f"0x{value:016X}" for value in sorted(matched_manufacturer)]
-    report["manufacturer_overridden_hashes"] = [f"0x{value:016X}" for value in sorted(overridden_manufacturer)]
+    report["manufacturer_globally_suppressed_hashes"] = [
+        f"0x{value:016X}" for value in sorted(globally_suppressed_manufacturer)
+    ]
     report["deferred_manufacturer_hashes"] = [f"0x{value:016X}" for value in sorted(deferred_manufacturer)]
     report["manufacturer_selector_results"] = [manufacturer_results[value] for value in sorted(manufacturer_results)]
     report["disabled_primary_hashes"] = [f"0x{value:016X}" for value in sorted(disabled_primary)]
