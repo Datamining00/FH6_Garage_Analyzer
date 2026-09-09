@@ -74,20 +74,30 @@ echo Output  : %OUTPUT%
 echo Mode    : FH6 GAME/SAVE READ-ONLY; derived GLB/JSON only
 echo.
 
-if defined SAVEROOT (
-  start "" /wait "%APP%" --p3f-materialbin-diagnostic --vehicle "%VEHICLE%" --save-root "%SAVEROOT%" --cache "%CACHE%" --output "%OUTPUT%"
-) else (
-  start "" /wait "%APP%" --p3f-materialbin-diagnostic --vehicle "%VEHICLE%" --cache "%CACHE%" --output "%OUTPUT%"
-)
+call :run_diagnostic
 set "RC=%ERRORLEVEL%"
+
+rem A fresh Portable build may not have a persisted last_save_path yet.
+rem Retry only the specific missing-save-path failure with a save-root picker;
+rem GLB conversion/livery parse failures stay fail-closed and are not hidden.
+if "%RC%"=="6" if not defined SAVEROOT if exist "%OUTPUT%" (
+  findstr /c:"No FH6 save path is available" "%OUTPUT%" >nul 2>&1
+  if not errorlevel 1 (
+    echo.
+    echo FH6 save path has not been configured yet.
+    echo Select the FH6 save root once; the matching C_livery is still chosen automatically.
+    call :pick_save_root
+    if defined SAVEROOT (
+      call :run_diagnostic
+      call set "RC=%%ERRORLEVEL%%"
+    )
+  )
+)
+
 if not "%RC%"=="0" (
   echo.
   echo ERROR: Paint P3F diagnostic failed with exit code %RC%.
-  if "%RC%"=="6" (
-    echo Automatic input preparation failed.
-    echo If no saved FH6 path exists, open FH6 Assistant once and select the save folder,
-    echo or run this launcher with the save root as the second argument.
-  )
+  if "%RC%"=="6" echo Automatic input preparation failed. See the diagnostic JSON detail above.
   if exist "%OUTPUT%" echo Diagnostic evidence: %OUTPUT%
   echo FH6 game/save inputs were not modified.
   pause
@@ -108,6 +118,24 @@ echo.
 echo Result: %OUTPUT%
 start "" explorer.exe /select,"%OUTPUT%"
 pause
+exit /b 0
+
+:run_diagnostic
+if defined SAVEROOT (
+  start "" /wait "%APP%" --p3f-materialbin-diagnostic --vehicle "%VEHICLE%" --save-root "%SAVEROOT%" --cache "%CACHE%" --output "%OUTPUT%"
+) else (
+  start "" /wait "%APP%" --p3f-materialbin-diagnostic --vehicle "%VEHICLE%" --cache "%CACHE%" --output "%OUTPUT%"
+)
+exit /b %ERRORLEVEL%
+
+:pick_save_root
+set "PICKDIR=%TEMP%\fh6_p3f_save_%RANDOM%_%RANDOM%.txt"
+if exist "%PICKDIR%" del /q "%PICKDIR%" >nul 2>&1
+powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -Command ^
+  "Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.FolderBrowserDialog; $d.Description = 'Select FH6 save root or current/ContainersRoot folder'; if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { [System.IO.File]::WriteAllText($env:PICKDIR, $d.SelectedPath) }"
+if not exist "%PICKDIR%" exit /b 1
+set /p "SAVEROOT="<"%PICKDIR%"
+del /q "%PICKDIR%" >nul 2>&1
 exit /b 0
 
 :pick_vehicle
