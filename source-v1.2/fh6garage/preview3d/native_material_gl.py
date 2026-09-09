@@ -26,9 +26,9 @@ class NativeGlTextureSpec:
 
 
 # Exact OpenGL enum values from the corresponding EXT/ARB/core specifications.
-# Formats are enabled only when the viewer has a defined material semantic for
-# their channels. Signed BC4 and packed multi-channel surface maps remain
-# disabled until their shader interpretation is explicit.
+# Formats are enabled only when their native channel layout is explicit. Signed
+# BC4/BC5 and packed multi-channel surface maps remain disabled until their
+# shader interpretation is explicit.
 _NATIVE_GL_SPECS: dict[int, NativeGlTextureSpec] = {
     71: NativeGlTextureSpec(71, "bc1", True, 0x83F1, required_extension="s3tc"),
     72: NativeGlTextureSpec(72, "bc1_srgb", True, 0x8C4D, required_extension="s3tc"),
@@ -37,6 +37,7 @@ _NATIVE_GL_SPECS: dict[int, NativeGlTextureSpec] = {
     77: NativeGlTextureSpec(77, "bc3", True, 0x83F3, required_extension="s3tc"),
     78: NativeGlTextureSpec(78, "bc3_srgb", True, 0x8C4F, required_extension="s3tc"),
     80: NativeGlTextureSpec(80, "bc4", True, 0x8DBB, required_extension="rgtc", core_version=(3, 0)),
+    83: NativeGlTextureSpec(83, "bc5", True, 0x8DBD, required_extension="rgtc", core_version=(3, 0)),
     98: NativeGlTextureSpec(98, "bc7", True, 0x8E8C, required_extension="bptc", core_version=(4, 2)),
     99: NativeGlTextureSpec(99, "bc7_srgb", True, 0x8E8D, required_extension="bptc", core_version=(4, 2)),
     28: NativeGlTextureSpec(28, "rgba8", False, 0x8058, external_format=0x1908, external_type=0x1401),
