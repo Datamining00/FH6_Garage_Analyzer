@@ -102,12 +102,14 @@ class _FakeGl:
 
 
 class NativeMaterialGlTests(unittest.TestCase):
-    def test_dxgi_mapping_is_explicit_and_unknown_fails_closed(self):
+    def test_dxgi_mapping_is_explicit_and_signed_bc4_stays_closed(self):
         self.assertEqual(native_gl_texture_spec(99).family, "bc7_srgb")
         self.assertTrue(native_gl_texture_spec(72).compressed)
-        self.assertFalse(native_gl_texture_spec(29).compressed)
+        self.assertEqual(native_gl_texture_spec(80).internal_format, 0x8DBB)
+        self.assertEqual(native_gl_texture_spec(61).internal_format, 0x8229)
+        self.assertFalse(native_gl_texture_spec(61).compressed)
         with self.assertRaises(NativeMaterialGlError):
-            native_gl_texture_spec(80)  # BC4 is parsed but not enabled for base color.
+            native_gl_texture_spec(81)  # signed BC4 has no [0,1] roughness contract
 
     def test_bc7_requires_bptc_and_uploads_exact_payload(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -131,6 +133,39 @@ class NativeMaterialGlTests(unittest.TestCase):
             self.assertEqual(call[7], payload)
             self.assertEqual(gl.deleted, [])
 
+    def test_bc4_uses_exact_rgtc_payload_and_core_30_support(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "roughness_bc4.dds"
+            payload = bytes(range(8))
+            _write_dds(path, 80, payload)
+            texture = parse_native_dds(path)
+
+            unsupported = _FakeGl(version=b"2.1", extensions=())
+            with self.assertRaisesRegex(NativeMaterialGlError, "rgtc"):
+                upload_native_dds_2d(unsupported, texture)
+
+            gl = _FakeGl(version=b"3.0", extensions=())
+            self.assertEqual(upload_native_dds_2d(gl, texture), 7)
+            self.assertEqual(len(gl.compressed_calls), 1)
+            call = gl.compressed_calls[0]
+            self.assertEqual(call[2], 0x8DBB)
+            self.assertEqual(call[6], 8)
+            self.assertEqual(call[7], payload)
+
+    def test_r8_upload_uses_red_channel_without_swizzle(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "roughness_r8.dds"
+            payload = bytes(range(16))
+            _write_dds(path, 61, payload)
+            texture = parse_native_dds(path)
+            gl = _FakeGl()
+            self.assertEqual(upload_native_dds_2d(gl, texture), 7)
+            self.assertEqual(len(gl.linear_calls), 1)
+            call = gl.linear_calls[0]
+            self.assertEqual(call[2], 0x8229)  # GL_R8
+            self.assertEqual(call[6], 0x1903)  # GL_RED
+            self.assertEqual(call[-1], payload)
+
     def test_rgba8_upload_uses_exact_linear_bytes(self):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "rgba.dds"
@@ -147,23 +182,14 @@ class NativeMaterialGlTests(unittest.TestCase):
     def test_partial_mip_chain_sets_explicit_texture_max_level(self):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "partial_mips.dds"
-            # 8x8 RGBA8 level 0 (256 bytes) + 4x4 level 1 (64 bytes). The DDS
-            # deliberately stops before 2x2/1x1, so GL_TEXTURE_MAX_LEVEL must
-            # prevent the mipmapped sampler from requiring nonexistent levels.
             payload = bytes((index % 251 for index in range(320)))
             _write_dds(path, 29, payload, width=8, height=8, mip_levels=2)
             texture = parse_native_dds(path)
             gl = _FakeGl()
             self.assertEqual(upload_native_dds_2d(gl, texture), 7)
             self.assertEqual(len(gl.linear_calls), 2)
-            self.assertIn(
-                (gl.GL_TEXTURE_2D, gl.GL_TEXTURE_BASE_LEVEL, 0),
-                gl.tex_parameters,
-            )
-            self.assertIn(
-                (gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MAX_LEVEL, 1),
-                gl.tex_parameters,
-            )
+            self.assertIn((gl.GL_TEXTURE_2D, gl.GL_TEXTURE_BASE_LEVEL, 0), gl.tex_parameters)
+            self.assertIn((gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MAX_LEVEL, 1), gl.tex_parameters)
             self.assertIn(
                 (gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MIN_FILTER, gl.GL_LINEAR_MIPMAP_LINEAR),
                 gl.tex_parameters,
