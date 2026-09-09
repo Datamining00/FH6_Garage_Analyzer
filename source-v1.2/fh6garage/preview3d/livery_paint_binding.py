@@ -1,0 +1,228 @@
+from __future__ import annotations
+
+import re
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+
+from .material_appearance_patch import _read_glb_document
+
+
+LIVERY_PAINT_BINDING_REVISION = 1
+_CANONICAL_BINDING_HASH = re.compile(r"^0x([0-9A-Fa-f]{16})$")
+_CUSTOM_COLOR_SELECTOR = 0xFFFFFFFF
+
+
+def _canonical_binding_hash(value: Any) -> int | None:
+    """Accept only the canonical 64-bit provenance emitted by the KFPS helper."""
+    if not isinstance(value, str):
+        return None
+    match = _CANONICAL_BINDING_HASH.fullmatch(value.strip())
+    if match is None:
+        return None
+    return int(match.group(1), 16)
+
+
+def _paint_record_index(report: Any) -> tuple[dict[int, dict[str, Any]], set[int], list[str]]:
+    if not isinstance(report, dict) or report.get("status") != "paint_descriptor_parsed":
+        return {}, set(), ["C_livery paint descriptor provenance is unavailable or unresolved."]
+
+    unique: dict[int, dict[str, Any]] = {}
+    ambiguous: set[int] = set()
+    issues: list[str] = []
+    for raw_record in report.get("records") or []:
+        if not isinstance(raw_record, dict):
+            issues.append("A paint descriptor record is not an object and was ignored.")
+            continue
+        try:
+            material_hash = int(raw_record.get("material_identifier_u64_le"))
+        except (TypeError, ValueError):
+            issues.append("A paint descriptor record has no valid 64-bit material identifier.")
+            continue
+        if material_hash < 0 or material_hash > 0xFFFFFFFFFFFFFFFF:
+            issues.append("A paint descriptor material identifier is outside the unsigned 64-bit range.")
+            continue
+        if material_hash in unique or material_hash in ambiguous:
+            unique.pop(material_hash, None)
+            ambiguous.add(material_hash)
+            continue
+        unique[material_hash] = raw_record
+    if ambiguous:
+        issues.append(
+            "Duplicate C_livery material identifiers are ambiguous and were not rendered: "
+            + ", ".join(f"0x{value:016X}" for value in sorted(ambiguous))
+        )
+    return unique, ambiguous, issues
+
+
+def _custom_primary_linear_rgb(record: dict[str, Any]) -> tuple[np.ndarray | None, str]:
+    if not bool(record.get("primary_color_enabled")):
+        return None, "primary_color_disabled"
+    try:
+        selector = int(record.get("manufacturer_color_selector"))
+    except (TypeError, ValueError):
+        return None, "manufacturer_selector_invalid"
+    if selector != _CUSTOM_COLOR_SELECTOR:
+        # Manufacturer palettes are a separate source of truth. Do not treat the
+        # raw BGRA bytes as authoritative while a palette selector is active.
+        return None, "manufacturer_selector_deferred"
+
+    rgba = record.get("primary_rgba")
+    if not isinstance(rgba, (list, tuple)) or len(rgba) < 4:
+        return None, "primary_rgba_invalid"
+    values: list[int] = []
+    for component in rgba[:4]:
+        if isinstance(component, bool):
+            return None, "primary_rgba_invalid"
+        try:
+            value = int(component)
+        except (TypeError, ValueError):
+            return None, "primary_rgba_invalid"
+        if value < 0 or value > 255:
+            return None, "primary_rgba_invalid"
+        values.append(value)
+
+    # The current PBR shader linearizes legacy/display paint colors with pow(2.2)
+    # before the livery alpha composite. Use that exact established contract here
+    # instead of introducing a second color-transfer convention in Paint P2.
+    display_rgb = np.asarray(values[:3], dtype=np.float32) / np.float32(255.0)
+    return np.power(display_rgb, np.float32(2.2)).astype(np.float32), "custom_primary_ready"
+
+
+def apply_exact_livery_paint_to_aux_stream(
+    glb_path: str | Path,
+    scene_data: Any,
+    aux_stream: np.ndarray,
+    paint_provenance: Any,
+) -> tuple[np.ndarray, dict[str, Any]]:
+    """Apply exact C_livery primary colors to the existing PBR aux stream.
+
+    Paint P2 intentionally has no mesh-name, filename, material-name, panel, or
+    vehicle-specific fallback. A GLB primitive must declare role=paint and carry
+    the canonical `kfps_material_binding_hash`; that exact 64-bit value must match
+    one unique C_livery paint record whose custom primary color is enabled.
+
+    Manufacturer palettes, secondary/two-tone color, finish materials, and
+    inheritance across related body paint groups remain deferred.
+    """
+    if not isinstance(aux_stream, np.ndarray) or aux_stream.ndim != 2 or aux_stream.shape[1] != 4:
+        raise ValueError("Paint P2 requires an Nx4 material aux stream.")
+    expected_vertices = int(len(getattr(scene_data, "positions")))
+    if len(aux_stream) != expected_vertices:
+        raise ValueError(
+            f"Paint P2 aux stream vertex count {len(aux_stream)} does not match scene {expected_vertices}."
+        )
+
+    records, ambiguous_hashes, record_issues = _paint_record_index(paint_provenance)
+    output = np.ascontiguousarray(aux_stream.copy(), dtype=np.float32)
+    report: dict[str, Any] = {
+        "format": "fh6_livery_paint_binding_v1",
+        "status": "paint_binding_unavailable" if not records and not ambiguous_hashes else "paint_binding_evaluated",
+        "rendering_applied": False,
+        "game_data_modified": False,
+        "matched_primitives": 0,
+        "matched_vertices": 0,
+        "exact_record_count": len(records),
+        "ambiguous_record_count": len(ambiguous_hashes),
+        "deferred_manufacturer_hashes": [],
+        "disabled_primary_hashes": [],
+        "unmatched_paint_hashes": [],
+        "malformed_binding_primitives": [],
+        "issues": list(record_issues),
+        "interpretation_boundary": (
+            "Paint P2 applies only unique exact-hash custom primary colors. Manufacturer palettes, "
+            "secondary/two-tone colors, finish materials, and paint-group inheritance remain deferred."
+        ),
+    }
+    if not isinstance(paint_provenance, dict) or paint_provenance.get("status") != "paint_descriptor_parsed":
+        return output, report
+
+    document = _read_glb_document(Path(glb_path))
+    meshes = document.get("meshes") or []
+    accessors = document.get("accessors") or []
+    node_extras_by_mesh: dict[int, dict[str, Any]] = {}
+    for node in document.get("nodes") or []:
+        if not isinstance(node, dict) or "mesh" not in node:
+            continue
+        try:
+            mesh_index = int(node["mesh"])
+        except (TypeError, ValueError):
+            continue
+        if 0 <= mesh_index < len(meshes):
+            node_extras_by_mesh[mesh_index] = dict(node.get("extras") or {})
+
+    offset = 0
+    unmatched: set[int] = set()
+    deferred_manufacturer: set[int] = set()
+    disabled_primary: set[int] = set()
+    for diagnostic_index, diagnostic in enumerate(
+        tuple(getattr(scene_data, "primitive_diagnostics", ()) or ())
+    ):
+        mesh_index = int(diagnostic.get("mesh_index", -1))
+        primitive_index = int(diagnostic.get("primitive_index", -1))
+        if mesh_index < 0 or mesh_index >= len(meshes):
+            raise ValueError("Paint P2 mesh index is outside the GLB.")
+        mesh = meshes[mesh_index]
+        primitives = mesh.get("primitives") or []
+        if primitive_index < 0 or primitive_index >= len(primitives):
+            raise ValueError("Paint P2 primitive index is outside the GLB.")
+        attrs = primitives[primitive_index].get("attributes") or {}
+        accessor_index = int(attrs["POSITION"])
+        if accessor_index < 0 or accessor_index >= len(accessors):
+            raise ValueError("Paint P2 POSITION accessor is outside the GLB.")
+        vertex_count = int(accessors[accessor_index].get("count", 0))
+        if vertex_count <= 0:
+            raise ValueError("Paint P2 primitive has no vertices.")
+        end = offset + vertex_count
+        if end > len(output):
+            raise ValueError("Paint P2 primitive ranges exceed the material aux stream.")
+
+        extras = dict(node_extras_by_mesh.get(mesh_index) or {})
+        extras.update(mesh.get("extras") or {})
+        role = str(diagnostic.get("declared_role") or extras.get("kfps_role") or "trim").casefold()
+        if role == "paint":
+            binding_hash = _canonical_binding_hash(extras.get("kfps_material_binding_hash"))
+            if binding_hash is None:
+                report["malformed_binding_primitives"].append(
+                    {"diagnostic_index": diagnostic_index, "mesh_index": mesh_index, "primitive_index": primitive_index}
+                )
+            elif binding_hash in ambiguous_hashes:
+                pass
+            else:
+                record = records.get(binding_hash)
+                if record is None:
+                    unmatched.add(binding_hash)
+                else:
+                    linear_rgb, state = _custom_primary_linear_rgb(record)
+                    if linear_rgb is not None:
+                        output[offset:end, 1:4] = linear_rgb[None, :]
+                        report["matched_primitives"] += 1
+                        report["matched_vertices"] += vertex_count
+                    elif state == "manufacturer_selector_deferred":
+                        deferred_manufacturer.add(binding_hash)
+                    elif state == "primary_color_disabled":
+                        disabled_primary.add(binding_hash)
+                    else:
+                        report["issues"].append(
+                            f"0x{binding_hash:016X} custom primary color is invalid ({state}) and was not rendered."
+                        )
+        offset = end
+
+    if offset != len(output):
+        raise ValueError(
+            f"Paint P2 flattened primitive vertex count {offset} does not match aux stream {len(output)}."
+        )
+
+    report["deferred_manufacturer_hashes"] = [
+        f"0x{value:016X}" for value in sorted(deferred_manufacturer)
+    ]
+    report["disabled_primary_hashes"] = [
+        f"0x{value:016X}" for value in sorted(disabled_primary)
+    ]
+    report["unmatched_paint_hashes"] = [f"0x{value:016X}" for value in sorted(unmatched)]
+    report["rendering_applied"] = report["matched_primitives"] > 0
+    report["status"] = (
+        "exact_custom_primary_applied" if report["rendering_applied"] else "no_exact_custom_primary_applied"
+    )
+    return output, report
