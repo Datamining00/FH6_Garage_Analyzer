@@ -7,6 +7,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "app.py"
 LAUNCHER = ROOT / "tools" / "Run_FH6_P3F_Materialbin_Diagnostic.cmd"
+SAFETY_PATCH = ROOT / "fh6garage" / "v1_3_2_safety_patch.py"
 
 
 class P3fPackagedEntrypointTests(unittest.TestCase):
@@ -44,6 +45,8 @@ class P3fPackagedEntrypointTests(unittest.TestCase):
         self.assertNotIn(":pick_paint", text.casefold())
         self.assertIn("GLB     : AUTO", text)
         self.assertIn("C_livery: AUTO", text)
+        self.assertIn(":pick_save_root", text)
+        self.assertIn("No FH6 save path is available", text)
         self.assertIn("%LOCALAPPDATA%\\FH6 Assistant\\Diagnostics", text)
         self.assertIn("P3FCache", text)
         self.assertIn("GAME/SAVE READ-ONLY", text)
@@ -51,6 +54,12 @@ class P3fPackagedEntrypointTests(unittest.TestCase):
         self.assertNotIn("copy /y", text.casefold())
         self.assertNotIn("move /y", text.casefold())
         self.assertNotIn('del /q "%VEHICLE%"', text)
+
+    def test_release_safety_patch_keeps_legacy_no_argument_startup_call_compatible(self):
+        text = SAFETY_PATCH.read_text(encoding="utf-8")
+        self.assertIn("def apply_v1_3_2_safety_patches(MainWindow=None)", text)
+        self.assertIn("if MainWindow is None:", text)
+        self.assertIn("from .ui import MainWindow as UiMainWindow", text)
 
 
 if __name__ == "__main__":
