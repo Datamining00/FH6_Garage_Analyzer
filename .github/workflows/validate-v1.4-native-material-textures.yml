@@ -17,6 +17,7 @@ on:
       - "source-v1.2/fh6garage/preview3d/native_material_gl.py"
       - "source-v1.2/fh6garage/preview3d/native_material_render_plan.py"
       - "source-v1.2/fh6garage/preview3d/native_material_texture_patch.py"
+      - "source-v1.2/fh6garage/preview3d/native_normal_texture_diagnostics.py"
       - "source-v1.2/fh6garage/preview3d/wheel_morph_helper.py"
       - "source-v1.2/tests/test_material_runtime_wiring_patch.py"
       - "source-v1.2/tests/test_native_material_textures.py"
@@ -25,6 +26,7 @@ on:
       - "source-v1.2/tests/test_native_material_gl.py"
       - "source-v1.2/tests/test_native_material_render_plan.py"
       - "source-v1.2/tests/test_native_material_texture_patch.py"
+      - "source-v1.2/tests/test_native_normal_texture_diagnostics.py"
       - "source-v1.2/tests/test_native_swatchbin_decoder_source.py"
       - "source-v1.2/tests/test_material_provenance_bridge.py"
       - "source-v1.2/tools/patch_kfps_wheel_morph_diagnostic.py"
@@ -82,6 +84,7 @@ jobs:
           python -m py_compile fh6garage/preview3d/native_material_gl.py
           python -m py_compile fh6garage/preview3d/native_material_render_plan.py
           python -m py_compile fh6garage/preview3d/native_material_texture_patch.py
+          python -m py_compile fh6garage/preview3d/native_normal_texture_diagnostics.py
           python -m py_compile fh6garage/preview3d/chassis_converter.py
           python -m unittest tests.test_material_runtime_wiring_patch -v
           python -m unittest tests.test_native_material_textures -v
@@ -90,6 +93,7 @@ jobs:
           python -m unittest tests.test_native_material_gl -v
           python -m unittest tests.test_native_material_render_plan -v
           python -m unittest tests.test_native_material_texture_patch -v
+          python -m unittest tests.test_native_normal_texture_diagnostics -v
           python -m unittest tests.test_native_swatchbin_decoder_source -v
           python -m unittest tests.test_material_provenance_bridge -v
 
