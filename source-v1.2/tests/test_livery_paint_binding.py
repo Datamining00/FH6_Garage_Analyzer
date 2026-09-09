@@ -65,6 +65,34 @@ def _report(records):
     return {"status": "paint_descriptor_parsed", "records": list(records)}
 
 
+def _palette(
+    primary=(0.2, 0.4, 0.6),
+    *,
+    primary_present=True,
+    secondary=(0.7, 0.8, 0.9),
+    secondary_present=True,
+    entry_count=1,
+):
+    entries = [
+        {"index": index, "material_names": ["carpaint"], "preview_color": [0.1, 0.1, 0.1], "path": f"p{index}.swatchbin"}
+        for index in range(entry_count)
+    ]
+    return {
+        "status": "manufacturer_colors_parsed",
+        "groups": [
+            {
+                "index": 0,
+                "entry_count": entry_count,
+                "entries": entries,
+                "primary_group_preview_present": bool(primary_present),
+                "primary_group_preview_color": list(primary),
+                "secondary_group_preview_present": bool(secondary_present),
+                "secondary_group_preview_color": list(secondary),
+            }
+        ],
+    }
+
+
 class LiveryPaintBindingTests(unittest.TestCase):
     def test_exact_kfps_x16_hash_custom_primary_applies_only_to_matching_primitive(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -82,8 +110,82 @@ class LiveryPaintBindingTests(unittest.TestCase):
             self.assertEqual(diagnostic["status"], "exact_custom_primary_applied")
             self.assertEqual(diagnostic["binding_format"], "kfps_material_binding_hash_x16_unprefixed")
             self.assertEqual(diagnostic["matched_primitives"], 1)
+            self.assertEqual(diagnostic["matched_custom_primitives"], 1)
+            self.assertEqual(diagnostic["matched_manufacturer_primitives"], 0)
             self.assertEqual(diagnostic["matched_vertices"], 3)
             self.assertIn(f"0x{HOOD:016X}", diagnostic["unmatched_paint_hashes"])
+
+    def test_manufacturer_selector_applies_group_trailer_primary_as_linear_even_if_custom_primary_disabled(self):
+        with tempfile.TemporaryDirectory() as temp:
+            glb = Path(temp) / "car.glb"
+            _write_glb(glb, [(_binding(BODY), 3)])
+            scene = _scene([3])
+            aux = np.asarray([[0.0, -1.0, -1.0, -1.0]] * 3, dtype=np.float32)
+            rendered, diagnostic = apply_exact_livery_paint_to_aux_stream(
+                glb,
+                scene,
+                aux,
+                _report([_record(BODY, rgba=(255, 0, 255, 255), enabled=False, selector=0)]),
+                _palette(primary=(0.2, 0.4, 0.6)),
+            )
+            expected = np.asarray([0.2, 0.4, 0.6], dtype=np.float32)
+            np.testing.assert_allclose(rendered[:, 1:4], np.repeat(expected[None, :], 3, axis=0), atol=1e-6)
+            self.assertEqual(diagnostic["status"], "exact_manufacturer_primary_applied")
+            self.assertEqual(diagnostic["matched_manufacturer_primitives"], 1)
+            self.assertEqual(diagnostic["matched_custom_primitives"], 0)
+            self.assertEqual(diagnostic["manufacturer_matched_hashes"], [f"0x{BODY:016X}"])
+            self.assertEqual(diagnostic["disabled_primary_hashes"], [])
+            self.assertEqual(diagnostic["manufacturer_selector_results"][0]["status"], "manufacturer_primary_linear_resolved")
+            self.assertTrue(diagnostic["manufacturer_selector_results"][0]["secondary_enabled"])
+
+    def test_manufacturer_group_primary_is_group_level_even_when_group_has_multiple_entries(self):
+        with tempfile.TemporaryDirectory() as temp:
+            glb = Path(temp) / "car.glb"
+            _write_glb(glb, [(_binding(BODY), 2)])
+            scene = _scene([2])
+            aux = np.asarray([[0.0, -1.0, -1.0, -1.0]] * 2, dtype=np.float32)
+            rendered, diagnostic = apply_exact_livery_paint_to_aux_stream(
+                glb,
+                scene,
+                aux,
+                _report([_record(BODY, selector=0)]),
+                _palette(primary=(0.15, 0.25, 0.35), entry_count=2),
+            )
+            np.testing.assert_allclose(rendered[:, 1:4], [[0.15, 0.25, 0.35]] * 2, atol=1e-6)
+            self.assertEqual(diagnostic["manufacturer_selector_results"][0]["entry_count"], 2)
+            self.assertEqual(diagnostic["matched_manufacturer_primitives"], 1)
+
+    def test_manufacturer_selector_without_palette_is_deferred_and_never_uses_raw_bgra(self):
+        with tempfile.TemporaryDirectory() as temp:
+            glb = Path(temp) / "car.glb"
+            _write_glb(glb, [(_binding(BODY), 3)])
+            scene = _scene([3])
+            aux = np.asarray([[0.0, -1.0, -1.0, -1.0]] * 3, dtype=np.float32)
+            rendered, diagnostic = apply_exact_livery_paint_to_aux_stream(
+                glb, scene, aux, _report([_record(BODY, rgba=(255, 0, 255, 255), selector=7)])
+            )
+            np.testing.assert_array_equal(rendered, aux)
+            self.assertEqual(diagnostic["deferred_manufacturer_hashes"], [f"0x{BODY:016X}"])
+            self.assertEqual(diagnostic["manufacturer_selector_results"][0]["status"], "manufacturer_palette_unavailable")
+            self.assertFalse(diagnostic["rendering_applied"])
+
+    def test_manufacturer_primary_absent_fails_closed_without_custom_fallback(self):
+        with tempfile.TemporaryDirectory() as temp:
+            glb = Path(temp) / "car.glb"
+            _write_glb(glb, [(_binding(BODY), 3)])
+            scene = _scene([3])
+            aux = np.asarray([[0.0, -1.0, -1.0, -1.0]] * 3, dtype=np.float32)
+            rendered, diagnostic = apply_exact_livery_paint_to_aux_stream(
+                glb,
+                scene,
+                aux,
+                _report([_record(BODY, rgba=(255, 255, 255, 255), selector=0)]),
+                _palette(primary_present=False),
+            )
+            np.testing.assert_array_equal(rendered, aux)
+            self.assertEqual(diagnostic["deferred_manufacturer_hashes"], [f"0x{BODY:016X}"])
+            self.assertEqual(diagnostic["manufacturer_selector_results"][0]["status"], "manufacturer_primary_trailer_absent")
+            self.assertFalse(diagnostic["rendering_applied"])
 
     def test_same_hash_on_non_paint_primitive_is_not_recolored(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -135,20 +237,7 @@ class LiveryPaintBindingTests(unittest.TestCase):
             self.assertEqual(diagnostic["ambiguous_record_count"], 1)
             self.assertTrue(any("Duplicate C_livery material identifiers" in issue for issue in diagnostic["issues"]))
 
-    def test_manufacturer_selector_is_deferred_not_guessed_from_raw_bgra(self):
-        with tempfile.TemporaryDirectory() as temp:
-            glb = Path(temp) / "car.glb"
-            _write_glb(glb, [(_binding(BODY), 3)])
-            scene = _scene([3])
-            aux = np.asarray([[0.0, -1.0, -1.0, -1.0]] * 3, dtype=np.float32)
-            rendered, diagnostic = apply_exact_livery_paint_to_aux_stream(
-                glb, scene, aux, _report([_record(BODY, selector=7)])
-            )
-            np.testing.assert_array_equal(rendered, aux)
-            self.assertEqual(diagnostic["deferred_manufacturer_hashes"], [f"0x{BODY:016X}"])
-            self.assertFalse(diagnostic["rendering_applied"])
-
-    def test_disabled_primary_color_is_not_applied(self):
+    def test_disabled_custom_primary_color_is_not_applied(self):
         with tempfile.TemporaryDirectory() as temp:
             glb = Path(temp) / "car.glb"
             _write_glb(glb, [(_binding(BODY), 3)])
