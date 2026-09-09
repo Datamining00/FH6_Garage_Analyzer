@@ -70,6 +70,25 @@ class MaterialProvenanceBridgeTests(unittest.TestCase):
         self.assertIn("uvTiling.X = SanitizeTilingValue(vector.X)", text)
         self.assertIn("uvTiling.Y = SanitizeTilingValue(vector.Y)", text)
 
+    def test_material_uv_tiling_covers_late_forzatechstudio_namehash_entries(self):
+        text = MATERIAL_HELPER.read_text(encoding="utf-8")
+        # These hashes occur later in FTS NameHashService and previously fell
+        # outside the converter's hand-maintained subset. Keep representative
+        # diffuse/roughness/effect/generic generations locked to the published
+        # identifiers rather than adding path/name heuristics.
+        self.assertIn("0xD5E8D0C1", text)  # GlassRoughnessUVTiling
+        self.assertIn("0x894A360A", text)  # GlossUVTiling
+        self.assertIn("0xEA33F406", text)  # BaseColorRoughnessTiledDirtUVTiling
+        self.assertIn("0xCD060FD0", text)  # CH1PatternMaskUVTiling
+        self.assertIn("0x694E917B", text)  # ScrollingPixel1_UVTiling
+        self.assertIn("0xF6C42060", text)  # MotionVector_Y_UVTiling
+        self.assertIn("0x708065F7", text)  # UVTiling_10
+        self.assertIn("0x9A7DB1FA", text)  # UVTiling_11
+        self.assertIn("0xFD6BB566", text)  # UVTiling_12
+        self.assertIn("0x32879008", text)  # UVTiling_13
+        self.assertIn("0x52E3B8D7", text)  # UVTiling_14
+        self.assertIn("0x0318C562", text)  # UVTiling_15
+
     def test_shader_semantics_are_global_not_vehicle_specific(self):
         text = MATERIAL_HELPER.read_text(encoding="utf-8")
         self.assertIn("0xA05F6E3F", text)  # Roughness
