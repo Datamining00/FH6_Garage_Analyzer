@@ -29,6 +29,7 @@ from .native_material_render_plan import (
     NativeMaterialTextureSelection,
     build_native_material_render_plan,
 )
+from .native_normal_texture_diagnostics import build_native_normal_texture_diagnostics
 
 _PATCH_MARKER = "_fh6_native_base_color_texture_rendering_patched"
 _BASE_TEXTURE_UNIT = 4
@@ -308,15 +309,18 @@ def configure_native_material_texture_widget(widget: Any, glb_path: str | Path) 
     """Prepare render-plan, UV0 stream and primitive draw ranges without touching GL."""
     try:
         plan = build_native_material_render_plan(glb_path)
+        normal_diagnostics = build_native_normal_texture_diagnostics(plan)
         uv0 = build_native_material_uv0_stream(glb_path, widget.scene_data)
         ranges, range_issues = build_native_base_color_draw_ranges(widget.scene_data, plan)
     except (OSError, ValueError, NativeMaterialRenderPlanError) as exc:
         widget._fh6_native_texture_plan = None
+        widget._fh6_native_normal_texture_diagnostics = None
         widget._fh6_native_material_uv0 = None
         widget._fh6_native_base_draw_ranges = ()
         widget._fh6_native_texture_prepare_error = f"{type(exc).__name__}: {exc}"
         return False
     widget._fh6_native_texture_plan = plan
+    widget._fh6_native_normal_texture_diagnostics = normal_diagnostics
     widget._fh6_native_material_uv0 = uv0
     widget._fh6_native_base_draw_ranges = ranges
     widget._fh6_native_texture_prepare_error = "; ".join(range_issues)
