@@ -51,10 +51,14 @@ class MaterialRuntimeWiringPatchTests(unittest.TestCase):
         self.assertEqual(widget._fh6_livery_paint_primitives, 0)
         self.assertEqual(widget._fh6_material_direct_wiring_status if hasattr(widget, "_fh6_material_direct_wiring_status") else "", "")
 
-    def test_configure_passes_transient_c_livery_provenance_to_exact_paint_bridge(self):
+    def test_configure_passes_transient_c_livery_and_manufacturer_provenance_to_exact_paint_bridge(self):
         scene = SimpleNamespace(positions=np.zeros((2, 3), dtype=np.float32))
         provenance = {"status": "paint_descriptor_parsed", "records": []}
-        textures = SimpleNamespace(_fh6_paint_provenance=provenance)
+        palette = {"status": "manufacturer_colors_parsed", "groups": []}
+        textures = SimpleNamespace(
+            _fh6_paint_provenance=provenance,
+            _fh6_manufacturer_colors=palette,
+        )
         widget = SimpleNamespace(scene_data=scene, livery_textures=textures)
         params = np.zeros((2, 4), dtype=np.float32)
         aux = np.asarray([[0.0, -1.0, -1.0, -1.0]] * 2, dtype=np.float32)
@@ -68,13 +72,14 @@ class MaterialRuntimeWiringPatchTests(unittest.TestCase):
             return_value=(params, aux, f0, coat, emission, 1, 0),
         ), patch(
             "fh6garage.preview3d.livery_paint_binding.apply_exact_livery_paint_to_aux_stream",
-            return_value=(painted_aux, {"status": "exact_custom_primary_applied", "matched_primitives": 1}),
+            return_value=(painted_aux, {"status": "exact_manufacturer_primary_applied", "matched_primitives": 1}),
         ) as apply_paint:
             self.assertTrue(wiring.configure_game_like_material_widget(widget, "car.glb"))
         self.assertIs(widget._fh6_material_aux, painted_aux)
         self.assertEqual(widget._fh6_livery_paint_primitives, 1)
-        self.assertEqual(widget._fh6_livery_paint_binding_report["status"], "exact_custom_primary_applied")
+        self.assertEqual(widget._fh6_livery_paint_binding_report["status"], "exact_manufacturer_primary_applied")
         self.assertIs(apply_paint.call_args.args[3], provenance)
+        self.assertIs(apply_paint.call_args.args[4], palette)
 
     def test_paint_bridge_failure_is_nonfatal_to_native_material_streams(self):
         scene = SimpleNamespace(positions=np.zeros((2, 3), dtype=np.float32))
