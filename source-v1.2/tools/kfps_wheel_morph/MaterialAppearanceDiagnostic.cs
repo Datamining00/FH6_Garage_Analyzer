@@ -5,6 +5,11 @@ using ForzaTools.Bundles.Metadata;
 
 namespace Kfps.ChassisConverter;
 
+internal sealed record MaterialTextureBindingDiagnostic(
+    string ParameterHash,
+    string PathHash,
+    string TexturePath);
+
 internal sealed record MaterialAppearanceDiagnostic(
     string ResolutionMode,
     string MaterialSource,
@@ -30,7 +35,8 @@ internal sealed record MaterialAppearanceDiagnostic(
     string EmissiveColorParameterHash,
     float? EmissiveIntensity,
     string EmissiveIntensityParameterHash,
-    string[] TexturePaths);
+    string[] TexturePaths,
+    MaterialTextureBindingDiagnostic[] TextureBindings);
 
 internal static class MaterialAppearanceRuntime
 {
@@ -146,6 +152,7 @@ internal static class MaterialAppearanceRuntime
         float? emissiveIntensity = null;
         var emissiveIntensityHash = string.Empty;
         var texturePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var textureBindings = new Dictionary<string, MaterialTextureBindingDiagnostic>(StringComparer.OrdinalIgnoreCase);
         var parameterCount = 0;
 
         foreach (var blob in parameterBlobs)
@@ -215,9 +222,13 @@ internal static class MaterialAppearanceRuntime
                     && parameter.Value is TextureParameter texture
                     && !string.IsNullOrWhiteSpace(texture.Path))
                 {
-                    // Provenance only in this revision. Texture decoding remains a
-                    // separate stage; paths are not rewritten or guessed here.
-                    texturePaths.Add(texture.Path.Replace('\\', '/'));
+                    // Preserve exact binding provenance. Decoding/sampling remains
+                    // downstream; no diffuse/normal/roughness role is guessed here.
+                    var texturePath = texture.Path.Replace('\\', '/');
+                    var pathHashText = $"{texture.PathHash:X8}";
+                    texturePaths.Add(texturePath);
+                    textureBindings[$"{hashText}|{pathHashText}|{texturePath}"] =
+                        new MaterialTextureBindingDiagnostic(hashText, pathHashText, texturePath);
                 }
             }
         }
@@ -247,7 +258,13 @@ internal static class MaterialAppearanceRuntime
             emissiveColorHash,
             emissiveIntensity,
             emissiveIntensityHash,
-            texturePaths.OrderBy(value => value, StringComparer.OrdinalIgnoreCase).Take(32).ToArray());
+            texturePaths.OrderBy(value => value, StringComparer.OrdinalIgnoreCase).Take(32).ToArray(),
+            textureBindings.Values
+                .OrderBy(value => value.ParameterHash, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(value => value.PathHash, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(value => value.TexturePath, StringComparer.OrdinalIgnoreCase)
+                .Take(64)
+                .ToArray());
     }
 
     private static float[] VectorValues(Vector4 value) => [value.X, value.Y, value.Z, value.W];
@@ -278,5 +295,6 @@ internal static class MaterialAppearanceRuntime
             "",
             null,
             "",
+            [],
             []);
 }
