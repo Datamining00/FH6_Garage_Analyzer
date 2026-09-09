@@ -3,11 +3,17 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from typing import Sequence
+import sys
+from typing import Any, Sequence
 
 from .manufacturer_materialbin_diagnostics import trace_manufacturer_materialbin_payloads
 from .manufacturer_overlay_diagnostics import diagnose_manufacturer_overlay
-from .wheel_morph_helper import WHEEL_MORPH_HELPER_REVISION, WHEEL_MORPH_HELPER_SHA256
+from .wheel_morph_helper import (
+    WHEEL_MORPH_HELPER_REVISION,
+    WHEEL_MORPH_HELPER_SHA256,
+    WheelMorphHelperError,
+    verified_bundled_wheel_morph_helper,
+)
 
 
 MANUFACTURER_MATERIALBIN_CLI_FORMAT = "fh6_manufacturer_materialbin_cli_v1"
@@ -33,6 +39,35 @@ def _validation_status(report: dict) -> str:
     return "materialbin_chain_unresolved"
 
 
+def _emit_error(message: str) -> None:
+    stream = getattr(sys, "stderr", None)
+    if stream is not None:
+        print(message, file=stream)
+
+
+def _write_result(result: dict[str, Any], output: Path | None) -> None:
+    payload = json.dumps(result, indent=2, ensure_ascii=False)
+    if output is not None:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(payload + "\n", encoding="utf-8")
+    stream = getattr(sys, "stdout", None)
+    if stream is not None:
+        print(payload, file=stream)
+
+
+def _base_cli_report(status: str) -> dict[str, Any]:
+    return {
+        "cli_format": MANUFACTURER_MATERIALBIN_CLI_FORMAT,
+        "cli_revision": MANUFACTURER_MATERIALBIN_CLI_REVISION,
+        "status": status,
+        "helper_revision": WHEEL_MORPH_HELPER_REVISION,
+        "helper_sha256": WHEEL_MORPH_HELPER_SHA256,
+        "rendering_enabled": False,
+        "rendering_applied": False,
+        "game_data_modified": False,
+    }
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
@@ -40,27 +75,68 @@ def build_parser() -> argparse.ArgumentParser:
             "through exact MatL/Texture2D references to the first exact swatchbin."
         )
     )
-    parser.add_argument("--glb", required=True, type=_existing_file)
-    parser.add_argument("--paint", required=True, type=_existing_file, help="C_livery paint source")
-    parser.add_argument("--vehicle", required=True, type=_existing_file, help="Selected FH6 vehicle ZIP")
-    parser.add_argument("--cache", required=True, type=Path, help="Writable diagnostic cache root outside FH6 data")
+    parser.add_argument("--self-check", action="store_true", help="Verify the packaged P3F module/helper contract only")
+    parser.add_argument("--glb", type=_existing_file)
+    parser.add_argument("--paint", type=_existing_file, help="C_livery paint source")
+    parser.add_argument("--vehicle", type=_existing_file, help="Selected FH6 vehicle ZIP")
+    parser.add_argument("--cache", type=Path, help="Writable diagnostic cache root outside FH6 data")
     parser.add_argument("--output", type=Path, help="Optional diagnostic JSON output path")
     return parser
 
 
+def _run_self_check(output: Path | None) -> int:
+    result = _base_cli_report("packaged_p3f_self_check_failed")
+    result["validation_status"] = "packaged_contract_unavailable"
+    try:
+        helper = verified_bundled_wheel_morph_helper()
+    except WheelMorphHelperError as exc:
+        result["detail"] = str(exc)
+        _write_result(result, output)
+        return 4
+    if helper is None:
+        result["detail"] = "The SHA-verified bundled KFPS helper is unavailable."
+        _write_result(result, output)
+        return 4
+    result["status"] = "packaged_p3f_self_check_passed"
+    result["validation_status"] = "packaged_contract_ready"
+    result["verified_helper"] = str(helper)
+    _write_result(result, output)
+    return 0
+
+
 def run_manufacturer_materialbin_diagnostic(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(list(argv) if argv is not None else None)
-    cache = args.cache.expanduser().resolve()
     output = args.output.expanduser().resolve() if args.output is not None else None
 
+    if args.self_check:
+        return _run_self_check(output)
+
+    if args.glb is None or args.paint is None or args.vehicle is None or args.cache is None:
+        _emit_error("--glb, --paint, --vehicle, and --cache are required unless --self-check is used.")
+        return 2
+
+    cache = args.cache.expanduser().resolve()
     protected_inputs = {args.glb, args.paint, args.vehicle}
     if output is not None and output in protected_inputs:
-        raise SystemExit("Refusing to overwrite a diagnostic source input with JSON output.")
+        _emit_error("Refusing to overwrite a diagnostic source input with JSON output.")
+        return 2
     if cache in protected_inputs:
-        raise SystemExit("Refusing to use a diagnostic source file as the cache root.")
+        _emit_error("Refusing to use a diagnostic source file as the cache root.")
+        return 2
 
-    p3d = diagnose_manufacturer_overlay(args.glb, args.paint, args.vehicle)
-    traced = trace_manufacturer_materialbin_payloads(p3d, args.vehicle, cache)
+    try:
+        p3d = diagnose_manufacturer_overlay(args.glb, args.paint, args.vehicle)
+        traced = trace_manufacturer_materialbin_payloads(p3d, args.vehicle, cache)
+    except Exception as exc:
+        result = _base_cli_report("manufacturer_materialbin_diagnostic_failed")
+        result["validation_status"] = "diagnostic_execution_failed"
+        result["detail"] = f"{type(exc).__name__}: {exc}"
+        result["glb_file"] = str(args.glb)
+        result["paint_source"] = str(args.paint)
+        result["vehicle_archive"] = str(args.vehicle)
+        result["cache_root"] = str(cache)
+        _write_result(result, output)
+        return 5
 
     result = dict(traced)
     result["cli_format"] = MANUFACTURER_MATERIALBIN_CLI_FORMAT
@@ -76,11 +152,7 @@ def run_manufacturer_materialbin_diagnostic(argv: Sequence[str] | None = None) -
     result["helper_sha256"] = WHEEL_MORPH_HELPER_SHA256
     result["game_data_modified"] = False
 
-    payload = json.dumps(result, indent=2, ensure_ascii=False)
-    if output is not None:
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(payload + "\n", encoding="utf-8")
-    print(payload)
+    _write_result(result, output)
     return 0
 
 
