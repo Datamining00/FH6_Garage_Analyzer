@@ -4,6 +4,8 @@ from pathlib import Path
 import unittest
 
 
+# Workflow sentinel: changes here trigger the packaged P3F validation workflow;
+# the full regression discovery in that workflow also executes test_p3d_breakdown.py.
 ROOT = Path(__file__).resolve().parents[1]
 HELPER = ROOT / "tools" / "kfps_wheel_morph" / "MaterialbinReferenceDiagnostic.cs"
 PATCHER = ROOT / "tools" / "patch_kfps_materialbin_diagnostic.py"
