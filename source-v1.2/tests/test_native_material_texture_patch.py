@@ -160,6 +160,16 @@ class NativeMaterialTexturePatchTests(unittest.TestCase):
         self.assertEqual(len(issues), 1)
         self.assertIsNone(ranges[0].dds_path)
 
+    def test_valid_base_binding_is_disabled_if_same_mesh_has_invalid_base_binding(self):
+        plan = _plan(
+            _selection(1, "base.dds", "base_color", dxgi_format=99, is_srgb=True),
+            _selection(1, "red.dds", "base_color_alpha", dxgi_format=80, is_srgb=False),
+        )
+        ranges, issues = build_native_base_color_draw_ranges(_scene(), plan)
+        self.assertEqual(len(issues), 1)
+        self.assertIn("RGB material sampling", issues[0])
+        self.assertIsNone(ranges[0].dds_path)
+
     def test_single_channel_roughness_and_gloss_are_explicit_surface_modes(self):
         rough_ranges, rough_issues = build_native_base_color_draw_ranges(
             _scene(),
