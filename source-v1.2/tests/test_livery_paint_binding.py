@@ -134,9 +134,34 @@ class LiveryPaintBindingTests(unittest.TestCase):
             self.assertEqual(diagnostic["matched_manufacturer_primitives"], 1)
             self.assertEqual(diagnostic["matched_custom_primitives"], 0)
             self.assertEqual(diagnostic["manufacturer_matched_hashes"], [f"0x{BODY:016X}"])
+            self.assertEqual(diagnostic["manufacturer_overridden_hashes"], [])
             self.assertEqual(diagnostic["disabled_primary_hashes"], [])
             self.assertEqual(diagnostic["manufacturer_selector_results"][0]["status"], "manufacturer_primary_linear_resolved")
+            self.assertEqual(diagnostic["manufacturer_selector_results"][0]["primary_output"], "manufacturer_group_trailer")
             self.assertTrue(diagnostic["manufacturer_selector_results"][0]["secondary_enabled"])
+
+    def test_enabled_custom_primary_overrides_manufacturer_group_primary(self):
+        with tempfile.TemporaryDirectory() as temp:
+            glb = Path(temp) / "car.glb"
+            _write_glb(glb, [(_binding(BODY), 3)])
+            scene = _scene([3])
+            aux = np.asarray([[0.0, -1.0, -1.0, -1.0]] * 3, dtype=np.float32)
+            rendered, diagnostic = apply_exact_livery_paint_to_aux_stream(
+                glb,
+                scene,
+                aux,
+                _report([_record(BODY, rgba=(200, 100, 50, 255), enabled=True, selector=0)]),
+                _palette(primary=(0.2, 0.4, 0.6)),
+            )
+            expected = np.power(np.asarray([200, 100, 50], dtype=np.float32) / 255.0, 2.2)
+            np.testing.assert_allclose(rendered[:, 1:4], np.repeat(expected[None, :], 3, axis=0), atol=1e-6)
+            self.assertEqual(diagnostic["status"], "exact_custom_primary_applied")
+            self.assertEqual(diagnostic["matched_custom_primitives"], 1)
+            self.assertEqual(diagnostic["matched_manufacturer_primitives"], 0)
+            self.assertEqual(diagnostic["manufacturer_matched_hashes"], [])
+            self.assertEqual(diagnostic["manufacturer_overridden_hashes"], [f"0x{BODY:016X}"])
+            self.assertEqual(diagnostic["manufacturer_selector_results"][0]["status"], "manufacturer_primary_linear_resolved")
+            self.assertEqual(diagnostic["manufacturer_selector_results"][0]["primary_output"], "custom_primary_override")
 
     def test_manufacturer_group_primary_is_group_level_even_when_group_has_multiple_entries(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -148,11 +173,12 @@ class LiveryPaintBindingTests(unittest.TestCase):
                 glb,
                 scene,
                 aux,
-                _report([_record(BODY, selector=0)]),
+                _report([_record(BODY, enabled=False, selector=0)]),
                 _palette(primary=(0.15, 0.25, 0.35), entry_count=2),
             )
             np.testing.assert_allclose(rendered[:, 1:4], [[0.15, 0.25, 0.35]] * 2, atol=1e-6)
             self.assertEqual(diagnostic["manufacturer_selector_results"][0]["entry_count"], 2)
+            self.assertEqual(diagnostic["manufacturer_selector_results"][0]["primary_output"], "manufacturer_group_trailer")
             self.assertEqual(diagnostic["matched_manufacturer_primitives"], 1)
 
     def test_manufacturer_selector_without_palette_is_deferred_and_never_uses_raw_bgra(self):
@@ -162,7 +188,7 @@ class LiveryPaintBindingTests(unittest.TestCase):
             scene = _scene([3])
             aux = np.asarray([[0.0, -1.0, -1.0, -1.0]] * 3, dtype=np.float32)
             rendered, diagnostic = apply_exact_livery_paint_to_aux_stream(
-                glb, scene, aux, _report([_record(BODY, rgba=(255, 0, 255, 255), selector=7)])
+                glb, scene, aux, _report([_record(BODY, rgba=(255, 0, 255, 255), enabled=False, selector=7)])
             )
             np.testing.assert_array_equal(rendered, aux)
             self.assertEqual(diagnostic["deferred_manufacturer_hashes"], [f"0x{BODY:016X}"])
@@ -179,7 +205,7 @@ class LiveryPaintBindingTests(unittest.TestCase):
                 glb,
                 scene,
                 aux,
-                _report([_record(BODY, rgba=(255, 255, 255, 255), selector=0)]),
+                _report([_record(BODY, rgba=(255, 255, 255, 255), enabled=False, selector=0)]),
                 _palette(primary_present=False),
             )
             np.testing.assert_array_equal(rendered, aux)
