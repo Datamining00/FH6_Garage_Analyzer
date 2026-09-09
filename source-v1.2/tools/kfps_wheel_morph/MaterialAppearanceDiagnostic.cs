@@ -103,11 +103,11 @@ internal static class MaterialAppearanceRuntime
         0x074CCD8C, 0x9421C781, 0xD78943E8, 0x4C6E94DA, 0x22F9702D,
     ];
 
-    // ForzaTechStudio's viewport resolves scalar U/V tiling plus vector
+    // ForzaTechStudio's viewport resolves scalar U/V tiling plus Vector2/Vector4
     // parameters whose published names contain "UVTiling" or "TilingOverride".
     // The converter's vendored source subset does not include NameHashService,
-    // therefore use only exact globally published hashes here rather than
-    // guessing names from material or texture paths.
+    // therefore this set mirrors those exact published names at FTS commit
+    // 4f373c5fb192551ce5249e320dd79b1399b693ca instead of guessing from paths.
     private static readonly HashSet<uint> UTilingHashes =
     [
         0x19A7D8F1, // U_Tiling
@@ -122,11 +122,14 @@ internal static class MaterialAppearanceRuntime
 
     private static readonly HashSet<uint> UvTilingVectorHashes =
     [
+        // Explicit TilingOverride names.
         0xB99646E7, // BaseColorAlphaTilingOverride
         0x1144D400, // BaseColorTilingOverride
         0x8BAB96B3, // RoughMetalAOTilingOverride
         0xF383EB56, // NormalTilingOverride
         0x4CCD7F85, // AlphaTilingOverride
+
+        // Generic UV tiling names.
         0x49455E2C, // UVTiling
         0x292176F3, // UVTiling1
         0x9F4459F8, // UVTiling_1
@@ -138,14 +141,35 @@ internal static class MaterialAppearanceRuntime
         0x6B33A7C0, // UVTiling_7
         0xA1AB3F08, // UVTiling_8
         0xADBA1134, // UVTiling_9
+        0x708065F7, // UVTiling_10
+        0x9A7DB1FA, // UVTiling_11
+        0xFD6BB566, // UVTiling_12
+        0x32879008, // UVTiling_13
+        0x52E3B8D7, // UVTiling_14
+        0x0318C562, // UVTiling_15
+        0x0C0672D0, // UVTilingA
+        0x3AD36FA3, // SlowUVTiling
+        0x12D9D5DD, // FastUVTiling
+        0x4111A187, // SlowUVTiling_1
+        0x691B1BF9, // FastUVTiling_1
+
+        // Diffuse/base-colour and pattern tiling.
         0x5EFF55B5, // CH1DiffuseUVTiling
         0x8C9998CD, // CH1DiffuseUVTiling_1
         0xF91D9509, // CH1DiffuseUVTiling_2
         0x35A9A138, // CH1DiffuseUVTiling_3
         0x6DB70810, // CH2DiffuseTextureUVTiling
         0x61E2989E, // CH2DiffuseUVTiling
+        0x84659583, // CH1DiffuseMapUVTiling
+        0x8D7CA8AF, // DiffuseMasks_UVTiling
+        0xC30E6C10, // DiffuseVarTexture_UVTiling
+        0xC996F379, // DiffusePatternUVTiling
+        0xEA33F406, // BaseColorRoughnessTiledDirtUVTiling
+
+        // Normal/clearcoat/flake tiling.
         0x28120924, // CH1NormalMapUVTiling
         0xD5C29BCB, // CH1NormalMapUVTiling_1
+        0x3FAE8362, // CH1NormalMapUVTiling_2
         0xF18DA88C, // CH1NormalUVTiling
         0xF568373C, // CH1NormalUVTiling_1
         0xDCA083CE, // CH2NormalUVTiling
@@ -154,45 +178,86 @@ internal static class MaterialAppearanceRuntime
         0x841064ED, // CH2NormalMapA_UVTiling
         0x6F27DFEE, // CH2NormalMapB_UVTiling
         0x6248E636, // CH1_CLCNormalMapUVTiling
+        0xF189C35D, // CH1_CLCNormalMapUVTiling_1
         0x3B2652BE, // DetailNomalAUVTiling
+        0x630F91BE, // NormalUVTiling
+        0x9A8A08E0, // OrangePeelUVTiling
+        0x9EFBEA4A, // FlakeNormalUVTiling
+        0xAF68C0AB, // FlakeTintUVTiling
+        0x2BAFF6C7, // FlakeUVTiling
+        0xEBF24437, // CH1Mask_Blur_UVTiling
+        0x19F682E4, // CH1Normal_Blur_UVTiling
+
+        // Gloss/roughness/specular/AO tiling.
         0xACB544D0, // CH1GlossUVTiling
         0x46AA5E2B, // CH2GlossMaskUVTiling
         0x6F17677C, // CH1GlossDiffMaskUVTiling
         0x19F25E41, // CH1GlossDiffMaskUVTiling_1
         0x061BA6B4, // GlossMaskUVTiling
-        0x7B5D1FC6, // CH1RTintUVTiling
-        0x5499D039, // CH2RTintUVTiling
+        0xE1008FC5, // GlossTextureMaskUVTiling
+        0xA1A59714, // GlossAUVTiling
+        0x894A360A, // GlossUVTiling
+        0xD5E8D0C1, // GlassRoughnessUVTiling
         0xE8EC0028, // CH1AOUVTiling
         0xFEBBD17D, // CH1AOUVTiling_1
+
+        // Mask/alpha/opacity/reflection tiling.
         0x327CFB31, // CH1MaskUVTiling
         0x9D013746, // CH1MaskUVTiling_1
         0xB3B9EA51, // CH1MaskUVTiling_2
         0xEA24DC3F, // CH1MaskUVTiling_3
+        0xAD410690, // Ch2MaskUVTiling
+        0xCEF3CC60, // Ch2MaskUVTiling_1
         0x3A2D8D16, // CH1LERPMaskUVTiling
+        0xCD060FD0, // CH1PatternMaskUVTiling
         0x84776FB1, // CH1OpacityUVTiling
         0xE81E684D, // CH1OpacityMapUVTiling
+        0xEA97A943, // CH1OpacityMapUVTiling_1
         0xB1981147, // CH1OppacityUVTiling
-        0x8D7CA8AF, // DiffuseMasks_UVTiling
-        0xC30E6C10, // DiffuseVarTexture_UVTiling
-        0x84659583, // CH1DiffuseMapUVTiling
-        0x60CD4B5E, // CH1LightMaskMaskUVTiling
-        0x7BD0DEE5, // CH1MultiplyMaskUVTiling
         0xE5AEA6D6, // MaskUVTiling
+        0x7B5D1FC6, // CH1RTintUVTiling
+        0x5499D039, // CH2RTintUVTiling
+        0xCF1717DD, // Reflected_RTint_UVTiling
+        0x488F29C3, // MaskAUVTiling
+        0xA3B892C0, // MaskBUVTiling
+        0x6103BD29, // MaskClouds_L_UVTiling
+        0x58640C72, // MaskClouds_R_UVTiling
+        0x694E917B, // ScrollingPixel1_UVTiling
+        0x82792A78, // ScrollingPixel2_UVTiling
+        0x60416837, // ScrollingAlphaMask_UVTiling
+
+        // Light/emissive/text/radiosity tiling.
         0x42B7C070, // CH2LightMapUVTilingA
         0xA9807B73, // CH2LightMapUVTilingB
-        0x9A1F8805, // CH1CloudinessMapUVTiling
-        0x4C2D24B8, // dyRTintUVTiling
+        0x60CD4B5E, // CH1LightMaskMaskUVTiling
         0x59983117, // StaticCH1LightMapUVTiling
+        0xDDE93258, // CH1LightMapUVTiling
         0x599C16D0, // CH1LightMapUVTiling_1
         0xEF1DA25B, // CH1IlluminationUVTiling
         0xB31ACBB2, // CH2LightMapUVTiling
-        0xCF1717DD, // Reflected_RTint_UVTiling
-        0xC996F379, // DiffusePatternUVTiling
-        0xEBF24437, // CH1Mask_Blur_UVTiling
-        0x19F682E4, // CH1Normal_Blur_UVTiling
+        0x5039ECB0, // CH3RadiosityMapUVTiling
         0x51D94226, // TextTextureArrayUVTiling0
         0xF7AE4992, // TextTextureArrayUVTiling1
-        0x0C0672D0, // UVTilingA
+        0xDAD0F024, // TextUVTiling
+
+        // General material/effect UV tiling names still consumed by the same FTS
+        // material-wide resolver when their value is Vector2/Vector4.
+        0x9A1F8805, // CH1CloudinessMapUVTiling
+        0x4C2D24B8, // dyRTintUVTiling
+        0x7BD0DEE5, // CH1MultiplyMaskUVTiling
+        0xEC71D28B, // CH2RetroPatternMaskUVTiling
+        0xF6C42060, // MotionVector_Y_UVTiling
+        0x7315BB5A, // MotionVector_UVTiling_Z
+        0xD6B5228F, // Texture2_UVTiling
+        0xC97B65FE, // Texture1_UVTiling
+        0x60686A61, // Texture3_UVTiling
+        0x218CEB47, // Texture1_UVTiling_1
+        0xF275BE80, // StripeUVTiling
+        0x1AAC2FED, // LargeUVTiling
+        0xD711B59A, // MidUVTiling
+        0xC91B0EBA, // ModulateUVTiling
+        0xA976318F, // MacroUVTiling
+        0xA0D72C0A, // MicroUVTiling
     ];
 
     public static MaterialAppearanceDiagnostic Resolve(Bundle modelBundle, string materialName)
