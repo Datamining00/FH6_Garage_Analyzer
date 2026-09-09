@@ -15,6 +15,7 @@ class P3dBreakdownTests(unittest.TestCase):
             "paint_primitive_count": 3,
             "evaluated_binding_count": 1,
             "exact_candidate_count": 0,
+            "resolved_group_inventory": {},
             "candidates": [
                 {
                     "mesh_index": 1,
@@ -22,6 +23,7 @@ class P3dBreakdownTests(unittest.TestCase):
                     "mesh_name": "PaintA",
                     "material_hash": "0x1111111111111111",
                     "material_name": "carpaint",
+                    "material_match_mode": None,
                     "selector": None,
                     "group_index": None,
                     "entry_index": None,
@@ -35,6 +37,7 @@ class P3dBreakdownTests(unittest.TestCase):
                     "mesh_name": "PaintB",
                     "material_hash": "0x2222222222222222",
                     "material_name": "carpaint",
+                    "material_match_mode": None,
                     "selector": None,
                     "group_index": None,
                     "entry_index": None,
@@ -48,6 +51,7 @@ class P3dBreakdownTests(unittest.TestCase):
                     "mesh_name": "PaintC",
                     "material_hash": None,
                     "material_name": None,
+                    "material_match_mode": None,
                     "selector": None,
                     "group_index": None,
                     "entry_index": None,
@@ -62,6 +66,7 @@ class P3dBreakdownTests(unittest.TestCase):
         self.assertEqual(breakdown["status"], "p3d_breakdown_diagnosed")
         self.assertEqual(breakdown["paint_primitive_count"], 3)
         self.assertEqual(breakdown["with_material_name_count"], 2)
+        self.assertEqual(breakdown["builtin_manufacturer_material_name_count"], 2)
         self.assertEqual(breakdown["with_binding_hash_count"], 2)
         self.assertEqual(breakdown["row_status_counts"]["binding_record_unmatched"], 2)
         self.assertEqual(breakdown["entry_path_kind_counts"]["missing"], 3)
@@ -73,12 +78,29 @@ class P3dBreakdownTests(unittest.TestCase):
         statuses = {sample["status"] for sample in breakdown["rejection_samples"]}
         self.assertEqual(statuses, {"binding_record_unmatched", "binding_hash_invalid"})
 
-    def test_breakdown_marks_materialbin_handoff_and_uv4_readiness(self):
+    def test_breakdown_marks_materialbin_handoff_uv4_and_group_inventory(self):
+        inventory = {
+            "0": {
+                "group_index": 0,
+                "entry_count": 1,
+                "entries_reported": 1,
+                "entries_truncated": False,
+                "entries": [
+                    {
+                        "index": 0,
+                        "material_names": ["body_factory"],
+                        "path": "factory.materialbin",
+                        "path_kind": "materialbin",
+                    }
+                ],
+            }
+        }
         report = {
             "status": "manufacturer_overlay_candidates_diagnosed",
             "paint_primitive_count": 2,
             "evaluated_binding_count": 2,
             "exact_candidate_count": 0,
+            "resolved_group_inventory": inventory,
             "candidates": [
                 {
                     "mesh_index": 1,
@@ -86,6 +108,7 @@ class P3dBreakdownTests(unittest.TestCase):
                     "mesh_name": "PaintA",
                     "material_hash": "0x1111111111111111",
                     "material_name": "carpaint",
+                    "material_match_mode": "fts_builtin_carpaint_unique_group_entry",
                     "selector": 0,
                     "group_index": 0,
                     "entry_index": 0,
@@ -98,7 +121,8 @@ class P3dBreakdownTests(unittest.TestCase):
                     "primitive_index": 0,
                     "mesh_name": "PaintB",
                     "material_hash": "0x2222222222222222",
-                    "material_name": "carpaint2",
+                    "material_name": "carpaint_secondary",
+                    "material_match_mode": "exact_entry_material_name",
                     "selector": 0,
                     "group_index": 0,
                     "entry_index": 1,
@@ -113,6 +137,15 @@ class P3dBreakdownTests(unittest.TestCase):
         self.assertEqual(breakdown["entry_path_kind_counts"]["materialbin"], 2)
         self.assertEqual(breakdown["p3f_materialbin_deferred_count"], 2)
         self.assertEqual(breakdown["p3f_materialbin_uv4_ready_count"], 1)
+        self.assertEqual(breakdown["builtin_manufacturer_material_name_count"], 2)
+        self.assertEqual(
+            breakdown["material_match_mode_counts"],
+            {
+                "exact_entry_material_name": 1,
+                "fts_builtin_carpaint_unique_group_entry": 1,
+            },
+        )
+        self.assertEqual(breakdown["manufacturer_group_inventory"], inventory)
         self.assertEqual(breakdown["diagnostic_focus"], "materialbin_candidates_present_uv4_ready")
 
     def test_p3f_report_always_carries_p3d_breakdown(self):
@@ -121,6 +154,7 @@ class P3dBreakdownTests(unittest.TestCase):
             "paint_primitive_count": 0,
             "evaluated_binding_count": 0,
             "exact_candidate_count": 0,
+            "resolved_group_inventory": {},
             "candidates": [],
         }
         report = trace_manufacturer_materialbin_payloads(
@@ -128,7 +162,7 @@ class P3dBreakdownTests(unittest.TestCase):
             "vehicle.zip",
             "cache",
         )
-        self.assertEqual(report["revision"], 2)
+        self.assertEqual(report["revision"], 3)
         self.assertEqual(report["candidate_count"], 0)
         self.assertEqual(report["p3d_breakdown"]["diagnostic_focus"], "no_paint_primitives_exported")
 
