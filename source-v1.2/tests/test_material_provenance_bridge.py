@@ -20,6 +20,14 @@ class MaterialProvenanceBridgeTests(unittest.TestCase):
         self.assertIn("MaterialAppearanceDiagnostic.cs", patcher)
         self.assertIn("glb_writer.write_text", patcher)
 
+    def test_kfps_material_binding_hash_is_unprefixed_x16(self):
+        patcher = PATCHER.read_text(encoding="utf-8")
+        # Pinned GlbWriter.cs emits exactly MaterialBindingHash.ToString("X16").
+        # Paint P2 consumes that exact 16-digit value; a synthetic 0x prefix is
+        # not part of the converter contract.
+        self.assertIn('mesh.MaterialBindingHash.ToString(\\"X16\\")', patcher)
+        self.assertNotIn('\\"0x\\" + mesh.MaterialBindingHash', patcher)
+
     def test_resolver_uses_embedded_material_blob_and_shader_parameters(self):
         text = MATERIAL_HELPER.read_text(encoding="utf-8")
         self.assertIn("OfType<MaterialBlob>()", text)
