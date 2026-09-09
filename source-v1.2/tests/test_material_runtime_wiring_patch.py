@@ -36,6 +36,9 @@ class MaterialRuntimeWiringPatchTests(unittest.TestCase):
         with patch(
             "fh6garage.preview3d.material_appearance_patch._build_material_vertex_streams_all",
             return_value=(params, aux, f0, coat, emission, 2, 1),
+        ), patch(
+            "fh6garage.preview3d.livery_paint_binding.apply_exact_livery_paint_to_aux_stream",
+            return_value=(aux, {"status": "paint_binding_unavailable", "matched_primitives": 0}),
         ):
             self.assertTrue(wiring.configure_game_like_material_widget(widget, "car.glb"))
         self.assertIs(widget._fh6_material_params, params)
@@ -45,7 +48,57 @@ class MaterialRuntimeWiringPatchTests(unittest.TestCase):
         self.assertIs(widget._fh6_material_emission, emission)
         self.assertEqual(widget._fh6_native_material_primitives, 2)
         self.assertEqual(widget._fh6_native_optical_primitives, 1)
+        self.assertEqual(widget._fh6_livery_paint_primitives, 0)
         self.assertEqual(widget._fh6_material_direct_wiring_status if hasattr(widget, "_fh6_material_direct_wiring_status") else "", "")
+
+    def test_configure_passes_transient_c_livery_provenance_to_exact_paint_bridge(self):
+        scene = SimpleNamespace(positions=np.zeros((2, 3), dtype=np.float32))
+        provenance = {"status": "paint_descriptor_parsed", "records": []}
+        textures = SimpleNamespace(_fh6_paint_provenance=provenance)
+        widget = SimpleNamespace(scene_data=scene, livery_textures=textures)
+        params = np.zeros((2, 4), dtype=np.float32)
+        aux = np.asarray([[0.0, -1.0, -1.0, -1.0]] * 2, dtype=np.float32)
+        f0 = np.zeros((2, 4), dtype=np.float32)
+        coat = np.zeros((2, 4), dtype=np.float32)
+        emission = np.zeros((2, 4), dtype=np.float32)
+        painted_aux = aux.copy()
+        painted_aux[:, 1:4] = [0.1, 0.2, 0.3]
+        with patch(
+            "fh6garage.preview3d.material_appearance_patch._build_material_vertex_streams_all",
+            return_value=(params, aux, f0, coat, emission, 1, 0),
+        ), patch(
+            "fh6garage.preview3d.livery_paint_binding.apply_exact_livery_paint_to_aux_stream",
+            return_value=(painted_aux, {"status": "exact_custom_primary_applied", "matched_primitives": 1}),
+        ) as apply_paint:
+            self.assertTrue(wiring.configure_game_like_material_widget(widget, "car.glb"))
+        self.assertIs(widget._fh6_material_aux, painted_aux)
+        self.assertEqual(widget._fh6_livery_paint_primitives, 1)
+        self.assertEqual(widget._fh6_livery_paint_binding_report["status"], "exact_custom_primary_applied")
+        self.assertIs(apply_paint.call_args.args[3], provenance)
+
+    def test_paint_bridge_failure_is_nonfatal_to_native_material_streams(self):
+        scene = SimpleNamespace(positions=np.zeros((2, 3), dtype=np.float32))
+        widget = SimpleNamespace(
+            scene_data=scene,
+            livery_textures=SimpleNamespace(_fh6_paint_provenance={"status": "paint_descriptor_parsed"}),
+        )
+        params = np.zeros((2, 4), dtype=np.float32)
+        aux = np.asarray([[0.0, -1.0, -1.0, -1.0]] * 2, dtype=np.float32)
+        f0 = np.zeros((2, 4), dtype=np.float32)
+        coat = np.zeros((2, 4), dtype=np.float32)
+        emission = np.zeros((2, 4), dtype=np.float32)
+        with patch(
+            "fh6garage.preview3d.material_appearance_patch._build_material_vertex_streams_all",
+            return_value=(params, aux, f0, coat, emission, 1, 0),
+        ), patch(
+            "fh6garage.preview3d.livery_paint_binding.apply_exact_livery_paint_to_aux_stream",
+            side_effect=ValueError("paint mismatch"),
+        ):
+            self.assertTrue(wiring.configure_game_like_material_widget(widget, "car.glb"))
+        self.assertIs(widget._fh6_material_aux, aux)
+        self.assertEqual(widget._fh6_livery_paint_binding_report["status"], "paint_binding_error")
+        self.assertIn("paint mismatch", widget._fh6_livery_paint_binding_report["error"])
+        self.assertEqual(widget._fh6_native_material_primitives, 1)
 
     def test_configure_fails_closed_to_existing_role_defaults(self):
         widget = SimpleNamespace(scene_data=SimpleNamespace())
@@ -59,6 +112,7 @@ class MaterialRuntimeWiringPatchTests(unittest.TestCase):
         self.assertIn("broken provenance", widget._fh6_material_stream_error)
         self.assertEqual(widget._fh6_native_material_primitives, 0)
         self.assertEqual(widget._fh6_native_optical_primitives, 0)
+        self.assertEqual(widget._fh6_livery_paint_binding_report["status"], "material_stream_unavailable")
 
     def test_lazy_installer_source_orders_material_patch_before_direct_wiring(self):
         root = Path(__file__).resolve().parents[1]
