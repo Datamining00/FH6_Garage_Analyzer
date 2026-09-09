@@ -196,6 +196,7 @@ def _base_selection_by_mesh(
         supported = [value for value in values if int(value.dxgi_format) in _BASE_COLOR_DXGI]
         if len(supported) != len(values):
             issues[mesh_index] = "base-color DDS format is not enabled for RGB material sampling"
+            continue
         by_path: dict[str, NativeMaterialTextureSelection] = {}
         for value in supported:
             by_path.setdefault(str(Path(value.dds_path).expanduser().resolve()).casefold(), value)
