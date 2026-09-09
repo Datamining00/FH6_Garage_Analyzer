@@ -73,6 +73,38 @@ class ManufacturerMaterialbinCliTests(unittest.TestCase):
             self.assertEqual(report["paint_source"], str(paint.resolve()))
             self.assertEqual(report["vehicle_archive"], str(vehicle.resolve()))
 
+    def test_self_check_verifies_packaged_helper_without_game_inputs(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            helper = root / "Kfps.ChassisConverter.WheelMorph.exe"
+            helper.write_bytes(b"verified-by-mock")
+            output = root / "self-check.json"
+            with patch.object(cli, "verified_bundled_wheel_morph_helper", return_value=helper.resolve()):
+                rc = cli.run_manufacturer_materialbin_diagnostic(
+                    ["--self-check", "--output", str(output)]
+                )
+            self.assertEqual(rc, 0)
+            report = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(report["status"], "packaged_p3f_self_check_passed")
+            self.assertEqual(report["validation_status"], "packaged_contract_ready")
+            self.assertEqual(report["helper_revision"], WHEEL_MORPH_HELPER_REVISION)
+            self.assertEqual(report["helper_sha256"], WHEEL_MORPH_HELPER_SHA256)
+            self.assertFalse(report["rendering_enabled"])
+            self.assertFalse(report["game_data_modified"])
+
+    def test_self_check_fails_closed_when_verified_helper_is_missing(self):
+        with TemporaryDirectory() as temporary:
+            output = Path(temporary) / "self-check.json"
+            with patch.object(cli, "verified_bundled_wheel_morph_helper", return_value=None):
+                rc = cli.run_manufacturer_materialbin_diagnostic(
+                    ["--self-check", "--output", str(output)]
+                )
+            self.assertEqual(rc, 4)
+            report = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(report["status"], "packaged_p3f_self_check_failed")
+            self.assertEqual(report["validation_status"], "packaged_contract_unavailable")
+            self.assertFalse(report["game_data_modified"])
+
     def test_validation_status_distinguishes_no_candidate_blocked_and_unresolved(self):
         self.assertEqual(
             cli._validation_status({"status": "manufacturer_materialbin_payloads_diagnosed", "candidate_count": 0}),
@@ -100,16 +132,38 @@ class ManufacturerMaterialbinCliTests(unittest.TestCase):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)
             glb, paint, vehicle = self._inputs(root)
-            with self.assertRaises(SystemExit):
-                cli.run_manufacturer_materialbin_diagnostic(
+            rc = cli.run_manufacturer_materialbin_diagnostic(
+                [
+                    "--glb", str(glb),
+                    "--paint", str(paint),
+                    "--vehicle", str(vehicle),
+                    "--cache", str(root / "cache"),
+                    "--output", str(paint),
+                ]
+            )
+            self.assertEqual(rc, 2)
+            self.assertEqual(paint.read_bytes(), b"paint")
+
+    def test_diagnostic_exception_writes_fail_closed_json_without_game_write_claim(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            glb, paint, vehicle = self._inputs(root)
+            output = root / "failure.json"
+            with patch.object(cli, "diagnose_manufacturer_overlay", side_effect=RuntimeError("boom")):
+                rc = cli.run_manufacturer_materialbin_diagnostic(
                     [
                         "--glb", str(glb),
                         "--paint", str(paint),
                         "--vehicle", str(vehicle),
                         "--cache", str(root / "cache"),
-                        "--output", str(paint),
+                        "--output", str(output),
                     ]
                 )
+            self.assertEqual(rc, 5)
+            report = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(report["status"], "manufacturer_materialbin_diagnostic_failed")
+            self.assertEqual(report["validation_status"], "diagnostic_execution_failed")
+            self.assertFalse(report["game_data_modified"])
 
 
 if __name__ == "__main__":
