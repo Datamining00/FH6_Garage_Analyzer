@@ -4,11 +4,11 @@ import hashlib
 from pathlib import Path
 import sys
 
-# This verified helper now carries both the established wheel/transform chain and
-# the read-only embedded MaterialBlob shader-provenance exporter used by the 3D viewer.
+# This verified helper carries the established wheel/transform chain plus the
+# read-only embedded MaterialBlob shader-provenance exporter consumed by the 3D viewer.
 WHEEL_MORPH_HELPER_FILENAME = "Kfps.ChassisConverter.WheelMorph.exe"
-WHEEL_MORPH_HELPER_SHA256 = "b324bec643270fada663e089c01c03f0ecdb2b6e586e53a5236a1ef1b122fbe1"
-WHEEL_MORPH_HELPER_REVISION = "kfps_6f53ca3_w3_native_material_provenance_v6"
+WHEEL_MORPH_HELPER_SHA256 = "92b255baadc43a3087d55e434a826bea5297cada8c1d7b148435c848fb779053"
+WHEEL_MORPH_HELPER_REVISION = "kfps_6f53ca3_w3_native_material_optical_v7"
 
 
 class WheelMorphHelperError(RuntimeError):
