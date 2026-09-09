@@ -15,6 +15,10 @@ on:
       - "source-v1.2/fh6garage/preview3d/glb_viewer.py"
       - "source-v1.2/fh6garage/preview3d/material_appearance_patch.py"
       - "source-v1.2/fh6garage/preview3d/material_runtime_wiring_patch.py"
+      - "source-v1.2/fh6garage/preview3d/livery_paint_provenance.py"
+      - "source-v1.2/fh6garage/preview3d/livery_paint_runtime_patch.py"
+      - "source-v1.2/fh6garage/preview3d/livery_paint_binding.py"
+      - "source-v1.2/fh6garage/preview3d/manufacturer_colors.py"
       - "source-v1.2/fh6garage/preview3d/native_dds.py"
       - "source-v1.2/fh6garage/preview3d/native_material_gl.py"
       - "source-v1.2/fh6garage/preview3d/native_material_render_plan.py"
@@ -48,6 +52,10 @@ on:
       - "source-v1.2/tests/test_material_appearance_patch.py"
       - "source-v1.2/tests/test_material_provenance_bridge.py"
       - "source-v1.2/tests/test_material_runtime_wiring_patch.py"
+      - "source-v1.2/tests/test_livery_paint_provenance.py"
+      - "source-v1.2/tests/test_livery_paint_runtime_patch.py"
+      - "source-v1.2/tests/test_livery_paint_binding.py"
+      - "source-v1.2/tests/test_manufacturer_colors.py"
       - "source-v1.2/tests/test_native_dds.py"
       - "source-v1.2/tests/test_native_material_gl.py"
       - "source-v1.2/tests/test_native_material_render_plan.py"
@@ -128,6 +136,10 @@ jobs:
           python -m py_compile fh6garage/preview3d/glb_parser.py
           python -m py_compile fh6garage/preview3d/material_appearance_patch.py
           python -m py_compile fh6garage/preview3d/material_runtime_wiring_patch.py
+          python -m py_compile fh6garage/preview3d/livery_paint_provenance.py
+          python -m py_compile fh6garage/preview3d/livery_paint_runtime_patch.py
+          python -m py_compile fh6garage/preview3d/livery_paint_binding.py
+          python -m py_compile fh6garage/preview3d/manufacturer_colors.py
           python -m py_compile fh6garage/preview3d/native_dds.py
           python -m py_compile fh6garage/preview3d/native_material_gl.py
           python -m py_compile fh6garage/preview3d/native_material_render_plan.py
@@ -154,6 +166,10 @@ jobs:
           python -m unittest tests.test_material_appearance_patch -v
           python -m unittest tests.test_material_provenance_bridge -v
           python -m unittest tests.test_material_runtime_wiring_patch -v
+          python -m unittest tests.test_livery_paint_provenance -v
+          python -m unittest tests.test_livery_paint_runtime_patch -v
+          python -m unittest tests.test_livery_paint_binding -v
+          python -m unittest tests.test_manufacturer_colors -v
           python -m unittest tests.test_native_dds -v
           python -m unittest tests.test_native_material_gl -v
           python -m unittest tests.test_native_material_render_plan -v
@@ -226,6 +242,7 @@ jobs:
           if (-not (Select-String -Path $program -SimpleMatch "MaterialAppearanceRuntime.Resolve" -Quiet)) { throw "Patched Program.cs is missing embedded material provenance resolution." }
           if (-not (Select-String -Path $program -SimpleMatch "--decode-swatchbin" -Quiet)) { throw "Patched Program.cs is missing native swatchbin decode mode." }
           if (-not (Select-String -Path $writer -SimpleMatch "kfps_material_appearance" -Quiet)) { throw "Patched GlbWriter.cs is missing material appearance extras." }
+          if (-not (Select-String -Path $writer -SimpleMatch 'mesh.MaterialBindingHash.ToString("X16")' -Quiet)) { throw "GlbWriter.cs material binding hash is not exact unprefixed X16." }
           if (-not (Test-Path "kfps-source/tools/livery/chassis-converter/TransformAudit.cs")) { throw "TransformAudit.cs was not staged." }
           if (-not (Test-Path "kfps-source/tools/livery/chassis-converter/MaterialAppearanceDiagnostic.cs")) { throw "MaterialAppearanceDiagnostic.cs was not staged." }
           if (-not (Test-Path "kfps-source/tools/livery/chassis-converter/NativeSwatchbinDecoder.cs")) { throw "NativeSwatchbinDecoder.cs was not staged." }
@@ -259,6 +276,10 @@ jobs:
           if (-not ($listing -match "Kfps\.ChassisConverter\.WheelMorph\.exe")) { throw "Standard OneFile does not contain the wheel morph helper." }
           if (-not ($listing -match "fh6garage\.preview3d\.material_appearance_patch")) { throw "Standard OneFile does not contain the native material appearance bridge." }
           if (-not ($listing -match "fh6garage\.preview3d\.material_runtime_wiring_patch")) { throw "Standard OneFile does not contain direct-widget native material wiring." }
+          if (-not ($listing -match "fh6garage\.preview3d\.livery_paint_provenance")) { throw "Standard OneFile does not contain C_livery paint provenance." }
+          if (-not ($listing -match "fh6garage\.preview3d\.livery_paint_runtime_patch")) { throw "Standard OneFile does not contain Paint P3 runtime handoff." }
+          if (-not ($listing -match "fh6garage\.preview3d\.livery_paint_binding")) { throw "Standard OneFile does not contain exact Paint P3 binding." }
+          if (-not ($listing -match "fh6garage\.preview3d\.manufacturer_colors")) { throw "Standard OneFile does not contain FH6 manufacturer color provenance/resolution." }
           if (-not ($listing -match "fh6garage\.preview3d\.native_dds")) { throw "Standard OneFile does not contain native DDS parsing." }
           if (-not ($listing -match "fh6garage\.preview3d\.native_material_gl")) { throw "Standard OneFile does not contain native DDS OpenGL upload." }
           if (-not ($listing -match "fh6garage\.preview3d\.native_material_render_plan")) { throw "Standard OneFile does not contain native material render planning." }
@@ -287,6 +308,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Could not recursively inspect Portable archive." }
           if (-not ($listing -match "fh6garage\.preview3d\.material_appearance_patch")) { throw "Portable OneDir does not contain the native material appearance bridge." }
           if (-not ($listing -match "fh6garage\.preview3d\.material_runtime_wiring_patch")) { throw "Portable OneDir does not contain direct-widget native material wiring." }
+          if (-not ($listing -match "fh6garage\.preview3d\.livery_paint_provenance")) { throw "Portable OneDir does not contain C_livery paint provenance." }
+          if (-not ($listing -match "fh6garage\.preview3d\.livery_paint_runtime_patch")) { throw "Portable OneDir does not contain Paint P3 runtime handoff." }
+          if (-not ($listing -match "fh6garage\.preview3d\.livery_paint_binding")) { throw "Portable OneDir does not contain exact Paint P3 binding." }
+          if (-not ($listing -match "fh6garage\.preview3d\.manufacturer_colors")) { throw "Portable OneDir does not contain FH6 manufacturer color provenance/resolution." }
           if (-not ($listing -match "fh6garage\.preview3d\.native_dds")) { throw "Portable OneDir does not contain native DDS parsing." }
           if (-not ($listing -match "fh6garage\.preview3d\.native_material_gl")) { throw "Portable OneDir does not contain native DDS OpenGL upload." }
           if (-not ($listing -match "fh6garage\.preview3d\.native_material_render_plan")) { throw "Portable OneDir does not contain native material render planning." }
