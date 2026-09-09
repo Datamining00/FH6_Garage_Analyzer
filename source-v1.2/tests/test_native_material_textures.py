@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 from fh6garage.preview3d.native_material_textures import (
     NATIVE_MATERIAL_TEXTURE_RESOLUTION_REVISION,
+    collect_native_texture_bindings,
     collect_native_texture_paths,
     resolve_native_material_textures,
 )
@@ -27,25 +28,7 @@ def _swatch_payload(label: bytes = b"test") -> bytes:
     return struct.pack("<I", BUNDLE_TAG) + label
 
 
-def _write_glb(path: Path, texture_paths: list[str]) -> None:
-    document = {
-        "asset": {"version": "2.0"},
-        "meshes": [
-            {
-                "primitives": [
-                    {
-                        "attributes": {},
-                        "extras": {
-                            "kfps_material_appearance": {
-                                "resolutionMode": "embedded_material_shader_parameters",
-                                "texturePaths": texture_paths,
-                            }
-                        },
-                    }
-                ]
-            }
-        ],
-    }
+def _write_document_glb(path: Path, document: dict) -> None:
     raw = json.dumps(document, separators=(",", ":")).encode("utf-8")
     raw += b" " * ((-len(raw)) % 4)
     total = 12 + 8 + len(raw)
@@ -57,8 +40,63 @@ def _write_glb(path: Path, texture_paths: list[str]) -> None:
     )
 
 
+def _write_glb(
+    path: Path,
+    texture_paths: list[str],
+    *,
+    texture_bindings: list[dict[str, str]] | None = None,
+    mesh_name: str = "body_mesh",
+    material_name: str = "carpaint",
+) -> None:
+    """Write the production KFPS layout: material appearance lives on mesh extras."""
+    appearance: dict[str, object] = {
+        "resolutionMode": "embedded_material_shader_parameters",
+        "texturePaths": texture_paths,
+    }
+    if texture_bindings is not None:
+        appearance["textureBindings"] = texture_bindings
+    document = {
+        "asset": {"version": "2.0"},
+        "meshes": [
+            {
+                "name": mesh_name,
+                "primitives": [{"attributes": {}}],
+                "extras": {
+                    "kfps_material_name": material_name,
+                    "kfps_material_appearance": appearance,
+                },
+            }
+        ],
+    }
+    _write_document_glb(path, document)
+
+
+def _write_legacy_primitive_glb(path: Path, texture_paths: list[str]) -> None:
+    """Retain compatibility coverage for early diagnostic/test GLBs."""
+    document = {
+        "asset": {"version": "2.0"},
+        "meshes": [
+            {
+                "primitives": [
+                    {
+                        "attributes": {},
+                        "extras": {
+                            "kfps_material_name": "legacy_material",
+                            "kfps_material_appearance": {
+                                "resolutionMode": "embedded_material_shader_parameters",
+                                "texturePaths": texture_paths,
+                            },
+                        },
+                    }
+                ]
+            }
+        ],
+    }
+    _write_document_glb(path, document)
+
+
 class NativeMaterialTextureResolutionTests(unittest.TestCase):
-    def test_collects_exact_texture_provenance_without_semantic_guessing(self):
+    def test_collects_production_mesh_level_paths_and_deduplicates_case(self):
         with tempfile.TemporaryDirectory() as temp:
             glb = Path(temp) / "car.glb"
             _write_glb(
@@ -77,7 +115,107 @@ class NativeMaterialTextureResolutionTests(unittest.TestCase):
                 ),
             )
 
-    def test_resolves_exact_derived_textures_zip_and_keeps_game_archive_unchanged(self):
+    def test_legacy_primitive_level_appearance_remains_supported(self):
+        with tempfile.TemporaryDirectory() as temp:
+            glb = Path(temp) / "legacy.glb"
+            path = r"Game:\media\textures\paint\legacy.swatchbin"
+            _write_legacy_primitive_glb(glb, [path])
+            self.assertEqual(collect_native_texture_paths(glb), (path,))
+
+    def test_collects_exact_texture_bindings_with_hash_semantics_per_mesh_material(self):
+        with tempfile.TemporaryDirectory() as temp:
+            glb = Path(temp) / "car.glb"
+            diffuse = r"Game:\media\textures\paint\body.swatchbin"
+            normal = r"Game:\media\textures\normal\body_n.swatchbin"
+            unknown = r"Game:\media\textures\misc\unknown.swatchbin"
+            _write_glb(
+                glb,
+                [diffuse, normal, unknown],
+                texture_bindings=[
+                    {
+                        "ParameterHash": "85F59336",
+                        "PathHash": "1111222233334444",
+                        "TexturePath": diffuse,
+                    },
+                    {
+                        "ParameterHash": "39731A8A",
+                        "PathHash": "5555666677778888",
+                        "TexturePath": normal,
+                    },
+                    {
+                        "ParameterHash": "DEADBEEF",
+                        "PathHash": "9999AAAABBBBCCCC",
+                        "TexturePath": unknown,
+                    },
+                ],
+                mesh_name="body_mesh",
+                material_name="carpaint",
+            )
+
+            bindings = collect_native_texture_bindings(glb)
+            self.assertEqual(len(bindings), 3)
+
+            first = bindings[0]
+            self.assertEqual(first.mesh_name, "body_mesh")
+            self.assertEqual(first.material_name, "carpaint")
+            self.assertEqual(first.parameter_hash, "85F59336")
+            self.assertEqual(first.path_hash, "1111222233334444")
+            self.assertEqual(first.texture_path, diffuse)
+            self.assertEqual(first.parameter_name, "DiffuseTexture")
+            self.assertEqual(first.semantic, "base_color")
+            self.assertEqual(first.semantic_resolution_mode, "forzatechstudio_namehash_exact")
+
+            second = bindings[1]
+            self.assertEqual(second.parameter_name, "NormalMap")
+            self.assertEqual(second.semantic, "normal")
+
+            third = bindings[2]
+            self.assertEqual(third.parameter_hash, "DEADBEEF")
+            self.assertIsNone(third.parameter_name)
+            self.assertEqual(third.semantic, "unknown")
+            self.assertEqual(third.semantic_resolution_mode, "unmapped_parameter_hash")
+
+            # Semantics come from ParameterHash only; the unknown path is not
+            # reclassified from its filename or folder name.
+            self.assertEqual(
+                collect_native_texture_paths(glb),
+                (diffuse, normal, unknown),
+            )
+
+    def test_mesh_level_appearance_is_authoritative_over_primitive_fallback(self):
+        with tempfile.TemporaryDirectory() as temp:
+            glb = Path(temp) / "car.glb"
+            mesh_path = r"Game:\media\textures\paint\mesh.swatchbin"
+            primitive_path = r"Game:\media\textures\paint\primitive.swatchbin"
+            document = {
+                "asset": {"version": "2.0"},
+                "meshes": [
+                    {
+                        "name": "body",
+                        "extras": {
+                            "kfps_material_name": "mesh_material",
+                            "kfps_material_appearance": {
+                                "texturePaths": [mesh_path],
+                            },
+                        },
+                        "primitives": [
+                            {
+                                "attributes": {},
+                                "extras": {
+                                    "kfps_material_name": "primitive_material",
+                                    "kfps_material_appearance": {
+                                        "texturePaths": [primitive_path],
+                                    },
+                                },
+                            }
+                        ],
+                    }
+                ],
+            }
+            _write_document_glb(glb, document)
+            self.assertEqual(collect_native_texture_paths(glb), (mesh_path,))
+
+    def test_resolves_exact_derived_textures_zip_and_writes_binding_manifest(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / "FH6"
             cars = root / "Content" / "media" / "cars"
@@ -94,13 +232,29 @@ class NativeMaterialTextureResolutionTests(unittest.TestCase):
 
             glb = Path(temp) / "cache" / "car.glb"
             glb.parent.mkdir()
-            _write_glb(glb, [r"Game:\media\textures\paint\body.swatchbin"])
+            texture_path = r"Game:\media\textures\paint\body.swatchbin"
+            _write_glb(
+                glb,
+                [texture_path],
+                texture_bindings=[
+                    {
+                        "ParameterHash": "85F59336",
+                        "PathHash": "1111222233334444",
+                        "TexturePath": texture_path,
+                    }
+                ],
+            )
 
             report = resolve_native_material_textures(glb, vehicle, decode_native=False)
             self.assertEqual(report.revision, NATIVE_MATERIAL_TEXTURE_RESOLUTION_REVISION)
             self.assertEqual(report.status, "resolved_all")
             self.assertEqual(report.decode_status, "not_requested")
             self.assertEqual(report.resolved_count, 1)
+            self.assertEqual(report.binding_count, 1)
+            self.assertEqual(report.recognized_binding_count, 1)
+            self.assertEqual(report.unknown_binding_count, 0)
+            self.assertEqual(report.bindings[0].semantic, "base_color")
+
             item = report.textures[0]
             self.assertEqual(item.status, "resolved_payload")
             self.assertEqual(item.resolution_mode, "derived_zip_exact")
@@ -110,6 +264,13 @@ class NativeMaterialTextureResolutionTests(unittest.TestCase):
             self.assertEqual(hashlib.sha256(vehicle.read_bytes()).hexdigest(), before)
             self.assertFalse(report.game_data_modified)
             self.assertTrue(Path(report.manifest_path).is_file())
+
+            manifest = json.loads(Path(report.manifest_path).read_text(encoding="utf-8"))
+            self.assertEqual(manifest["format"], "fh6_native_material_texture_resolution_v3")
+            self.assertEqual(manifest["binding_count"], 1)
+            self.assertEqual(manifest["recognized_binding_count"], 1)
+            self.assertEqual(manifest["bindings"][0]["parameter_name"], "DiffuseTexture")
+            self.assertEqual(manifest["bindings"][0]["semantic"], "base_color")
 
     def test_decodes_resolved_payload_to_sha_addressed_dds_and_reuses_cache(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -252,6 +413,8 @@ class NativeMaterialTextureResolutionTests(unittest.TestCase):
         self.assertIn("verified_bundled_wheel_morph_helper", native)
         self.assertIn('"--decode-swatchbin"', native)
         self.assertIn('decode_status="decoder_unavailable"', native)
+        self.assertIn("collect_native_texture_bindings", native)
+        self.assertIn("forzatechstudio_namehash_exact", (ROOT / "fh6garage" / "preview3d" / "native_texture_semantics.py").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
