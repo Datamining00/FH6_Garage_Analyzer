@@ -29,6 +29,7 @@ native_tire_hiddenimports = [
     'fh6garage.preview3d.exact_game_asset',
     'fh6garage.preview3d.materialbin_reference_helper',
     'fh6garage.preview3d.manufacturer_materialbin_diagnostics',
+    'fh6garage.preview3d.manufacturer_materialbin_cli',
     'fh6garage.preview3d.native_transform_chain_patch',
     'fh6garage.preview3d.native_transform_chain_v2',
     'fh6garage.preview3d.native_transform_chain_v3',
