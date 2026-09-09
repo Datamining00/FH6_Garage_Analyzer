@@ -225,6 +225,11 @@ def _surface_selection_by_mesh(
 
     resolved: dict[int, NativeMaterialTextureSelection] = {}
     for mesh_index, values in grouped.items():
+        # A mesh is all-or-nothing for this first surface-texture stage. If any
+        # roughness/gloss binding on the mesh was rejected above, retain the
+        # scalar native material value rather than selecting a surviving map.
+        if mesh_index in issues:
+            continue
         unique: dict[tuple[str, str], NativeMaterialTextureSelection] = {}
         for value in values:
             key = (
