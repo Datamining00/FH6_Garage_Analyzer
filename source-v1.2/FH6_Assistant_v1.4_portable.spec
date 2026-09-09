@@ -18,6 +18,10 @@ if wheel_morph_helper.is_file():
 
 native_tire_hiddenimports = [
     'fh6garage.preview3d.material_appearance_patch',
+    'fh6garage.preview3d.material_runtime_wiring_patch',
+    'fh6garage.preview3d.livery_paint_provenance',
+    'fh6garage.preview3d.livery_paint_runtime_patch',
+    'fh6garage.preview3d.livery_paint_binding',
     'fh6garage.preview3d.native_transform_chain_patch',
     'fh6garage.preview3d.native_transform_chain_v2',
     'fh6garage.preview3d.native_transform_chain_v3',
