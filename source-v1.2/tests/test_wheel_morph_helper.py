@@ -13,11 +13,11 @@ class WheelMorphHelperTests(unittest.TestCase):
     def test_verified_helper_sha_matches_transform_chain_binary(self):
         self.assertEqual(
             helper.WHEEL_MORPH_HELPER_SHA256,
-            "813e6f3a27d87d5183e5ee075c49307c097376d942456fc644dade274c3ecc80",
+            "9196da4977f55f84f24698a74050a7ab8510e13d60eda70d683387b19728913e",
         )
         self.assertEqual(
             helper.WHEEL_MORPH_HELPER_REVISION,
-            "kfps_6f53ca3_w3_p3f_materialbin_references_v12",
+            "kfps_6f53ca3_w3_p3f_materialbin_references_uv4_v13",
         )
 
     def test_missing_bundled_helper_returns_none(self):
