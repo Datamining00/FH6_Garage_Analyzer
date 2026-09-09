@@ -13,9 +13,13 @@ non-BC5 normal textures and ambiguous/unresolved bindings remain deferred.
 
 from dataclasses import asdict, dataclass
 import math
+from pathlib import Path
 from typing import Any
 
-from .native_material_render_plan import NativeMaterialRenderPlan
+from .native_material_render_plan import (
+    NativeMaterialRenderPlan,
+    build_native_material_render_plan,
+)
 
 NATIVE_NORMAL_TEXTURE_DIAGNOSTICS_REVISION = 1
 _STANDARD_UV_TRANSFORM_MODE = "kfps_baked_texcoord_transform_vflip_plus_material_tiling"
@@ -196,10 +200,20 @@ def build_native_normal_texture_diagnostics(
     )
 
 
+def diagnose_native_normal_textures(
+    glb_path: str | Path,
+) -> NativeNormalTextureDiagnostics:
+    """Build the verified render plan and return read-only normal diagnostics."""
+    return build_native_normal_texture_diagnostics(
+        build_native_material_render_plan(glb_path)
+    )
+
+
 __all__ = [
     "NATIVE_NORMAL_TEXTURE_DIAGNOSTICS_REVISION",
     "NativeNormalTextureCandidateDiagnostic",
     "NativeNormalTextureDiagnostics",
     "NativeNormalTextureIssueDiagnostic",
     "build_native_normal_texture_diagnostics",
+    "diagnose_native_normal_textures",
 ]
