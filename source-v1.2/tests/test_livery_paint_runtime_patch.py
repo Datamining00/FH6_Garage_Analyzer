@@ -5,8 +5,10 @@ import tempfile
 import unittest
 from dataclasses import dataclass
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
+from fh6garage.preview3d import direct_livery
 from fh6garage.preview3d import kfps_render_backend as backend
 from fh6garage.preview3d import livery_paint_runtime_patch as runtime_patch
 
@@ -20,9 +22,11 @@ class _Result:
 class LiveryPaintRuntimePatchTests(unittest.TestCase):
     def setUp(self):
         self.original_render = backend.render_clivery_sections
+        self.original_build_textures = direct_livery.build_direct_livery_textures
 
     def tearDown(self):
         backend.render_clivery_sections = self.original_render
+        direct_livery.build_direct_livery_textures = self.original_build_textures
 
     def test_runtime_patch_writes_transient_diagnostic_without_changing_render_result_contract(self):
         with tempfile.TemporaryDirectory() as td:
@@ -59,6 +63,18 @@ class LiveryPaintRuntimePatchTests(unittest.TestCase):
             self.assertEqual(stored, report)
             self.assertTrue(any("Paint P1 provenance" in line for line in logs))
 
+    def test_provenance_is_carried_to_direct_livery_textures_as_transient_state(self):
+        result = _Result(Path("C_livery"), Path("."))
+        report = {"status": "paint_descriptor_parsed", "records": [{"material_identifier_u64_le": 1}]}
+        object.__setattr__(result, "_fh6_paint_provenance", report)
+        textures = SimpleNamespace()
+        direct_livery.build_direct_livery_textures = lambda render_result, *args, **kwargs: textures
+
+        self.assertTrue(runtime_patch.install_livery_paint_provenance_runtime_patch())
+        returned = direct_livery.build_direct_livery_textures(result, object())
+        self.assertIs(returned, textures)
+        self.assertIs(returned._fh6_paint_provenance, report)
+
     def test_diagnostic_failure_is_nonfatal_and_does_not_replace_render_output(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -72,12 +88,15 @@ class LiveryPaintRuntimePatchTests(unittest.TestCase):
             self.assertFalse(returned._fh6_paint_provenance["rendering_applied"])
             self.assertIsNone(returned._fh6_paint_provenance_path)
 
-    def test_installer_is_idempotent(self):
+    def test_installer_is_idempotent_for_render_and_texture_handoff(self):
         backend.render_clivery_sections = lambda *args, **kwargs: _Result(Path("C_livery"), Path("."))
+        direct_livery.build_direct_livery_textures = lambda *args, **kwargs: SimpleNamespace()
         self.assertTrue(runtime_patch.install_livery_paint_provenance_runtime_patch())
-        first = backend.render_clivery_sections
+        first_render = backend.render_clivery_sections
+        first_textures = direct_livery.build_direct_livery_textures
         self.assertTrue(runtime_patch.install_livery_paint_provenance_runtime_patch())
-        self.assertIs(backend.render_clivery_sections, first)
+        self.assertIs(backend.render_clivery_sections, first_render)
+        self.assertIs(direct_livery.build_direct_livery_textures, first_textures)
 
 
 if __name__ == "__main__":
