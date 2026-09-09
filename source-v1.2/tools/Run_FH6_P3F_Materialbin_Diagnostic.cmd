@@ -42,27 +42,7 @@ if errorlevel 1 (
   exit /b 4
 )
 
-set "GLB=%~1"
-if not defined GLB call :pick_glb
-if not defined GLB exit /b 1
-if not exist "%GLB%" (
-  echo ERROR: GLB does not exist:
-  echo %GLB%
-  pause
-  exit /b 2
-)
-
-set "PAINT=%~2"
-if not defined PAINT call :pick_paint
-if not defined PAINT exit /b 1
-if not exist "%PAINT%" (
-  echo ERROR: C_livery paint source does not exist:
-  echo %PAINT%
-  pause
-  exit /b 2
-)
-
-set "VEHICLE=%~3"
+set "VEHICLE=%~1"
 if not defined VEHICLE call :pick_vehicle
 if not defined VEHICLE exit /b 1
 if not exist "%VEHICLE%" (
@@ -72,24 +52,43 @@ if not exist "%VEHICLE%" (
   exit /b 2
 )
 
-for %%F in ("%GLB%") do set "STEM=%%~nF"
+set "SAVEROOT=%~2"
+if defined SAVEROOT if not exist "%SAVEROOT%\." (
+  echo ERROR: Optional FH6 save root does not exist:
+  echo %SAVEROOT%
+  pause
+  exit /b 2
+)
+
+for %%F in ("%VEHICLE%") do set "STEM=%%~nF"
 set "OUTPUT=%OUTDIR%\%STEM%_manufacturer_materialbin_p3f.json"
 
-echo FH6 Paint P3F Manufacturer Materialbin Diagnostic
+echo FH6 Paint P3F Automatic Real-Data Diagnostic
 echo ------------------------------------------------------------
-echo GLB     : %GLB%
-echo C_livery: %PAINT%
 echo Vehicle : %VEHICLE%
+echo GLB     : AUTO - generated from vehicle ZIP into diagnostic cache
+echo C_livery: AUTO - matched by Car ID from FH6 Assistant last save path
+if defined SAVEROOT echo Save root: %SAVEROOT%
 echo Cache   : %CACHE%
 echo Output  : %OUTPUT%
-echo Mode    : FH6 GAME/SAVE READ-ONLY; diagnostic derivatives only
+echo Mode    : FH6 GAME/SAVE READ-ONLY; derived GLB/JSON only
 echo.
 
-start "" /wait "%APP%" --p3f-materialbin-diagnostic --glb "%GLB%" --paint "%PAINT%" --vehicle "%VEHICLE%" --cache "%CACHE%" --output "%OUTPUT%"
+if defined SAVEROOT (
+  start "" /wait "%APP%" --p3f-materialbin-diagnostic --vehicle "%VEHICLE%" --save-root "%SAVEROOT%" --cache "%CACHE%" --output "%OUTPUT%"
+) else (
+  start "" /wait "%APP%" --p3f-materialbin-diagnostic --vehicle "%VEHICLE%" --cache "%CACHE%" --output "%OUTPUT%"
+)
 set "RC=%ERRORLEVEL%"
 if not "%RC%"=="0" (
   echo.
   echo ERROR: Paint P3F diagnostic failed with exit code %RC%.
+  if "%RC%"=="6" (
+    echo Automatic input preparation failed.
+    echo If no saved FH6 path exists, open FH6 Assistant once and select the save folder,
+    echo or run this launcher with the save root as the second argument.
+  )
+  if exist "%OUTPUT%" echo Diagnostic evidence: %OUTPUT%
   echo FH6 game/save inputs were not modified.
   pause
   exit /b %RC%
@@ -104,38 +103,18 @@ if not exist "%OUTPUT%" (
 
 echo.
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
-  "$r = Get-Content -LiteralPath $env:OUTPUT -Raw | ConvertFrom-Json; Write-Host ('Validation : ' + $r.validation_status); Write-Host ('P3D       : ' + $r.p3d_status); Write-Host ('Candidates: ' + $r.candidate_count); Write-Host ('Resolved  : ' + $r.exact_resolved_count); Write-Host ('Blocked   : ' + $r.blocked_count); Write-Host ('Unresolved: ' + $r.unresolved_count); Write-Host ('Helper    : ' + $r.helper_revision)"
+  "$r = Get-Content -LiteralPath $env:OUTPUT -Raw | ConvertFrom-Json; Write-Host ('Validation : ' + $r.validation_status); Write-Host ('P3D       : ' + $r.p3d_status); Write-Host ('Candidates: ' + $r.candidate_count); Write-Host ('Resolved  : ' + $r.exact_resolved_count); Write-Host ('Blocked   : ' + $r.blocked_count); Write-Host ('Unresolved: ' + $r.unresolved_count); Write-Host ('GLB       : ' + $r.glb_file); Write-Host ('C_livery  : ' + $r.paint_source); Write-Host ('Helper    : ' + $r.helper_revision)"
 echo.
 echo Result: %OUTPUT%
 start "" explorer.exe /select,"%OUTPUT%"
 pause
 exit /b 0
 
-:pick_glb
-set "PICKFILE=%TEMP%\fh6_p3f_glb_%RANDOM%_%RANDOM%.txt"
-if exist "%PICKFILE%" del /q "%PICKFILE%" >nul 2>&1
-powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -Command ^
-  "Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.OpenFileDialog; $d.Filter = 'FH6 converted GLB (*.glb)|*.glb|All files (*.*)|*.*'; $d.Title = 'Select current FH6 converted GLB'; if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { [System.IO.File]::WriteAllText($env:PICKFILE, $d.FileName) }"
-if not exist "%PICKFILE%" exit /b 1
-set /p "GLB="<"%PICKFILE%"
-del /q "%PICKFILE%" >nul 2>&1
-exit /b 0
-
-:pick_paint
-set "PICKFILE=%TEMP%\fh6_p3f_paint_%RANDOM%_%RANDOM%.txt"
-if exist "%PICKFILE%" del /q "%PICKFILE%" >nul 2>&1
-powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -Command ^
-  "Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.OpenFileDialog; $d.Filter = 'FH6 C_livery|C_livery|All files (*.*)|*.*'; $d.Title = 'Select matching C_livery paint source'; if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { [System.IO.File]::WriteAllText($env:PICKFILE, $d.FileName) }"
-if not exist "%PICKFILE%" exit /b 1
-set /p "PAINT="<"%PICKFILE%"
-del /q "%PICKFILE%" >nul 2>&1
-exit /b 0
-
 :pick_vehicle
 set "PICKFILE=%TEMP%\fh6_p3f_vehicle_%RANDOM%_%RANDOM%.txt"
 if exist "%PICKFILE%" del /q "%PICKFILE%" >nul 2>&1
 powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -Command ^
-  "Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.OpenFileDialog; $d.Filter = 'FH6 vehicle archive (*.zip)|*.zip|All files (*.*)|*.*'; $d.Title = 'Select matching FH6 vehicle ZIP'; if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { [System.IO.File]::WriteAllText($env:PICKFILE, $d.FileName) }"
+  "Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.OpenFileDialog; $d.Filter = 'FH6 vehicle archive (*.zip)|*.zip|All files (*.*)|*.*'; $d.Title = 'Select FH6 vehicle ZIP - GLB and C_livery will be prepared automatically'; if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { [System.IO.File]::WriteAllText($env:PICKFILE, $d.FileName) }"
 if not exist "%PICKFILE%" exit /b 1
 set /p "VEHICLE="<"%PICKFILE%"
 del /q "%PICKFILE%" >nul 2>&1
