@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -10,8 +11,9 @@ from .native_dds import NativeDdsError, NativeDdsTexture, parse_native_dds
 from .native_material_textures import _read_glb_json
 from .native_texture_semantics import classify_native_texture_parameter
 
-NATIVE_MATERIAL_RENDER_PLAN_REVISION = 1
+NATIVE_MATERIAL_RENDER_PLAN_REVISION = 2
 _SUPPORTED_MANIFEST_FORMAT = "fh6_native_material_texture_resolution_v3"
+_STANDARD_MATERIAL_UV_CHANNEL = 0
 
 
 class NativeMaterialRenderPlanError(RuntimeError):
@@ -22,6 +24,7 @@ class NativeMaterialRenderPlanError(RuntimeError):
 class NativeMaterialTextureSelection:
     mesh_index: int
     mesh_name: str
+    mesh_role: str
     material_name: str
     semantic: str
     parameter_hash: str
@@ -35,6 +38,10 @@ class NativeMaterialTextureSelection:
     dxgi_format: int
     compression_family: str
     is_srgb: bool
+    uv_channel: int
+    uv_tiling_u: float
+    uv_tiling_v: float
+    uv_transform_mode: str
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -220,12 +227,66 @@ def _mesh_binding_groups(document: dict[str, Any]) -> tuple[dict[tuple[int, str]
     return groups, binding_count, recognized, unknown
 
 
+def _material_uv_contract(mesh: dict[str, Any]) -> tuple[int, float, float, str]:
+    """Return the exact standard material texture coordinate contract.
+
+    Pinned KFPS exports UV0 after applying MeshBlob.TexCoordTransforms and the
+    ForzaTechStudio source-V flip.  MaterialAppearanceDiagnostic exports the
+    remaining material U/V tiling multiplier. Missing tiling provenance is not
+    guessed for a legacy GLB.
+    """
+    primitives = mesh.get("primitives")
+    if not isinstance(primitives, list) or not primitives:
+        raise NativeMaterialRenderPlanError("Mesh has no primitive for material UV sampling.")
+    for primitive in primitives:
+        if not isinstance(primitive, dict):
+            raise NativeMaterialRenderPlanError("Mesh contains an invalid primitive record.")
+        attrs = primitive.get("attributes")
+        if not isinstance(attrs, dict) or "TEXCOORD_0" not in attrs:
+            raise NativeMaterialRenderPlanError(
+                "Standard native material texture requires TEXCOORD_0, but this mesh does not export it."
+            )
+
+    extras = mesh.get("extras")
+    if not isinstance(extras, dict):
+        raise NativeMaterialRenderPlanError("Mesh material extras are unavailable.")
+    appearance = extras.get("kfps_material_appearance")
+    if not isinstance(appearance, dict):
+        raise NativeMaterialRenderPlanError("Embedded material appearance provenance is unavailable.")
+    raw_tiling = _mapping_value(appearance, "uvTiling", "UvTiling")
+    if not isinstance(raw_tiling, (list, tuple)) or len(raw_tiling) < 2:
+        raise NativeMaterialRenderPlanError(
+            "Material UV tiling provenance is missing; refusing to assume identity tiling for a legacy GLB."
+        )
+    try:
+        tiling_u = float(raw_tiling[0])
+        tiling_v = float(raw_tiling[1])
+    except (TypeError, ValueError) as exc:
+        raise NativeMaterialRenderPlanError("Material UV tiling contains a non-numeric value.") from exc
+    if (
+        not math.isfinite(tiling_u)
+        or not math.isfinite(tiling_v)
+        or abs(tiling_u) <= 1e-6
+        or abs(tiling_v) <= 1e-6
+    ):
+        raise NativeMaterialRenderPlanError(
+            f"Material UV tiling is invalid: ({tiling_u!r}, {tiling_v!r})."
+        )
+    return (
+        _STANDARD_MATERIAL_UV_CHANNEL,
+        tiling_u,
+        tiling_v,
+        "kfps_baked_texcoord_transform_vflip_plus_material_tiling",
+    )
+
+
 def build_native_material_render_plan(glb_path: str | Path) -> NativeMaterialRenderPlan:
     """Join exact mesh TextureBindings to verified decoded DDS derivatives.
 
-    This stage deliberately does not choose UV channels, upload OpenGL textures,
-    or collapse multiple texture layers.  A mesh/semantic with more than one
-    distinct Texture2D path is marked ambiguous and receives no selection.
+    Standard material textures follow the ForzaTechStudio viewport contract:
+    transformed UV0 for diffuse/normal/specular/emissive texture sampling. Car
+    paint base colour remains controlled by the existing paint/livery state and
+    is deliberately not replaced by a static diffuse Texture2D.
     """
     glb = Path(glb_path).expanduser().resolve()
     manifest_path, manifest = _load_manifest(glb)
@@ -242,6 +303,7 @@ def build_native_material_render_plan(glb_path: str | Path) -> NativeMaterialRen
         extras = mesh.get("extras") if isinstance(mesh, dict) else {}
         extras = extras if isinstance(extras, dict) else {}
         mesh_name = str(mesh.get("name") or "") if isinstance(mesh, dict) else ""
+        mesh_role = str(extras.get("kfps_role") or "trim").strip().casefold()
         material_name = str(extras.get("kfps_material_name") or "")
 
         unique: dict[str, dict[str, str]] = {}
@@ -267,6 +329,43 @@ def build_native_material_render_plan(glb_path: str | Path) -> NativeMaterialRen
             continue
 
         key, candidate = next(iter(unique.items()))
+
+        # Match ForzaTechStudio's viewport behaviour: car-paint diffuse/base maps
+        # do not replace the dynamic manufacturer/user/livery colour. Normal and
+        # other material maps remain eligible for later stages.
+        if mesh_role == "paint" and semantic in {"base_color", "base_color_alpha"}:
+            issues.append(
+                NativeMaterialTextureIssue(
+                    mesh_index=mesh_index,
+                    mesh_name=mesh_name,
+                    material_name=material_name,
+                    semantic=semantic,
+                    status="dynamic_paint_base_color_authoritative",
+                    detail=(
+                        "Static car-paint base Texture2D is not sampled because the existing "
+                        "manufacturer/user paint and livery albedo remains authoritative."
+                    ),
+                    texture_paths=(candidate["texture_path"],),
+                )
+            )
+            continue
+
+        try:
+            uv_channel, tiling_u, tiling_v, uv_transform_mode = _material_uv_contract(mesh)
+        except NativeMaterialRenderPlanError as exc:
+            issues.append(
+                NativeMaterialTextureIssue(
+                    mesh_index=mesh_index,
+                    mesh_name=mesh_name,
+                    material_name=material_name,
+                    semantic=semantic,
+                    status="material_uv_contract_unavailable",
+                    detail=str(exc),
+                    texture_paths=(candidate["texture_path"],),
+                )
+            )
+            continue
+
         if key in payload_conflicts:
             issues.append(
                 NativeMaterialTextureIssue(
@@ -314,6 +413,7 @@ def build_native_material_render_plan(glb_path: str | Path) -> NativeMaterialRen
             NativeMaterialTextureSelection(
                 mesh_index=mesh_index,
                 mesh_name=mesh_name,
+                mesh_role=mesh_role,
                 material_name=material_name,
                 semantic=semantic,
                 parameter_hash=candidate["parameter_hash"],
@@ -327,6 +427,10 @@ def build_native_material_render_plan(glb_path: str | Path) -> NativeMaterialRen
                 dxgi_format=texture.dxgi_format,
                 compression_family=texture.compression_family,
                 is_srgb=texture.is_srgb,
+                uv_channel=uv_channel,
+                uv_tiling_u=tiling_u,
+                uv_tiling_v=tiling_v,
+                uv_transform_mode=uv_transform_mode,
             )
         )
 
