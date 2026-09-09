@@ -84,7 +84,13 @@ def _paint(records: list[dict]) -> dict:
     return {"status": "paint_descriptor_parsed", "records": records}
 
 
-def _palette(entries: list[dict]) -> dict:
+def _palette(
+    entries: list[dict],
+    *,
+    primary=(0.2, 0.4, 0.6),
+    secondary=(0.0, 0.0, 0.0),
+    secondary_present: bool = False,
+) -> dict:
     return {
         "status": "manufacturer_colors_parsed",
         "groups": [
@@ -93,19 +99,25 @@ def _palette(entries: list[dict]) -> dict:
                 "entry_count": len(entries),
                 "entries": entries,
                 "primary_group_preview_present": True,
-                "primary_group_preview_color": [0.2, 0.4, 0.6],
-                "secondary_group_preview_present": False,
-                "secondary_group_preview_color": [0.0, 0.0, 0.0],
+                "primary_group_preview_color": list(primary),
+                "secondary_group_preview_present": secondary_present,
+                "secondary_group_preview_color": list(secondary),
             }
         ],
     }
 
 
-def _entry(index: int, *, names=("carpaint",), path="factory.swatchbin") -> dict:
+def _entry(
+    index: int,
+    *,
+    names=("carpaint",),
+    path="factory.swatchbin",
+    preview=(0.1, 0.2, 0.3),
+) -> dict:
     return {
         "index": index,
         "material_names": list(names),
-        "preview_color": [0.1, 0.2, 0.3],
+        "preview_color": list(preview),
         "path": path,
     }
 
@@ -122,7 +134,7 @@ class ManufacturerOverlayDiagnosticsTests(unittest.TestCase):
             )
 
             self.assertEqual(report["status"], "manufacturer_overlay_candidates_diagnosed")
-            self.assertEqual(report["revision"], 2)
+            self.assertEqual(report["revision"], 3)
             self.assertEqual(report["exact_candidate_count"], 1)
             self.assertFalse(report["rendering_enabled"])
             self.assertFalse(report["rendering_applied"])
@@ -173,6 +185,88 @@ class ManufacturerOverlayDiagnosticsTests(unittest.TestCase):
             self.assertEqual(inventory["entry_count"], 1)
             self.assertEqual(inventory["entries"][0]["path_kind"], "materialbin")
 
+    def test_fts_builtin_carpaint_uses_unique_primary_preview_entry_in_multi_entry_group(self):
+        with tempfile.TemporaryDirectory() as temp:
+            glb = Path(temp) / "car.glb"
+            _write_glb(glb, material_name="carPaint", uv4="valid")
+            report = build_manufacturer_overlay_diagnostics(
+                glb,
+                _paint([_record(BODY)]),
+                _palette(
+                    [
+                        _entry(
+                            0,
+                            names=("Body", "Hood", "Mirror", "Wing"),
+                            path="rosso.materialbin",
+                            preview=(0.6039215922355652, 0.019607843831181526, 0.0470588244497776),
+                        ),
+                        _entry(
+                            1,
+                            names=("Stripes",),
+                            path="white.materialbin",
+                            preview=(0.9411764740943909, 0.9411764740943909, 0.9411764740943909),
+                        ),
+                    ],
+                    primary=(0.6039215922355652, 0.019607843831181526, 0.0470588244497776),
+                ),
+            )
+
+            row = report["candidates"][0]
+            self.assertEqual(report["builtin_primary_preview_match_count"], 1)
+            self.assertEqual(row["material_match_mode"], "fts_builtin_carpaint_primary_preview_entry")
+            self.assertEqual(row["entry_index"], 0)
+            self.assertEqual(row["entry_path"], "rosso.materialbin")
+            self.assertEqual(row["status"], "manufacturer_entry_path_not_swatchbin")
+            self.assertEqual(row["uv4"]["status"], "uv4_exact_kfps_accessor")
+
+    def test_fts_builtin_secondary_preview_can_coalesce_multiple_entries_with_same_path(self):
+        with tempfile.TemporaryDirectory() as temp:
+            glb = Path(temp) / "car.glb"
+            _write_glb(glb, material_name="carpaint_secondary", uv4="valid")
+            report = build_manufacturer_overlay_diagnostics(
+                glb,
+                _paint([_record(BODY)]),
+                _palette(
+                    [
+                        _entry(0, names=("Body",), path="primary.materialbin", preview=(0.6, 0.02, 0.05)),
+                        _entry(1, names=("Stripes",), path="white.materialbin", preview=(0.94, 0.94, 0.94)),
+                        _entry(2, names=("Body_SecondaryColor",), path="white.materialbin", preview=(0.94, 0.94, 0.94)),
+                    ],
+                    primary=(0.6, 0.02, 0.05),
+                    secondary=(0.94, 0.94, 0.94),
+                    secondary_present=True,
+                ),
+            )
+
+            row = report["candidates"][0]
+            self.assertEqual(report["builtin_secondary_preview_match_count"], 1)
+            self.assertEqual(report["builtin_preview_same_path_match_count"], 1)
+            self.assertEqual(row["material_match_mode"], "fts_builtin_carpaint_secondary_preview_same_path")
+            self.assertEqual(row["matching_entry_indices"], [1, 2])
+            self.assertEqual(row["entry_path"], "white.materialbin")
+            self.assertEqual(row["status"], "manufacturer_entry_path_not_swatchbin")
+
+    def test_preview_match_with_multiple_paths_stays_fail_closed(self):
+        with tempfile.TemporaryDirectory() as temp:
+            glb = Path(temp) / "car.glb"
+            _write_glb(glb, material_name="carpaint", uv4="valid")
+            report = build_manufacturer_overlay_diagnostics(
+                glb,
+                _paint([_record(BODY)]),
+                _palette(
+                    [
+                        _entry(0, names=("body_a",), path="a.materialbin", preview=(0.2, 0.4, 0.6)),
+                        _entry(1, names=("body_b",), path="b.materialbin", preview=(0.2, 0.4, 0.6)),
+                    ]
+                ),
+            )
+
+            self.assertEqual(report["ambiguous_entry_count"], 1)
+            self.assertEqual(report["exact_candidate_count"], 0)
+            row = report["candidates"][0]
+            self.assertEqual(row["status"], "manufacturer_entry_primary_preview_ambiguous")
+            self.assertEqual(row["matching_entry_indices"], [0, 1])
+
     def test_fts_builtin_carpaint_stays_fail_closed_for_multi_entry_group_without_exact_match(self):
         with tempfile.TemporaryDirectory() as temp:
             glb = Path(temp) / "car.glb"
@@ -187,6 +281,7 @@ class ManufacturerOverlayDiagnosticsTests(unittest.TestCase):
             )
 
             self.assertEqual(report["builtin_unique_entry_match_count"], 0)
+            self.assertEqual(report["builtin_primary_preview_match_count"], 0)
             self.assertEqual(report["unmatched_entry_count"], 1)
             self.assertEqual(report["resolved_group_inventory"]["0"]["entry_count"], 2)
             self.assertEqual(
