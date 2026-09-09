@@ -16,6 +16,11 @@ BODY = 0xF7DBE8A7C839A675
 HOOD = 0x6AC1E9D87FE5D953
 
 
+def _binding(material_hash: int) -> str:
+    # Exact pinned KFPS GlbWriter contract: MaterialBindingHash.ToString("X16").
+    return f"{material_hash:016X}"
+
+
 def _write_glb(path: Path, mesh_specs: list[tuple[str | None, int]]) -> None:
     accessors = []
     meshes = []
@@ -61,10 +66,10 @@ def _report(records):
 
 
 class LiveryPaintBindingTests(unittest.TestCase):
-    def test_exact_hash_custom_primary_applies_only_to_matching_primitive(self):
+    def test_exact_kfps_x16_hash_custom_primary_applies_only_to_matching_primitive(self):
         with tempfile.TemporaryDirectory() as temp:
             glb = Path(temp) / "car.glb"
-            _write_glb(glb, [(f"0x{BODY:016X}", 3), (f"0x{HOOD:016X}", 2)])
+            _write_glb(glb, [(_binding(BODY), 3), (_binding(HOOD), 2)])
             scene = _scene([3, 2])
             aux = np.full((5, 4), -1.0, dtype=np.float32)
             aux[:, 0] = 0.0
@@ -75,6 +80,7 @@ class LiveryPaintBindingTests(unittest.TestCase):
             np.testing.assert_allclose(rendered[:3, 1:4], np.repeat(expected[None, :], 3, axis=0), atol=1e-6)
             np.testing.assert_allclose(rendered[3:, 1:4], -1.0, atol=1e-6)
             self.assertEqual(diagnostic["status"], "exact_custom_primary_applied")
+            self.assertEqual(diagnostic["binding_format"], "kfps_material_binding_hash_x16_unprefixed")
             self.assertEqual(diagnostic["matched_primitives"], 1)
             self.assertEqual(diagnostic["matched_vertices"], 3)
             self.assertIn(f"0x{HOOD:016X}", diagnostic["unmatched_paint_hashes"])
@@ -82,7 +88,7 @@ class LiveryPaintBindingTests(unittest.TestCase):
     def test_same_hash_on_non_paint_primitive_is_not_recolored(self):
         with tempfile.TemporaryDirectory() as temp:
             glb = Path(temp) / "car.glb"
-            _write_glb(glb, [(f"0x{BODY:016X}", 3)])
+            _write_glb(glb, [(_binding(BODY), 3)])
             scene = _scene([3], roles=["trim"])
             aux = np.asarray([[0.0, -1.0, -1.0, -1.0]] * 3, dtype=np.float32)
             rendered, diagnostic = apply_exact_livery_paint_to_aux_stream(
@@ -91,7 +97,7 @@ class LiveryPaintBindingTests(unittest.TestCase):
             np.testing.assert_array_equal(rendered, aux)
             self.assertFalse(diagnostic["rendering_applied"])
 
-    def test_binding_must_be_canonical_64_bit_hash_not_material_name(self):
+    def test_binding_must_be_exact_unprefixed_kfps_x16_not_material_name_or_short_hex(self):
         with tempfile.TemporaryDirectory() as temp:
             glb = Path(temp) / "car.glb"
             _write_glb(glb, [("BodyPaint", 3), ("0x1234", 2)])
@@ -103,10 +109,23 @@ class LiveryPaintBindingTests(unittest.TestCase):
             np.testing.assert_array_equal(rendered, aux)
             self.assertEqual(len(diagnostic["malformed_binding_primitives"]), 2)
 
-    def test_duplicate_c_livery_hash_fails_closed(self):
+    def test_human_readable_0x_prefix_is_rejected_because_kfps_exporter_does_not_emit_it(self):
         with tempfile.TemporaryDirectory() as temp:
             glb = Path(temp) / "car.glb"
             _write_glb(glb, [(f"0x{BODY:016X}", 3)])
+            scene = _scene([3])
+            aux = np.asarray([[0.0, -1.0, -1.0, -1.0]] * 3, dtype=np.float32)
+            rendered, diagnostic = apply_exact_livery_paint_to_aux_stream(
+                glb, scene, aux, _report([_record(BODY)])
+            )
+            np.testing.assert_array_equal(rendered, aux)
+            self.assertEqual(len(diagnostic["malformed_binding_primitives"]), 1)
+            self.assertFalse(diagnostic["rendering_applied"])
+
+    def test_duplicate_c_livery_hash_fails_closed(self):
+        with tempfile.TemporaryDirectory() as temp:
+            glb = Path(temp) / "car.glb"
+            _write_glb(glb, [(_binding(BODY), 3)])
             scene = _scene([3])
             aux = np.asarray([[0.0, -1.0, -1.0, -1.0]] * 3, dtype=np.float32)
             rendered, diagnostic = apply_exact_livery_paint_to_aux_stream(
@@ -119,7 +138,7 @@ class LiveryPaintBindingTests(unittest.TestCase):
     def test_manufacturer_selector_is_deferred_not_guessed_from_raw_bgra(self):
         with tempfile.TemporaryDirectory() as temp:
             glb = Path(temp) / "car.glb"
-            _write_glb(glb, [(f"0x{BODY:016X}", 3)])
+            _write_glb(glb, [(_binding(BODY), 3)])
             scene = _scene([3])
             aux = np.asarray([[0.0, -1.0, -1.0, -1.0]] * 3, dtype=np.float32)
             rendered, diagnostic = apply_exact_livery_paint_to_aux_stream(
@@ -132,7 +151,7 @@ class LiveryPaintBindingTests(unittest.TestCase):
     def test_disabled_primary_color_is_not_applied(self):
         with tempfile.TemporaryDirectory() as temp:
             glb = Path(temp) / "car.glb"
-            _write_glb(glb, [(f"0x{BODY:016X}", 3)])
+            _write_glb(glb, [(_binding(BODY), 3)])
             scene = _scene([3])
             aux = np.asarray([[0.0, -1.0, -1.0, -1.0]] * 3, dtype=np.float32)
             rendered, diagnostic = apply_exact_livery_paint_to_aux_stream(
@@ -144,7 +163,7 @@ class LiveryPaintBindingTests(unittest.TestCase):
     def test_unresolved_provenance_keeps_existing_material_aux_stream(self):
         with tempfile.TemporaryDirectory() as temp:
             glb = Path(temp) / "car.glb"
-            _write_glb(glb, [(f"0x{BODY:016X}", 3)])
+            _write_glb(glb, [(_binding(BODY), 3)])
             scene = _scene([3])
             aux = np.asarray([[0.0, -1.0, -1.0, -1.0]] * 3, dtype=np.float32)
             rendered, diagnostic = apply_exact_livery_paint_to_aux_stream(
