@@ -5,11 +5,12 @@ from pathlib import Path
 import sys
 
 # This verified helper carries the established wheel/transform chain plus the
-# read-only embedded MaterialBlob shader/Texture2D provenance exporter and the
-# TXCB/TXCH native swatchbin-to-DDS decoder consumed by the 3D viewer pipeline.
+# read-only embedded MaterialBlob shader/Texture2D provenance exporter, exact
+# material UV-tiling provenance, and the TXCB/TXCH native swatchbin-to-DDS
+# decoder consumed by the 3D viewer pipeline.
 WHEEL_MORPH_HELPER_FILENAME = "Kfps.ChassisConverter.WheelMorph.exe"
-WHEEL_MORPH_HELPER_SHA256 = "b9c7234900d11ec81da1a4505dd575d68d0a99c16e1a2baf71b8eb1ec96ab65e"
-WHEEL_MORPH_HELPER_REVISION = "kfps_6f53ca3_w3_native_material_swatchbin_decoder_v9"
+WHEEL_MORPH_HELPER_SHA256 = "44125004933816e31ed67f8652235f28c5013b46c6bc60f77bccdbc49568108c"
+WHEEL_MORPH_HELPER_REVISION = "kfps_6f53ca3_w3_native_material_texture_uv_v10"
 
 
 class WheelMorphHelperError(RuntimeError):
