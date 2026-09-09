@@ -18,6 +18,9 @@ on:
       - "source-v1.2/fh6garage/preview3d/manufacturer_colors.py"
       - "source-v1.2/fh6garage/preview3d/manufacturer_overlay_diagnostics.py"
       - "source-v1.2/fh6garage/preview3d/manufacturer_overlay_texture_diagnostics.py"
+      - "source-v1.2/fh6garage/preview3d/exact_game_asset.py"
+      - "source-v1.2/fh6garage/preview3d/materialbin_reference_helper.py"
+      - "source-v1.2/fh6garage/preview3d/manufacturer_materialbin_diagnostics.py"
       - "source-v1.2/fh6garage/preview3d/native_material_textures.py"
       - "source-v1.2/fh6garage/preview3d/native_texture_semantics.py"
       - "source-v1.2/fh6garage/preview3d/native_dds.py"
@@ -37,6 +40,9 @@ on:
       - "source-v1.2/tests/test_manufacturer_colors.py"
       - "source-v1.2/tests/test_manufacturer_overlay_diagnostics.py"
       - "source-v1.2/tests/test_manufacturer_overlay_texture_diagnostics.py"
+      - "source-v1.2/tests/test_exact_game_asset.py"
+      - "source-v1.2/tests/test_materialbin_reference_helper_source.py"
+      - "source-v1.2/tests/test_manufacturer_materialbin_diagnostics.py"
       - "source-v1.2/tests/test_native_material_textures.py"
       - "source-v1.2/tests/test_native_texture_semantics.py"
       - "source-v1.2/tests/test_native_dds.py"
@@ -52,9 +58,12 @@ on:
       - "source-v1.2/tools/analyze_livery_paint.py"
       - "source-v1.2/tools/analyze_manufacturer_overlay.py"
       - "source-v1.2/tools/analyze_manufacturer_overlay_texture.py"
+      - "source-v1.2/tools/analyze_manufacturer_materialbin.py"
       - "source-v1.2/tools/patch_kfps_wheel_morph_diagnostic.py"
+      - "source-v1.2/tools/patch_kfps_materialbin_diagnostic.py"
       - "source-v1.2/tools/kfps_wheel_morph/MaterialAppearanceDiagnostic.cs"
       - "source-v1.2/tools/kfps_wheel_morph/NativeSwatchbinDecoder.cs"
+      - "source-v1.2/tools/kfps_wheel_morph/MaterialbinReferenceDiagnostic.cs"
       - ".github/workflows/validate-v1.4-native-material-textures.yml"
 
 permissions:
@@ -108,6 +117,9 @@ jobs:
           python -m py_compile fh6garage/preview3d/manufacturer_colors.py
           python -m py_compile fh6garage/preview3d/manufacturer_overlay_diagnostics.py
           python -m py_compile fh6garage/preview3d/manufacturer_overlay_texture_diagnostics.py
+          python -m py_compile fh6garage/preview3d/exact_game_asset.py
+          python -m py_compile fh6garage/preview3d/materialbin_reference_helper.py
+          python -m py_compile fh6garage/preview3d/manufacturer_materialbin_diagnostics.py
           python -m py_compile fh6garage/preview3d/native_material_textures.py
           python -m py_compile fh6garage/preview3d/native_texture_semantics.py
           python -m py_compile fh6garage/preview3d/native_dds.py
@@ -122,6 +134,8 @@ jobs:
           python -m py_compile tools/analyze_livery_paint.py
           python -m py_compile tools/analyze_manufacturer_overlay.py
           python -m py_compile tools/analyze_manufacturer_overlay_texture.py
+          python -m py_compile tools/analyze_manufacturer_materialbin.py
+          python -m py_compile tools/patch_kfps_materialbin_diagnostic.py
           python -m unittest tests.test_material_runtime_wiring_patch -v
           python -m unittest tests.test_livery_paint_provenance -v
           python -m unittest tests.test_livery_paint_runtime_patch -v
@@ -131,6 +145,9 @@ jobs:
           python -m unittest tests.test_manufacturer_colors -v
           python -m unittest tests.test_manufacturer_overlay_diagnostics -v
           python -m unittest tests.test_manufacturer_overlay_texture_diagnostics -v
+          python -m unittest tests.test_exact_game_asset -v
+          python -m unittest tests.test_materialbin_reference_helper_source -v
+          python -m unittest tests.test_manufacturer_materialbin_diagnostics -v
           python -m unittest tests.test_native_material_textures -v
           python -m unittest tests.test_native_texture_semantics -v
           python -m unittest tests.test_native_dds -v
@@ -153,20 +170,25 @@ jobs:
           $actual = (git -C kfps-source rev-parse HEAD).Trim()
           if ($actual -ne "6f53ca3c584d78659d06d4b4a39561db67d79345") { throw "Pinned KFPS commit mismatch: $actual" }
 
-      - name: Apply material texture patch
+      - name: Apply material texture and P3F materialbin patches
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           $PSNativeCommandUseErrorActionPreference = $true
           python source-v1.2/tools/patch_kfps_wheel_morph_diagnostic.py --kfps-root kfps-source
-          if ($LASTEXITCODE -ne 0) { throw "KFPS patcher failed with exit code $LASTEXITCODE" }
+          if ($LASTEXITCODE -ne 0) { throw "KFPS base patcher failed with exit code $LASTEXITCODE" }
+          python source-v1.2/tools/patch_kfps_materialbin_diagnostic.py --kfps-root kfps-source
+          if ($LASTEXITCODE -ne 0) { throw "KFPS materialbin patcher failed with exit code $LASTEXITCODE" }
           git -C kfps-source diff --check
           if ($LASTEXITCODE -ne 0) { throw "Patched KFPS diff check failed" }
           $program = "kfps-source/tools/livery/chassis-converter/Program.cs"
           if (-not (Select-String -Path $program -SimpleMatch "--decode-swatchbin" -Quiet)) { throw "Program.cs is missing native swatchbin decode mode." }
           if (-not (Select-String -Path $program -SimpleMatch "NativeSwatchbinDecoder.Decode" -Quiet)) { throw "Program.cs is missing NativeSwatchbinDecoder invocation." }
+          if (-not (Select-String -Path $program -SimpleMatch "--diagnose-materialbin" -Quiet)) { throw "Program.cs is missing P3F materialbin diagnostic mode." }
+          if (-not (Select-String -Path $program -SimpleMatch "MaterialbinReferenceRuntime.Diagnose" -Quiet)) { throw "Program.cs is missing P3F materialbin diagnostic invocation." }
           if (-not (Select-String -Path $program -SimpleMatch "materialBindingHash" -Quiet)) { throw "Program.cs is missing exact material binding hash propagation." }
           if (-not (Test-Path "kfps-source/tools/livery/chassis-converter/NativeSwatchbinDecoder.cs")) { throw "NativeSwatchbinDecoder.cs was not staged." }
+          if (-not (Test-Path "kfps-source/tools/livery/chassis-converter/MaterialbinReferenceDiagnostic.cs")) { throw "MaterialbinReferenceDiagnostic.cs was not staged." }
           if (-not (Select-String -Path "kfps-source/tools/livery/chassis-converter/MaterialAppearanceDiagnostic.cs" -SimpleMatch "TextureBindings" -Quiet)) { throw "TextureBindings provenance is missing." }
           if (-not (Select-String -Path "kfps-source/tools/livery/chassis-converter/MaterialAppearanceDiagnostic.cs" -SimpleMatch "UvTilingVectorHashes" -Quiet)) { throw "Material UV tiling provenance is missing." }
           $writer = "kfps-source/tools/livery/chassis-converter/GlbWriter.cs"
