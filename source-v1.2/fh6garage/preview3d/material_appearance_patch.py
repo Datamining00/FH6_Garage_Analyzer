@@ -41,7 +41,14 @@ _PBR_OUTPUT = """                vec3 decalLinear = pow(max(decal.rgb, vec3(0.0)
                     : pow(clamp(vColor, 0.0, 1.0), vec3(2.2));
                 albedo = mix(albedo, decalLinear, decal.a);
                 vec3 shaded = fh6ShadeMaterial(
-                    albedo, N, V, vMaterialParams, clamp(vMaterialAux.x, 0.0, 1.0));
+                    albedo,
+                    N,
+                    V,
+                    vMaterialParams,
+                    clamp(vMaterialAux.x, 0.0, 1.0),
+                    vMaterialF0,
+                    vMaterialCoatF0,
+                    vMaterialEmission);
 
                 if (uDebugSections && bestSlot >= 0) {
                     fragColor = vec4(mix(shaded, debugColor(bestSlot), max(bestCoverage, 0.55)), 1.0);
@@ -55,24 +62,36 @@ _VERTEX_ATTR_MARKER = """            layout(location=6) in float inDirectUv;
 _VERTEX_ATTR_REPLACEMENT = """            layout(location=6) in float inDirectUv;
             layout(location=7) in vec4 inMaterialParams;
             layout(location=8) in vec4 inMaterialAux;
+            layout(location=9) in vec4 inMaterialF0;
+            layout(location=10) in vec4 inMaterialCoatF0;
+            layout(location=11) in vec4 inMaterialEmission;
 """
 _VERTEX_OUT_MARKER = """            flat out int vDirectUv;
 """
 _VERTEX_OUT_REPLACEMENT = """            flat out int vDirectUv;
             out vec4 vMaterialParams;
             out vec4 vMaterialAux;
+            out vec4 vMaterialF0;
+            out vec4 vMaterialCoatF0;
+            out vec4 vMaterialEmission;
 """
 _VERTEX_ASSIGN_MARKER = """                vDirectUv = int(floor(inDirectUv + 0.5));
 """
 _VERTEX_ASSIGN_REPLACEMENT = """                vDirectUv = int(floor(inDirectUv + 0.5));
                 vMaterialParams = inMaterialParams;
                 vMaterialAux = inMaterialAux;
+                vMaterialF0 = inMaterialF0;
+                vMaterialCoatF0 = inMaterialCoatF0;
+                vMaterialEmission = inMaterialEmission;
 """
 _FRAGMENT_IN_MARKER = """            flat in int vDirectUv;
 """
 _FRAGMENT_IN_REPLACEMENT = """            flat in int vDirectUv;
             in vec4 vMaterialParams;
             in vec4 vMaterialAux;
+            in vec4 vMaterialF0;
+            in vec4 vMaterialCoatF0;
+            in vec4 vMaterialEmission;
 """
 
 _PBR_HELPERS = r"""
@@ -112,7 +131,14 @@ _PBR_HELPERS = r"""
             }
 
             vec3 fh6ShadeMaterial(
-                vec3 albedo, vec3 N, vec3 V, vec4 materialParams, float transmission) {
+                vec3 albedo,
+                vec3 N,
+                vec3 V,
+                vec4 materialParams,
+                float transmission,
+                vec4 nativeF0,
+                vec4 nativeCoatF0,
+                vec4 nativeEmission) {
                 float metallic = clamp(materialParams.x, 0.0, 1.0);
                 float roughness = clamp(materialParams.y, 0.025, 1.0);
                 float clearcoat = clamp(materialParams.z, 0.0, 1.0);
@@ -125,7 +151,10 @@ _PBR_HELPERS = r"""
                 float ndh = max(dot(N, H), 0.0);
                 float vdh = max(dot(V, H), 0.0);
 
-                vec3 F0 = mix(vec3(0.04), albedo, metallic);
+                vec3 fallbackF0 = mix(vec3(0.04), albedo, metallic);
+                vec3 F0 = nativeF0.w > 0.5
+                    ? clamp(nativeF0.xyz, 0.0, 1.0)
+                    : fallbackF0;
                 vec3 F = fh6FresnelSchlick(vdh, F0);
                 float D = fh6DistributionGGX(N, H, roughness);
                 float G = fh6GeometrySmith(N, V, L, roughness);
@@ -143,12 +172,19 @@ _PBR_HELPERS = r"""
 
                 float coatPower = mix(256.0, 28.0, coatRoughness);
                 float coatHighlight = pow(ndh, coatPower) * clearcoat;
-                vec3 coatF = fh6FresnelSchlick(ndv, vec3(0.04));
+                vec3 coatF0 = nativeCoatF0.w > 0.5
+                    ? clamp(nativeCoatF0.xyz, 0.0, 1.0)
+                    : vec3(0.04);
+                vec3 coatF = fh6FresnelSchlick(ndv, coatF0);
                 vec3 color = direct + ambient + coatF * coatHighlight * 2.1;
 
                 if (transmission > 0.0) {
                     vec3 glassEnvironment = fh6Environment(R) * (vec3(0.72) + 0.28 * envF);
                     color = mix(color, glassEnvironment + albedo * 0.12, transmission);
+                }
+
+                if (nativeEmission.w > 0.5) {
+                    color += max(nativeEmission.rgb, vec3(0.0));
                 }
 
                 color = max(color, vec3(0.0));
@@ -175,6 +211,17 @@ def _finite_scalar(value: Any) -> float | None:
 
 def _clamp01(value: float) -> float:
     return max(0.0, min(1.0, float(value)))
+
+
+def _finite_rgb(value: Any, *, clamp_unit: bool) -> np.ndarray | None:
+    if not isinstance(value, (list, tuple)) or len(value) < 3:
+        return None
+    values = [_finite_scalar(value[index]) for index in range(3)]
+    if any(component is None for component in values):
+        return None
+    if clamp_unit:
+        return np.asarray([_clamp01(float(component)) for component in values], dtype=np.float32)
+    return np.asarray([max(0.0, float(component)) for component in values], dtype=np.float32)
 
 
 def material_values_for_primitive(
@@ -232,6 +279,47 @@ def material_values_for_primitive(
     return params, aux, used
 
 
+def material_optical_values_for_primitive(
+    appearance: dict[str, Any] | None,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, bool]:
+    """Return native Fresnel/clearcoat Fresnel/emissive streams.
+
+    The W component is an explicit validity flag.  Missing values remain zero so
+    the shader uses its established dielectric/metallic fallback.  Emissive RGB
+    is stored as linear color multiplied by the native emissive intensity; no
+    arbitrary intensity or vehicle-specific correction is introduced.
+    """
+    f0 = np.zeros(4, dtype=np.float32)
+    coat_f0 = np.zeros(4, dtype=np.float32)
+    emission = np.zeros(4, dtype=np.float32)
+    if not isinstance(appearance, dict):
+        return f0, coat_f0, emission, False
+    if appearance.get("resolutionMode") != "embedded_material_shader_parameters":
+        return f0, coat_f0, emission, False
+
+    used = False
+    native_f0 = _finite_rgb(appearance.get("f0"), clamp_unit=True)
+    if native_f0 is not None:
+        f0[:3] = native_f0
+        f0[3] = 1.0
+        used = True
+
+    native_coat_f0 = _finite_rgb(appearance.get("clearCoatF0"), clamp_unit=True)
+    if native_coat_f0 is not None:
+        coat_f0[:3] = native_coat_f0
+        coat_f0[3] = 1.0
+        used = True
+
+    emissive_color = _finite_rgb(appearance.get("emissiveColor"), clamp_unit=False)
+    emissive_intensity = _finite_scalar(appearance.get("emissiveIntensity"))
+    if emissive_color is not None and emissive_intensity is not None and emissive_intensity >= 0.0:
+        emission[:3] = emissive_color * float(emissive_intensity)
+        emission[3] = 1.0
+        used = True
+
+    return f0, coat_f0, emission, used
+
+
 def _read_glb_document(path: Path) -> dict[str, Any]:
     with path.open("rb") as source:
         header = source.read(12)
@@ -262,11 +350,11 @@ def _read_glb_document(path: Path) -> dict[str, Any]:
     raise ValueError("GLB has no JSON chunk")
 
 
-def build_material_vertex_streams(
+def _build_material_vertex_streams_all(
     glb_path: Path | str,
     scene_data: Any,
-) -> tuple[np.ndarray, np.ndarray, int]:
-    """Map exported mesh material extras onto the parser's flattened vertex order."""
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, int, int]:
+    """Map exported material extras onto the parser's flattened vertex order."""
     document = _read_glb_document(Path(glb_path))
     meshes = document.get("meshes") or []
     accessors = document.get("accessors") or []
@@ -283,7 +371,11 @@ def build_material_vertex_streams(
 
     all_params: list[np.ndarray] = []
     all_aux: list[np.ndarray] = []
+    all_f0: list[np.ndarray] = []
+    all_coat_f0: list[np.ndarray] = []
+    all_emission: list[np.ndarray] = []
     native_primitives = 0
+    native_optical_primitives = 0
     for diagnostic in tuple(getattr(scene_data, "primitive_diagnostics", ()) or ()):
         mesh_index = int(diagnostic.get("mesh_index", -1))
         primitive_index = int(diagnostic.get("primitive_index", -1))
@@ -304,23 +396,81 @@ def build_material_vertex_streams(
         extras = dict(node_extras_by_mesh.get(mesh_index) or {})
         extras.update(mesh.get("extras") or {})
         appearance = extras.get("kfps_material_appearance")
-        params, aux, used = material_values_for_primitive(
+        material_appearance = appearance if isinstance(appearance, dict) else None
+        params, aux, surface_used = material_values_for_primitive(
             str(diagnostic.get("declared_role") or extras.get("kfps_role") or "trim"),
-            appearance if isinstance(appearance, dict) else None,
+            material_appearance,
         )
-        if used:
+        f0, coat_f0, emission, optical_used = material_optical_values_for_primitive(
+            material_appearance
+        )
+        if surface_used or optical_used:
             native_primitives += 1
+        if optical_used:
+            native_optical_primitives += 1
         all_params.append(np.repeat(params[None, :], vertex_count, axis=0))
         all_aux.append(np.repeat(aux[None, :], vertex_count, axis=0))
+        all_f0.append(np.repeat(f0[None, :], vertex_count, axis=0))
+        all_coat_f0.append(np.repeat(coat_f0[None, :], vertex_count, axis=0))
+        all_emission.append(np.repeat(emission[None, :], vertex_count, axis=0))
+
+    if not all_params:
+        expected = int(len(getattr(scene_data, "positions")))
+        if expected != 0:
+            raise ValueError("material stream contains no primitives for a non-empty scene")
+        empty = np.empty((0, 4), dtype=np.float32)
+        return empty, empty.copy(), empty.copy(), empty.copy(), empty.copy(), 0, 0
 
     params_stream = np.ascontiguousarray(np.concatenate(all_params), dtype=np.float32)
     aux_stream = np.ascontiguousarray(np.concatenate(all_aux), dtype=np.float32)
+    f0_stream = np.ascontiguousarray(np.concatenate(all_f0), dtype=np.float32)
+    coat_f0_stream = np.ascontiguousarray(np.concatenate(all_coat_f0), dtype=np.float32)
+    emission_stream = np.ascontiguousarray(np.concatenate(all_emission), dtype=np.float32)
     expected = int(len(getattr(scene_data, "positions")))
-    if len(params_stream) != expected or len(aux_stream) != expected:
+    lengths = {
+        len(params_stream),
+        len(aux_stream),
+        len(f0_stream),
+        len(coat_f0_stream),
+        len(emission_stream),
+    }
+    if lengths != {expected}:
         raise ValueError(
-            f"material stream vertex count mismatch: {len(params_stream)} / {len(aux_stream)} != {expected}"
+            "material stream vertex count mismatch: "
+            f"params={len(params_stream)}, aux={len(aux_stream)}, f0={len(f0_stream)}, "
+            f"coat_f0={len(coat_f0_stream)}, emission={len(emission_stream)} != {expected}"
         )
-    return params_stream, aux_stream, native_primitives
+    return (
+        params_stream,
+        aux_stream,
+        f0_stream,
+        coat_f0_stream,
+        emission_stream,
+        native_primitives,
+        native_optical_primitives,
+    )
+
+
+def build_material_vertex_streams(
+    glb_path: Path | str,
+    scene_data: Any,
+) -> tuple[np.ndarray, np.ndarray, int]:
+    """Backward-compatible surface PBR stream contract."""
+    params, aux, _f0, _coat_f0, _emission, native_count, _optical_count = (
+        _build_material_vertex_streams_all(glb_path, scene_data)
+    )
+    return params, aux, native_count
+
+
+def build_material_optical_vertex_streams(
+    glb_path: Path | str,
+    scene_data: Any,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, int]:
+    """Return native F0, clearcoat-F0 and emissive vertex streams."""
+    _params, _aux, f0, coat_f0, emission, _native_count, optical_count = (
+        _build_material_vertex_streams_all(glb_path, scene_data)
+    )
+    return f0, coat_f0, emission, optical_count
 
 
 def upgrade_vertex_shader(vertex: str) -> str:
@@ -375,17 +525,33 @@ def install_game_like_material_patch() -> bool:
     def _dialog_init_with_materials(self, glb_path, *args, **kwargs):
         original_dialog_init(self, glb_path, *args, **kwargs)
         try:
-            params, aux, native_count = build_material_vertex_streams(glb_path, self.scene_data)
+            (
+                params,
+                aux,
+                f0,
+                coat_f0,
+                emission,
+                native_count,
+                native_optical_count,
+            ) = _build_material_vertex_streams_all(glb_path, self.scene_data)
         except Exception as exc:
             self.viewer._fh6_material_params = None
             self.viewer._fh6_material_aux = None
+            self.viewer._fh6_material_f0 = None
+            self.viewer._fh6_material_coat_f0 = None
+            self.viewer._fh6_material_emission = None
             self.viewer._fh6_material_stream_error = f"{type(exc).__name__}: {exc}"
             self.viewer._fh6_native_material_primitives = 0
+            self.viewer._fh6_native_optical_primitives = 0
         else:
             self.viewer._fh6_material_params = params
             self.viewer._fh6_material_aux = aux
+            self.viewer._fh6_material_f0 = f0
+            self.viewer._fh6_material_coat_f0 = coat_f0
+            self.viewer._fh6_material_emission = emission
             self.viewer._fh6_material_stream_error = ""
             self.viewer._fh6_native_material_primitives = int(native_count)
+            self.viewer._fh6_native_optical_primitives = int(native_optical_count)
 
     def _initialize_with_materials(self) -> None:
         original_initialize(self)
@@ -395,6 +561,9 @@ def install_game_like_material_patch() -> bool:
 
         params = getattr(self, "_fh6_material_params", None)
         aux = getattr(self, "_fh6_material_aux", None)
+        f0 = getattr(self, "_fh6_material_f0", None)
+        coat_f0 = getattr(self, "_fh6_material_coat_f0", None)
+        emission = getattr(self, "_fh6_material_emission", None)
         self._fh6_material_vbo = 0
         GL.glBindVertexArray(self._vao)
         # Safe generic defaults when loading a legacy GLB without provenance.
@@ -402,23 +571,32 @@ def install_game_like_material_patch() -> bool:
         GL.glVertexAttrib4f(7, 0.28, 0.40, 0.18, 0.18)
         GL.glDisableVertexAttribArray(8)
         GL.glVertexAttrib4f(8, 0.0, -1.0, -1.0, -1.0)
+        for location in (9, 10, 11):
+            GL.glDisableVertexAttribArray(location)
+            GL.glVertexAttrib4f(location, 0.0, 0.0, 0.0, 0.0)
+        streams = (params, aux, f0, coat_f0, emission)
         if (
-            isinstance(params, np.ndarray)
-            and isinstance(aux, np.ndarray)
-            and params.shape == aux.shape
+            all(isinstance(stream, np.ndarray) for stream in streams)
+            and all(stream.shape == params.shape for stream in streams)
             and params.ndim == 2
             and params.shape[1] == 4
             and params.shape[0] == len(self.scene_data.positions)
         ):
-            packed = np.ascontiguousarray(np.concatenate((params, aux), axis=1), dtype=np.float32)
+            packed = np.ascontiguousarray(np.concatenate(streams, axis=1), dtype=np.float32)
             self._fh6_material_vbo = GL.glGenBuffers(1)
             GL.glBindBuffer(GL.GL_ARRAY_BUFFER, self._fh6_material_vbo)
             GL.glBufferData(GL.GL_ARRAY_BUFFER, packed.nbytes, packed, GL.GL_STATIC_DRAW)
-            stride = 8 * 4
-            GL.glEnableVertexAttribArray(7)
-            GL.glVertexAttribPointer(7, 4, GL.GL_FLOAT, GL.GL_FALSE, stride, GL.GLvoidp(0))
-            GL.glEnableVertexAttribArray(8)
-            GL.glVertexAttribPointer(8, 4, GL.GL_FLOAT, GL.GL_FALSE, stride, GL.GLvoidp(16))
+            stride = 20 * 4
+            for location, offset in ((7, 0), (8, 16), (9, 32), (10, 48), (11, 64)):
+                GL.glEnableVertexAttribArray(location)
+                GL.glVertexAttribPointer(
+                    location,
+                    4,
+                    GL.GL_FLOAT,
+                    GL.GL_FALSE,
+                    stride,
+                    GL.GLvoidp(offset),
+                )
         GL.glBindBuffer(GL.GL_ARRAY_BUFFER, 0)
         GL.glBindVertexArray(0)
 
