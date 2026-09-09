@@ -10,9 +10,11 @@ import zipfile
 from dataclasses import asdict, dataclass, replace
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Iterator
 
-NATIVE_MATERIAL_TEXTURE_RESOLUTION_REVISION = 2
+from .native_texture_semantics import classify_native_texture_parameter
+
+NATIVE_MATERIAL_TEXTURE_RESOLUTION_REVISION = 3
 _BUNDLE_TAG = 0x47727562  # Grub bundle tag used by .swatchbin
 _DDS_MAGIC = b"DDS "
 _JSON_CHUNK_TYPE = 0x4E4F534A
@@ -20,6 +22,21 @@ _JSON_CHUNK_TYPE = 0x4E4F534A
 
 class NativeMaterialTextureError(RuntimeError):
     pass
+
+
+@dataclass(frozen=True)
+class NativeTextureBindingReference:
+    mesh_name: str
+    material_name: str
+    parameter_hash: str
+    path_hash: str
+    texture_path: str
+    parameter_name: str | None
+    semantic: str
+    semantic_resolution_mode: str
+
+    def as_dict(self) -> dict[str, Any]:
+        return asdict(self)
 
 
 @dataclass(frozen=True)
@@ -57,6 +74,9 @@ class NativeMaterialTextureReport:
     decode_status: str
     reference_count: int
     unique_reference_count: int
+    binding_count: int
+    recognized_binding_count: int
+    unknown_binding_count: int
     resolved_count: int
     unresolved_count: int
     located_unreadable_count: int
@@ -66,11 +86,13 @@ class NativeMaterialTextureReport:
     manifest_path: str
     game_namespace_root: str | None
     textures: tuple[NativeTexturePayload, ...]
+    bindings: tuple[NativeTextureBindingReference, ...]
     game_data_modified: bool = False
 
     def as_dict(self) -> dict[str, Any]:
         data = asdict(self)
         data["textures"] = [item.as_dict() for item in self.textures]
+        data["bindings"] = [item.as_dict() for item in self.bindings]
         return data
 
 
@@ -106,18 +128,43 @@ def _read_glb_json(path: Path) -> dict[str, Any]:
     raise NativeMaterialTextureError("GLB has no JSON chunk.")
 
 
-def collect_native_texture_paths(glb_path: str | Path) -> tuple[str, ...]:
-    """Collect exact KFPS Texture2D provenance paths without assigning semantics."""
-    document = _read_glb_json(Path(glb_path))
-    ordered: list[str] = []
-    seen: set[str] = set()
+def _mapping_value(mapping: dict[str, Any], *names: str) -> Any:
+    for name in names:
+        if name in mapping:
+            return mapping[name]
+    folded = {str(key).casefold(): value for key, value in mapping.items()}
+    for name in names:
+        key = name.casefold()
+        if key in folded:
+            return folded[key]
+    return None
 
+
+def _iter_material_appearances(
+    document: dict[str, Any],
+) -> Iterator[tuple[str, str, dict[str, Any]]]:
+    """Yield KFPS appearance records from the real mesh-level layout plus legacy primitive fixtures."""
     meshes = document.get("meshes")
     if not isinstance(meshes, list):
-        return ()
+        return
 
     for mesh in meshes:
         if not isinstance(mesh, dict):
+            continue
+        mesh_name = str(mesh.get("name") or "")
+        mesh_extras = mesh.get("extras")
+        yielded_mesh_appearance = False
+        if isinstance(mesh_extras, dict):
+            appearance = mesh_extras.get("kfps_material_appearance")
+            if isinstance(appearance, dict):
+                material_name = str(mesh_extras.get("kfps_material_name") or "")
+                yielded_mesh_appearance = True
+                yield mesh_name, material_name, appearance
+
+        # Early tests/diagnostics wrote the appearance on primitive extras. Keep
+        # compatibility, but do not double count when the authoritative mesh-level
+        # appearance exists in a production KFPS GLB.
+        if yielded_mesh_appearance:
             continue
         primitives = mesh.get("primitives")
         if not isinstance(primitives, list):
@@ -131,21 +178,97 @@ def collect_native_texture_paths(glb_path: str | Path) -> tuple[str, ...]:
             appearance = extras.get("kfps_material_appearance")
             if not isinstance(appearance, dict):
                 continue
-            paths = appearance.get("texturePaths")
-            if paths is None:
-                paths = appearance.get("TexturePaths")
-            if not isinstance(paths, list):
+            material_name = str(extras.get("kfps_material_name") or "")
+            yield mesh_name, material_name, appearance
+
+
+def _clean_texture_path(value: Any) -> str:
+    if not isinstance(value, str):
+        return ""
+    return value.strip()
+
+
+def collect_native_texture_bindings(
+    glb_path: str | Path,
+) -> tuple[NativeTextureBindingReference, ...]:
+    """Preserve exact Texture2D parameter/path binding provenance per material mesh."""
+    document = _read_glb_json(Path(glb_path))
+    ordered: list[NativeTextureBindingReference] = []
+    seen: set[tuple[str, str, str, str, str]] = set()
+
+    for mesh_name, material_name, appearance in _iter_material_appearances(document):
+        raw_bindings = _mapping_value(appearance, "textureBindings", "TextureBindings")
+        if not isinstance(raw_bindings, list):
+            continue
+        for raw in raw_bindings:
+            if not isinstance(raw, dict):
                 continue
+            texture_path = _clean_texture_path(
+                _mapping_value(raw, "texturePath", "TexturePath")
+            )
+            if not texture_path:
+                continue
+            raw_parameter_hash = _mapping_value(raw, "parameterHash", "ParameterHash")
+            raw_path_hash = _mapping_value(raw, "pathHash", "PathHash")
+            semantic = classify_native_texture_parameter(raw_parameter_hash)
+            parameter_hash = semantic.parameter_hash
+            if not parameter_hash and raw_parameter_hash is not None:
+                parameter_hash = str(raw_parameter_hash).strip().upper().removeprefix("0X")
+            path_hash = str(raw_path_hash or "").strip().upper().removeprefix("0X")
+            key = (
+                mesh_name.casefold(),
+                material_name.casefold(),
+                parameter_hash.casefold(),
+                path_hash.casefold(),
+                texture_path.replace("\\", "/").casefold(),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            ordered.append(
+                NativeTextureBindingReference(
+                    mesh_name=mesh_name,
+                    material_name=material_name,
+                    parameter_hash=parameter_hash,
+                    path_hash=path_hash,
+                    texture_path=texture_path,
+                    parameter_name=semantic.parameter_name,
+                    semantic=semantic.semantic,
+                    semantic_resolution_mode=semantic.resolution_mode,
+                )
+            )
+    return tuple(ordered)
+
+
+def collect_native_texture_paths(glb_path: str | Path) -> tuple[str, ...]:
+    """Collect unique Texture2D paths from KFPS mesh-level appearance provenance."""
+    document = _read_glb_json(Path(glb_path))
+    ordered: list[str] = []
+    seen: set[str] = set()
+
+    def add(value: Any) -> None:
+        path = _clean_texture_path(value)
+        if not path:
+            return
+        key = path.replace("\\", "/").casefold()
+        if key in seen:
+            return
+        seen.add(key)
+        ordered.append(path)
+
+    # TextureBindings retain the strongest provenance. Add them first.
+    for _mesh_name, _material_name, appearance in _iter_material_appearances(document):
+        raw_bindings = _mapping_value(appearance, "textureBindings", "TextureBindings")
+        if isinstance(raw_bindings, list):
+            for raw in raw_bindings:
+                if isinstance(raw, dict):
+                    add(_mapping_value(raw, "texturePath", "TexturePath"))
+
+        # Keep old TexturePaths-only GLBs usable without inventing semantics.
+        paths = _mapping_value(appearance, "texturePaths", "TexturePaths")
+        if isinstance(paths, list):
             for value in paths:
-                if not isinstance(value, str):
-                    continue
-                value = value.strip()
-                if not value:
-                    continue
-                key = value.replace("\\", "/").casefold()
-                if key not in seen:
-                    seen.add(key)
-                    ordered.append(value)
+                add(value)
     return tuple(ordered)
 
 
@@ -546,15 +669,7 @@ def resolve_native_texture_reference(
 
 
 def _decoder_value(diagnostic: dict[str, Any], *names: str) -> Any:
-    for name in names:
-        if name in diagnostic:
-            return diagnostic[name]
-    lowered = {str(key).casefold(): value for key, value in diagnostic.items()}
-    for name in names:
-        key = name.casefold()
-        if key in lowered:
-            return lowered[key]
-    return None
+    return _mapping_value(diagnostic, *names)
 
 
 def _parse_decoder_diagnostic(stdout: str) -> dict[str, Any] | None:
@@ -762,6 +877,7 @@ def resolve_native_material_textures(
     target_root.mkdir(parents=True, exist_ok=True)
 
     texture_paths = collect_native_texture_paths(glb)
+    bindings = collect_native_texture_bindings(glb)
     resolved_items = tuple(
         resolve_native_texture_reference(path, source_archive, target_root)
         for path in texture_paths
@@ -769,7 +885,6 @@ def resolve_native_material_textures(
 
     decoder_detail = None
     if not decode_native:
-        decoder_path = None
         results = resolved_items
     else:
         if decoder_helper is not None:
@@ -794,6 +909,8 @@ def resolve_native_material_textures(
     decoded = sum(item.decode_status in {"decoded_dds", "decoded_dds_cached"} for item in results)
     decode_failed = sum(item.decode_status == "decode_failed" for item in results)
     decoder_unavailable = sum(item.decode_status == "decoder_unavailable" for item in results)
+    recognized_bindings = sum(item.semantic != "unknown" for item in bindings)
+    unknown_bindings = len(bindings) - recognized_bindings
 
     if not results:
         status = "no_texture_references"
@@ -825,6 +942,9 @@ def resolve_native_material_textures(
         decode_status=decode_status,
         reference_count=len(texture_paths),
         unique_reference_count=len(texture_paths),
+        binding_count=len(bindings),
+        recognized_binding_count=recognized_bindings,
+        unknown_binding_count=unknown_bindings,
         resolved_count=resolved,
         unresolved_count=unresolved,
         located_unreadable_count=unreadable,
@@ -834,10 +954,11 @@ def resolve_native_material_textures(
         manifest_path=str(manifest),
         game_namespace_root=str(namespace_root) if namespace_root is not None else None,
         textures=results,
+        bindings=bindings,
         game_data_modified=False,
     )
     payload = report.as_dict()
-    payload["format"] = "fh6_native_material_texture_resolution_v2"
+    payload["format"] = "fh6_native_material_texture_resolution_v3"
     temp = manifest.with_suffix(manifest.suffix + ".tmp")
     temp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     temp.replace(manifest)
