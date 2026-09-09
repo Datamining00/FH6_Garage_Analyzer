@@ -8,7 +8,7 @@ from .livery_paint_provenance import diagnose_livery_paint
 from .manufacturer_colors import diagnose_manufacturer_colors_archive
 
 
-LIVERY_PAINT_RUNTIME_PATCH_REVISION = 3
+LIVERY_PAINT_RUNTIME_PATCH_REVISION = 4
 _PATCH_MARKER = "_fh6_livery_paint_provenance_runtime_patched"
 _TEXTURE_PATCH_MARKER = "_fh6_livery_paint_provenance_texture_patched"
 
@@ -36,7 +36,7 @@ def _manufacturer_palette_report(asset) -> dict:
             "groups": [],
             "issues": [f"{type(exc).__name__}: {exc}"],
             "interpretation_boundary": (
-                "Manufacturer color provenance is non-fatal and never changes existing paint/livery rendering."
+                "Manufacturer color provenance is non-fatal; failure retains the existing paint/livery rendering."
             ),
         }
 
@@ -45,10 +45,12 @@ def install_livery_paint_provenance_runtime_patch() -> bool:
     """Attach read-only paint provenance to the established C_livery render path.
 
     Paint P1 inventories C_livery descriptors. Paint P2 carries that report into
-    DirectLiveryTextures for exact GLB material-hash matching. Paint P3A also
-    inventories the selected vehicle archive's ManufacturerColors.bin and carries
-    the full group/entry structure as transient state. P3A does not apply palette
-    colors, material-specific entries, UV4 overlays, or finish semantics.
+    DirectLiveryTextures for exact GLB material-hash matching. Paint P3A inventories
+    the selected vehicle archive's ManufacturerColors.bin and carries the full
+    group/entry structure as transient state. Paint P3B allows the downstream
+    material bridge to consume only a resolved manufacturer's FH6 group-trailer
+    primary RGB. Secondary/two-tone, entry Path/material semantics, UV4 overlays,
+    flake, and finish semantics remain deferred.
 
     None of these wrappers modifies game/save files, rendered livery pixels, or
     GLB bytes.
@@ -78,9 +80,10 @@ def install_livery_paint_provenance_runtime_patch() -> bool:
                 object.__setattr__(result, "_fh6_paint_provenance_path", output_path)
                 if callable(log):
                     log(
-                        "Paint P1 provenance: "
-                        f"{record_count} raw descriptor record(s), "
-                        "manufacturer selector/finish semantics unresolved; "
+                        "Paint provenance: "
+                        f"{record_count} raw descriptor record(s); "
+                        "custom/manufacturer primary resolution available downstream, "
+                        "secondary/finish semantics deferred; "
                         f"diagnostic -> {output_path.name}"
                     )
             except Exception as exc:
@@ -97,7 +100,7 @@ def install_livery_paint_provenance_runtime_patch() -> bool:
                 object.__setattr__(result, "_fh6_paint_provenance", report)
                 object.__setattr__(result, "_fh6_paint_provenance_path", None)
                 if callable(log):
-                    log(f"Paint P1 provenance unavailable ({exc}); existing 3D rendering retained.")
+                    log(f"Paint provenance unavailable ({exc}); existing 3D rendering retained.")
             return result
 
         setattr(wrapped_render_clivery_sections, _PATCH_MARKER, True)
