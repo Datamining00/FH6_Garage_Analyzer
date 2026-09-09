@@ -3,8 +3,18 @@ from __future__ import annotations
 from .models import LiveryRecord
 
 
-def apply_v1_3_2_safety_patches(MainWindow) -> None:
-    """Keep auction records isolated from My Designs-only semantics."""
+def apply_v1_3_2_safety_patches(MainWindow=None) -> None:
+    """Keep auction records isolated from My Designs-only semantics.
+
+    ``MainWindow`` remains injectable for tests/compatibility callers. The
+    release entry point historically calls this patch with no argument, so the
+    class is resolved lazily when omitted instead of failing during startup.
+    """
+    if MainWindow is None:
+        from .ui import MainWindow as UiMainWindow
+
+        MainWindow = UiMainWindow
+
     if getattr(MainWindow, "_fh6_v132_safety_patched", False):
         return
 
