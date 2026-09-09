@@ -13,12 +13,13 @@ from .native_material_textures import resolve_native_texture_reference
 
 
 MANUFACTURER_MATERIALBIN_DIAGNOSTICS_FORMAT = "fh6_manufacturer_materialbin_diagnostics_v1"
-MANUFACTURER_MATERIALBIN_DIAGNOSTICS_REVISION = 2
+MANUFACTURER_MATERIALBIN_DIAGNOSTICS_REVISION = 3
 _EXACT_RESOLUTION_MODES = frozenset(
     {"vehicle_archive_exact", "game_loose_exact", "derived_zip_exact"}
 )
 _MAX_DIAGNOSTIC_DEPTH = 64
 _MAX_P3D_BREAKDOWN_SAMPLES = 12
+_BUILTIN_MANUFACTURER_MATERIAL_NAMES = frozenset({"carpaint", "carpaint_secondary"})
 
 
 def _report_value(mapping: Any, snake: str, camel: str) -> Any:
@@ -73,6 +74,7 @@ def _p3d_breakdown(p3d_report: Any) -> dict[str, Any]:
         "exact_swatch_candidate_count": 0,
         "with_material_name_count": 0,
         "with_binding_hash_count": 0,
+        "builtin_manufacturer_material_name_count": 0,
         "resolved_manufacturer_group_count": 0,
         "matched_manufacturer_entry_count": 0,
         "with_entry_path_count": 0,
@@ -84,6 +86,8 @@ def _p3d_breakdown(p3d_report: Any) -> dict[str, Any]:
         },
         "uv4_status_counts": {},
         "row_status_counts": {},
+        "material_match_mode_counts": {},
+        "manufacturer_group_inventory": {},
         "p3f_materialbin_deferred_count": 0,
         "p3f_materialbin_uv4_ready_count": 0,
         "diagnostic_focus": "p3d_report_unavailable",
@@ -107,6 +111,9 @@ def _p3d_breakdown(p3d_report: Any) -> dict[str, Any]:
     summary["exact_swatch_candidate_count"] = _as_int(
         p3d_report.get("exact_candidate_count")
     )
+    inventory = p3d_report.get("resolved_group_inventory")
+    if isinstance(inventory, dict):
+        summary["manufacturer_group_inventory"] = inventory
 
     rows = p3d_report.get("candidates") or []
     if not isinstance(rows, list):
@@ -116,8 +123,10 @@ def _p3d_breakdown(p3d_report: Any) -> dict[str, Any]:
     status_counts: Counter[str] = Counter()
     uv4_counts: Counter[str] = Counter()
     path_counts: Counter[str] = Counter()
+    match_mode_counts: Counter[str] = Counter()
     material_name_count = 0
     binding_hash_count = 0
+    builtin_material_count = 0
     resolved_group_count = 0
     matched_entry_count = 0
     entry_path_count = 0
@@ -135,12 +144,17 @@ def _p3d_breakdown(p3d_report: Any) -> dict[str, Any]:
         material_hash = str(row.get("material_hash") or "").strip()
         if material_name:
             material_name_count += 1
+            if material_name.casefold() in _BUILTIN_MANUFACTURER_MATERIAL_NAMES:
+                builtin_material_count += 1
         if material_hash:
             binding_hash_count += 1
         if row.get("group_index") is not None:
             resolved_group_count += 1
         if row.get("entry_index") is not None:
             matched_entry_count += 1
+        match_mode = str(row.get("material_match_mode") or "").strip()
+        if match_mode:
+            match_mode_counts[match_mode] += 1
 
         uv4 = row.get("uv4") if isinstance(row.get("uv4"), dict) else {}
         uv4_status = str(uv4.get("status") or "uv4_status_missing")
@@ -181,6 +195,7 @@ def _p3d_breakdown(p3d_report: Any) -> dict[str, Any]:
                 "mesh_name": row.get("mesh_name"),
                 "material_name": row.get("material_name"),
                 "material_hash": row.get("material_hash"),
+                "material_match_mode": row.get("material_match_mode"),
                 "selector": row.get("selector"),
                 "group_index": row.get("group_index"),
                 "entry_index": row.get("entry_index"),
@@ -196,6 +211,7 @@ def _p3d_breakdown(p3d_report: Any) -> dict[str, Any]:
             "status": "p3d_breakdown_diagnosed",
             "with_material_name_count": material_name_count,
             "with_binding_hash_count": binding_hash_count,
+            "builtin_manufacturer_material_name_count": builtin_material_count,
             "resolved_manufacturer_group_count": resolved_group_count,
             "matched_manufacturer_entry_count": matched_entry_count,
             "with_entry_path_count": entry_path_count,
@@ -205,6 +221,7 @@ def _p3d_breakdown(p3d_report: Any) -> dict[str, Any]:
             },
             "uv4_status_counts": dict(sorted(uv4_counts.items())),
             "row_status_counts": dict(sorted(status_counts.items())),
+            "material_match_mode_counts": dict(sorted(match_mode_counts.items())),
             "p3f_materialbin_deferred_count": p3f_materialbin_count,
             "p3f_materialbin_uv4_ready_count": p3f_materialbin_uv4_ready_count,
             "rejection_samples": list(samples_by_status.values()),
