@@ -39,15 +39,18 @@ class MaterialProvenanceBridgeTests(unittest.TestCase):
         self.assertIn("TextureBindings", text)
         self.assertIn("no diffuse/normal/roughness role is guessed", text)
 
-    def test_material_uv_tiling_matches_forzatechstudio_contract(self):
+    def test_material_uv_tiling_uses_exact_published_hashes_without_service_dependency(self):
         text = MATERIAL_HELPER.read_text(encoding="utf-8")
-        self.assertIn("NameHashService.Instance.GetName", text)
+        self.assertNotIn("NameHashService.Instance", text)
         self.assertIn("0x19A7D8F1", text)  # U_Tiling
         self.assertIn("0xB01AEE8E", text)  # alternate U_Tiling hash
         self.assertIn("0x4A3D8375", text)  # V_Tiling
         self.assertIn("0x3E95E96D", text)  # alternate V_Tiling hash
-        self.assertIn("IsUvTilingVectorParameter", text)
-        self.assertIn("BaseColorAlphaTilingOverride", text)
+        self.assertIn("0xB99646E7", text)  # BaseColorAlphaTilingOverride
+        self.assertIn("0x1144D400", text)  # BaseColorTilingOverride
+        self.assertIn("0x5EFF55B5", text)  # CH1DiffuseUVTiling
+        self.assertIn("0x6DB70810", text)  # CH2DiffuseTextureUVTiling
+        self.assertIn("UvTilingVectorHashes.Contains(hash)", text)
         self.assertIn("SanitizeTilingValue", text)
         self.assertIn("float.IsFinite(value) && MathF.Abs(value) > 1e-6f", text)
         self.assertIn("[uvTiling.X, uvTiling.Y]", text)
