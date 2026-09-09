@@ -30,6 +30,15 @@ class MaterialProvenanceBridgeTests(unittest.TestCase):
         self.assertIn("ShaderParameterType.Texture2D", text)
         self.assertIn("TextureParameter", text)
 
+    def test_texture_provenance_preserves_parameter_and_path_hashes(self):
+        text = MATERIAL_HELPER.read_text(encoding="utf-8")
+        self.assertIn("MaterialTextureBindingDiagnostic", text)
+        self.assertIn("ParameterHash", text)
+        self.assertIn("PathHash", text)
+        self.assertIn("texture.PathHash", text)
+        self.assertIn("TextureBindings", text)
+        self.assertIn("no diffuse/normal/roughness role is guessed", text)
+
     def test_shader_semantics_are_global_not_vehicle_specific(self):
         text = MATERIAL_HELPER.read_text(encoding="utf-8")
         self.assertIn("0xA05F6E3F", text)  # Roughness
