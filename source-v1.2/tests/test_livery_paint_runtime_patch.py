@@ -63,17 +63,40 @@ class LiveryPaintRuntimePatchTests(unittest.TestCase):
             self.assertEqual(stored, report)
             self.assertTrue(any("Paint P1 provenance" in line for line in logs))
 
-    def test_provenance_is_carried_to_direct_livery_textures_as_transient_state(self):
+    def test_provenance_and_manufacturer_palette_are_carried_as_transient_texture_state(self):
         result = _Result(Path("C_livery"), Path("."))
-        report = {"status": "paint_descriptor_parsed", "records": [{"material_identifier_u64_le": 1}]}
-        object.__setattr__(result, "_fh6_paint_provenance", report)
+        paint_report = {"status": "paint_descriptor_parsed", "records": [{"material_identifier_u64_le": 1}]}
+        palette_report = {
+            "status": "manufacturer_colors_parsed",
+            "group_count": 1,
+            "groups": [{"index": 0, "entries": [{"material_names": ["carpaint"]}]}],
+            "rendering_applied": False,
+        }
+        object.__setattr__(result, "_fh6_paint_provenance", paint_report)
         textures = SimpleNamespace()
+        asset = SimpleNamespace(archive_path="car.zip")
         direct_livery.build_direct_livery_textures = lambda render_result, *args, **kwargs: textures
 
-        self.assertTrue(runtime_patch.install_livery_paint_provenance_runtime_patch())
-        returned = direct_livery.build_direct_livery_textures(result, object())
+        with patch.object(runtime_patch, "diagnose_manufacturer_colors_archive", return_value=palette_report) as diagnose:
+            self.assertTrue(runtime_patch.install_livery_paint_provenance_runtime_patch())
+            returned = direct_livery.build_direct_livery_textures(result, asset)
         self.assertIs(returned, textures)
-        self.assertIs(returned._fh6_paint_provenance, report)
+        self.assertIs(returned._fh6_paint_provenance, paint_report)
+        self.assertIs(returned._fh6_manufacturer_colors, palette_report)
+        diagnose.assert_called_once_with("car.zip")
+        self.assertFalse(returned._fh6_manufacturer_colors["rendering_applied"])
+
+    def test_manufacturer_palette_failure_is_nonfatal_and_carried_as_unresolved_state(self):
+        result = _Result(Path("C_livery"), Path("."))
+        textures = SimpleNamespace()
+        asset = SimpleNamespace(archive_path="broken.zip")
+        direct_livery.build_direct_livery_textures = lambda render_result, *args, **kwargs: textures
+        with patch.object(runtime_patch, "diagnose_manufacturer_colors_archive", side_effect=RuntimeError("bad palette")):
+            self.assertTrue(runtime_patch.install_livery_paint_provenance_runtime_patch())
+            returned = direct_livery.build_direct_livery_textures(result, asset)
+        self.assertEqual(returned._fh6_manufacturer_colors["status"], "manufacturer_colors_unresolved")
+        self.assertFalse(returned._fh6_manufacturer_colors["rendering_applied"])
+        self.assertIn("bad palette", returned._fh6_manufacturer_colors["issues"][0])
 
     def test_diagnostic_failure_is_nonfatal_and_does_not_replace_render_output(self):
         with tempfile.TemporaryDirectory() as td:
