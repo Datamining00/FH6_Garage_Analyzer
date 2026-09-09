@@ -1,5 +1,4 @@
 using System.Numerics;
-using ForzaTechStudio.Services;
 using ForzaTools.Bundles;
 using ForzaTools.Bundles.Blobs;
 using ForzaTools.Bundles.Metadata;
@@ -104,9 +103,11 @@ internal static class MaterialAppearanceRuntime
         0x074CCD8C, 0x9421C781, 0xD78943E8, 0x4C6E94DA, 0x22F9702D,
     ];
 
-    // ForzaTechStudio viewport material UV tiling contract. KFPS already bakes
-    // MeshBlob.TexCoordTransforms plus the source V flip into exported UVs;
-    // these material-level multipliers are the remaining transform.
+    // ForzaTechStudio's viewport resolves scalar U/V tiling plus vector
+    // parameters whose published names contain "UVTiling" or "TilingOverride".
+    // The converter's vendored source subset does not include NameHashService,
+    // therefore use only exact globally published hashes here rather than
+    // guessing names from material or texture paths.
     private static readonly HashSet<uint> UTilingHashes =
     [
         0x19A7D8F1, // U_Tiling
@@ -117,6 +118,81 @@ internal static class MaterialAppearanceRuntime
     [
         0x4A3D8375, // V_Tiling
         0x3E95E96D, // V_Tiling observed in shaderbin parameter tables
+    ];
+
+    private static readonly HashSet<uint> UvTilingVectorHashes =
+    [
+        0xB99646E7, // BaseColorAlphaTilingOverride
+        0x1144D400, // BaseColorTilingOverride
+        0x8BAB96B3, // RoughMetalAOTilingOverride
+        0xF383EB56, // NormalTilingOverride
+        0x4CCD7F85, // AlphaTilingOverride
+        0x49455E2C, // UVTiling
+        0x292176F3, // UVTiling1
+        0x9F4459F8, // UVTiling_1
+        0xC325B227, // UVTiling_2
+        0x50700B46, // UVTiling_3
+        0x4A138397, // UVTiling_4
+        0x426FC232, // UVTiling_5
+        0xAF07D9C0, // UVTiling_6
+        0x6B33A7C0, // UVTiling_7
+        0xA1AB3F08, // UVTiling_8
+        0xADBA1134, // UVTiling_9
+        0x5EFF55B5, // CH1DiffuseUVTiling
+        0x8C9998CD, // CH1DiffuseUVTiling_1
+        0xF91D9509, // CH1DiffuseUVTiling_2
+        0x35A9A138, // CH1DiffuseUVTiling_3
+        0x6DB70810, // CH2DiffuseTextureUVTiling
+        0x61E2989E, // CH2DiffuseUVTiling
+        0x28120924, // CH1NormalMapUVTiling
+        0xD5C29BCB, // CH1NormalMapUVTiling_1
+        0xF18DA88C, // CH1NormalUVTiling
+        0xF568373C, // CH1NormalUVTiling_1
+        0xDCA083CE, // CH2NormalUVTiling
+        0x76941D62, // CH2NormalMapUVTiling
+        0x76B4575A, // CH2NormalUVTiling_1
+        0x841064ED, // CH2NormalMapA_UVTiling
+        0x6F27DFEE, // CH2NormalMapB_UVTiling
+        0x6248E636, // CH1_CLCNormalMapUVTiling
+        0x3B2652BE, // DetailNomalAUVTiling
+        0xACB544D0, // CH1GlossUVTiling
+        0x46AA5E2B, // CH2GlossMaskUVTiling
+        0x6F17677C, // CH1GlossDiffMaskUVTiling
+        0x19F25E41, // CH1GlossDiffMaskUVTiling_1
+        0x061BA6B4, // GlossMaskUVTiling
+        0x7B5D1FC6, // CH1RTintUVTiling
+        0x5499D039, // CH2RTintUVTiling
+        0xE8EC0028, // CH1AOUVTiling
+        0xFEBBD17D, // CH1AOUVTiling_1
+        0x327CFB31, // CH1MaskUVTiling
+        0x9D013746, // CH1MaskUVTiling_1
+        0xB3B9EA51, // CH1MaskUVTiling_2
+        0xEA24DC3F, // CH1MaskUVTiling_3
+        0x3A2D8D16, // CH1LERPMaskUVTiling
+        0x84776FB1, // CH1OpacityUVTiling
+        0xE81E684D, // CH1OpacityMapUVTiling
+        0xB1981147, // CH1OppacityUVTiling
+        0x8D7CA8AF, // DiffuseMasks_UVTiling
+        0xC30E6C10, // DiffuseVarTexture_UVTiling
+        0x84659583, // CH1DiffuseMapUVTiling
+        0x60CD4B5E, // CH1LightMaskMaskUVTiling
+        0x7BD0DEE5, // CH1MultiplyMaskUVTiling
+        0xE5AEA6D6, // MaskUVTiling
+        0x42B7C070, // CH2LightMapUVTilingA
+        0xA9807B73, // CH2LightMapUVTilingB
+        0x9A1F8805, // CH1CloudinessMapUVTiling
+        0x4C2D24B8, // dyRTintUVTiling
+        0x59983117, // StaticCH1LightMapUVTiling
+        0x599C16D0, // CH1LightMapUVTiling_1
+        0xEF1DA25B, // CH1IlluminationUVTiling
+        0xB31ACBB2, // CH2LightMapUVTiling
+        0xCF1717DD, // Reflected_RTint_UVTiling
+        0xC996F379, // DiffusePatternUVTiling
+        0xEBF24437, // CH1Mask_Blur_UVTiling
+        0x19F682E4, // CH1Normal_Blur_UVTiling
+        0x51D94226, // TextTextureArrayUVTiling0
+        0xF7AE4992, // TextTextureArrayUVTiling1
+        0x0C0672D0, // UVTilingA
     ];
 
     public static MaterialAppearanceDiagnostic Resolve(Bundle modelBundle, string materialName)
@@ -186,11 +262,10 @@ internal static class MaterialAppearanceRuntime
                 parameterCount++;
                 var hash = parameter.NameHash;
                 var hashText = $"{hash:X8}";
-                var parameterName = NameHashService.Instance.GetName(hash) ?? string.Empty;
 
                 if (parameter.Value is Vector2 vector2)
                 {
-                    if (IsUvTilingVectorParameter(parameterName))
+                    if (UvTilingVectorHashes.Contains(hash))
                     {
                         uvTiling.X = SanitizeTilingValue(vector2.X);
                         uvTiling.Y = SanitizeTilingValue(vector2.Y);
@@ -199,7 +274,7 @@ internal static class MaterialAppearanceRuntime
                 }
                 else if (parameter.Value is Vector4 vector)
                 {
-                    if (IsUvTilingVectorParameter(parameterName))
+                    if (UvTilingVectorHashes.Contains(hash))
                     {
                         uvTiling.X = SanitizeTilingValue(vector.X);
                         uvTiling.Y = SanitizeTilingValue(vector.Y);
@@ -228,14 +303,12 @@ internal static class MaterialAppearanceRuntime
                 }
                 else if (parameter.Value is float scalar && float.IsFinite(scalar))
                 {
-                    if (UTilingHashes.Contains(hash)
-                        || parameterName.Equals("U_Tiling", StringComparison.OrdinalIgnoreCase))
+                    if (UTilingHashes.Contains(hash))
                     {
                         uvTiling.X = SanitizeTilingValue(scalar);
                         uvTilingUHash = hashText;
                     }
-                    else if (VTilingHashes.Contains(hash)
-                        || parameterName.Equals("V_Tiling", StringComparison.OrdinalIgnoreCase))
+                    else if (VTilingHashes.Contains(hash))
                     {
                         uvTiling.Y = SanitizeTilingValue(scalar);
                         uvTilingVHash = hashText;
@@ -325,43 +398,39 @@ internal static class MaterialAppearanceRuntime
 
     private static float[] VectorValues(Vector4 value) => [value.X, value.Y, value.Z, value.W];
 
-    private static bool IsUvTilingVectorParameter(string parameterName) =>
-        parameterName.Contains("uvtiling", StringComparison.OrdinalIgnoreCase)
-        || parameterName.Contains("tilingoverride", StringComparison.OrdinalIgnoreCase)
-        || parameterName.Equals("BaseColorAlphaTilingOverride", StringComparison.OrdinalIgnoreCase)
-        || parameterName.Equals("BaseColorTilingOverride", StringComparison.OrdinalIgnoreCase);
-
     private static float SanitizeTilingValue(float value) =>
         float.IsFinite(value) && MathF.Abs(value) > 1e-6f ? value : 1.0f;
 
     private static MaterialAppearanceDiagnostic Empty(string mode, string materialName) =>
         new(
-            mode,
-            "",
-            materialName,
-            0,
-            0,
-            null,
-            "",
-            null,
-            "",
-            null,
-            "",
-            null,
-            "",
-            null,
-            null,
-            "",
-            null,
-            "",
-            null,
-            "",
-            null,
-            "",
-            [1.0f, 1.0f],
-            "",
-            "",
-            "",
-            [],
-            []);
+            ResolutionMode: mode,
+            MaterialSource: "",
+            MaterialName: materialName,
+            ParameterBlobCount: 0,
+            ParameterCount: 0,
+            BaseColor: null,
+            BaseColorParameterHash: "",
+            Roughness: null,
+            RoughnessParameterHash: "",
+            Gloss: null,
+            GlossParameterHash: "",
+            ClearCoatGloss: null,
+            ClearCoatGlossParameterHash: "",
+            Metalness: null,
+            MetalnessParameterHash: "",
+            MetalSwitch: null,
+            F0: null,
+            F0ParameterHash: "",
+            ClearCoatF0: null,
+            ClearCoatF0ParameterHash: "",
+            EmissiveColor: null,
+            EmissiveColorParameterHash: "",
+            EmissiveIntensity: null,
+            EmissiveIntensityParameterHash: "",
+            UvTiling: [1.0f, 1.0f],
+            UvTilingUParameterHash: "",
+            UvTilingVParameterHash: "",
+            UvTilingVectorParameterHash: "",
+            TexturePaths: [],
+            TextureBindings: []);
 }
