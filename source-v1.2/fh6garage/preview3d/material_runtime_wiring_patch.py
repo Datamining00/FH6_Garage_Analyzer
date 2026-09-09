@@ -4,9 +4,11 @@ The PBR patch historically populated material vertex streams from
 CarViewerDialog.__init__. FinalVerify1's production 3D tab constructs
 CarOpenGLWidget directly, so this bridge records the GLB source when
 load_kfps_glb() returns and configures the widget from the same scene object.
-Paint P2 may then replace only the native-base RGB part of that stream from an
-exact C_livery material-binding match before the established livery composite.
-No geometry, livery, game file, or save data is modified.
+Paint P2 may replace only the native-base RGB part of that stream from an exact
+C_livery material-binding match. Paint P3B may additionally resolve a non-custom
+manufacturer selector to the FH6 ManufacturerColors group-trailer primary RGB.
+Both happen before the established livery composite. No geometry, livery, game
+file, or save data is modified.
 """
 
 from __future__ import annotations
@@ -47,7 +49,7 @@ def scene_glb_path(scene_data: Any) -> str | None:
 
 
 def configure_game_like_material_widget(widget: Any, glb_path: str | Path) -> bool:
-    """Populate native PBR streams and fail-closed Paint P2 exact color overrides."""
+    """Populate native PBR streams and fail-closed exact paint overrides."""
     from .livery_paint_binding import apply_exact_livery_paint_to_aux_stream
     from .material_appearance_patch import _build_material_vertex_streams_all
 
@@ -81,21 +83,20 @@ def configure_game_like_material_widget(widget: Any, glb_path: str | Path) -> bo
         widget._fh6_livery_paint_primitives = 0
         return False
 
-    paint_provenance = getattr(
-        getattr(widget, "livery_textures", None),
-        "_fh6_paint_provenance",
-        None,
-    )
+    livery_textures = getattr(widget, "livery_textures", None)
+    paint_provenance = getattr(livery_textures, "_fh6_paint_provenance", None)
+    manufacturer_colors = getattr(livery_textures, "_fh6_manufacturer_colors", None)
     try:
         paint_aux, paint_report = apply_exact_livery_paint_to_aux_stream(
             widget._fh6_glb_path,
             widget.scene_data,
             aux,
             paint_provenance,
+            manufacturer_colors,
         )
     except Exception as exc:
-        # Paint P2 is deliberately non-fatal. Native material/PBR streams stay
-        # valid and the viewer falls back to the pre-P2 role/display paint color.
+        # Paint P2/P3B is deliberately non-fatal. Native material/PBR streams stay
+        # valid and the viewer falls back to the pre-paint role/display color.
         paint_aux = aux
         paint_report = {
             "format": "fh6_livery_paint_binding_v1",
@@ -104,7 +105,7 @@ def configure_game_like_material_widget(widget: Any, glb_path: str | Path) -> bo
             "game_data_modified": False,
             "error": f"{type(exc).__name__}: {exc}",
             "interpretation_boundary": (
-                "Paint P2 failed closed; native material and existing livery rendering were retained."
+                "Paint P2/P3B failed closed; native material and existing livery rendering were retained."
             ),
         }
 
