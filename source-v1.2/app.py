@@ -79,6 +79,24 @@ from fh6garage.v1_3_2_thread_affinity_patch import (
 )
 
 
+_P3F_DIAGNOSTIC_FLAG = "--p3f-materialbin-diagnostic"
+
+
+def _run_special_cli_mode(argv: list[str] | None = None) -> int | None:
+    """Run opt-in packaged diagnostics before QApplication or UI patch installation."""
+    args = list(sys.argv[1:] if argv is None else argv)
+    if _P3F_DIAGNOSTIC_FLAG not in args:
+        return None
+    if args.count(_P3F_DIAGNOSTIC_FLAG) != 1:
+        return 2
+    args.remove(_P3F_DIAGNOSTIC_FLAG)
+    from fh6garage.preview3d.manufacturer_materialbin_cli import (
+        run_manufacturer_materialbin_diagnostic,
+    )
+
+    return run_manufacturer_materialbin_diagnostic(args)
+
+
 def resource_root() -> Path:
     """Return the bundled-resource directory in source and PyInstaller builds."""
     if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
@@ -97,7 +115,7 @@ def _apply_foundation_patch_stack() -> None:
     apply_v1_3_ui_patches(MainWindow)
     apply_v1_3_1_patches(MainWindow)
     apply_v1_3_2_patches(MainWindow)
-    apply_v1_3_2_safety_patches(MainWindow)
+    apply_v1_3_2_safety_patches()
     apply_v1_3_2_startup_patches()
     apply_v1_3_2_list_fixes(MainWindow)
     apply_v1_3_2_visibility_patches(MainWindow)
@@ -265,6 +283,10 @@ def _apply_finalizer_patch_stack() -> None:
 
 
 def main() -> int:
+    special_result = _run_special_cli_mode()
+    if special_result is not None:
+        return special_result
+
     # Startup profiling is independent of the user-controlled runtime switch.
     _performance_metrics.begin_startup(_APP_ENTRY_NS)
 
