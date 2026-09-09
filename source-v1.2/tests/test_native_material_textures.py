@@ -15,6 +15,8 @@ from fh6garage.preview3d.native_material_textures import (
 )
 
 
+ROOT = Path(__file__).resolve().parents[1]
+CHASSIS_CONVERTER = ROOT / "fh6garage" / "preview3d" / "chassis_converter.py"
 BUNDLE_TAG = 0x47727562
 
 
@@ -145,6 +147,14 @@ class NativeMaterialTextureResolutionTests(unittest.TestCase):
             self.assertEqual(report.status, "unresolved")
             self.assertEqual(report.textures[0].status, "game_namespace_unavailable")
             self.assertFalse(report.game_data_modified)
+
+    def test_chassis_converter_integrates_resolver_without_making_it_geometry_fatal(self):
+        text = CHASSIS_CONVERTER.read_text(encoding="utf-8")
+        self.assertIn("resolve_native_material_textures", text)
+        self.assertIn('diagnostics["native_material_texture_status"]', text)
+        self.assertIn('"resolver_error"', text)
+        self.assertIn('"game_data_modified": False', text)
+        self.assertIn("return ConversionResult", text)
 
 
 if __name__ == "__main__":
