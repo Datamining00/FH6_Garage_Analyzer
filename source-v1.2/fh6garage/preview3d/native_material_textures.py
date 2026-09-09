@@ -734,12 +734,23 @@ def _decode_resolved_payload(
     )
 
 
+def _automatic_decoder_helper() -> tuple[Path | None, str | None]:
+    """Resolve only the SHA-verified bundled helper; never fall back to an arbitrary executable."""
+    try:
+        from .wheel_morph_helper import WheelMorphHelperError, verified_bundled_wheel_morph_helper
+
+        return verified_bundled_wheel_morph_helper(), None
+    except WheelMorphHelperError as exc:
+        return None, f"Bundled native texture decoder failed integrity verification: {exc}"
+
+
 def resolve_native_material_textures(
     glb_path: str | Path,
     vehicle_archive: str | Path,
     *,
     cache_root: str | Path | None = None,
     decoder_helper: str | Path | None = None,
+    decode_native: bool = True,
 ) -> NativeMaterialTextureReport:
     glb = Path(glb_path).expanduser().resolve()
     source_archive = Path(vehicle_archive).expanduser().resolve()
@@ -755,11 +766,27 @@ def resolve_native_material_textures(
         resolve_native_texture_reference(path, source_archive, target_root)
         for path in texture_paths
     )
-    decoder_path = Path(decoder_helper) if decoder_helper is not None else None
-    results = tuple(
-        _decode_resolved_payload(item, decoder_path, target_root)
-        for item in resolved_items
-    )
+
+    decoder_detail = None
+    if not decode_native:
+        decoder_path = None
+        results = resolved_items
+    else:
+        if decoder_helper is not None:
+            decoder_path = Path(decoder_helper)
+        else:
+            decoder_path, decoder_detail = _automatic_decoder_helper()
+        results = tuple(
+            _decode_resolved_payload(item, decoder_path, target_root)
+            for item in resolved_items
+        )
+        if decoder_detail:
+            results = tuple(
+                replace(item, decoder_detail=decoder_detail)
+                if item.decode_status == "decoder_unavailable" and not item.decoder_detail
+                else item
+                for item in results
+            )
 
     resolved = sum(item.status == "resolved_payload" for item in results)
     unreadable = sum(item.status == "payload_located_unreadable" for item in results)
@@ -777,7 +804,7 @@ def resolve_native_material_textures(
     else:
         status = "unresolved"
 
-    if decoder_helper is None:
+    if not decode_native:
         decode_status = "not_requested"
     elif resolved == 0:
         decode_status = "no_resolved_payloads"
