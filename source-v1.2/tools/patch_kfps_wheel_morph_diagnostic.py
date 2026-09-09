@@ -20,6 +20,7 @@ def patch(kfps_root: Path, helper: Path, audit_helper: Path) -> None:
     program = converter / "Program.cs"
     glb_writer = converter / "GlbWriter.cs"
     material_helper = audit_helper.with_name("MaterialAppearanceDiagnostic.cs")
+    swatch_helper = audit_helper.with_name("NativeSwatchbinDecoder.cs")
     if not program.is_file():
         raise RuntimeError(f"Pinned KFPS Program.cs was not found: {program}")
     if not glb_writer.is_file():
@@ -30,8 +31,17 @@ def patch(kfps_root: Path, helper: Path, audit_helper: Path) -> None:
         raise RuntimeError(f"TransformAudit.cs was not found: {audit_helper}")
     if not material_helper.is_file():
         raise RuntimeError(f"MaterialAppearanceDiagnostic.cs was not found: {material_helper}")
+    if not swatch_helper.is_file():
+        raise RuntimeError(f"NativeSwatchbinDecoder.cs was not found: {swatch_helper}")
 
     text = program.read_text(encoding="utf-8-sig")
+
+    text = _replace_exact(
+        text,
+        """        try\n        {\n            if (args.Length != 2 || args[0] != \"--request\")\n                throw new InvalidDataException(\"Usage: Kfps.ChassisConverter --request <request.json>\");\n\n            var requestPath = Path.GetFullPath(args[1]);""",
+        """        try\n        {\n            if (args.Length == 3 && args[0] == \"--decode-swatchbin\")\n            {\n                var diagnostic = NativeSwatchbinDecoder.Decode(args[1], args[2]);\n                Console.WriteLine(JsonSerializer.Serialize(diagnostic, JsonOptions()));\n                return 0;\n            }\n            if (args.Length != 2 || args[0] != \"--request\")\n                throw new InvalidDataException(\n                    \"Usage: Kfps.ChassisConverter --request <request.json> OR --decode-swatchbin <input.swatchbin> <output.dds>\");\n\n            var requestPath = Path.GetFullPath(args[1]);""",
+        "add read-only native swatchbin decode mode",
+    )
 
     text = _replace_exact(
         text,
@@ -158,13 +168,15 @@ def patch(kfps_root: Path, helper: Path, audit_helper: Path) -> None:
     shutil.copy2(helper, converter / "WheelMorphDiagnostic.cs")
     shutil.copy2(audit_helper, converter / "TransformAudit.cs")
     shutil.copy2(material_helper, converter / "MaterialAppearanceDiagnostic.cs")
+    shutil.copy2(swatch_helper, converter / "NativeSwatchbinDecoder.cs")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
             "Patch the pinned KFPS chassis converter with weighted wheel morph, "
-            "exact transform-chain diagnostics, and embedded material provenance."
+            "exact transform-chain diagnostics, embedded material provenance, "
+            "and read-only native swatchbin DDS decoding."
         )
     )
     parser.add_argument("--kfps-root", type=Path, required=True)
@@ -180,7 +192,7 @@ def main() -> int:
     )
     args = parser.parse_args()
     patch(args.kfps_root.resolve(), args.helper.resolve(), args.audit_helper.resolve())
-    print(f"Patched pinned KFPS wheel morph/transform/material diagnostics: {args.kfps_root}")
+    print(f"Patched pinned KFPS wheel morph/transform/material/texture diagnostics: {args.kfps_root}")
     return 0
 
 
