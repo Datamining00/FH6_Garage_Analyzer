@@ -4,12 +4,12 @@ import hashlib
 from pathlib import Path
 import sys
 
-# This verified helper carries the established wheel/transform chain plus the
-# read-only embedded MaterialBlob shader/Texture2D provenance exporter, exact
-# material UV-tiling provenance, native UV4 pass-through, TXCB/TXCH native
-# swatchbin-to-DDS decoder, and the P3F read-only materialbin reference exporter
-# used by manufacturer paint diagnostics. No FH6 game/save data is modified by
-# the diagnostic modes.
+# The v13 verified helper carries the established wheel/transform chain plus
+# the read-only embedded MaterialBlob shader/Texture2D provenance exporter,
+# exact material UV-tiling provenance, native UV4 pass-through, TXCB/TXCH
+# native swatchbin-to-DDS decoder, and the P3F read-only materialbin reference
+# exporter used by manufacturer paint diagnostics. No FH6 game/save data is
+# modified by the diagnostic modes.
 WHEEL_MORPH_HELPER_FILENAME = "Kfps.ChassisConverter.WheelMorph.exe"
 WHEEL_MORPH_HELPER_SHA256 = "9196da4977f55f84f24698a74050a7ab8510e13d60eda70d683387b19728913e"
 WHEEL_MORPH_HELPER_REVISION = "kfps_6f53ca3_w3_p3f_materialbin_references_uv4_v13"
