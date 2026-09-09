@@ -12,6 +12,7 @@ from fh6garage.preview3d.manufacturer_colors import (
     ManufacturerColorsError,
     diagnose_manufacturer_colors_archive,
     parse_manufacturer_colors_bundle,
+    resolve_manufacturer_group_linear_paint,
     resolve_manufacturer_selector,
 )
 
@@ -45,8 +46,14 @@ def _entry(material_names: list[str], preview=(0.1, 0.2, 0.3), path="materials/c
     return bytes(result)
 
 
-def _trailer(primary=(0.4, 0.5, 0.6), secondary=(0.7, 0.8, 0.9), *, secondary_present=1) -> bytes:
-    return bytes([1]) + _color(*primary) + bytes([0, secondary_present]) + _color(*secondary)
+def _trailer(
+    primary=(0.4, 0.5, 0.6),
+    secondary=(0.7, 0.8, 0.9),
+    *,
+    primary_present=1,
+    secondary_present=1,
+) -> bytes:
+    return bytes([primary_present]) + _color(*primary) + bytes([0, secondary_present]) + _color(*secondary)
 
 
 def _manufacturer_payload(*, long_name: bool = False, trailing: bytes = b"\xaa\xbb") -> bytes:
@@ -124,6 +131,33 @@ class ManufacturerColorsTests(unittest.TestCase):
         self.assertEqual(empty["status"], "manufacturer_selector_empty_group")
         self.assertEqual(resolve_manufacturer_selector(report, 2)["status"], "manufacturer_selector_out_of_range")
         self.assertEqual(resolve_manufacturer_selector(report, 0xFFFFFFFF)["status"], "custom_color_selector")
+
+    def test_p3b_resolves_group_trailer_primary_as_linear_and_preserves_secondary_diagnostic(self):
+        report = parse_manufacturer_colors_bundle(_manufacturer_bundle())
+        resolved = resolve_manufacturer_group_linear_paint(report, 0)
+        self.assertEqual(resolved["status"], "manufacturer_primary_linear_resolved")
+        self.assertEqual(resolved["group_index"], 0)
+        self.assertEqual(resolved["entry_count"], 1)
+        for actual, expected in zip(resolved["primary_linear_rgb"], [0.4, 0.5, 0.6]):
+            self.assertAlmostEqual(actual, expected, places=6)
+        self.assertTrue(resolved["secondary_enabled"])
+        for actual, expected in zip(resolved["secondary_linear_rgb"], [0.7, 0.8, 0.9]):
+            self.assertAlmostEqual(actual, expected, places=6)
+        self.assertEqual(resolved["secondary_status"], "manufacturer_secondary_trailer_preserved_deferred")
+
+    def test_p3b_primary_resolution_fails_closed_if_trailer_marks_primary_absent(self):
+        report = parse_manufacturer_colors_bundle(_manufacturer_bundle())
+        report["groups"][0]["primary_group_preview_present"] = False
+        resolved = resolve_manufacturer_group_linear_paint(report, 0)
+        self.assertEqual(resolved["status"], "manufacturer_primary_trailer_absent")
+        self.assertIsNone(resolved["primary_linear_rgb"])
+
+    def test_p3b_group_linear_color_uses_same_unit_clamp_as_reference_display_conversion(self):
+        report = parse_manufacturer_colors_bundle(_manufacturer_bundle())
+        report["groups"][0]["primary_group_preview_color"] = [-0.25, 0.5, 1.25]
+        resolved = resolve_manufacturer_group_linear_paint(report, 0)
+        self.assertEqual(resolved["status"], "manufacturer_primary_linear_resolved")
+        self.assertEqual(resolved["primary_linear_rgb"], [0.0, 0.5, 1.0])
 
     def test_archive_lookup_is_case_insensitive_and_basename_exact(self):
         with tempfile.TemporaryDirectory() as temp:
