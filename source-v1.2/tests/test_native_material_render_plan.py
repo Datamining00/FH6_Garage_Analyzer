@@ -8,26 +8,41 @@ import unittest
 from pathlib import Path
 
 from fh6garage.preview3d.native_material_render_plan import (
+    NATIVE_MATERIAL_RENDER_PLAN_REVISION,
     NativeMaterialRenderPlanError,
     build_native_material_render_plan,
 )
 from fh6garage.preview3d.native_dds import DDS_DX10_HEADER_SIZE
 
 
-def _write_glb(path: Path, bindings: list[dict[str, str]]) -> None:
+def _write_glb(
+    path: Path,
+    bindings: list[dict[str, str]],
+    *,
+    role: str = "trim",
+    material_name: str = "body_trim",
+    uv_tiling: tuple[float, float] | None = (1.0, 1.0),
+    include_uv0: bool = True,
+) -> None:
+    appearance = {
+        "resolutionMode": "embedded_material_shader_parameters",
+        "textureBindings": bindings,
+        "texturePaths": [item["TexturePath"] for item in bindings],
+    }
+    if uv_tiling is not None:
+        appearance["uvTiling"] = [float(uv_tiling[0]), float(uv_tiling[1])]
     document = {
         "asset": {"version": "2.0"},
         "meshes": [
             {
                 "name": "body_mesh",
-                "primitives": [{"attributes": {}}],
+                "primitives": [
+                    {"attributes": {"TEXCOORD_0": 0} if include_uv0 else {}}
+                ],
                 "extras": {
-                    "kfps_material_name": "carpaint",
-                    "kfps_material_appearance": {
-                        "resolutionMode": "embedded_material_shader_parameters",
-                        "textureBindings": bindings,
-                        "texturePaths": [item["TexturePath"] for item in bindings],
-                    },
+                    "kfps_role": role,
+                    "kfps_material_name": material_name,
+                    "kfps_material_appearance": appearance,
                 },
             }
         ],
@@ -61,7 +76,13 @@ def _write_bc7_dds(path: Path, *, srgb: bool = True) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _write_manifest(glb: Path, textures: list[dict], *, read_only: bool = True, format_name: str = "fh6_native_material_texture_resolution_v3") -> Path:
+def _write_manifest(
+    glb: Path,
+    textures: list[dict],
+    *,
+    read_only: bool = True,
+    format_name: str = "fh6_native_material_texture_resolution_v3",
+) -> Path:
     manifest = glb.with_suffix(glb.suffix + ".native_textures.json")
     manifest.write_text(
         json.dumps(
@@ -98,11 +119,11 @@ def _payload(texture_path: str, dds_path: Path, dds_sha: str) -> dict:
 
 
 class NativeMaterialRenderPlanTests(unittest.TestCase):
-    def test_joins_exact_mesh_binding_to_verified_dds(self):
+    def test_joins_exact_mesh_binding_to_verified_dds_and_uv0_contract(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             glb = root / "car.glb"
-            texture_path = r"Game:\media\textures\paint\body.swatchbin"
+            texture_path = r"Game:\media\textures\trim\body.swatchbin"
             _write_glb(
                 glb,
                 [
@@ -112,12 +133,14 @@ class NativeMaterialRenderPlanTests(unittest.TestCase):
                         "TexturePath": texture_path,
                     }
                 ],
+                uv_tiling=(2.0, 3.0),
             )
             dds = root / "body.dds"
             dds_sha = _write_bc7_dds(dds, srgb=True)
             _write_manifest(glb, [_payload(texture_path, dds, dds_sha)])
 
             plan = build_native_material_render_plan(glb)
+            self.assertEqual(plan.revision, NATIVE_MATERIAL_RENDER_PLAN_REVISION)
             self.assertEqual(plan.status, "ready")
             self.assertEqual(plan.binding_count, 1)
             self.assertEqual(plan.recognized_binding_count, 1)
@@ -127,7 +150,8 @@ class NativeMaterialRenderPlanTests(unittest.TestCase):
             selection = plan.selections[0]
             self.assertEqual(selection.mesh_index, 0)
             self.assertEqual(selection.mesh_name, "body_mesh")
-            self.assertEqual(selection.material_name, "carpaint")
+            self.assertEqual(selection.mesh_role, "trim")
+            self.assertEqual(selection.material_name, "body_trim")
             self.assertEqual(selection.semantic, "base_color")
             self.assertEqual(selection.parameter_name, "DiffuseTexture")
             self.assertEqual(selection.parameter_hash, "85F59336")
@@ -136,14 +160,66 @@ class NativeMaterialRenderPlanTests(unittest.TestCase):
             self.assertEqual(selection.dxgi_format, 99)
             self.assertEqual(selection.compression_family, "bc7")
             self.assertTrue(selection.is_srgb)
+            self.assertEqual(selection.uv_channel, 0)
+            self.assertEqual(selection.uv_tiling_u, 2.0)
+            self.assertEqual(selection.uv_tiling_v, 3.0)
+            self.assertEqual(
+                selection.uv_transform_mode,
+                "kfps_baked_texcoord_transform_vflip_plus_material_tiling",
+            )
             self.assertFalse(plan.game_data_modified)
+
+    def test_carpaint_base_texture_does_not_replace_dynamic_paint_or_livery_albedo(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            glb = root / "car.glb"
+            texture_path = r"Game:\media\textures\paint\body.swatchbin"
+            _write_glb(
+                glb,
+                [{"ParameterHash": "85F59336", "PathHash": "1", "TexturePath": texture_path}],
+                role="paint",
+                material_name="carpaint",
+            )
+            dds = root / "body.dds"
+            dds_sha = _write_bc7_dds(dds)
+            _write_manifest(glb, [_payload(texture_path, dds, dds_sha)])
+
+            plan = build_native_material_render_plan(glb)
+            self.assertEqual(plan.status, "unavailable")
+            self.assertEqual(plan.selection_count, 0)
+            self.assertEqual(plan.issue_count, 1)
+            self.assertEqual(plan.issues[0].status, "dynamic_paint_base_color_authoritative")
+
+    def test_missing_uv_tiling_or_uv0_fails_closed(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            texture_path = r"Game:\media\textures\trim\body.swatchbin"
+            binding = {"ParameterHash": "85F59336", "PathHash": "1", "TexturePath": texture_path}
+            dds = root / "body.dds"
+            dds_sha = _write_bc7_dds(dds)
+
+            glb = root / "missing_tiling.glb"
+            _write_glb(glb, [binding], uv_tiling=None)
+            _write_manifest(glb, [_payload(texture_path, dds, dds_sha)])
+            plan = build_native_material_render_plan(glb)
+            self.assertEqual(plan.selection_count, 0)
+            self.assertEqual(plan.issues[0].status, "material_uv_contract_unavailable")
+            self.assertIn("tiling provenance is missing", plan.issues[0].detail)
+
+            glb = root / "missing_uv0.glb"
+            _write_glb(glb, [binding], include_uv0=False)
+            _write_manifest(glb, [_payload(texture_path, dds, dds_sha)])
+            plan = build_native_material_render_plan(glb)
+            self.assertEqual(plan.selection_count, 0)
+            self.assertEqual(plan.issues[0].status, "material_uv_contract_unavailable")
+            self.assertIn("TEXCOORD_0", plan.issues[0].detail)
 
     def test_multiple_distinct_paths_for_one_semantic_fail_closed(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             glb = root / "car.glb"
-            path_a = r"Game:\media\textures\paint\a.swatchbin"
-            path_b = r"Game:\media\textures\paint\b.swatchbin"
+            path_a = r"Game:\media\textures\trim\a.swatchbin"
+            path_b = r"Game:\media\textures\trim\b.swatchbin"
             _write_glb(
                 glb,
                 [
@@ -190,7 +266,7 @@ class NativeMaterialRenderPlanTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             glb = root / "car.glb"
-            texture_path = r"Game:\media\textures\paint\body.swatchbin"
+            texture_path = r"Game:\media\textures\trim\body.swatchbin"
             _write_glb(
                 glb,
                 [{"ParameterHash": "85F59336", "PathHash": "1", "TexturePath": texture_path}],
