@@ -26,9 +26,9 @@ class NativeGlTextureSpec:
 
 
 # Exact OpenGL enum values from the corresponding EXT/ARB/core specifications.
-# The viewer currently enables only formats suitable for the first native
-# base-colour stage. Other parsed DDS formats remain available to later normal/
-# roughness stages but are not silently uploaded with an approximate format.
+# Formats are enabled only when the viewer has a defined material semantic for
+# their channels. Signed BC4 and packed multi-channel surface maps remain
+# disabled until their shader interpretation is explicit.
 _NATIVE_GL_SPECS: dict[int, NativeGlTextureSpec] = {
     71: NativeGlTextureSpec(71, "bc1", True, 0x83F1, required_extension="s3tc"),
     72: NativeGlTextureSpec(72, "bc1_srgb", True, 0x8C4D, required_extension="s3tc"),
@@ -36,10 +36,12 @@ _NATIVE_GL_SPECS: dict[int, NativeGlTextureSpec] = {
     75: NativeGlTextureSpec(75, "bc2_srgb", True, 0x8C4E, required_extension="s3tc"),
     77: NativeGlTextureSpec(77, "bc3", True, 0x83F3, required_extension="s3tc"),
     78: NativeGlTextureSpec(78, "bc3_srgb", True, 0x8C4F, required_extension="s3tc"),
+    80: NativeGlTextureSpec(80, "bc4", True, 0x8DBB, required_extension="rgtc", core_version=(3, 0)),
     98: NativeGlTextureSpec(98, "bc7", True, 0x8E8C, required_extension="bptc", core_version=(4, 2)),
     99: NativeGlTextureSpec(99, "bc7_srgb", True, 0x8E8D, required_extension="bptc", core_version=(4, 2)),
     28: NativeGlTextureSpec(28, "rgba8", False, 0x8058, external_format=0x1908, external_type=0x1401),
     29: NativeGlTextureSpec(29, "rgba8_srgb", False, 0x8C43, external_format=0x1908, external_type=0x1401),
+    61: NativeGlTextureSpec(61, "r8", False, 0x8229, external_format=0x1903, external_type=0x1401),
     87: NativeGlTextureSpec(87, "bgra8", False, 0x8058, external_format=0x80E1, external_type=0x1401),
 }
 
@@ -106,6 +108,14 @@ def _supports_spec(gl: Any, spec: NativeGlTextureSpec) -> bool:
         )
     if spec.required_extension == "bptc":
         return "GL_ARB_texture_compression_bptc" in extensions
+    if spec.required_extension == "rgtc":
+        return bool(
+            {
+                "GL_ARB_texture_compression_rgtc",
+                "GL_EXT_texture_compression_rgtc",
+            }
+            & extensions
+        )
     return False
 
 
