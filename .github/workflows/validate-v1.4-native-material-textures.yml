@@ -149,6 +149,7 @@ jobs:
           if (-not (Select-String -Path "kfps-source/tools/livery/chassis-converter/MaterialAppearanceDiagnostic.cs" -SimpleMatch "UvTilingVectorHashes" -Quiet)) { throw "Material UV tiling provenance is missing." }
           $writer = "kfps-source/tools/livery/chassis-converter/GlbWriter.cs"
           if (-not (Select-String -Path $writer -SimpleMatch "kfps_material_binding_hash" -Quiet)) { throw "GlbWriter.cs is missing exact material binding hash extras." }
+          if (-not (Select-String -Path $writer -SimpleMatch 'mesh.MaterialBindingHash.ToString("X16")' -Quiet)) { throw "GlbWriter.cs material binding hash is not exact unprefixed X16." }
 
       - name: Compile helper and verify integrity pin
         shell: pwsh
