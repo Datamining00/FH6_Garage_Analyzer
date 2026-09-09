@@ -25,6 +25,7 @@ native_tire_hiddenimports = [
     'fh6garage.preview3d.livery_paint_secondary_diagnostics',
     'fh6garage.preview3d.manufacturer_colors',
     'fh6garage.preview3d.manufacturer_overlay_diagnostics',
+    'fh6garage.preview3d.manufacturer_overlay_texture_diagnostics',
     'fh6garage.preview3d.native_transform_chain_patch',
     'fh6garage.preview3d.native_transform_chain_v2',
     'fh6garage.preview3d.native_transform_chain_v3',
