@@ -39,6 +39,19 @@ class MaterialProvenanceBridgeTests(unittest.TestCase):
         self.assertIn("TextureBindings", text)
         self.assertIn("no diffuse/normal/roughness role is guessed", text)
 
+    def test_material_uv_tiling_matches_forzatechstudio_contract(self):
+        text = MATERIAL_HELPER.read_text(encoding="utf-8")
+        self.assertIn("NameHashService.Instance.GetName", text)
+        self.assertIn("0x19A7D8F1", text)  # U_Tiling
+        self.assertIn("0xB01AEE8E", text)  # alternate U_Tiling hash
+        self.assertIn("0x4A3D8375", text)  # V_Tiling
+        self.assertIn("0x3E95E96D", text)  # alternate V_Tiling hash
+        self.assertIn("IsUvTilingVectorParameter", text)
+        self.assertIn("BaseColorAlphaTilingOverride", text)
+        self.assertIn("SanitizeTilingValue", text)
+        self.assertIn("float.IsFinite(value) && MathF.Abs(value) > 1e-6f", text)
+        self.assertIn("[uvTiling.X, uvTiling.Y]", text)
+
     def test_shader_semantics_are_global_not_vehicle_specific(self):
         text = MATERIAL_HELPER.read_text(encoding="utf-8")
         self.assertIn("0xA05F6E3F", text)  # Roughness
