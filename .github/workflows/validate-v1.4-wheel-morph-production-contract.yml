@@ -7,10 +7,17 @@ on:
       - v1.4-rc1-wheel-morph-w3
     paths:
       - "source-v1.2/fh6garage/v1_4_finalverify1_preview_patch.py"
+      - "source-v1.2/fh6garage/preview3d/__init__.py"
       - "source-v1.2/fh6garage/preview3d/chassis_converter.py"
       - "source-v1.2/fh6garage/preview3d/glb_viewer.py"
       - "source-v1.2/fh6garage/preview3d/material_appearance_patch.py"
+      - "source-v1.2/fh6garage/preview3d/material_runtime_wiring_patch.py"
       - "source-v1.2/fh6garage/preview3d/native_material_textures.py"
+      - "source-v1.2/fh6garage/preview3d/native_texture_semantics.py"
+      - "source-v1.2/fh6garage/preview3d/native_dds.py"
+      - "source-v1.2/fh6garage/preview3d/native_material_gl.py"
+      - "source-v1.2/fh6garage/preview3d/native_material_render_plan.py"
+      - "source-v1.2/fh6garage/preview3d/native_material_texture_patch.py"
       - "source-v1.2/fh6garage/preview3d/native_transform_chain_patch.py"
       - "source-v1.2/fh6garage/preview3d/native_transform_chain_v2.py"
       - "source-v1.2/fh6garage/preview3d/native_transform_chain_v3.py"
@@ -30,7 +37,13 @@ on:
       - "source-v1.2/tests/test_chassis_converter_wheel_morph_helper.py"
       - "source-v1.2/tests/test_material_appearance_patch.py"
       - "source-v1.2/tests/test_material_provenance_bridge.py"
+      - "source-v1.2/tests/test_material_runtime_wiring_patch.py"
       - "source-v1.2/tests/test_native_material_textures.py"
+      - "source-v1.2/tests/test_native_texture_semantics.py"
+      - "source-v1.2/tests/test_native_dds.py"
+      - "source-v1.2/tests/test_native_material_gl.py"
+      - "source-v1.2/tests/test_native_material_render_plan.py"
+      - "source-v1.2/tests/test_native_material_texture_patch.py"
       - "source-v1.2/tests/test_native_transform_chain_patch.py"
       - "source-v1.2/tests/test_native_transform_chain_v2.py"
       - "source-v1.2/tests/test_native_transform_chain_v3.py"
@@ -91,7 +104,13 @@ jobs:
           Set-Location source-v1.2
           python -m py_compile fh6garage/v1_4_finalverify1_preview_patch.py
           python -m py_compile fh6garage/preview3d/material_appearance_patch.py
+          python -m py_compile fh6garage/preview3d/material_runtime_wiring_patch.py
           python -m py_compile fh6garage/preview3d/native_material_textures.py
+          python -m py_compile fh6garage/preview3d/native_texture_semantics.py
+          python -m py_compile fh6garage/preview3d/native_dds.py
+          python -m py_compile fh6garage/preview3d/native_material_gl.py
+          python -m py_compile fh6garage/preview3d/native_material_render_plan.py
+          python -m py_compile fh6garage/preview3d/native_material_texture_patch.py
           python -m py_compile fh6garage/preview3d/native_transform_chain_patch.py
           python -m py_compile fh6garage/preview3d/native_transform_chain_v2.py
           python -m py_compile fh6garage/preview3d/native_transform_chain_v3.py
@@ -121,7 +140,13 @@ jobs:
           Set-Location source-v1.2
           python -m unittest tests.test_material_appearance_patch -v
           python -m unittest tests.test_material_provenance_bridge -v
+          python -m unittest tests.test_material_runtime_wiring_patch -v
           python -m unittest tests.test_native_material_textures -v
+          python -m unittest tests.test_native_texture_semantics -v
+          python -m unittest tests.test_native_dds -v
+          python -m unittest tests.test_native_material_gl -v
+          python -m unittest tests.test_native_material_render_plan -v
+          python -m unittest tests.test_native_material_texture_patch -v
           python -m unittest tests.test_native_transform_chain_patch -v
           python -m unittest tests.test_native_transform_chain_v2 -v
           python -m unittest tests.test_native_transform_chain_v3 -v
