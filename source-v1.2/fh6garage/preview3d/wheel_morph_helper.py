@@ -6,11 +6,12 @@ import sys
 
 # This verified helper carries the established wheel/transform chain plus the
 # read-only embedded MaterialBlob shader/Texture2D provenance exporter, exact
-# material UV-tiling provenance, and the TXCB/TXCH native swatchbin-to-DDS
-# decoder consumed by the 3D viewer pipeline.
+# material UV-tiling provenance, TXCB/TXCH native swatchbin-to-DDS decoder, and
+# the P3F read-only materialbin reference exporter used by manufacturer paint
+# diagnostics. No FH6 game/save data is modified by the diagnostic modes.
 WHEEL_MORPH_HELPER_FILENAME = "Kfps.ChassisConverter.WheelMorph.exe"
-WHEEL_MORPH_HELPER_SHA256 = "bb2ab7b0344fd008968b0dacb74e7698e32c011890cd72f2ea0e9d274bbb05d2"
-WHEEL_MORPH_HELPER_REVISION = "kfps_6f53ca3_w3_native_material_texture_uv_complete_v11"
+WHEEL_MORPH_HELPER_SHA256 = "813e6f3a27d87d5183e5ee075c49307c097376d942456fc644dade274c3ecc80"
+WHEEL_MORPH_HELPER_REVISION = "kfps_6f53ca3_w3_p3f_materialbin_references_v12"
 
 
 class WheelMorphHelperError(RuntimeError):
