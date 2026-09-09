@@ -13,7 +13,15 @@ from fh6garage.preview3d.native_material_gl import (
 )
 
 
-def _write_dds(path: Path, dxgi: int, payload: bytes, *, width: int = 4, height: int = 4) -> None:
+def _write_dds(
+    path: Path,
+    dxgi: int,
+    payload: bytes,
+    *,
+    width: int = 4,
+    height: int = 4,
+    mip_levels: int = 1,
+) -> None:
     header = bytearray(DDS_DX10_HEADER_SIZE)
     header[:4] = b"DDS "
     struct.pack_into("<I", header, 4, 124)
@@ -21,7 +29,7 @@ def _write_dds(path: Path, dxgi: int, payload: bytes, *, width: int = 4, height:
     struct.pack_into("<I", header, 12, height)
     struct.pack_into("<I", header, 16, width)
     struct.pack_into("<I", header, 24, 1)
-    struct.pack_into("<I", header, 28, 1)
+    struct.pack_into("<I", header, 28, mip_levels)
     struct.pack_into("<I", header, 76, 32)
     struct.pack_into("<I", header, 80, 0x4)
     header[84:88] = b"DX10"
@@ -39,6 +47,8 @@ class _FakeGl:
     GL_TEXTURE_WRAP_T = 0x2803
     GL_TEXTURE_MIN_FILTER = 0x2801
     GL_TEXTURE_MAG_FILTER = 0x2800
+    GL_TEXTURE_BASE_LEVEL = 0x813C
+    GL_TEXTURE_MAX_LEVEL = 0x813D
     GL_REPEAT = 0x2901
     GL_LINEAR = 0x2601
     GL_LINEAR_MIPMAP_LINEAR = 0x2703
@@ -51,6 +61,7 @@ class _FakeGl:
         self.linear_calls = []
         self.deleted = []
         self.bound = []
+        self.tex_parameters = []
         self.next_error = 0
 
     def glGetString(self, name):
@@ -73,7 +84,7 @@ class _FakeGl:
         self.bound.append((target, texture))
 
     def glTexParameteri(self, *args):
-        return None
+        self.tex_parameters.append(args)
 
     def glCompressedTexImage2D(self, *args):
         self.compressed_calls.append(args)
@@ -132,6 +143,31 @@ class NativeMaterialGlTests(unittest.TestCase):
             call = gl.linear_calls[0]
             self.assertEqual(call[2], 0x8C43)
             self.assertEqual(call[-1], payload)
+
+    def test_partial_mip_chain_sets_explicit_texture_max_level(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "partial_mips.dds"
+            # 8x8 RGBA8 level 0 (256 bytes) + 4x4 level 1 (64 bytes). The DDS
+            # deliberately stops before 2x2/1x1, so GL_TEXTURE_MAX_LEVEL must
+            # prevent the mipmapped sampler from requiring nonexistent levels.
+            payload = bytes((index % 251 for index in range(320)))
+            _write_dds(path, 29, payload, width=8, height=8, mip_levels=2)
+            texture = parse_native_dds(path)
+            gl = _FakeGl()
+            self.assertEqual(upload_native_dds_2d(gl, texture), 7)
+            self.assertEqual(len(gl.linear_calls), 2)
+            self.assertIn(
+                (gl.GL_TEXTURE_2D, gl.GL_TEXTURE_BASE_LEVEL, 0),
+                gl.tex_parameters,
+            )
+            self.assertIn(
+                (gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MAX_LEVEL, 1),
+                gl.tex_parameters,
+            )
+            self.assertIn(
+                (gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MIN_FILTER, gl.GL_LINEAR_MIPMAP_LINEAR),
+                gl.tex_parameters,
+            )
 
     def test_gl_error_deletes_partial_texture(self):
         with tempfile.TemporaryDirectory() as temp:
