@@ -131,6 +131,16 @@ def upload_native_dds_2d(gl: Any, texture: NativeDdsTexture) -> int:
         gl.glBindTexture(gl.GL_TEXTURE_2D, texture_id)
         gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_S, gl.GL_REPEAT)
         gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_T, gl.GL_REPEAT)
+        gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_BASE_LEVEL, 0)
+        # DDS assets are allowed to contain a deliberately partial mip chain.
+        # Restrict the sampling range to the levels that were actually decoded;
+        # otherwise a mipmapped minification filter can make the texture
+        # incomplete and sample black even though every supplied mip uploaded.
+        gl.glTexParameteri(
+            gl.GL_TEXTURE_2D,
+            gl.GL_TEXTURE_MAX_LEVEL,
+            max(0, int(texture.mip_levels) - 1),
+        )
         gl.glTexParameteri(
             gl.GL_TEXTURE_2D,
             gl.GL_TEXTURE_MIN_FILTER,
