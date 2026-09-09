@@ -19,10 +19,18 @@ from .near_lod_archive import (
     discard_near_lod_archive,
     prepare_near_lod_archive,
 )
+from .native_material_render_plan import (
+    NativeMaterialRenderPlanError,
+    build_native_material_render_plan,
+)
 from .native_material_textures import (
     NATIVE_MATERIAL_TEXTURE_RESOLUTION_REVISION,
     NativeMaterialTextureError,
     resolve_native_material_textures,
+)
+from .native_normal_texture_diagnostics import (
+    NATIVE_NORMAL_TEXTURE_DIAGNOSTICS_REVISION,
+    build_native_normal_texture_diagnostics,
 )
 
 from .neutral_geometry import NEUTRAL_GEOMETRY_REVISION, NeutralGeometryError, annotate_neutral_geometry
@@ -507,6 +515,9 @@ def convert_vehicle(
     diagnostics["native_material_texture_resolution_revision"] = (
         NATIVE_MATERIAL_TEXTURE_RESOLUTION_REVISION
     )
+    diagnostics["native_normal_texture_diagnostics_revision"] = (
+        NATIVE_NORMAL_TEXTURE_DIAGNOSTICS_REVISION
+    )
     try:
         native_texture_report = resolve_native_material_textures(
             output,
@@ -515,6 +526,20 @@ def convert_vehicle(
         )
         diagnostics["native_material_texture_status"] = native_texture_report.status
         diagnostics["native_material_texture_resolution"] = native_texture_report.as_dict()
+        try:
+            native_render_plan = build_native_material_render_plan(output)
+            native_normal_report = build_native_normal_texture_diagnostics(native_render_plan)
+            diagnostics["native_normal_texture_status"] = native_normal_report.status
+            diagnostics["native_normal_texture_diagnostics"] = native_normal_report.as_dict()
+        except (OSError, ValueError, NativeMaterialRenderPlanError) as exc:
+            diagnostics["native_normal_texture_status"] = "diagnostics_unavailable"
+            diagnostics["native_normal_texture_diagnostics"] = {
+                "revision": NATIVE_NORMAL_TEXTURE_DIAGNOSTICS_REVISION,
+                "status": "diagnostics_unavailable",
+                "error": f"{type(exc).__name__}: {exc}",
+                "rendering_enabled": False,
+                "game_data_modified": False,
+            }
         if progress and native_texture_report.reference_count:
             progress(
                 "Native Texture2D payloads: "
@@ -527,6 +552,14 @@ def convert_vehicle(
             "revision": NATIVE_MATERIAL_TEXTURE_RESOLUTION_REVISION,
             "status": "resolver_error",
             "error": f"{type(exc).__name__}: {exc}",
+            "game_data_modified": False,
+        }
+        diagnostics["native_normal_texture_status"] = "diagnostics_unavailable"
+        diagnostics["native_normal_texture_diagnostics"] = {
+            "revision": NATIVE_NORMAL_TEXTURE_DIAGNOSTICS_REVISION,
+            "status": "diagnostics_unavailable",
+            "detail": "Native texture resolution failed before normal candidates could be classified.",
+            "rendering_enabled": False,
             "game_data_modified": False,
         }
 
