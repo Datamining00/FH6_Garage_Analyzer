@@ -14,6 +14,13 @@ on:
       - "source-v1.2/fh6garage/preview3d/glb_parser.py"
       - "source-v1.2/fh6garage/preview3d/glb_viewer.py"
       - "source-v1.2/fh6garage/preview3d/material_appearance_patch.py"
+      - "source-v1.2/fh6garage/preview3d/material_runtime_wiring_patch.py"
+      - "source-v1.2/fh6garage/preview3d/native_dds.py"
+      - "source-v1.2/fh6garage/preview3d/native_material_gl.py"
+      - "source-v1.2/fh6garage/preview3d/native_material_render_plan.py"
+      - "source-v1.2/fh6garage/preview3d/native_material_texture_patch.py"
+      - "source-v1.2/fh6garage/preview3d/native_material_textures.py"
+      - "source-v1.2/fh6garage/preview3d/native_texture_semantics.py"
       - "source-v1.2/fh6garage/preview3d/native_transform_chain_patch.py"
       - "source-v1.2/fh6garage/preview3d/native_transform_chain_v2.py"
       - "source-v1.2/fh6garage/preview3d/native_transform_chain_v3.py"
@@ -39,6 +46,14 @@ on:
       - "source-v1.2/tests/test_kfps_wheel_morph_diagnostic_patch.py"
       - "source-v1.2/tests/test_material_appearance_patch.py"
       - "source-v1.2/tests/test_material_provenance_bridge.py"
+      - "source-v1.2/tests/test_material_runtime_wiring_patch.py"
+      - "source-v1.2/tests/test_native_dds.py"
+      - "source-v1.2/tests/test_native_material_gl.py"
+      - "source-v1.2/tests/test_native_material_render_plan.py"
+      - "source-v1.2/tests/test_native_material_texture_patch.py"
+      - "source-v1.2/tests/test_native_material_textures.py"
+      - "source-v1.2/tests/test_native_swatchbin_decoder_source.py"
+      - "source-v1.2/tests/test_native_texture_semantics.py"
       - "source-v1.2/tests/test_native_transform_chain_patch.py"
       - "source-v1.2/tests/test_native_transform_chain_v2.py"
       - "source-v1.2/tests/test_native_transform_chain_v3.py"
@@ -57,6 +72,7 @@ on:
       - "source-v1.2/tests/test_wheel_spec_database.py"
       - "source-v1.2/tools/patch_kfps_wheel_morph_diagnostic.py"
       - "source-v1.2/tools/kfps_wheel_morph/MaterialAppearanceDiagnostic.cs"
+      - "source-v1.2/tools/kfps_wheel_morph/NativeSwatchbinDecoder.cs"
       - "source-v1.2/tools/kfps_wheel_morph/WheelMorphDiagnostic.cs"
       - "source-v1.2/tools/kfps_wheel_morph/TransformAudit.cs"
       - ".github/workflows/build-v1.4-wheel-morph-w3.yml"
@@ -109,6 +125,13 @@ jobs:
           python -m py_compile fh6garage/preview3d/__init__.py
           python -m py_compile fh6garage/preview3d/glb_parser.py
           python -m py_compile fh6garage/preview3d/material_appearance_patch.py
+          python -m py_compile fh6garage/preview3d/material_runtime_wiring_patch.py
+          python -m py_compile fh6garage/preview3d/native_dds.py
+          python -m py_compile fh6garage/preview3d/native_material_gl.py
+          python -m py_compile fh6garage/preview3d/native_material_render_plan.py
+          python -m py_compile fh6garage/preview3d/native_material_texture_patch.py
+          python -m py_compile fh6garage/preview3d/native_material_textures.py
+          python -m py_compile fh6garage/preview3d/native_texture_semantics.py
           python -m py_compile fh6garage/preview3d/wheel_spec_database.py
           python -m py_compile fh6garage/preview3d/wheel_morph_auto.py
           python -m py_compile fh6garage/preview3d/chassis_converter.py
@@ -127,6 +150,14 @@ jobs:
           python -m unittest tests.test_glb_livery_structural_exclusion -v
           python -m unittest tests.test_material_appearance_patch -v
           python -m unittest tests.test_material_provenance_bridge -v
+          python -m unittest tests.test_material_runtime_wiring_patch -v
+          python -m unittest tests.test_native_dds -v
+          python -m unittest tests.test_native_material_gl -v
+          python -m unittest tests.test_native_material_render_plan -v
+          python -m unittest tests.test_native_material_texture_patch -v
+          python -m unittest tests.test_native_material_textures -v
+          python -m unittest tests.test_native_swatchbin_decoder_source -v
+          python -m unittest tests.test_native_texture_semantics -v
           python -m unittest tests.test_wheel_spec_database -v
           python -m unittest tests.test_wheel_morph_auto -v
           python -m unittest tests.test_chassis_converter_wheel_morph_helper -v
@@ -189,9 +220,13 @@ jobs:
           if (-not (Select-String -Path $program -SimpleMatch "scene_skeleton_path = TransformAuditRuntime.RequestedSceneSkeletonPath" -Quiet)) { throw "Patched Program.cs is missing Scene.SkeletonPath diagnostics." }
           if (-not (Select-String -Path $program -SimpleMatch "authoritative_scene_skeleton_source = TransformAuditRuntime.AuthoritativeSceneSkeletonSource" -Quiet)) { throw "Patched Program.cs is missing authoritative scene skeleton diagnostics." }
           if (-not (Select-String -Path $program -SimpleMatch "MaterialAppearanceRuntime.Resolve" -Quiet)) { throw "Patched Program.cs is missing embedded material provenance resolution." }
+          if (-not (Select-String -Path $program -SimpleMatch "--decode-swatchbin" -Quiet)) { throw "Patched Program.cs is missing native swatchbin decode mode." }
           if (-not (Select-String -Path $writer -SimpleMatch "kfps_material_appearance" -Quiet)) { throw "Patched GlbWriter.cs is missing material appearance extras." }
           if (-not (Test-Path "kfps-source/tools/livery/chassis-converter/TransformAudit.cs")) { throw "TransformAudit.cs was not staged." }
           if (-not (Test-Path "kfps-source/tools/livery/chassis-converter/MaterialAppearanceDiagnostic.cs")) { throw "MaterialAppearanceDiagnostic.cs was not staged." }
+          if (-not (Test-Path "kfps-source/tools/livery/chassis-converter/NativeSwatchbinDecoder.cs")) { throw "NativeSwatchbinDecoder.cs was not staged." }
+          if (-not (Select-String -Path "kfps-source/tools/livery/chassis-converter/MaterialAppearanceDiagnostic.cs" -SimpleMatch "TextureBindings" -Quiet)) { throw "TextureBindings provenance is missing." }
+          if (-not (Select-String -Path "kfps-source/tools/livery/chassis-converter/MaterialAppearanceDiagnostic.cs" -SimpleMatch "UvTilingVectorHashes" -Quiet)) { throw "Material UV tiling provenance is missing." }
 
       - name: Publish and stage verified helper
         shell: pwsh
@@ -219,6 +254,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Could not recursively inspect Standard archive." }
           if (-not ($listing -match "Kfps\.ChassisConverter\.WheelMorph\.exe")) { throw "Standard OneFile does not contain the wheel morph helper." }
           if (-not ($listing -match "fh6garage\.preview3d\.material_appearance_patch")) { throw "Standard OneFile does not contain the native material appearance bridge." }
+          if (-not ($listing -match "fh6garage\.preview3d\.material_runtime_wiring_patch")) { throw "Standard OneFile does not contain direct-widget native material wiring." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_dds")) { throw "Standard OneFile does not contain native DDS parsing." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_material_gl")) { throw "Standard OneFile does not contain native DDS OpenGL upload." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_material_render_plan")) { throw "Standard OneFile does not contain native material render planning." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_material_texture_patch")) { throw "Standard OneFile does not contain native Texture2D rendering." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_material_textures")) { throw "Standard OneFile does not contain native material texture resolution." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_texture_semantics")) { throw "Standard OneFile does not contain exact native texture semantics." }
           if (-not ($listing -match "fh6garage\.preview3d\.native_transform_chain_patch")) { throw "Standard OneFile does not contain the native transform-chain v1 module." }
           if (-not ($listing -match "fh6garage\.preview3d\.native_transform_chain_v2")) { throw "Standard OneFile does not contain the native transform-chain v2 module." }
           if (-not ($listing -match "fh6garage\.preview3d\.native_transform_chain_v3")) { throw "Standard OneFile does not contain the rendered-rim native transform-chain v3 module." }
@@ -239,6 +281,14 @@ jobs:
           $listing = python -m PyInstaller.utils.cliutils.archive_viewer -l -r $portableExe
           if ($LASTEXITCODE -ne 0) { throw "Could not recursively inspect Portable archive." }
           if (-not ($listing -match "fh6garage\.preview3d\.material_appearance_patch")) { throw "Portable OneDir does not contain the native material appearance bridge." }
+          if (-not ($listing -match "fh6garage\.preview3d\.material_runtime_wiring_patch")) { throw "Portable OneDir does not contain direct-widget native material wiring." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_dds")) { throw "Portable OneDir does not contain native DDS parsing." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_material_gl")) { throw "Portable OneDir does not contain native DDS OpenGL upload." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_material_render_plan")) { throw "Portable OneDir does not contain native material render planning." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_material_texture_patch")) { throw "Portable OneDir does not contain native Texture2D rendering." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_material_textures")) { throw "Portable OneDir does not contain native material texture resolution." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_texture_semantics")) { throw "Portable OneDir does not contain exact native texture semantics." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_transform_chain_patch")) { throw "Portable OneDir does not contain the native transform-chain v1 module." }
           if (-not ($listing -match "fh6garage\.preview3d\.native_transform_chain_v2")) { throw "Portable OneDir does not contain the native transform-chain v2 module." }
           if (-not ($listing -match "fh6garage\.preview3d\.native_transform_chain_v3")) { throw "Portable OneDir does not contain the rendered-rim native transform-chain v3 module." }
 
