@@ -21,6 +21,7 @@ on:
       - "source-v1.2/fh6garage/preview3d/livery_paint_secondary_diagnostics.py"
       - "source-v1.2/fh6garage/preview3d/manufacturer_colors.py"
       - "source-v1.2/fh6garage/preview3d/manufacturer_overlay_diagnostics.py"
+      - "source-v1.2/fh6garage/preview3d/manufacturer_overlay_texture_diagnostics.py"
       - "source-v1.2/fh6garage/preview3d/native_dds.py"
       - "source-v1.2/fh6garage/preview3d/native_material_gl.py"
       - "source-v1.2/fh6garage/preview3d/native_material_render_plan.py"
@@ -61,6 +62,7 @@ on:
       - "source-v1.2/tests/test_livery_paint_secondary_diagnostics.py"
       - "source-v1.2/tests/test_manufacturer_colors.py"
       - "source-v1.2/tests/test_manufacturer_overlay_diagnostics.py"
+      - "source-v1.2/tests/test_manufacturer_overlay_texture_diagnostics.py"
       - "source-v1.2/tests/test_native_dds.py"
       - "source-v1.2/tests/test_native_material_gl.py"
       - "source-v1.2/tests/test_native_material_render_plan.py"
@@ -86,6 +88,7 @@ on:
       - "source-v1.2/tests/test_wheel_morph_runtime.py"
       - "source-v1.2/tests/test_wheel_spec_database.py"
       - "source-v1.2/tools/analyze_manufacturer_overlay.py"
+      - "source-v1.2/tools/analyze_manufacturer_overlay_texture.py"
       - "source-v1.2/tools/patch_kfps_wheel_morph_diagnostic.py"
       - "source-v1.2/tools/kfps_wheel_morph/MaterialAppearanceDiagnostic.cs"
       - "source-v1.2/tools/kfps_wheel_morph/NativeSwatchbinDecoder.cs"
@@ -148,7 +151,9 @@ jobs:
           python -m py_compile fh6garage/preview3d/livery_paint_secondary_diagnostics.py
           python -m py_compile fh6garage/preview3d/manufacturer_colors.py
           python -m py_compile fh6garage/preview3d/manufacturer_overlay_diagnostics.py
+          python -m py_compile fh6garage/preview3d/manufacturer_overlay_texture_diagnostics.py
           python -m py_compile tools/analyze_manufacturer_overlay.py
+          python -m py_compile tools/analyze_manufacturer_overlay_texture.py
           python -m py_compile fh6garage/preview3d/native_dds.py
           python -m py_compile fh6garage/preview3d/native_material_gl.py
           python -m py_compile fh6garage/preview3d/native_material_render_plan.py
@@ -182,6 +187,7 @@ jobs:
           python -m unittest tests.test_livery_paint_secondary_diagnostics -v
           python -m unittest tests.test_manufacturer_colors -v
           python -m unittest tests.test_manufacturer_overlay_diagnostics -v
+          python -m unittest tests.test_manufacturer_overlay_texture_diagnostics -v
           python -m unittest tests.test_native_dds -v
           python -m unittest tests.test_native_material_gl -v
           python -m unittest tests.test_native_material_render_plan -v
@@ -294,6 +300,7 @@ jobs:
           if (-not ($listing -match "fh6garage\.preview3d\.livery_paint_secondary_diagnostics")) { throw "Standard OneFile does not contain fail-closed Paint P3C secondary diagnostics." }
           if (-not ($listing -match "fh6garage\.preview3d\.manufacturer_colors")) { throw "Standard OneFile does not contain FH6 manufacturer color provenance/resolution." }
           if (-not ($listing -match "fh6garage\.preview3d\.manufacturer_overlay_diagnostics")) { throw "Standard OneFile does not contain exact Paint P3D manufacturer overlay diagnostics." }
+          if (-not ($listing -match "fh6garage\.preview3d\.manufacturer_overlay_texture_diagnostics")) { throw "Standard OneFile does not contain exact Paint P3E manufacturer overlay texture diagnostics." }
           if (-not ($listing -match "fh6garage\.preview3d\.native_dds")) { throw "Standard OneFile does not contain native DDS parsing." }
           if (-not ($listing -match "fh6garage\.preview3d\.native_material_gl")) { throw "Standard OneFile does not contain native DDS OpenGL upload." }
           if (-not ($listing -match "fh6garage\.preview3d\.native_material_render_plan")) { throw "Standard OneFile does not contain native material render planning." }
@@ -328,6 +335,7 @@ jobs:
           if (-not ($listing -match "fh6garage\.preview3d\.livery_paint_secondary_diagnostics")) { throw "Portable OneDir does not contain fail-closed Paint P3C secondary diagnostics." }
           if (-not ($listing -match "fh6garage\.preview3d\.manufacturer_colors")) { throw "Portable OneDir does not contain FH6 manufacturer color provenance/resolution." }
           if (-not ($listing -match "fh6garage\.preview3d\.manufacturer_overlay_diagnostics")) { throw "Portable OneDir does not contain exact Paint P3D manufacturer overlay diagnostics." }
+          if (-not ($listing -match "fh6garage\.preview3d\.manufacturer_overlay_texture_diagnostics")) { throw "Portable OneDir does not contain exact Paint P3E manufacturer overlay texture diagnostics." }
           if (-not ($listing -match "fh6garage\.preview3d\.native_dds")) { throw "Portable OneDir does not contain native DDS parsing." }
           if (-not ($listing -match "fh6garage\.preview3d\.native_material_gl")) { throw "Portable OneDir does not contain native DDS OpenGL upload." }
           if (-not ($listing -match "fh6garage\.preview3d\.native_material_render_plan")) { throw "Portable OneDir does not contain native material render planning." }
