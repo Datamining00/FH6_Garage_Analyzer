@@ -140,6 +140,16 @@ jobs:
           python -m pip install --disable-pip-version-check -r requirements.txt
           python -m pip install --disable-pip-version-check --upgrade pyinstaller
 
+      - name: Run complete regression including production cache restart tests
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          Set-Location source-v1.2
+          python -m unittest discover -s tests -v
+
       - name: Validate production rim native tire and material preview before packaging
         shell: pwsh
         env:

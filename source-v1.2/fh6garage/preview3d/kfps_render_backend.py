@@ -972,6 +972,7 @@ def render_clivery_sections(
     resolution: str | LiveryResolution | None = None,
     output_root: str | Path | None = None,
     log: Callable[[str], None] | None = None,
+    skip_empty_sections: bool = False,
 ) -> RenderResult:
     source_path = Path(source)
     if not source_path.is_file():
@@ -1050,6 +1051,8 @@ def render_clivery_sections(
     for section in SECTION_NAMES:
         current = by_section[section]
         section_counts[section] = len(current)
+        if skip_empty_sections and not current:
+            continue
         started = time.monotonic()
         path = out_dir / f"{section}.png"
         if log:

@@ -45,8 +45,8 @@ def _install_native_transform_chain_preview() -> bool:
 
     # Normal production preview keeps game/save data read-only. Persistent caches
     # store only derived GLBs, fully merged stock-tire previews, and rendered livery
-    # sections under LocalAppData. Cold renders first narrow the pinned KFPS section
-    # list to sections that actually contain decoded layers; the livery cache wraps
+    # sections under LocalAppData. Cold renders use one decode and skip empty
+    # sections without changing the global section list; the livery cache wraps
     # that production-visible fast path so subsequent opens skip decode/render too.
     # Repeated stock-tire opens reuse the already merged/baked derived GLB and the
     # pinned wheel DB is cryptographically hashed only once per unchanged process
