@@ -38,6 +38,13 @@ class WheelSpecDatabaseError(RuntimeError):
     """Raised when the pinned stock wheel database cannot be verified safely."""
 
 
+# Full SHA-1 + SHA-256 verification reads the ~16 MiB pinned database twice. Keep
+# the first verification strict, then reuse that verdict while the exact same file
+# identity remains unchanged in this process. Any path/size/mtime change forces a
+# fresh cryptographic verification.
+_VERIFIED_FILE_IDENTITIES: set[tuple[str, int, int, str, str]] = set()
+
+
 def _runtime_root() -> Path:
     base = os.environ.get("LOCALAPPDATA")
     if base:
@@ -74,6 +81,17 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _verified_identity(path: Path, source: WheelSpecDatabaseSource) -> tuple[str, int, int, str, str]:
+    stat = path.stat()
+    return (
+        str(path.resolve()),
+        int(stat.st_size),
+        int(stat.st_mtime_ns),
+        str(source.git_blob_sha1).casefold(),
+        str(source.sha256).casefold(),
+    )
+
+
 def stock_wheel_database_is_valid(
     path: str | Path,
     source: WheelSpecDatabaseSource = PINNED_WHEEL_SPEC_DATABASE,
@@ -82,9 +100,15 @@ def stock_wheel_database_is_valid(
     try:
         if not target.is_file() or target.stat().st_size != int(source.size):
             return False
+        identity = _verified_identity(target, source)
+        if identity in _VERIFIED_FILE_IDENTITIES:
+            return True
         if _git_blob_sha1(target).casefold() != source.git_blob_sha1.casefold():
             return False
-        return _sha256(target).casefold() == source.sha256.casefold()
+        if _sha256(target).casefold() != source.sha256.casefold():
+            return False
+        _VERIFIED_FILE_IDENTITIES.add(identity)
+        return True
     except OSError:
         return False
 
@@ -96,7 +120,7 @@ def ensure_stock_wheel_database(
 ) -> Path:
     """Return a verified cached FH6 stock-wheel SQLite snapshot.
 
-    The database is not distributed with FH6 Assistant.  It is downloaded only
+    The database is not distributed with FH6 Assistant. It is downloaded only
     when requested, stored under LocalAppData, integrity-checked by byte size,
     Git blob SHA-1 and SHA-256, and later opened read-only by FH6WheelSpecResolver.
     """
@@ -163,6 +187,10 @@ def ensure_stock_wheel_database(
 
     try:
         temp.replace(target)
+        # The bytes were cryptographically verified immediately before the atomic
+        # replace. Seed the target identity so the next lookup does not re-read the
+        # same 16 MiB file twice again.
+        _VERIFIED_FILE_IDENTITIES.add(_verified_identity(target, source))
     except OSError as exc:
         try:
             temp.unlink(missing_ok=True)
