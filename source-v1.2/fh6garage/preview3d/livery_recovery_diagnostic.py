@@ -6,13 +6,18 @@ from pathlib import Path
 from typing import Any
 
 
-_DIAGNOSTIC_RISK_TOKENS = (
+# These tokens are diagnostic guardrails only.  They are intentionally kept out
+# of the production renderer until a real-vehicle corpus demonstrates that the
+# recovery rule is stable across cars.
+_ACCESSORY_OR_NON_LIVERY_TOKENS = (
     "headlight",
     "taillight",
     "headlamp",
     "taillamp",
+    "light",
     "lamp",
     "bulb",
+    "reflector",
     "intake",
     "grille",
     "grill",
@@ -22,24 +27,71 @@ _DIAGNOSTIC_RISK_TOKENS = (
     "wheel",
     "tire",
     "tyre",
+    "doorhandle",
+    "door_handle",
+    "handle",
+    "antenna",
+    "badge",
+    "emblem",
+    "logo",
+)
+
+# KFPS keeps unclassified geometry out of the livery route.  Recovery therefore
+# starts only from authored exterior shell families observed to carry body vinyls
+# in real FH6 archives.  This is an allowlist for *diagnostic review*, not yet a
+# production eligibility rule.
+_EXTERIOR_SHELL_PATHS = (
+    "/scene/exterior/doors/",
+    "/scene/exterior/fenders/",
+    "/scene/exterior/platform/",
+    "/scene/exterior/hood/",
+    "/scene/exterior/roof/",
+    "/scene/exterior/trunk/",
+    "/scene/exterior/bumper/",
+    "/scene/exterior/bumpers/",
+    "/scene/exterior/body/",
+)
+
+_HARD_NON_LIVERY_PATHS = (
+    "/scene/exterior/primarylights/",
+    "/scene/exterior/secondarylights/",
+    "/scene/exterior/lights/",
+    "/scene/exterior/brakes/",
+    "/scene/exterior/wheels/",
+    "/scene/interior/",
 )
 
 
-def classify_strict_recovery_candidate(diagnostic: dict[str, Any]) -> dict[str, Any]:
-    """Classify a Strict false-negative candidate without changing rendering.
+def _canonical_source(diagnostic: dict[str, Any]) -> str:
+    source = str(diagnostic.get("source_entry") or "").replace("\\", "/").casefold()
+    return f"/{source.lstrip('/')}"
 
-    This is deliberately diagnostic-only. KFPS's published livery contract keeps
-    converter-declared paint/glass authoritative and rejects unclassified geometry
-    rather than guessing it into the livery route. We therefore collect evidence
-    from Strict-missed exterior CarBody primitives first and only enable a future
-    Hybrid policy after real-vehicle validation.
+
+def _searchable_identity(diagnostic: dict[str, Any]) -> str:
+    return " ".join(
+        (
+            str(diagnostic.get("mesh_name") or ""),
+            str(diagnostic.get("material_name") or ""),
+            str(diagnostic.get("source_entry") or ""),
+        )
+    ).casefold()
+
+
+def classify_strict_recovery_candidate(diagnostic: dict[str, Any]) -> dict[str, Any]:
+    """Classify a Strict false negative without changing rendering.
+
+    KFPS's published livery contract treats converter-declared paint/glass and
+    side contracts as authoritative and rejects unclassified geometry rather
+    than guessing it into the livery route.  This diagnostic therefore records
+    all Strict-missed exterior CarBody primitives, but marks only high-confidence
+    authored shell families as suitable for future Hybrid recovery review.
     """
     final_allowed = int(diagnostic.get("final_allowed_sides") or 0)
     structural = str(diagnostic.get("structural_livery_exclusion") or "").strip()
     role = str(diagnostic.get("declared_role") or "").strip().casefold()
     part_type = str(diagnostic.get("part_type") or "").strip().casefold()
-    source = str(diagnostic.get("source_entry") or "").replace("\\", "/").casefold()
-    canonical_source = f"/{source.lstrip('/')}"
+    canonical_source = _canonical_source(diagnostic)
+    searchable = _searchable_identity(diagnostic)
     evidence_mask = int(
         diagnostic.get("selected_uv_evidence_sides")
         or diagnostic.get("uv3_evidence_sides")
@@ -66,14 +118,35 @@ def classify_strict_recovery_candidate(diagnostic: dict[str, Any]) -> dict[str, 
         candidate = True
         reason = "strict_missed_exterior_carbody_with_mask_evidence"
 
-    searchable = " ".join(
-        (
-            str(diagnostic.get("mesh_name") or ""),
-            str(diagnostic.get("material_name") or ""),
-            str(diagnostic.get("source_entry") or ""),
-        )
-    ).casefold()
-    risk_tokens = tuple(token for token in _DIAGNOSTIC_RISK_TOKENS if token in searchable)
+    risk_tokens = tuple(
+        token for token in _ACCESSORY_OR_NON_LIVERY_TOKENS if token in searchable
+    )
+    hard_non_livery_path = next(
+        (path for path in _HARD_NON_LIVERY_PATHS if path in canonical_source),
+        "",
+    )
+    shell_path = next(
+        (path for path in _EXTERIOR_SHELL_PATHS if path in canonical_source),
+        "",
+    )
+
+    if not candidate:
+        recovery_class = "not_candidate"
+        review_reason = reason
+    elif hard_non_livery_path:
+        recovery_class = "non_livery_structure"
+        review_reason = f"hard_non_livery_path:{hard_non_livery_path.strip('/')}"
+    elif risk_tokens:
+        recovery_class = "accessory_or_non_livery"
+        review_reason = "accessory_or_non_livery_identity"
+    elif not shell_path:
+        recovery_class = "unclassified_exterior"
+        review_reason = "outside_verified_exterior_shell_families"
+    else:
+        recovery_class = "exterior_shell"
+        review_reason = "high_confidence_exterior_shell_with_mask_evidence"
+
+    safe = bool(candidate and recovery_class == "exterior_shell")
 
     return {
         "candidate": bool(candidate),
@@ -81,7 +154,11 @@ def classify_strict_recovery_candidate(diagnostic: dict[str, Any]) -> dict[str, 
         "declared_role": role,
         "evidence_mask": evidence_mask,
         "risk_tokens": risk_tokens,
-        "safe_candidate_for_review": bool(candidate and not risk_tokens),
+        "hard_non_livery_path": hard_non_livery_path,
+        "shell_path": shell_path,
+        "recovery_class": recovery_class,
+        "review_reason": review_reason,
+        "safe_candidate_for_review": safe,
     }
 
 
@@ -95,6 +172,8 @@ def annotate_scene_recovery_diagnostics(scene: Any) -> dict[str, Any]:
         item["livery_recovery_reason"] = result["reason"]
         item["livery_recovery_evidence_mask"] = result["evidence_mask"]
         item["livery_recovery_risk_tokens"] = list(result["risk_tokens"])
+        item["livery_recovery_class"] = result["recovery_class"]
+        item["livery_recovery_review_reason"] = result["review_reason"]
         item["livery_recovery_safe_candidate_for_review"] = result["safe_candidate_for_review"]
         if result["candidate"]:
             rows.append({
@@ -111,13 +190,24 @@ def annotate_scene_recovery_diagnostics(scene: Any) -> dict[str, Any]:
                 "inferred_mask_sides": item.get("inferred_mask_sides"),
                 "final_allowed_sides": item.get("final_allowed_sides"),
                 "risk_tokens": list(result["risk_tokens"]),
+                "hard_non_livery_path": result["hard_non_livery_path"],
+                "shell_path": result["shell_path"],
+                "recovery_class": result["recovery_class"],
+                "review_reason": result["review_reason"],
                 "safe_candidate_for_review": result["safe_candidate_for_review"],
             })
+
+    class_counts: dict[str, int] = {}
+    for row in rows:
+        key = str(row["recovery_class"])
+        class_counts[key] = class_counts.get(key, 0) + 1
+
     return {
-        "format": "fh6_livery_strict_recovery_diagnostic_v1",
+        "format": "fh6_livery_strict_recovery_diagnostic_v2",
         "policy": str(getattr(scene, "livery_eligibility_policy", "")),
         "candidate_count": len(rows),
         "safe_candidate_count": sum(bool(row["safe_candidate_for_review"]) for row in rows),
+        "class_counts": class_counts,
         "candidates": rows,
     }
 
