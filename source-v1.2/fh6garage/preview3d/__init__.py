@@ -58,7 +58,8 @@ def _install_native_transform_chain_preview() -> bool:
     # Strict recovery diagnostics record converter-missed exterior CarBody evidence.
     # Hybrid is installed afterwards as an explicit test mode: it starts from the
     # exact Strict scene and restores only v2 high-confidence exterior-shell rows.
-    # Strict remains the shipped default until multi-car visual validation passes.
+    # Dedicated selector/recovery tests keep Strict as the shipped default until
+    # multi-car visual validation proves the Hybrid rule safe.
     install_game_like_material_patch()
     install_material_runtime_wiring_patch()
     install_native_material_texture_patch()
