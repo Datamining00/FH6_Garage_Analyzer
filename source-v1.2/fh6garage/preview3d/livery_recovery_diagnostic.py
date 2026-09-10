@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -132,7 +133,7 @@ def _write_report_for_glb(path: Path | str, report: dict[str, Any]) -> Path | No
 
 
 def install_livery_recovery_diagnostic_patch() -> bool:
-    """Annotate/load a report while preserving the exact existing render result."""
+    """Annotate/report Strict recovery evidence without changing render policy."""
     from . import glb_parser
 
     if getattr(glb_parser, "_fh6_livery_recovery_diagnostic_patched", False):
@@ -152,4 +153,11 @@ def install_livery_recovery_diagnostic_patch() -> bool:
 
     glb_parser.load_kfps_glb = wrapped
     glb_parser._fh6_livery_recovery_diagnostic_patched = True
+
+    # If integration was imported before this late diagnostic installer, update
+    # only the exact alias that still points at the original function. Do not
+    # import integration here; avoiding that import keeps this patch cycle-free.
+    integration = sys.modules.get(f"{__package__}.integration")
+    if integration is not None and getattr(integration, "load_kfps_glb", None) is original:
+        integration.load_kfps_glb = wrapped
     return True
