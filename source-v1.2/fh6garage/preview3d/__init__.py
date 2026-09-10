@@ -38,6 +38,7 @@ def _install_native_transform_chain_preview() -> bool:
     from .glass_livery_composite_patch import install_glass_livery_composite_patch
     from .livery_paint_runtime_patch import install_livery_paint_provenance_runtime_patch
     from .native_transform_chain_v3 import install_native_transform_chain_v3
+    from .geometry_cache_patch import install_geometry_cache_patch
     from .hybrid_livery_recovery_patch import install_hybrid_livery_recovery_patch
     from .strict_livery_default_patch import install_strict_livery_default_patch
     from .preview_presentation_patch import install_preview_presentation_patch
@@ -60,9 +61,15 @@ def _install_native_transform_chain_preview() -> bool:
     # normal production path. It remains importable for explicit investigations,
     # but Legacy rendering must not pay the report-generation / inventory cost.
     # Hybrid remains available as an opt-in Strict superset. Product default is
-    # Legacy, matching the current visual-completeness priority. Presentation is
-    # patched last so camera reset and GL clear colour are deterministic without
-    # altering material/livery shader contracts.
+    # Legacy, matching the current visual-completeness priority.
+    #
+    # Geometry cache is installed before Preview3DController imports/uses the
+    # converter. A verified LocalAppData GLB is reused when the FH6 archive stat,
+    # carbin entry, converter/normalization revisions, and automatic wheel-morph
+    # provenance match. This removes the repeated near-LOD + KFPS conversion
+    # bottleneck on subsequent opens while keeping original game data read-only.
+    # Presentation is patched last so camera reset and GL clear colour are
+    # deterministic without altering material/livery shader contracts.
     install_game_like_material_patch()
     install_material_runtime_wiring_patch()
     install_native_material_texture_patch()
@@ -72,6 +79,7 @@ def _install_native_transform_chain_preview() -> bool:
     install_glass_livery_composite_patch()
     install_livery_paint_provenance_runtime_patch()
     install_native_transform_chain_v3()
+    install_geometry_cache_patch()
     install_hybrid_livery_recovery_patch()
     install_strict_livery_default_patch()
     install_preview_presentation_patch()
