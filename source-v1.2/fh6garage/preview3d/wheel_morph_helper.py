@@ -14,7 +14,7 @@ import sys
 # parser corruption is reported fail-closed before composition can be accepted.
 # No FH6 game/save data is modified and parameter composition does not render.
 WHEEL_MORPH_HELPER_FILENAME = "Kfps.ChassisConverter.WheelMorph.exe"
-WHEEL_MORPH_HELPER_SHA256 = "334aa812fff4107c8d1b6b54492383c69bbb8dbdfd2a1a5cda84e571ae28c8b5"
+WHEEL_MORPH_HELPER_SHA256 = "41848b8eab4818b3fb528509eed932e336f77c5fd7146c38345639f1e9328c6d"
 WHEEL_MORPH_HELPER_REVISION = "kfps_6f53ca3_w3_p3f_material_shader_parameters_uv4_v15"
 
 
