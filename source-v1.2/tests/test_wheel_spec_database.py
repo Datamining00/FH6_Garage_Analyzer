@@ -8,6 +8,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+import fh6garage.preview3d.wheel_spec_database as wheel_db
 from fh6garage.preview3d.wheel_spec_database import (
     WheelSpecDatabaseError,
     WheelSpecDatabaseSource,
@@ -32,6 +33,9 @@ def _source(data: bytes) -> WheelSpecDatabaseSource:
 
 
 class WheelSpecDatabaseRuntimeTests(unittest.TestCase):
+    def setUp(self) -> None:
+        wheel_db._VERIFIED_FILE_IDENTITIES.clear()
+
     def test_reuses_verified_cached_database_without_network(self) -> None:
         data = b"SQLite format 3\0fixture-wheel-db"
         source = _source(data)
@@ -46,6 +50,21 @@ class WheelSpecDatabaseRuntimeTests(unittest.TestCase):
             self.assertEqual(resolved, target)
             self.assertEqual(resolved.read_bytes(), data)
             urlopen.assert_not_called()
+
+    def test_verified_identity_skips_rehash_until_file_changes(self) -> None:
+        data = b"SQLite format 3\0fixture-wheel-db-memo"
+        source = _source(data)
+        with tempfile.TemporaryDirectory() as temp_dir, patch.dict(
+            os.environ, {"LOCALAPPDATA": temp_dir}, clear=False
+        ):
+            target = stock_wheel_database_path(source)
+            target.write_bytes(data)
+            self.assertTrue(stock_wheel_database_is_valid(target, source))
+            with patch.object(wheel_db, "_git_blob_sha1", side_effect=AssertionError("unexpected rehash")), patch.object(
+                wheel_db, "_sha256", side_effect=AssertionError("unexpected rehash")
+            ):
+                self.assertTrue(stock_wheel_database_is_valid(target, source))
+                self.assertEqual(ensure_stock_wheel_database(source=source), target)
 
     def test_replaces_invalid_cached_database_with_verified_download(self) -> None:
         data = b"SQLite format 3\0fixture-wheel-db-valid"
