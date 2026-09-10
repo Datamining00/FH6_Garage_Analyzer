@@ -60,6 +60,26 @@ class HybridLiveryRecoveryPatchTests(unittest.TestCase):
         self.assertEqual(result.promoted_livery_meshes, 1)
         self.assertEqual(result.primitive_diagnostics[0]["inference_action"], "hybrid_recovered_exterior_shell")
 
+    def test_kfps_hood_part_with_top_mask_evidence_is_recovered(self):
+        scene = self._scene([{
+            "_indices": [0, 1, 2],
+            "triangle_count": 1,
+            "final_allowed_sides": 0,
+            "structural_livery_exclusion": "",
+            "declared_role": "trim",
+            "part_type": "Hood",
+            "source_entry": r"Scene\Exterior\Hood\hood_a.modelbin",
+            "mesh_name": "hood_a :: hood_a_LODS0",
+            "material_name": "",
+            "selected_uv_evidence_sides": 4,
+            "has_selected_uv": True,
+        }])
+        result = apply_hybrid_recovery_to_scene(scene)
+        self.assertTrue(np.all(result.allowed_sides[:, 0] == 4.0))
+        self.assertTrue(np.all(result.direct_uv[:, 0] == 1.0))
+        self.assertEqual(result.promoted_livery_meshes, 1)
+        self.assertTrue(result.primitive_diagnostics[0]["livery_recovery_applied"])
+
     def test_primary_light_is_not_recovered(self):
         scene = self._scene([{
             "_indices": [0, 1, 2],
@@ -105,11 +125,11 @@ class HybridLiveryRecoveryPatchTests(unittest.TestCase):
             "final_allowed_sides": 0,
             "structural_livery_exclusion": "",
             "declared_role": "trim",
-            "part_type": "CarBody",
-            "source_entry": r"Scene\Exterior\Platform\body_a.modelbin",
-            "mesh_name": "body_a :: body_a_LODS0",
+            "part_type": "Hood",
+            "source_entry": r"Scene\Exterior\Hood\hood_a.modelbin",
+            "mesh_name": "hood_a :: hood_a_LODS0",
             "material_name": "",
-            "selected_uv_evidence_sides": 28,
+            "selected_uv_evidence_sides": 4,
             "has_selected_uv": False,
         }])
         result = apply_hybrid_recovery_to_scene(scene)
