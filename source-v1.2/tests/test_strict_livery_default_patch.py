@@ -4,6 +4,7 @@ import unittest
 
 from fh6garage.preview3d.strict_livery_default_patch import (
     ensure_hybrid_livery_option,
+    select_legacy_livery_default,
     select_strict_livery_default,
 )
 
@@ -39,14 +40,28 @@ class _FakeStatus:
         self.text = str(value)
 
 
-class StrictLiveryDefaultPatchTests(unittest.TestCase):
-    def test_initial_legacy_selection_is_promoted_to_strict(self):
+class LegacyLiveryDefaultPatchTests(unittest.TestCase):
+    def test_initial_strict_selection_is_restored_to_legacy(self):
+        combo = _FakeCombo("strict")
+        status = _FakeStatus()
+        changed = select_legacy_livery_default({"eligibility": combo, "status": status})
+        self.assertTrue(changed)
+        self.assertEqual(combo.currentData(), "legacy")
+        self.assertIn("Legacy", status.text)
+
+    def test_existing_legacy_selection_stays_legacy(self):
         combo = _FakeCombo("legacy")
         status = _FakeStatus()
-        changed = select_strict_livery_default({"eligibility": combo, "status": status})
+        changed = select_legacy_livery_default({"eligibility": combo, "status": status})
+        self.assertFalse(changed)
+        self.assertEqual(combo.currentData(), "legacy")
+        self.assertIn("Legacy", status.text)
+
+    def test_compatibility_alias_now_follows_legacy_default(self):
+        combo = _FakeCombo("strict")
+        changed = select_strict_livery_default({"eligibility": combo})
         self.assertTrue(changed)
-        self.assertEqual(combo.currentData(), "strict")
-        self.assertIn("Strict", status.text)
+        self.assertEqual(combo.currentData(), "legacy")
 
     def test_hybrid_option_is_added_without_changing_current_selection(self):
         combo = _FakeCombo("legacy")
@@ -56,22 +71,16 @@ class StrictLiveryDefaultPatchTests(unittest.TestCase):
         self.assertGreaterEqual(combo.findData("hybrid"), 0)
 
     def test_existing_hybrid_option_is_not_duplicated(self):
-        combo = _FakeCombo("strict", ("legacy", "strict", "declared_confirmed", "hybrid"))
+        combo = _FakeCombo("legacy", ("legacy", "strict", "declared_confirmed", "hybrid"))
         changed = ensure_hybrid_livery_option({"eligibility": combo})
         self.assertFalse(changed)
         self.assertEqual(combo.values.count("hybrid"), 1)
 
-    def test_explicit_nonlegacy_selection_is_preserved(self):
-        combo = _FakeCombo("declared_confirmed")
-        changed = select_strict_livery_default({"eligibility": combo})
+    def test_missing_legacy_choice_fails_closed(self):
+        combo = _FakeCombo("strict", ("strict", "declared_confirmed"))
+        changed = select_legacy_livery_default({"eligibility": combo})
         self.assertFalse(changed)
-        self.assertEqual(combo.currentData(), "declared_confirmed")
-
-    def test_missing_strict_choice_fails_closed_without_changing_legacy(self):
-        combo = _FakeCombo("legacy", ("legacy", "declared_confirmed"))
-        changed = select_strict_livery_default({"eligibility": combo})
-        self.assertFalse(changed)
-        self.assertEqual(combo.currentData(), "legacy")
+        self.assertEqual(combo.currentData(), "strict")
 
 
 if __name__ == "__main__":
