@@ -66,10 +66,12 @@ def _install_native_transform_chain_preview() -> bool:
     # Geometry cache is installed before Preview3DController imports/uses the
     # converter. A verified LocalAppData GLB is reused when the FH6 archive stat,
     # carbin entry, converter/normalization revisions, and automatic wheel-morph
-    # provenance match. This removes the repeated near-LOD + KFPS conversion
-    # bottleneck on subsequent opens while keeping original game data read-only.
-    # Presentation is patched last so camera reset and GL clear colour are
-    # deterministic without altering material/livery shader contracts.
+    # provenance match. The fingerprint gets its own directory while the canonical
+    # GLB basename is preserved so native material sidecars remain attached. This
+    # removes the repeated near-LOD + KFPS conversion bottleneck on subsequent
+    # opens while keeping original game data read-only. Presentation is patched
+    # last so camera reset and GL clear colour are deterministic without altering
+    # material/livery shader contracts.
     install_game_like_material_patch()
     install_material_runtime_wiring_patch()
     install_native_material_texture_patch()
