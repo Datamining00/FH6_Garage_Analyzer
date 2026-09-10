@@ -34,6 +34,7 @@ def _install_native_transform_chain_preview() -> bool:
     from .native_material_texture_patch import install_native_material_texture_patch
     from .native_normal_texture_patch import install_native_normal_texture_patch
     from .native_emissive_texture_patch import install_native_emissive_texture_patch
+    from .manufacturer_paint_texture_patch import install_manufacturer_paint_texture_patch
     from .glass_livery_composite_patch import install_glass_livery_composite_patch
     from .livery_paint_runtime_patch import install_livery_paint_provenance_runtime_patch
     from .native_transform_chain_v3 import install_native_transform_chain_v3
@@ -46,16 +47,17 @@ def _install_native_transform_chain_preview() -> bool:
     # BC5 normal stage is installed after native Texture2D so it can reuse the
     # verified render plan and per-primitive draw interception contract. The
     # evidence-closed emissive stage follows the ForzaTechStudio/glTF sRGB
-    # reference contract and adds exact emissive maps without changing albedo
-    # authority. Glass livery compositing then separates substrate transmission
-    # from livery alpha coverage without changing opaque paint. Paint P1
-    # inventories C_livery paint descriptors as read-only diagnostics only; it
-    # does not alter the established paint -> livery -> PBR render ordering.
+    # reference contract. Manufacturer Paint P3F then applies only exact P3E
+    # primary carpaint swatches on native TEXCOORD_4, multiplying the established
+    # manufacturer tint before the C_livery composite. Glass livery compositing
+    # remains the final albedo/transmission separation. Paint provenance wrappers
+    # supply exact C_livery/archive/cache paths as transient read-only state.
     install_game_like_material_patch()
     install_material_runtime_wiring_patch()
     install_native_material_texture_patch()
     install_native_normal_texture_patch()
     install_native_emissive_texture_patch()
+    install_manufacturer_paint_texture_patch()
     install_glass_livery_composite_patch()
     install_livery_paint_provenance_runtime_patch()
     install_native_transform_chain_v3()
