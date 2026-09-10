@@ -36,10 +36,27 @@ _ACCESSORY_OR_NON_LIVERY_TOKENS = (
     "logo",
 )
 
+# KFPS's converter gives these CCarParts explicit livery-side semantics in
+# ProjectionLiverySides(): Hood, FrontBumper, RearBumper, SideSkirts and
+# RearWing.  CarBody remains the authored exterior-shell container used for
+# doors/fenders/platform geometry.  Hybrid recovery may review only these
+# structurally paintable part families; wheels/brakes and arbitrary part types
+# remain fail-closed.
+_PAINTABLE_LIVERY_PART_TYPES = frozenset(
+    {
+        "carbody",
+        "hood",
+        "frontbumper",
+        "rearbumper",
+        "sideskirts",
+        "rearwing",
+    }
+)
+
 # KFPS keeps unclassified geometry out of the livery route.  Recovery therefore
 # starts only from authored exterior shell families observed to carry body vinyls
-# in real FH6 archives.  This is an allowlist for *diagnostic review*, not yet a
-# production eligibility rule.
+# in real FH6 archives.  This allowlist is deliberately narrower than the full
+# Scene/Exterior tree.
 _EXTERIOR_SHELL_PATHS = (
     "/scene/exterior/doors/",
     "/scene/exterior/fenders/",
@@ -50,6 +67,9 @@ _EXTERIOR_SHELL_PATHS = (
     "/scene/exterior/bumper/",
     "/scene/exterior/bumpers/",
     "/scene/exterior/body/",
+    "/scene/exterior/sideskirts/",
+    "/scene/exterior/rearwing/",
+    "/scene/exterior/wing/",
 )
 
 _HARD_NON_LIVERY_PATHS = (
@@ -78,13 +98,14 @@ def _searchable_identity(diagnostic: dict[str, Any]) -> str:
 
 
 def classify_strict_recovery_candidate(diagnostic: dict[str, Any]) -> dict[str, Any]:
-    """Classify a Strict false negative without changing rendering.
+    """Classify a Strict false negative without weakening non-livery exclusions.
 
-    KFPS's published livery contract treats converter-declared paint/glass and
-    side contracts as authoritative and rejects unclassified geometry rather
-    than guessing it into the livery route.  This diagnostic therefore records
-    all Strict-missed exterior CarBody primitives, but marks only high-confidence
-    authored shell families as suitable for future Hybrid recovery review.
+    KFPS's converter treats declared paint/glass and side contracts as the primary
+    livery contract.  Its own ProjectionLiverySides implementation also declares
+    explicit body-part semantics for Hood/FrontBumper/RearBumper/SideSkirts/
+    RearWing.  Strict can miss those parts when an individual primitive was
+    classified as trim, so Hybrid may recover them only when the source remains
+    under Scene/Exterior and real UV/mask evidence exists.
     """
     final_allowed = int(diagnostic.get("final_allowed_sides") or 0)
     structural = str(diagnostic.get("structural_livery_exclusion") or "").strip()
@@ -105,9 +126,9 @@ def classify_strict_recovery_candidate(diagnostic: dict[str, Any]) -> dict[str, 
     elif structural:
         candidate = False
         reason = f"structural_exclusion:{structural}"
-    elif part_type != "carbody":
+    elif part_type not in _PAINTABLE_LIVERY_PART_TYPES:
         candidate = False
-        reason = "not_carbody"
+        reason = "not_paintable_livery_part_type"
     elif "/scene/exterior/" not in canonical_source:
         candidate = False
         reason = "not_scene_exterior"
@@ -116,7 +137,7 @@ def classify_strict_recovery_candidate(diagnostic: dict[str, Any]) -> dict[str, 
         reason = "no_livery_mask_evidence"
     else:
         candidate = True
-        reason = "strict_missed_exterior_carbody_with_mask_evidence"
+        reason = "strict_missed_paintable_exterior_with_mask_evidence"
 
     risk_tokens = tuple(
         token for token in _ACCESSORY_OR_NON_LIVERY_TOKENS if token in searchable
@@ -144,7 +165,7 @@ def classify_strict_recovery_candidate(diagnostic: dict[str, Any]) -> dict[str, 
         review_reason = "outside_verified_exterior_shell_families"
     else:
         recovery_class = "exterior_shell"
-        review_reason = "high_confidence_exterior_shell_with_mask_evidence"
+        review_reason = "high_confidence_paintable_exterior_with_mask_evidence"
 
     safe = bool(candidate and recovery_class == "exterior_shell")
 
@@ -152,6 +173,7 @@ def classify_strict_recovery_candidate(diagnostic: dict[str, Any]) -> dict[str, 
         "candidate": bool(candidate),
         "reason": reason,
         "declared_role": role,
+        "part_type": part_type,
         "evidence_mask": evidence_mask,
         "risk_tokens": risk_tokens,
         "hard_non_livery_path": hard_non_livery_path,
@@ -203,7 +225,7 @@ def annotate_scene_recovery_diagnostics(scene: Any) -> dict[str, Any]:
         class_counts[key] = class_counts.get(key, 0) + 1
 
     return {
-        "format": "fh6_livery_strict_recovery_diagnostic_v2",
+        "format": "fh6_livery_strict_recovery_diagnostic_v3",
         "policy": str(getattr(scene, "livery_eligibility_policy", "")),
         "candidate_count": len(rows),
         "safe_candidate_count": sum(bool(row["safe_candidate_for_review"]) for row in rows),
@@ -223,7 +245,7 @@ def _write_report_for_glb(path: Path | str, report: dict[str, Any]) -> Path | No
 
 
 def install_livery_recovery_diagnostic_patch() -> bool:
-    """Annotate/report Strict recovery evidence without changing render policy."""
+    """Annotate/report Strict recovery evidence without changing base parser policy."""
     from . import glb_parser
 
     if getattr(glb_parser, "_fh6_livery_recovery_diagnostic_patched", False):
@@ -244,9 +266,6 @@ def install_livery_recovery_diagnostic_patch() -> bool:
     glb_parser.load_kfps_glb = wrapped
     glb_parser._fh6_livery_recovery_diagnostic_patched = True
 
-    # If integration was imported before this late diagnostic installer, update
-    # only the exact alias that still points at the original function. Do not
-    # import integration here; avoiding that import keeps this patch cycle-free.
     integration = sys.modules.get(f"{__package__}.integration")
     if integration is not None and getattr(integration, "load_kfps_glb", None) is original:
         integration.load_kfps_glb = wrapped
