@@ -50,7 +50,8 @@ def _install_native_transform_chain_preview() -> bool:
     # Hybrid remains opt-in. Mechanical visibility filtering alters only the
     # in-memory scene index list; it never rewrites the cached GLB. Native tire
     # provenance is recovered from derived GLB node extras so the wheel/tire
-    # checkbox can hide the separately merged rubber geometry reliably.
+    # checkbox can hide the separately merged rubber geometry reliably. Regression
+    # coverage also guards PrimaryLights against the former `rim` substring match.
     install_game_like_material_patch()
     install_material_runtime_wiring_patch()
     install_native_material_texture_patch()
