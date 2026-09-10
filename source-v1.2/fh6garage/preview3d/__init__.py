@@ -38,9 +38,9 @@ def _install_native_transform_chain_preview() -> bool:
     from .glass_livery_composite_patch import install_glass_livery_composite_patch
     from .livery_paint_runtime_patch import install_livery_paint_provenance_runtime_patch
     from .native_transform_chain_v3 import install_native_transform_chain_v3
-    from .livery_recovery_diagnostic import install_livery_recovery_diagnostic_patch
     from .hybrid_livery_recovery_patch import install_hybrid_livery_recovery_patch
     from .strict_livery_default_patch import install_strict_livery_default_patch
+    from .preview_presentation_patch import install_preview_presentation_patch
     from . import tire_preview_integration as tire_preview_integration
 
     # Viewer patches are installed before integration.py imports its load_kfps_glb
@@ -55,13 +55,14 @@ def _install_native_transform_chain_preview() -> bool:
     # manufacturer tint before the C_livery composite. Glass livery compositing
     # remains the final albedo/transmission separation. Paint provenance wrappers
     # supply exact C_livery/archive/cache paths as transient read-only state.
-    # Strict recovery diagnostics now preserve converter material-binding and
-    # instance provenance and inventory every evidence-bearing missed exterior
-    # primitive. This v4 inventory is intentionally broader than Hybrid itself so
-    # exotic layouts such as FXX rear-deck/roof/aero bodywork can be studied
-    # without weakening the current light/accessory exclusions. Hybrid remains a
-    # narrow Strict superset and the shipped default remains Strict until the
-    # multi-car visual corpus supports promotion.
+    #
+    # The earlier Strict-recovery JSON diagnostic is no longer installed on the
+    # normal production path. It remains importable for explicit investigations,
+    # but Legacy rendering must not pay the report-generation / inventory cost.
+    # Hybrid remains available as an opt-in Strict superset. Product default is
+    # Legacy, matching the current visual-completeness priority. Presentation is
+    # patched last so camera reset and GL clear colour are deterministic without
+    # altering material/livery shader contracts.
     install_game_like_material_patch()
     install_material_runtime_wiring_patch()
     install_native_material_texture_patch()
@@ -71,9 +72,9 @@ def _install_native_transform_chain_preview() -> bool:
     install_glass_livery_composite_patch()
     install_livery_paint_provenance_runtime_patch()
     install_native_transform_chain_v3()
-    install_livery_recovery_diagnostic_patch()
     install_hybrid_livery_recovery_patch()
     install_strict_livery_default_patch()
+    install_preview_presentation_patch()
     return tire_preview_integration.install_global_stock_native_tire_preview()
 
 
