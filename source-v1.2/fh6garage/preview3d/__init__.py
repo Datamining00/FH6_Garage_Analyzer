@@ -33,7 +33,9 @@ def _install_native_transform_chain_preview() -> bool:
     from .livery_paint_runtime_patch import install_livery_paint_provenance_runtime_patch
     from .native_transform_chain_v3 import install_native_transform_chain_v3
     from .geometry_cache_patch import install_geometry_cache_patch
+    from .cold_livery_render_fastpath_patch import install_cold_livery_render_fastpath_patch
     from .livery_render_cache_patch import install_livery_render_cache_patch
+    from .native_tire_visibility_provenance_patch import install_native_tire_visibility_provenance_patch
     from .hybrid_livery_recovery_patch import install_hybrid_livery_recovery_patch
     from .strict_livery_default_patch import install_strict_livery_default_patch
     from .part_visibility_patch import install_part_visibility_patch
@@ -42,9 +44,13 @@ def _install_native_transform_chain_preview() -> bool:
 
     # Normal production preview keeps game/save data read-only. Persistent caches
     # store only derived GLBs and rendered livery sections under LocalAppData.
-    # Strict-recovery JSON inventory is intentionally not installed on the normal
-    # Legacy path. Hybrid remains opt-in. Mechanical visibility filtering alters
-    # only the in-memory scene index list; it never rewrites the cached GLB.
+    # Cold renders first narrow the pinned KFPS section list to sections that
+    # actually contain decoded layers, avoiding full-size transparent PNG work.
+    # The cache wraps that fast path so subsequent opens skip decode/render too.
+    # Hybrid remains opt-in. Mechanical visibility filtering alters only the
+    # in-memory scene index list; it never rewrites the cached GLB. Native tire
+    # provenance is recovered from derived GLB node extras so the wheel/tire
+    # checkbox can hide the separately merged rubber geometry reliably.
     install_game_like_material_patch()
     install_material_runtime_wiring_patch()
     install_native_material_texture_patch()
@@ -55,7 +61,9 @@ def _install_native_transform_chain_preview() -> bool:
     install_livery_paint_provenance_runtime_patch()
     install_native_transform_chain_v3()
     install_geometry_cache_patch()
+    install_cold_livery_render_fastpath_patch()
     install_livery_render_cache_patch()
+    install_native_tire_visibility_provenance_patch()
     install_hybrid_livery_recovery_patch()
     install_strict_livery_default_patch()
     install_part_visibility_patch()
