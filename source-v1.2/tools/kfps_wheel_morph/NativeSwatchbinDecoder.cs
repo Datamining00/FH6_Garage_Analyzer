@@ -17,6 +17,7 @@ internal sealed record NativeSwatchbinDecodeDiagnostic(
     bool IsTextureCube,
     bool IsTexture3D,
     bool IsPremultipliedAlpha,
+    bool IsDurangoFormat,
     int Encoding,
     int Transcoding,
     int ColorProfile,
@@ -57,6 +58,7 @@ internal static class NativeSwatchbinDecoder
         bool isCube;
         bool is3D;
         bool premultiplied;
+        bool isDurango;
         int encoding;
         int transcoding;
         int colorProfile;
@@ -70,6 +72,7 @@ internal static class NativeSwatchbinDecoder
             isCube = pc.IsCubeMap;
             is3D = false;
             premultiplied = pc.IsPremultipliedAlpha;
+            isDurango = false;
             encoding = pc.Slices.Count > 0 ? (int)pc.Slices[0].Encoding : -1;
             transcoding = (int)pc.Transcoding;
             colorProfile = (int)pc.TargetColorProfile;
@@ -83,6 +86,7 @@ internal static class NativeSwatchbinDecoder
             isCube = durango.IsCubeMap;
             is3D = durango.Is3DTexture;
             premultiplied = durango.IsPremultipliedAlpha;
+            isDurango = true;
             encoding = (int)durango.Encoding;
             transcoding = (int)durango.Transcoding;
             colorProfile = (int)durango.TargetColorProfile;
@@ -91,6 +95,14 @@ internal static class NativeSwatchbinDecoder
         {
             throw new InvalidDataException("The TXCH header is neither PC nor Durango format.");
         }
+
+        // ForzaTechStudio's reference renderer detiles and dealigns Durango/Xbox
+        // swatchbin texture memory through the XG resource-layout API before DDS
+        // construction. This standalone helper does not carry that native XG
+        // dependency. Never label tiled bytes as a linear render-ready DDS.
+        if (isDurango)
+            throw new InvalidDataException(
+                "Durango/Xbox swatchbin decoding requires XG detile/dealign before DDS construction; refusing to wrap tiled texture bytes as linear DDS.");
 
         var raw = textureBlob.Data;
         if (raw is null || raw.Length == 0)
@@ -136,6 +148,7 @@ internal static class NativeSwatchbinDecoder
             isCube,
             is3D,
             premultiplied,
+            isDurango,
             encoding,
             transcoding,
             colorProfile,
