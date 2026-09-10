@@ -87,6 +87,7 @@ class ManufacturerMaterialbinDiagnosticsTests(unittest.TestCase):
             analyze_materialbin=lambda _path: helper,
         )
         self.assertEqual(report["exact_resolved_count"], 1)
+        self.assertEqual(report["exact_shader_resolved_count"], 0)
         trace = report["traces"][0]
         self.assertEqual(trace["status"], "manufacturer_materialbin_swatch_resolved_exact")
         root = trace["root"]
@@ -94,8 +95,74 @@ class ManufacturerMaterialbinDiagnosticsTests(unittest.TestCase):
         self.assertEqual(root["references"][1]["status"], "swatch_resolved_exact")
         self.assertEqual(root["selected_swatch"]["reference_path"], "body.swatchbin")
         self.assertEqual(root["selected_swatch"]["parameter_hash"], "AABBCCDD")
+        self.assertIsNone(root["selected_shader"])
         self.assertFalse(report["rendering_enabled"])
         self.assertFalse(report["game_data_modified"])
+
+    def test_exact_shader_reference_is_material_chain_terminal_without_swatch_guess(self):
+        assets = {
+            "rossocorsa.materialbin": _Payload("resolved_payload", "derived_zip_exact", "rosso.cache"),
+            "car_automotive_paint.shaderbin": _Payload("resolved_payload", "derived_zip_exact", "shader.cache"),
+        }
+        helper = _helper([
+            ("matl", "Path", "", "", "car_automotive_paint.shaderbin"),
+        ])
+        swatch_called = {"value": False}
+
+        def swatch_resolver(*_args):
+            swatch_called["value"] = True
+            raise AssertionError("shaderbin must not be sent to the swatch resolver")
+
+        report = trace_manufacturer_materialbin_payloads(
+            _p3d("rossocorsa.materialbin"),
+            "vehicle.zip",
+            "cache",
+            resolve_asset=lambda path, *_: assets[path],
+            resolve_swatch=swatch_resolver,
+            analyze_materialbin=lambda _path: helper,
+        )
+        self.assertFalse(swatch_called["value"])
+        self.assertEqual(report["exact_resolved_count"], 0)
+        self.assertEqual(report["exact_shader_resolved_count"], 1)
+        self.assertEqual(report["unresolved_count"], 0)
+        trace = report["traces"][0]
+        self.assertEqual(trace["status"], "manufacturer_materialbin_shader_resolved_exact")
+        root = trace["root"]
+        self.assertEqual(root["status"], "materialbin_selected_exact_shader")
+        self.assertEqual(root["references"][0]["status"], "shader_resolved_exact")
+        self.assertEqual(root["selected_shader"]["reference_path"], "car_automotive_paint.shaderbin")
+        self.assertEqual(
+            root["selected_lineage"],
+            ["rossocorsa.materialbin", "car_automotive_paint.shaderbin"],
+        )
+        self.assertIsNone(root["selected_swatch"])
+
+    def test_exact_shader_does_not_hide_later_exact_swatch(self):
+        assets = {
+            "factory.materialbin": _Payload("resolved_payload", "game_loose_exact", "factory.cache"),
+            "paint.shaderbin": _Payload("resolved_payload", "game_loose_exact", "shader.cache"),
+        }
+        helper = _helper([
+            ("matl", "Path", "", "", "paint.shaderbin"),
+            ("texture2d", "TextureParameter.Path", "AABBCCDD", "11223344", "body.swatchbin"),
+        ])
+        report = trace_manufacturer_materialbin_payloads(
+            _p3d("factory.materialbin"),
+            "vehicle.zip",
+            "cache",
+            resolve_asset=lambda path, *_: assets[path],
+            resolve_swatch=lambda path, *_: _Payload(
+                "resolved_payload", "vehicle_archive_exact", "body.cache", path
+            ),
+            analyze_materialbin=lambda _path: helper,
+        )
+        self.assertEqual(report["exact_resolved_count"], 1)
+        self.assertEqual(report["exact_shader_resolved_count"], 1)
+        root = report["traces"][0]["root"]
+        self.assertEqual(root["references"][0]["status"], "shader_resolved_exact")
+        self.assertEqual(root["references"][1]["status"], "swatch_resolved_exact")
+        self.assertEqual(root["selected_shader"]["reference_path"], "paint.shaderbin")
+        self.assertEqual(root["selected_swatch"]["reference_path"], "body.swatchbin")
 
     def test_nested_materialbin_resolves_exact_swatch_and_preserves_lineage(self):
         assets = {
