@@ -137,6 +137,7 @@ def make_native_tire_preview_cache_wrapper(
         vehicle_glb,
         work_root,
         progress=None,
+        converter_diagnostics=None,
     ):
         try:
             payload = _stable_payload(
@@ -146,6 +147,13 @@ def make_native_tire_preview_cache_wrapper(
                 game_or_cars_path=game_or_cars_path,
                 vehicle_glb=vehicle_glb,
             )
+            if converter_diagnostics is not None:
+                # Transform/rim provenance is required by the production v3
+                # attachment path, including when base geometry was cached.
+                payload["converter_transform_inventory"] = {
+                    key: converter_diagnostics.get(key)
+                    for key in ("wheel_style_anchors", "transform_audit")
+                }
             cache_root, manifest = _cache_paths(payload)
             cached = _load_cached_result(integration_module, payload, manifest)
         except (OSError, ValueError, TypeError, KeyError):
@@ -165,6 +173,9 @@ def make_native_tire_preview_cache_wrapper(
         # the original game/save files stay read-only and only generated GLBs are
         # stored here. If fingerprinting failed, retain the caller's temporary path.
         target_root = cache_root if cache_root is not None else Path(work_root)
+        extra = {}
+        if converter_diagnostics is not None:
+            extra["converter_diagnostics"] = converter_diagnostics
         result = original(
             asset,
             carbin_entry=carbin_entry,
@@ -172,6 +183,7 @@ def make_native_tire_preview_cache_wrapper(
             vehicle_glb=vehicle_glb,
             work_root=target_root,
             progress=progress,
+            **extra,
         )
         if payload is not None and manifest is not None:
             try:

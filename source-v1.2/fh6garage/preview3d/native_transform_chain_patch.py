@@ -997,7 +997,9 @@ def _make_v5_convert_wrapper(original_convert: Callable[..., Any]) -> Callable[.
             if work_root is not None
             else Path(result.output_path).expanduser().resolve().parent
         )
-        integration = _try_apply_v5(
+        # Resolve the public entrypoint at call time: production installs the
+        # persistent tire cache around the v3 implementation there.
+        integration = legacy_integration.try_apply_stock_native_tire_preview(
             asset,
             carbin_entry=selected_carbin,
             game_or_cars_path=source_archive.parent,

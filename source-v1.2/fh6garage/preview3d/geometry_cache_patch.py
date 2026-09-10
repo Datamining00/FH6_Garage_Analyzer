@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 
-CACHE_SCHEMA = "fh6_preview3d_geometry_cache_v1"
+CACHE_SCHEMA = "fh6_preview3d_geometry_cache_v2"
 
 
 def _stable_payload(asset: Any, carbin_entry: str, morph: Any) -> dict[str, Any]:
@@ -74,7 +74,7 @@ def _valid_cached_glb(glb: Path, manifest: Path, payload: dict[str, Any]) -> boo
             if handle.read(4) != b"glTF":
                 return False
         stored = json.loads(manifest.read_text(encoding="utf-8"))
-        return stored == payload
+        return stored.get("key") == payload and isinstance(stored.get("diagnostics"), dict)
     except (OSError, ValueError, TypeError, json.JSONDecodeError):
         return False
 
@@ -116,18 +116,15 @@ def install_geometry_cache_patch() -> bool:
             return original(asset, progress=progress, carbin_entry=carbin_entry, work_root=work_root)
 
         if _valid_cached_glb(glb, manifest, payload):
+            stored = json.loads(manifest.read_text(encoding="utf-8"))
+            diagnostics = dict(stored["diagnostics"])
+            diagnostics.update(status="cache_hit", cache_schema=CACHE_SCHEMA)
             if progress:
                 progress(f"3D geometry cache hit: Car ID {asset.car_id} 변환을 생략합니다.")
             return chassis_converter.ConversionResult(
                 output_path=str(glb),
                 helper_path="persistent_geometry_cache",
-                diagnostics={
-                    "status": "cache_hit",
-                    "cache_schema": CACHE_SCHEMA,
-                    "game_data_modified": False,
-                    "car_id": int(asset.car_id),
-                    "model_code": str(asset.model_code),
-                },
+                diagnostics=diagnostics,
             )
 
         if progress:
@@ -151,11 +148,14 @@ def install_geometry_cache_patch() -> bool:
                 # work_root. Avoid moving a GLB whose adjacent sidecars would then
                 # lose basename-relative provenance; simply use the produced path.
                 return result
-            manifest.write_text(
-                json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2),
+            temporary_manifest = manifest.with_suffix(".tmp")
+            temporary_manifest.write_text(
+                json.dumps({"key": payload, "diagnostics": dict(result.diagnostics or {})},
+                           ensure_ascii=False, sort_keys=True, indent=2),
                 encoding="utf-8",
             )
-        except OSError:
+            temporary_manifest.replace(manifest)
+        except (OSError, TypeError, ValueError):
             # Cache persistence is an optimization only. A valid produced GLB
             # remains usable even if the manifest cannot be written.
             return result
