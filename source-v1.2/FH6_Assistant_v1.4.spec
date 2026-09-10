@@ -34,6 +34,7 @@ native_tire_hiddenimports = [
     'fh6garage.preview3d.native_transform_chain_v2',
     'fh6garage.preview3d.native_transform_chain_v3',
     'fh6garage.preview3d.tire_preview_integration',
+    'fh6garage.preview3d.tire_preview_cache_patch',
     'fh6garage.preview3d.tire_asset',
     'fh6garage.preview3d.tire_production_policy',
     'fh6garage.preview3d.tire_production_trial_geometry',
