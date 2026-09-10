@@ -25,6 +25,15 @@ def _node(material: str, shader: str, *, nested=None):
     }
 
 
+def _composed_helper() -> dict:
+    return {
+        "status": "material_shader_parameters_composed",
+        "parser_integrity_status": "clean",
+        "rendering_enabled": False,
+        "game_data_modified": False,
+    }
+
+
 class ManufacturerMaterialParameterCompositionTests(unittest.TestCase):
     def test_composes_one_direct_exact_pair(self):
         traced = {"traces": [{"root": _node("a.materialbin", "b.shaderbin")}]}
@@ -32,17 +41,14 @@ class ManufacturerMaterialParameterCompositionTests(unittest.TestCase):
 
         def analyze(material, shader):
             calls.append((material, shader))
-            return {
-                "status": "material_shader_parameters_composed",
-                "rendering_enabled": False,
-                "game_data_modified": False,
-            }
+            return _composed_helper()
 
         report = diagnose_manufacturer_material_parameter_composition(
             traced,
             analyze_parameters=analyze,
         )
         self.assertEqual(calls, [("a.materialbin", "b.shaderbin")])
+        self.assertEqual(report["revision"], 2)
         self.assertEqual(report["target_count"], 1)
         self.assertEqual(report["composed_count"], 1)
         self.assertEqual(report["failed_count"], 0)
@@ -65,7 +71,7 @@ class ManufacturerMaterialParameterCompositionTests(unittest.TestCase):
 
         def analyze(material, shader):
             calls.append((material, shader))
-            return {"status": "material_shader_parameters_composed"}
+            return _composed_helper()
 
         report = diagnose_manufacturer_material_parameter_composition(
             traced,
@@ -90,7 +96,7 @@ class ManufacturerMaterialParameterCompositionTests(unittest.TestCase):
 
         def analyze(material, shader):
             calls.append((material, shader))
-            return {"status": "material_shader_parameters_composed"}
+            return _composed_helper()
 
         report = diagnose_manufacturer_material_parameter_composition(
             {"traces": [{"root": root}]},
@@ -98,6 +104,32 @@ class ManufacturerMaterialParameterCompositionTests(unittest.TestCase):
         )
         self.assertEqual(calls, [("child.materialbin", "child.shaderbin")])
         self.assertEqual(report["target_count"], 1)
+
+    def test_composed_status_without_clean_integrity_is_rejected(self):
+        traced = {"traces": [{"root": _node("a.materialbin", "b.shaderbin")}]} 
+
+        for integrity in (None, "failed"):
+            with self.subTest(integrity=integrity):
+                def analyze(_material, _shader, integrity=integrity):
+                    result = {"status": "material_shader_parameters_composed"}
+                    if integrity is not None:
+                        result["parser_integrity_status"] = integrity
+                    return result
+
+                report = diagnose_manufacturer_material_parameter_composition(
+                    traced,
+                    analyze_parameters=analyze,
+                )
+                self.assertEqual(report["composed_count"], 0)
+                self.assertEqual(report["failed_count"], 1)
+                self.assertEqual(
+                    report["status"],
+                    "manufacturer_material_shader_parameters_incomplete",
+                )
+                self.assertIn(
+                    "parser_integrity_not_clean",
+                    report["pairs"][0]["detail"],
+                )
 
     def test_helper_failure_is_reported_fail_closed(self):
         traced = {"traces": [{"root": _node("a.materialbin", "b.shaderbin")}]}
