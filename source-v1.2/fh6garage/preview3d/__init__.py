@@ -44,10 +44,11 @@ def _install_native_transform_chain_preview() -> bool:
     # authority away from dynamic car paint or the livery composite. The narrow
     # BC5 normal stage is installed after native Texture2D so it can reuse the
     # verified render plan and per-primitive draw interception contract. The
-    # evidence-closed emissive stage then adds exact sRGB emissive maps without
-    # changing albedo authority. Paint P1 inventories C_livery paint descriptors
-    # as read-only diagnostics only; it does not alter the established
-    # paint -> livery -> PBR render ordering.
+    # evidence-closed emissive stage follows the ForzaTechStudio/glTF sRGB
+    # reference contract and adds exact emissive maps without changing albedo
+    # authority. Paint P1 inventories C_livery paint descriptors as read-only
+    # diagnostics only; it does not alter the established paint -> livery -> PBR
+    # render ordering.
     install_game_like_material_patch()
     install_material_runtime_wiring_patch()
     install_native_material_texture_patch()
