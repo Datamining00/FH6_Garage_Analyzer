@@ -12,7 +12,7 @@ from .wheel_morph_helper import (
 
 
 MATERIAL_SHADER_PARAMETER_HELPER_FORMAT = "fh6_material_shader_parameter_diagnostic_v1"
-MATERIAL_SHADER_PARAMETER_HELPER_REVISION = 1
+MATERIAL_SHADER_PARAMETER_HELPER_REVISION = 2
 _MAX_TRANSPORT_DIAGNOSTIC_LINES = 32
 _MAX_TRANSPORT_DIAGNOSTIC_CHARS = 1000
 
@@ -27,6 +27,12 @@ def _explicit_false(report: dict[str, Any], snake: str, camel: str) -> bool:
     if camel in report:
         return report.get(camel) is False
     return False
+
+
+def _field(report: dict[str, Any], snake: str, camel: str) -> Any:
+    if snake in report:
+        return report.get(snake)
+    return report.get(camel)
 
 
 def _diagnostic_lines(text: str | None) -> list[str]:
@@ -47,7 +53,7 @@ def _decode_helper_stdout(payload: str) -> tuple[dict[str, Any], list[str]]:
     """Decode one trusted helper JSON object while preserving prefixed diagnostics.
 
     ForzaTools Bundle.Load writes recoverable per-blob parse diagnostics to stdout.
-    The patched helper then writes its JSON report to the same stream.  Accept that
+    The patched helper then writes its JSON report to the same stream. Accept that
     transport shape only when there is exactly one matching helper JSON object at
     the end of stdout; arbitrary suffix output or ambiguous matching objects remain
     fail-closed.
@@ -99,7 +105,8 @@ def diagnose_material_shader_parameters(
     The patched KFPS/ForzaTools helper follows the same composition key used by
     ForzaTechStudio's Materials & Shaders workstation: NameHash + parameter type,
     with the first parameter per source retained and the material override taking
-    precedence over the linked shader default.
+    precedence over the linked shader default. Parser integrity must be explicitly
+    clean before the report can be accepted.
     """
     material = Path(materialbin_path).expanduser().resolve()
     shader = Path(shaderbin_path).expanduser().resolve()
@@ -177,6 +184,24 @@ def diagnose_material_shader_parameters(
     if not _explicit_false(report, "rendering_enabled", "renderingEnabled"):
         raise MaterialShaderParameterHelperError(
             "Material/shader parameter helper did not explicitly report rendering_enabled=false."
+        )
+
+    parser_integrity = _field(
+        report,
+        "parser_integrity_status",
+        "parserIntegrityStatus",
+    )
+    if parser_integrity != "clean":
+        parser_error_count = _field(report, "parser_error_count", "parserErrorCount")
+        unsupported_count = _field(
+            report,
+            "unsupported_parameter_count",
+            "unsupportedParameterCount",
+        )
+        raise MaterialShaderParameterHelperError(
+            "Material/shader parameter parser integrity is not clean: "
+            f"status={parser_integrity!r}, parser_errors={parser_error_count!r}, "
+            f"unsupported_parameters={unsupported_count!r}."
         )
 
     stderr_diagnostics = _diagnostic_lines(completed.stderr)
