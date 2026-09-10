@@ -34,6 +34,7 @@ def _install_native_transform_chain_preview() -> bool:
     from .native_material_texture_patch import install_native_material_texture_patch
     from .native_normal_texture_patch import install_native_normal_texture_patch
     from .native_emissive_texture_patch import install_native_emissive_texture_patch
+    from .glass_livery_composite_patch import install_glass_livery_composite_patch
     from .livery_paint_runtime_patch import install_livery_paint_provenance_runtime_patch
     from .native_transform_chain_v3 import install_native_transform_chain_v3
     from . import tire_preview_integration as tire_preview_integration
@@ -46,14 +47,16 @@ def _install_native_transform_chain_preview() -> bool:
     # verified render plan and per-primitive draw interception contract. The
     # evidence-closed emissive stage follows the ForzaTechStudio/glTF sRGB
     # reference contract and adds exact emissive maps without changing albedo
-    # authority. Paint P1 inventories C_livery paint descriptors as read-only
-    # diagnostics only; it does not alter the established paint -> livery -> PBR
-    # render ordering.
+    # authority. Glass livery compositing then separates substrate transmission
+    # from livery alpha coverage without changing opaque paint. Paint P1
+    # inventories C_livery paint descriptors as read-only diagnostics only; it
+    # does not alter the established paint -> livery -> PBR render ordering.
     install_game_like_material_patch()
     install_material_runtime_wiring_patch()
     install_native_material_texture_patch()
     install_native_normal_texture_patch()
     install_native_emissive_texture_patch()
+    install_glass_livery_composite_patch()
     install_livery_paint_provenance_runtime_patch()
     install_native_transform_chain_v3()
     return tire_preview_integration.install_global_stock_native_tire_preview()
