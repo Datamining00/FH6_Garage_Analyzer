@@ -68,6 +68,8 @@ def _validation_status(report: dict) -> str:
         return "diagnostic_unavailable"
     if int(report.get("exact_resolved_count") or 0) > 0:
         return "exact_swatch_chain_resolved"
+    if int(report.get("exact_shader_resolved_count") or 0) > 0:
+        return "exact_material_shader_chain_resolved"
     if int(report.get("candidate_count") or 0) == 0:
         return "no_materialbin_candidate"
     if int(report.get("blocked_count") or 0) > 0:
@@ -380,7 +382,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
             "Read-only Paint P3F diagnostic: follow P3D-exact manufacturer .materialbin entries "
-            "through exact MatL/Texture2D references to the first exact swatchbin. "
+            "through exact material/shader references and any exact native swatchbin Texture2D reference. "
             "When --glb and/or --paint are omitted, the packaged diagnostic creates the GLB "
             "from --vehicle and resolves a matching C_livery from the saved FH6 save path."
         )
