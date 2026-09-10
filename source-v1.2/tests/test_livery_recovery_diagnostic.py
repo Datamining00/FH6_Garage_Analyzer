@@ -22,6 +22,29 @@ class LiveryRecoveryDiagnosticTests(unittest.TestCase):
         self.assertEqual(result["recovery_class"], "exterior_shell")
         self.assertEqual(result["evidence_mask"], 4)
 
+    def test_kfps_paintable_part_types_are_recovery_candidates_with_real_evidence(self):
+        cases = (
+            ("Hood", r"Scene\Exterior\Hood\hood_a.modelbin", 4),
+            ("FrontBumper", r"Scene\Exterior\Bumpers\frontbumper_a.modelbin", 25),
+            ("RearBumper", r"Scene\Exterior\Bumpers\rearbumper_a.modelbin", 26),
+            ("SideSkirts", r"Scene\Exterior\SideSkirts\sideskirt_a.modelbin", 24),
+            ("RearWing", r"Scene\Exterior\RearWing\wing_a.modelbin", 32),
+        )
+        for part_type, source_entry, evidence in cases:
+            with self.subTest(part_type=part_type):
+                result = classify_strict_recovery_candidate({
+                    "final_allowed_sides": 0,
+                    "structural_livery_exclusion": "",
+                    "declared_role": "trim",
+                    "part_type": part_type,
+                    "source_entry": source_entry,
+                    "mesh_name": source_entry.split("\\")[-1],
+                    "selected_uv_evidence_sides": evidence,
+                })
+                self.assertTrue(result["candidate"])
+                self.assertTrue(result["safe_candidate_for_review"])
+                self.assertEqual(result["recovery_class"], "exterior_shell")
+
     def test_already_strict_eligible_is_not_candidate(self):
         result = classify_strict_recovery_candidate({
             "final_allowed_sides": 3,
@@ -43,7 +66,7 @@ class LiveryRecoveryDiagnosticTests(unittest.TestCase):
         self.assertFalse(result["candidate"])
         self.assertTrue(result["reason"].startswith("structural_exclusion:"))
 
-    def test_non_carbody_exterior_is_not_candidate(self):
+    def test_non_paintable_exterior_part_type_is_not_candidate(self):
         result = classify_strict_recovery_candidate({
             "final_allowed_sides": 0,
             "part_type": "WheelStyle",
@@ -51,13 +74,13 @@ class LiveryRecoveryDiagnosticTests(unittest.TestCase):
             "selected_uv_evidence_sides": 1,
         })
         self.assertFalse(result["candidate"])
-        self.assertEqual(result["reason"], "not_carbody")
+        self.assertEqual(result["reason"], "not_paintable_livery_part_type")
 
-    def test_carbody_without_mask_evidence_is_not_candidate(self):
+    def test_paintable_part_without_mask_evidence_is_not_candidate(self):
         result = classify_strict_recovery_candidate({
             "final_allowed_sides": 0,
-            "part_type": "CarBody",
-            "source_entry": r"Scene\Exterior\Roof\roof_a.modelbin",
+            "part_type": "Hood",
+            "source_entry": r"Scene\Exterior\Hood\hood_a.modelbin",
             "selected_uv_evidence_sides": 0,
             "uv3_evidence_sides": 0,
         })
