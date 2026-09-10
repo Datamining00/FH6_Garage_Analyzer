@@ -52,6 +52,14 @@ class MaterialbinReferenceHelperSourceTests(unittest.TestCase):
         self.assertIn("Expected exactly one established --decode-swatchbin CLI contract", text)
         self.assertIn("shutil.copy2", text)
 
+    def test_followup_patcher_carries_exact_fh6_v34_sampler_alignment_contract(self):
+        text = PATCHER.read_text(encoding="utf-8")
+        self.assertIn("MaterialShaderParameterBlob.cs", text)
+        self.assertIn("FH6 v3.4 sampler records observed in real shaderbin data", text)
+        self.assertIn("VersionMajor == 3 && VersionMinor == 4", text)
+        self.assertIn("_ = bs.ReadUInt32();", text)
+        self.assertIn("expected exactly one pinned occurrence", text)
+
     @staticmethod
     def _diagnose_report(safety_field: dict) -> dict:
         with tempfile.TemporaryDirectory() as tmp:
