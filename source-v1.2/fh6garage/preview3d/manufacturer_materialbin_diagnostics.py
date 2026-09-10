@@ -13,7 +13,7 @@ from .native_material_textures import resolve_native_texture_reference
 
 
 MANUFACTURER_MATERIALBIN_DIAGNOSTICS_FORMAT = "fh6_manufacturer_materialbin_diagnostics_v1"
-MANUFACTURER_MATERIALBIN_DIAGNOSTICS_REVISION = 3
+MANUFACTURER_MATERIALBIN_DIAGNOSTICS_REVISION = 4
 _EXACT_RESOLUTION_MODES = frozenset(
     {"vehicle_archive_exact", "game_loose_exact", "derived_zip_exact"}
 )
@@ -265,6 +265,7 @@ def _trace_materialbin(
         "asset": None,
         "references": [],
         "selected_swatch": None,
+        "selected_shader": None,
         "selected_lineage": list(lineage),
         "rendering_enabled": False,
     }
@@ -322,8 +323,9 @@ def _trace_materialbin(
             "reference_path": child_path,
             "status": "unresolved",
         }
+        normalized_child = child_path.replace("\\", "/").casefold()
 
-        if child_path.replace("\\", "/").casefold().endswith(".materialbin"):
+        if normalized_child.endswith(".materialbin"):
             nested = _trace_materialbin(
                 child_path,
                 vehicle_archive,
@@ -342,9 +344,17 @@ def _trace_materialbin(
                 attempts.append(attempt)
                 node["references"] = attempts
                 node["selected_swatch"] = nested["selected_swatch"]
+                node["selected_shader"] = nested.get("selected_shader")
                 node["selected_lineage"] = nested.get("selected_lineage") or list(next_lineage)
                 node["status"] = "materialbin_selected_exact_swatch"
                 return node
+            if nested.get("selected_shader") is not None:
+                attempt["status"] = "nested_materialbin_selected_exact_shader"
+                attempts.append(attempt)
+                if node["selected_shader"] is None:
+                    node["selected_shader"] = nested["selected_shader"]
+                    node["selected_lineage"] = nested.get("selected_lineage") or list(next_lineage)
+                continue
             if nested_status in {
                 "materialbin_helper_unavailable",
                 "materialbin_reference_inventory_invalid",
@@ -361,40 +371,73 @@ def _trace_materialbin(
             attempts.append(attempt)
             continue
 
-        payload = resolve_swatch(child_path, vehicle_archive, cache_root)
-        payload_dict = payload.as_dict() if hasattr(payload, "as_dict") else dict(payload)
-        attempt["payload"] = payload_dict
-        if payload_dict.get("status") == "resolved_payload":
-            mode = str(payload_dict.get("resolution_mode") or "")
-            if mode in _EXACT_RESOLUTION_MODES:
-                attempt["status"] = "swatch_resolved_exact"
+        if normalized_child.endswith(".shaderbin"):
+            shader = resolve_asset(child_path, vehicle_archive, cache_root)
+            shader_dict = shader.as_dict() if hasattr(shader, "as_dict") else dict(shader)
+            attempt["payload"] = shader_dict
+            if shader_dict.get("status") == "resolved_payload" and str(
+                shader_dict.get("resolution_mode") or ""
+            ) in _EXACT_RESOLUTION_MODES:
+                attempt["status"] = "shader_resolved_exact"
                 attempts.append(attempt)
-                selected = {
-                    "reference_order": index,
-                    "source_kind": source_kind,
-                    "source_field": source_field,
-                    "parameter_hash": attempt["parameter_hash"],
-                    "path_hash": attempt["path_hash"],
-                    "reference_path": child_path,
-                    "payload": payload_dict,
-                }
+                if node["selected_shader"] is None:
+                    node["selected_shader"] = {
+                        "reference_order": index,
+                        "source_kind": source_kind,
+                        "source_field": source_field,
+                        "parameter_hash": attempt["parameter_hash"],
+                        "path_hash": attempt["path_hash"],
+                        "reference_path": child_path,
+                        "payload": shader_dict,
+                    }
+                    node["selected_lineage"] = list(next_lineage) + [child_path]
+                continue
+            attempt["status"] = "shader_unresolved_exact"
+            attempts.append(attempt)
+            continue
+
+        if normalized_child.endswith(".swatchbin"):
+            payload = resolve_swatch(child_path, vehicle_archive, cache_root)
+            payload_dict = payload.as_dict() if hasattr(payload, "as_dict") else dict(payload)
+            attempt["payload"] = payload_dict
+            if payload_dict.get("status") == "resolved_payload":
+                mode = str(payload_dict.get("resolution_mode") or "")
+                if mode in _EXACT_RESOLUTION_MODES:
+                    attempt["status"] = "swatch_resolved_exact"
+                    attempts.append(attempt)
+                    selected = {
+                        "reference_order": index,
+                        "source_kind": source_kind,
+                        "source_field": source_field,
+                        "parameter_hash": attempt["parameter_hash"],
+                        "path_hash": attempt["path_hash"],
+                        "reference_path": child_path,
+                        "payload": payload_dict,
+                    }
+                    node["references"] = attempts
+                    node["selected_swatch"] = selected
+                    node["selected_lineage"] = list(next_lineage) + [child_path]
+                    node["status"] = "materialbin_selected_exact_swatch"
+                    return node
+
+                attempt["status"] = "swatch_nonexact_resolution_blocks_order"
+                attempts.append(attempt)
                 node["references"] = attempts
-                node["selected_swatch"] = selected
-                node["selected_lineage"] = list(next_lineage) + [child_path]
-                node["status"] = "materialbin_selected_exact_swatch"
+                node["status"] = "materialbin_blocked_by_nonexact_resolution"
                 return node
 
-            attempt["status"] = "swatch_nonexact_resolution_blocks_order"
+            attempt["status"] = "swatch_unresolved"
             attempts.append(attempt)
-            node["references"] = attempts
-            node["status"] = "materialbin_blocked_by_nonexact_resolution"
-            return node
+            continue
 
-        attempt["status"] = "swatch_unresolved"
+        attempt["status"] = "unsupported_reference_kind"
         attempts.append(attempt)
 
     node["references"] = attempts
-    node["status"] = "materialbin_no_exact_swatch_resolved"
+    if node["selected_shader"] is not None:
+        node["status"] = "materialbin_selected_exact_shader"
+    else:
+        node["status"] = "materialbin_no_exact_swatch_resolved"
     return node
 
 
@@ -407,7 +450,7 @@ def trace_manufacturer_materialbin_payloads(
     resolve_swatch: Callable[..., Any] = resolve_native_texture_reference,
     analyze_materialbin: Callable[..., dict[str, Any]] = diagnose_materialbin_references,
 ) -> dict[str, Any]:
-    """Trace P3D .materialbin entries to the first exact swatchbin, without rendering."""
+    """Trace P3D .materialbin entries to exact swatchbin or shaderbin references, without rendering."""
     report: dict[str, Any] = {
         "format": MANUFACTURER_MATERIALBIN_DIAGNOSTICS_FORMAT,
         "revision": MANUFACTURER_MATERIALBIN_DIAGNOSTICS_REVISION,
@@ -417,6 +460,7 @@ def trace_manufacturer_materialbin_payloads(
         "game_data_modified": False,
         "candidate_count": 0,
         "exact_resolved_count": 0,
+        "exact_shader_resolved_count": 0,
         "blocked_count": 0,
         "unresolved_count": 0,
         "traces": [],
@@ -424,11 +468,13 @@ def trace_manufacturer_materialbin_payloads(
         "p3d_breakdown": _p3d_breakdown(p3d_report),
         "interpretation_boundary": (
             "Paint P3F follows only P3D-exact manufacturer entries whose Path is .materialbin. "
-            "Materialbin bytes are located only by vehicle_archive_exact, game_loose_exact, or derived_zip_exact; "
-            "the SHA-verified KFPS/ForzaTools helper exports MatL Path/PathV1_1/PathV1_2 references first and "
-            "Texture2D references second, preserving FTS traversal order. Filename fallback can block but never "
-            "promote a result. DDS decode/detile, UV4 sampling, tint/alpha composition, finish shaders, rendering, "
-            "and FH6 game/save writes remain disabled."
+            "Materialbin and shaderbin bytes are located only by vehicle_archive_exact, game_loose_exact, or "
+            "derived_zip_exact; the SHA-verified KFPS/ForzaTools helper exports MatL Path/PathV1_1/PathV1_2 "
+            "references first and Texture2D references second, preserving FTS traversal order. Exact .shaderbin "
+            "references are retained as material-chain terminals while exact .swatchbin Texture2D references keep "
+            "their existing overlay role. Filename fallback can block but never promote a result. Shader parameter "
+            "composition, DDS decode/detile, UV4 sampling, tint/alpha composition, finish shaders, rendering, and "
+            "FH6 game/save writes remain disabled."
         ),
     }
     if not isinstance(p3d_report, dict) or p3d_report.get("status") != "manufacturer_overlay_candidates_diagnosed":
@@ -463,6 +509,7 @@ def trace_manufacturer_materialbin_payloads(
             "uv4_status": uv4.get("status"),
             "status": "manufacturer_materialbin_unresolved",
             "selected_swatch": None,
+            "selected_shader": None,
             "rendering_enabled": False,
         }
         if uv4.get("status") != "uv4_exact_kfps_accessor":
@@ -484,10 +531,15 @@ def trace_manufacturer_materialbin_payloads(
         )
         trace["root"] = root
         trace["selected_swatch"] = root.get("selected_swatch")
+        trace["selected_shader"] = root.get("selected_shader")
         root_status = str(root.get("status") or "")
+        if root.get("selected_shader") is not None:
+            report["exact_shader_resolved_count"] += 1
         if root_status == "materialbin_selected_exact_swatch":
             trace["status"] = "manufacturer_materialbin_swatch_resolved_exact"
             report["exact_resolved_count"] += 1
+        elif root_status == "materialbin_selected_exact_shader":
+            trace["status"] = "manufacturer_materialbin_shader_resolved_exact"
         elif root_status in {
             "materialbin_blocked_by_nonexact_resolution",
             "materialbin_traversal_tooling_blocked",
