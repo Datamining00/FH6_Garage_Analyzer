@@ -35,6 +35,7 @@ def _install_native_transform_chain_preview() -> bool:
     from .geometry_cache_patch import install_geometry_cache_patch
     from .cold_livery_render_fastpath_patch import install_cold_livery_render_fastpath_patch
     from .livery_render_cache_patch import install_livery_render_cache_patch
+    from .native_tire_preview_cache_patch import install_native_tire_preview_cache_patch
     from .native_tire_visibility_provenance_patch import install_native_tire_visibility_provenance_patch
     from .hybrid_livery_recovery_patch import install_hybrid_livery_recovery_patch
     from .strict_livery_default_patch import install_strict_livery_default_patch
@@ -43,15 +44,14 @@ def _install_native_transform_chain_preview() -> bool:
     from . import tire_preview_integration as tire_preview_integration
 
     # Normal production preview keeps game/save data read-only. Persistent caches
-    # store only derived GLBs and rendered livery sections under LocalAppData.
-    # Cold renders first narrow the pinned KFPS section list to sections that
-    # actually contain decoded layers, avoiding full-size transparent PNG work.
-    # The cache wraps that fast path so subsequent opens skip decode/render too.
+    # store only derived GLBs, fully merged stock-tire previews, and rendered livery
+    # sections under LocalAppData. Cold renders first narrow the pinned KFPS section
+    # list to sections that actually contain decoded layers; the livery cache wraps
+    # that production-visible fast path so subsequent opens skip decode/render too.
     # Hybrid remains opt-in. Mechanical visibility filtering alters only the
-    # in-memory scene index list; it never rewrites the cached GLB. Native tire
+    # in-memory scene index list; it never rewrites cached GLBs. Native tire
     # provenance is recovered from derived GLB node extras so the wheel/tire
-    # checkbox can hide the separately merged rubber geometry reliably. Regression
-    # coverage also guards PrimaryLights against the former `rim` substring match.
+    # checkbox can hide the separately merged rubber geometry reliably.
     install_game_like_material_patch()
     install_material_runtime_wiring_patch()
     install_native_material_texture_patch()
@@ -64,6 +64,7 @@ def _install_native_transform_chain_preview() -> bool:
     install_geometry_cache_patch()
     install_cold_livery_render_fastpath_patch()
     install_livery_render_cache_patch()
+    install_native_tire_preview_cache_patch()
     install_native_tire_visibility_provenance_patch()
     install_hybrid_livery_recovery_patch()
     install_strict_livery_default_patch()
