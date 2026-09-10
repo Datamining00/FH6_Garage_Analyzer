@@ -53,9 +53,17 @@ def _cache_paths(asset: Any, payload: dict[str, Any]) -> tuple[Path, Path]:
     encoded = json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode("utf-8")
     digest = hashlib.sha256(encoded).hexdigest()[:20]
     model = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in str(asset.model_code))
-    root = app_data_root() / "geometry_cache_v1" / f"car_{int(asset.car_id)}_{model}"
+    # Keep the converter's canonical GLB basename inside a fingerprinted directory.
+    # Native material/texture sidecars are named relative to that basename; keeping
+    # it unchanged avoids disconnecting those side products from the cached GLB.
+    root = (
+        app_data_root()
+        / "geometry_cache_v1"
+        / f"car_{int(asset.car_id)}_{model}"
+        / digest
+    )
     root.mkdir(parents=True, exist_ok=True)
-    return root / f"{digest}.glb", root / f"{digest}.json"
+    return root / f"car_{int(asset.car_id)}_{model}.glb", root / "manifest.json"
 
 
 def _valid_cached_glb(glb: Path, manifest: Path, payload: dict[str, Any]) -> bool:
@@ -125,9 +133,9 @@ def install_geometry_cache_patch() -> bool:
         if progress:
             progress(f"3D geometry cache miss: Car ID {asset.car_id} 최초 변환을 수행합니다.")
 
-        # Store the full converter output and native material side products under
-        # LocalAppData rather than the dialog TemporaryDirectory.  The original
-        # FH6 archive remains read-only; only derived cache files are persistent.
+        # Store the full converter output and all native material side products under
+        # LocalAppData rather than the dialog TemporaryDirectory. The original FH6
+        # archive remains read-only; only derived cache files are persistent.
         result = original(
             asset,
             progress=progress,
@@ -139,7 +147,10 @@ def install_geometry_cache_patch() -> bool:
         produced = Path(result.output_path)
         try:
             if produced.resolve() != glb.resolve():
-                produced.replace(glb)
+                # This should not normally happen because glb.parent is passed as
+                # work_root. Avoid moving a GLB whose adjacent sidecars would then
+                # lose basename-relative provenance; simply use the produced path.
+                return result
             manifest.write_text(
                 json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2),
                 encoding="utf-8",
