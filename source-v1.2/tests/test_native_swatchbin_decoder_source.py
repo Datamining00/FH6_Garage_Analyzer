@@ -43,6 +43,20 @@ class NativeSwatchbinDecoderSourceTests(unittest.TestCase):
         self.assertNotIn("vehicle", text.casefold())
         self.assertNotIn("car id", text.casefold())
 
+    def test_decoder_marks_platform_and_refuses_tiled_durango_bytes(self):
+        text = DECODER.read_text(encoding="utf-8")
+        self.assertIn("bool IsDurangoFormat", text)
+        self.assertIn("isDurango = false", text)
+        self.assertIn("isDurango = true", text)
+        self.assertIn("if (isDurango)", text)
+        self.assertIn("XG detile/dealign", text)
+        self.assertIn("refusing to wrap tiled texture bytes as linear DDS", text)
+        durango_guard = text.index("if (isDurango)")
+        raw_read = text.index("var raw = textureBlob.Data")
+        dds_build = text.index("var dds = CreateDds")
+        self.assertLess(durango_guard, raw_read)
+        self.assertLess(durango_guard, dds_build)
+
 
 if __name__ == "__main__":
     unittest.main()
