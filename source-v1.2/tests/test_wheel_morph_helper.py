@@ -46,6 +46,17 @@ class WheelMorphHelperTests(unittest.TestCase):
             ):
                 self.assertEqual(helper.verified_bundled_wheel_morph_helper(), candidate.resolve())
 
+    def test_release_specs_bundle_native_tire_preview_cache_patch(self):
+        source_root = Path(__file__).resolve().parents[1]
+        required = "'fh6garage.preview3d.tire_preview_cache_patch'"
+        for spec_name in ("FH6_Assistant_v1.4.spec", "FH6_Assistant_v1.4_portable.spec"):
+            spec_text = (source_root / spec_name).read_text(encoding="utf-8")
+            self.assertIn(
+                required,
+                spec_text,
+                msg=f"{spec_name} must explicitly bundle the lazy native tire preview cache patch",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
