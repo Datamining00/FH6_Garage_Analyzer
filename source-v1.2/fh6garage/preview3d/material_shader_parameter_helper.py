@@ -13,6 +13,8 @@ from .wheel_morph_helper import (
 
 MATERIAL_SHADER_PARAMETER_HELPER_FORMAT = "fh6_material_shader_parameter_diagnostic_v1"
 MATERIAL_SHADER_PARAMETER_HELPER_REVISION = 1
+_MAX_TRANSPORT_DIAGNOSTIC_LINES = 32
+_MAX_TRANSPORT_DIAGNOSTIC_CHARS = 1000
 
 
 class MaterialShaderParameterHelperError(RuntimeError):
@@ -25,6 +27,65 @@ def _explicit_false(report: dict[str, Any], snake: str, camel: str) -> bool:
     if camel in report:
         return report.get(camel) is False
     return False
+
+
+def _diagnostic_lines(text: str | None) -> list[str]:
+    lines: list[str] = []
+    for raw in str(text or "").splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if len(line) > _MAX_TRANSPORT_DIAGNOSTIC_CHARS:
+            line = line[:_MAX_TRANSPORT_DIAGNOSTIC_CHARS] + "..."
+        lines.append(line)
+        if len(lines) >= _MAX_TRANSPORT_DIAGNOSTIC_LINES:
+            break
+    return lines
+
+
+def _decode_helper_stdout(payload: str) -> tuple[dict[str, Any], list[str]]:
+    """Decode one trusted helper JSON object while preserving prefixed diagnostics.
+
+    ForzaTools Bundle.Load writes recoverable per-blob parse diagnostics to stdout.
+    The patched helper then writes its JSON report to the same stream.  Accept that
+    transport shape only when there is exactly one matching helper JSON object at
+    the end of stdout; arbitrary suffix output or ambiguous matching objects remain
+    fail-closed.
+    """
+    clean = payload.lstrip("\ufeff")
+    try:
+        direct = json.loads(clean)
+    except json.JSONDecodeError as direct_error:
+        decoder = json.JSONDecoder()
+        matches: list[tuple[int, dict[str, Any]]] = []
+        for index, char in enumerate(clean):
+            if char != "{":
+                continue
+            try:
+                value, end = decoder.raw_decode(clean, index)
+            except json.JSONDecodeError:
+                continue
+            if clean[end:].strip():
+                continue
+            if (
+                isinstance(value, dict)
+                and value.get("format") == MATERIAL_SHADER_PARAMETER_HELPER_FORMAT
+            ):
+                matches.append((index, value))
+        if len(matches) != 1:
+            raise MaterialShaderParameterHelperError(
+                "Material/shader parameter helper returned invalid JSON: "
+                f"{direct_error}; matching terminal helper reports={len(matches)}"
+            ) from direct_error
+        start, report = matches[0]
+        diagnostics = _diagnostic_lines(clean[:start])
+        return report, diagnostics
+
+    if not isinstance(direct, dict):
+        raise MaterialShaderParameterHelperError(
+            "Material/shader parameter helper JSON root is not an object."
+        )
+    return direct, []
 
 
 def diagnose_material_shader_parameters(
@@ -99,16 +160,8 @@ def diagnose_material_shader_parameters(
         raise MaterialShaderParameterHelperError(
             "Material/shader parameter helper returned no JSON diagnostic."
         )
-    try:
-        report = json.loads(payload)
-    except json.JSONDecodeError as exc:
-        raise MaterialShaderParameterHelperError(
-            f"Material/shader parameter helper returned invalid JSON: {exc}"
-        ) from exc
-    if not isinstance(report, dict):
-        raise MaterialShaderParameterHelperError(
-            "Material/shader parameter helper JSON root is not an object."
-        )
+
+    report, stdout_diagnostics = _decode_helper_stdout(payload)
     if report.get("format") != MATERIAL_SHADER_PARAMETER_HELPER_FORMAT:
         raise MaterialShaderParameterHelperError(
             f"Unexpected material/shader parameter helper format: {report.get('format')!r}"
@@ -125,4 +178,12 @@ def diagnose_material_shader_parameters(
         raise MaterialShaderParameterHelperError(
             "Material/shader parameter helper did not explicitly report rendering_enabled=false."
         )
+
+    stderr_diagnostics = _diagnostic_lines(completed.stderr)
+    if stdout_diagnostics or stderr_diagnostics:
+        report = dict(report)
+        if stdout_diagnostics:
+            report["stdout_diagnostics"] = stdout_diagnostics
+        if stderr_diagnostics:
+            report["stderr_diagnostics"] = stderr_diagnostics
     return report
