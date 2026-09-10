@@ -38,6 +38,7 @@ def _install_native_transform_chain_preview() -> bool:
     from .glass_livery_composite_patch import install_glass_livery_composite_patch
     from .livery_paint_runtime_patch import install_livery_paint_provenance_runtime_patch
     from .native_transform_chain_v3 import install_native_transform_chain_v3
+    from .strict_livery_default_patch import install_strict_livery_default_patch
     from . import tire_preview_integration as tire_preview_integration
 
     # Viewer patches are installed before integration.py imports its load_kfps_glb
@@ -52,6 +53,8 @@ def _install_native_transform_chain_preview() -> bool:
     # manufacturer tint before the C_livery composite. Glass livery compositing
     # remains the final albedo/transmission separation. Paint provenance wrappers
     # supply exact C_livery/archive/cache paths as transient read-only state.
+    # Finally, production 3D preview starts from KFPS converter-declared Strict
+    # livery eligibility; Legacy remains available as an explicit diagnostic mode.
     install_game_like_material_patch()
     install_material_runtime_wiring_patch()
     install_native_material_texture_patch()
@@ -61,6 +64,7 @@ def _install_native_transform_chain_preview() -> bool:
     install_glass_livery_composite_patch()
     install_livery_paint_provenance_runtime_patch()
     install_native_transform_chain_v3()
+    install_strict_livery_default_patch()
     return tire_preview_integration.install_global_stock_native_tire_preview()
 
 
