@@ -39,6 +39,7 @@ def _install_native_transform_chain_preview() -> bool:
     from .livery_paint_runtime_patch import install_livery_paint_provenance_runtime_patch
     from .native_transform_chain_v3 import install_native_transform_chain_v3
     from .livery_recovery_diagnostic import install_livery_recovery_diagnostic_patch
+    from .hybrid_livery_recovery_patch import install_hybrid_livery_recovery_patch
     from .strict_livery_default_patch import install_strict_livery_default_patch
     from . import tire_preview_integration as tire_preview_integration
 
@@ -54,11 +55,10 @@ def _install_native_transform_chain_preview() -> bool:
     # manufacturer tint before the C_livery composite. Glass livery compositing
     # remains the final albedo/transmission separation. Paint provenance wrappers
     # supply exact C_livery/archive/cache paths as transient read-only state.
-    # Strict recovery diagnostics then record exterior CarBody + real mask evidence
-    # that Strict omitted, but deliberately do not promote any geometry. This keeps
-    # KFPS's conservative role contract intact while collecting evidence for a
-    # later Hybrid policy. Production 3D preview still starts from Strict; Legacy
-    # remains available as an explicit diagnostic mode.
+    # Strict recovery diagnostics record converter-missed exterior CarBody evidence.
+    # Hybrid is installed afterwards as an explicit test mode: it starts from the
+    # exact Strict scene and restores only v2 high-confidence exterior-shell rows.
+    # Strict remains the shipped default until multi-car visual validation passes.
     install_game_like_material_patch()
     install_material_runtime_wiring_patch()
     install_native_material_texture_patch()
@@ -69,6 +69,7 @@ def _install_native_transform_chain_preview() -> bool:
     install_livery_paint_provenance_runtime_patch()
     install_native_transform_chain_v3()
     install_livery_recovery_diagnostic_patch()
+    install_hybrid_livery_recovery_patch()
     install_strict_livery_default_patch()
     return tire_preview_integration.install_global_stock_native_tire_preview()
 
