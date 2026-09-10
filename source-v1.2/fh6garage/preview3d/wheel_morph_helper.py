@@ -4,16 +4,18 @@ import hashlib
 from pathlib import Path
 import sys
 
-# The v14 verified helper carries the established wheel/transform chain plus
+# The v15 verified helper carries the established wheel/transform chain plus
 # the read-only embedded MaterialBlob shader/Texture2D provenance exporter,
 # exact material UV-tiling provenance, native UV4 pass-through, TXCB/TXCH
 # native swatchbin-to-DDS decoder, the P3F read-only materialbin reference
 # exporter, and typed materialbin override + shaderbin default parameter
-# composition diagnostics. No FH6 game/save data is modified by the diagnostic
-# modes and parameter composition does not enable rendering.
+# composition diagnostics. v15 additionally consumes the real-data FH6 v3.4
+# Sampler trailing DWORD structurally to preserve parameter-stream alignment;
+# parser corruption is reported fail-closed before composition can be accepted.
+# No FH6 game/save data is modified and parameter composition does not render.
 WHEEL_MORPH_HELPER_FILENAME = "Kfps.ChassisConverter.WheelMorph.exe"
-WHEEL_MORPH_HELPER_SHA256 = "8bdd0e25632096d8b63f5877202230de7cc341b0255e13b407b7c26816d45dc0"
-WHEEL_MORPH_HELPER_REVISION = "kfps_6f53ca3_w3_p3f_material_shader_parameters_uv4_v14"
+WHEEL_MORPH_HELPER_SHA256 = "334aa812fff4107c8d1b6b54492383c69bbb8dbdfd2a1a5cda84e571ae28c8b5"
+WHEEL_MORPH_HELPER_REVISION = "kfps_6f53ca3_w3_p3f_material_shader_parameters_uv4_v15"
 
 
 class WheelMorphHelperError(RuntimeError):
