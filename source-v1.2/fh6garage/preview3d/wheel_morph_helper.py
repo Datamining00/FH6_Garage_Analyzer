@@ -4,18 +4,19 @@ import hashlib
 from pathlib import Path
 import sys
 
-# The v15 verified helper carries the established wheel/transform chain plus
+# The v16 verified helper carries the established wheel/transform chain plus
 # the read-only embedded MaterialBlob shader/Texture2D provenance exporter,
 # exact material UV-tiling provenance, native UV4 pass-through, TXCB/TXCH
 # native swatchbin-to-DDS decoder, the P3F read-only materialbin reference
 # exporter, and typed materialbin override + shaderbin default parameter
-# composition diagnostics. v15 additionally consumes the real-data FH6 v3.4
-# Sampler trailing DWORD structurally to preserve parameter-stream alignment;
-# parser corruption is reported fail-closed before composition can be accepted.
-# No FH6 game/save data is modified and parameter composition does not render.
+# composition diagnostics. It retains the FH6 v3.4 sampler-alignment contract
+# from v15 and additionally fails closed for Durango/Xbox swatchbin payloads
+# until their tiled texture memory is XG-detiled/dealigned before DDS creation.
+# PC-linear swatchbin decoding remains supported. No FH6 game/save data is
+# modified and parameter composition does not render.
 WHEEL_MORPH_HELPER_FILENAME = "Kfps.ChassisConverter.WheelMorph.exe"
-WHEEL_MORPH_HELPER_SHA256 = "334aa812fff4107c8d1b6b54492383c69bbb8dbdfd2a1a5cda84e571ae28c8b5"
-WHEEL_MORPH_HELPER_REVISION = "kfps_6f53ca3_w3_p3f_material_shader_parameters_uv4_v15"
+WHEEL_MORPH_HELPER_SHA256 = "3c90cc38a939bb91f7fb3ef71c8330c1665a18708be1b9e4018b01402adb5411"
+WHEEL_MORPH_HELPER_REVISION = "kfps_6f53ca3_w3_p3f_material_shader_parameters_uv4_durango_guard_v16"
 
 
 class WheelMorphHelperError(RuntimeError):
