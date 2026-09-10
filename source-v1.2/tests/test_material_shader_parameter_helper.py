@@ -40,8 +40,11 @@ class MaterialShaderParameterHelperTests(unittest.TestCase):
     def _payload() -> dict:
         return {
             "format": "fh6_material_shader_parameter_diagnostic_v1",
-            "revision": 1,
+            "revision": 2,
             "status": "material_shader_parameters_composed",
+            "parser_integrity_status": "clean",
+            "parser_error_count": 0,
+            "unsupported_parameter_count": 0,
             "rendering_enabled": False,
             "game_data_modified": False,
             "effective_parameters": [],
@@ -68,13 +71,16 @@ class MaterialShaderParameterHelperTests(unittest.TestCase):
             self.assertEqual(command[2], str(material.resolve()))
             self.assertEqual(command[3], str(shader.resolve()))
 
-    def test_accepts_camel_case_csharp_safety_fields(self):
+    def test_accepts_camel_case_csharp_safety_and_integrity_fields(self):
         with tempfile.TemporaryDirectory() as temp:
             material, shader, helper = self._paths(Path(temp))
             payload = {
                 "format": "fh6_material_shader_parameter_diagnostic_v1",
-                "revision": 1,
+                "revision": 2,
                 "status": "material_shader_parameters_composed",
+                "parserIntegrityStatus": "clean",
+                "parserErrorCount": 0,
+                "unsupportedParameterCount": 0,
                 "renderingEnabled": False,
                 "gameDataModified": False,
             }
@@ -89,6 +95,7 @@ class MaterialShaderParameterHelperTests(unittest.TestCase):
                 )
             self.assertFalse(report["renderingEnabled"])
             self.assertFalse(report["gameDataModified"])
+            self.assertEqual(report["parserIntegrityStatus"], "clean")
 
     def test_accepts_terminal_json_after_forzatools_bundle_stdout_diagnostics(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -119,6 +126,41 @@ class MaterialShaderParameterHelperTests(unittest.TestCase):
                 ],
             )
             self.assertEqual(report["stderr_diagnostics"], ["helper warning"])
+
+    def test_rejects_non_clean_or_missing_parser_integrity(self):
+        cases = [
+            {
+                "format": "fh6_material_shader_parameter_diagnostic_v1",
+                "revision": 2,
+                "status": "material_shader_parameter_integrity_failed",
+                "parser_integrity_status": "failed",
+                "parser_error_count": 1,
+                "unsupported_parameter_count": 0,
+                "rendering_enabled": False,
+                "game_data_modified": False,
+            },
+            {
+                "format": "fh6_material_shader_parameter_diagnostic_v1",
+                "revision": 2,
+                "status": "material_shader_parameters_composed",
+                "rendering_enabled": False,
+                "game_data_modified": False,
+            },
+        ]
+        with tempfile.TemporaryDirectory() as temp:
+            material, shader, helper = self._paths(Path(temp))
+            for payload in cases:
+                with self.subTest(payload=payload):
+                    with patch(
+                        "fh6garage.preview3d.material_shader_parameter_helper.subprocess.run",
+                        return_value=_Completed(payload),
+                    ):
+                        with self.assertRaises(MaterialShaderParameterHelperError):
+                            diagnose_material_shader_parameters(
+                                material,
+                                shader,
+                                helper_path=helper,
+                            )
 
     def test_rejects_terminal_json_with_non_whitespace_suffix(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -154,21 +196,24 @@ class MaterialShaderParameterHelperTests(unittest.TestCase):
         cases = [
             {
                 "format": "fh6_material_shader_parameter_diagnostic_v1",
-                "revision": 1,
+                "revision": 2,
                 "status": "material_shader_parameters_composed",
+                "parser_integrity_status": "clean",
                 "rendering_enabled": False,
             },
             {
                 "format": "fh6_material_shader_parameter_diagnostic_v1",
-                "revision": 1,
+                "revision": 2,
                 "status": "material_shader_parameters_composed",
+                "parser_integrity_status": "clean",
                 "rendering_enabled": False,
                 "game_data_modified": True,
             },
             {
                 "format": "fh6_material_shader_parameter_diagnostic_v1",
-                "revision": 1,
+                "revision": 2,
                 "status": "material_shader_parameters_composed",
+                "parser_integrity_status": "clean",
                 "game_data_modified": False,
                 "rendering_enabled": True,
             },
