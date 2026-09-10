@@ -47,6 +47,10 @@ internal sealed record MaterialShaderParameterDiagnostic(
     int EffectiveParameterCount,
     int DuplicateMaterialOverrideKeyCount,
     int DuplicateShaderDefaultKeyCount,
+    string ParserIntegrityStatus,
+    int ParserErrorCount,
+    int UnsupportedParameterCount,
+    string[] ParserIntegrityIssues,
     MaterialShaderParameterSnapshot[] MaterialOverrides,
     MaterialShaderParameterSnapshot[] ShaderDefaults,
     MaterialShaderEffectiveParameter[] EffectiveParameters,
@@ -57,8 +61,14 @@ internal sealed record MaterialShaderParameterDiagnostic(
 
 internal static class MaterialShaderParameterRuntime
 {
-    public const int Revision = 1;
+    public const int Revision = 2;
     private const string Format = "fh6_material_shader_parameter_diagnostic_v1";
+
+    private sealed record ParserIntegrity(
+        string Status,
+        int ErrorCount,
+        int UnsupportedCount,
+        string[] Issues);
 
     public static MaterialShaderParameterDiagnostic Diagnose(string materialPath, string shaderPath)
     {
@@ -86,6 +96,7 @@ internal static class MaterialShaderParameterRuntime
 
             var materialOverrides = Snapshot(materialBlob?.Parameters, "material_override");
             var shaderDefaults = Snapshot(shaderBlob.Parameters, "shader_default");
+            var parserIntegrity = InspectParserIntegrity(materialOverrides, shaderDefaults);
 
             var defaultGroups = shaderDefaults
                 .GroupBy(parameter => parameter.Key, StringComparer.OrdinalIgnoreCase)
@@ -135,10 +146,14 @@ internal static class MaterialShaderParameterRuntime
                     selected));
             }
 
+            var status = parserIntegrity.Status == "clean"
+                ? "material_shader_parameters_composed"
+                : "material_shader_parameter_integrity_failed";
+
             return new MaterialShaderParameterDiagnostic(
                 Format,
                 Revision,
-                "material_shader_parameters_composed",
+                status,
                 fullMaterialPath,
                 fullShaderPath,
                 materialOverrides.Length,
@@ -146,11 +161,15 @@ internal static class MaterialShaderParameterRuntime
                 effective.Count,
                 overrideGroups.Count(group => group.Count() > 1),
                 defaultGroups.Count(group => group.Count() > 1),
+                parserIntegrity.Status,
+                parserIntegrity.ErrorCount,
+                parserIntegrity.UnsupportedCount,
+                parserIntegrity.Issues,
                 materialOverrides,
                 shaderDefaults,
                 effective.ToArray(),
                 "key=NameHash|Type; first parameter per source; material override wins over linked shader default",
-                [],
+                parserIntegrity.Issues,
                 false,
                 false);
         }
@@ -170,6 +189,41 @@ internal static class MaterialShaderParameterRuntime
         var bundle = new Bundle();
         bundle.Load(stream);
         return bundle;
+    }
+
+    private static ParserIntegrity InspectParserIntegrity(
+        IEnumerable<MaterialShaderParameterSnapshot> materialOverrides,
+        IEnumerable<MaterialShaderParameterSnapshot> shaderDefaults)
+    {
+        var errorCount = 0;
+        var unsupportedCount = 0;
+        var issues = new List<string>();
+
+        foreach (var parameter in materialOverrides.Concat(shaderDefaults))
+        {
+            var location = $"{parameter.SourceKind}[{parameter.Order}]";
+            if (string.Equals(parameter.NameHash, "DEADBEEF", StringComparison.OrdinalIgnoreCase))
+            {
+                errorCount++;
+                issues.Add($"{location}: parser_error_placeholder");
+            }
+            if (parameter.RawValueText?.StartsWith("<Error:", StringComparison.Ordinal) == true)
+            {
+                errorCount++;
+                issues.Add($"{location}: parameter_value_parse_error");
+            }
+            if (string.Equals(parameter.ValueKind, "unsupported", StringComparison.Ordinal))
+            {
+                unsupportedCount++;
+                issues.Add($"{location}: unsupported_parameter_type_0x{parameter.TypeCode:X2}");
+            }
+        }
+
+        return new ParserIntegrity(
+            errorCount == 0 && unsupportedCount == 0 ? "clean" : "failed",
+            errorCount,
+            unsupportedCount,
+            issues.Distinct(StringComparer.Ordinal).ToArray());
     }
 
     private static MaterialShaderParameterSnapshot[] Snapshot(
@@ -321,6 +375,10 @@ internal static class MaterialShaderParameterRuntime
             0,
             0,
             0,
+            "not_evaluated",
+            0,
+            0,
+            [],
             [],
             [],
             [],
