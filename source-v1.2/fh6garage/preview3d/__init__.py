@@ -55,9 +55,10 @@ def _install_native_transform_chain_preview() -> bool:
     # manufacturer tint before the C_livery composite. Glass livery compositing
     # remains the final albedo/transmission separation. Paint provenance wrappers
     # supply exact C_livery/archive/cache paths as transient read-only state.
-    # Strict recovery diagnostics record converter-missed exterior CarBody evidence.
-    # Hybrid is installed afterwards as an explicit test mode: it starts from the
-    # exact Strict scene and restores only v2 high-confidence exterior-shell rows.
+    # Strict recovery diagnostics record converter-missed paintable exterior
+    # evidence. Hybrid starts from the exact Strict scene and restores only v3
+    # high-confidence shell rows, including the explicit Hood/bumper/side-skirt/
+    # rear-wing part families that KFPS itself assigns livery projection sides.
     # Dedicated selector/recovery tests keep Strict as the shipped default until
     # multi-car visual validation proves the Hybrid rule safe.
     install_game_like_material_patch()
