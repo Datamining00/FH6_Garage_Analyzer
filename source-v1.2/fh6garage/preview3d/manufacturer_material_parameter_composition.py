@@ -12,7 +12,7 @@ from .material_shader_parameter_helper import (
 MANUFACTURER_MATERIAL_PARAMETER_COMPOSITION_FORMAT = (
     "fh6_manufacturer_material_parameter_composition_v1"
 )
-MANUFACTURER_MATERIAL_PARAMETER_COMPOSITION_REVISION = 1
+MANUFACTURER_MATERIAL_PARAMETER_COMPOSITION_REVISION = 2
 
 
 def _cache_path(mapping: Any) -> str | None:
@@ -65,6 +65,12 @@ def _unique_pairs(traced_report: Any) -> list[tuple[str, str]]:
     return pairs
 
 
+def _parser_integrity_status(helper: dict[str, Any]) -> Any:
+    if "parser_integrity_status" in helper:
+        return helper.get("parser_integrity_status")
+    return helper.get("parserIntegrityStatus")
+
+
 def diagnose_manufacturer_material_parameter_composition(
     traced_report: Any,
     *,
@@ -74,7 +80,8 @@ def diagnose_manufacturer_material_parameter_composition(
 
     Multiple paint primitives commonly resolve to the same material/shader pair;
     they are deliberately deduplicated so the external helper is invoked once per
-    exact pair rather than once per mesh primitive.
+    exact pair rather than once per mesh primitive. A composed row is accepted only
+    when the helper also explicitly reports clean parser integrity.
     """
     report: dict[str, Any] = {
         "format": MANUFACTURER_MATERIAL_PARAMETER_COMPOSITION_FORMAT,
@@ -89,7 +96,7 @@ def diagnose_manufacturer_material_parameter_composition(
         "game_data_modified": False,
         "composition_rule": (
             "key=NameHash|Type; first parameter per source; "
-            "material override wins over linked shader default"
+            "material override wins over linked shader default; parser integrity must be clean"
         ),
     }
 
@@ -120,13 +127,18 @@ def diagnose_manufacturer_material_parameter_composition(
             continue
 
         row["helper"] = helper
-        if isinstance(helper, dict) and helper.get("status") == "material_shader_parameters_composed":
+        helper_status = helper.get("status") if isinstance(helper, dict) else None
+        integrity_status = (
+            _parser_integrity_status(helper) if isinstance(helper, dict) else None
+        )
+        if helper_status == "material_shader_parameters_composed" and integrity_status == "clean":
             row["status"] = "material_shader_parameters_composed"
             report["composed_count"] += 1
         else:
-            row["detail"] = str(
-                helper.get("status") if isinstance(helper, dict) else "invalid_helper_report"
-            )
+            if helper_status == "material_shader_parameters_composed":
+                row["detail"] = f"parser_integrity_not_clean:{integrity_status!r}"
+            else:
+                row["detail"] = str(helper_status or "invalid_helper_report")
             report["failed_count"] += 1
         rows.append(row)
 
