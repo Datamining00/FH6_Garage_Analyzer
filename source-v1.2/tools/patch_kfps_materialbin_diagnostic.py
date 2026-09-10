@@ -4,6 +4,11 @@ import argparse
 from pathlib import Path
 import shutil
 
+if __package__:
+    from .patch_kfps_uv4_passthrough import patch as _patch_uv4_passthrough
+else:
+    from patch_kfps_uv4_passthrough import patch as _patch_uv4_passthrough
+
 
 PINNED_KFPS_COMMIT = "6f53ca3c584d78659d06d4b4a39561db67d79345"
 
@@ -54,12 +59,44 @@ _SAMPLER_V34_ALIGNED = '''        if (VersionMajor >= 1 && VersionMinor >= 1)
             _ = bs.ReadUInt32();
         return sp;'''
 
+_UV4_BASE_WHERE = "item.Key is >= 0 and <= 3 && item.Value.Length == vertexCount"
+_UV4_PATCHED_WHERE = "item.Key is >= 0 and <= 4 && item.Value.Length == vertexCount"
+_UV4_BASE_GUARD = "channel is < 0 or > 3 || source.Length != vertexCount"
+_UV4_PATCHED_GUARD = "channel is < 0 or > 4 || source.Length != vertexCount"
+
 
 def _replace_exact(text: str, old: str, new: str, label: str) -> str:
     count = text.count(old)
     if count != 1:
         raise RuntimeError(f"{label}: expected exactly one pinned occurrence, found {count}.")
     return text.replace(old, new, 1)
+
+
+def _ensure_native_uv4_passthrough(kfps_root: Path, program: Path) -> None:
+    """Ensure the canonical material helper always includes native UV4 pass-through."""
+    text = program.read_text(encoding="utf-8-sig")
+    base_counts = (text.count(_UV4_BASE_WHERE), text.count(_UV4_BASE_GUARD))
+    patched_counts = (text.count(_UV4_PATCHED_WHERE), text.count(_UV4_PATCHED_GUARD))
+
+    if base_counts == (1, 1) and patched_counts == (0, 0):
+        _patch_uv4_passthrough(kfps_root)
+        verified = program.read_text(encoding="utf-8-sig")
+        if (
+            verified.count(_UV4_BASE_WHERE) != 0
+            or verified.count(_UV4_BASE_GUARD) != 0
+            or verified.count(_UV4_PATCHED_WHERE) != 1
+            or verified.count(_UV4_PATCHED_GUARD) != 1
+        ):
+            raise RuntimeError("Native UV4 pass-through patch did not establish the pinned contract.")
+        return
+
+    if base_counts == (0, 0) and patched_counts == (1, 1):
+        return
+
+    raise RuntimeError(
+        "Pinned KFPS UV-channel contract is ambiguous before material/shader patching: "
+        f"base={base_counts}, patched={patched_counts}."
+    )
 
 
 def patch(kfps_root: Path, helper_source: Path, parameter_helper_source: Path) -> None:
@@ -86,6 +123,12 @@ def patch(kfps_root: Path, helper_source: Path, parameter_helper_source: Path) -
         raise RuntimeError(
             f"MaterialShaderParameterDiagnostic.cs was not found: {parameter_helper_source}"
         )
+
+    # Every v15 material/shader helper must be built from the same native UV4
+    # pass-through state. Workflows that already apply the dedicated UV4 patch
+    # are accepted; workflows that omit it receive the exact same structural
+    # patch here. Mixed or ambiguous upstream states fail closed.
+    _ensure_native_uv4_passthrough(kfps_root, program)
 
     text = program.read_text(encoding="utf-8-sig")
     if "--diagnose-materialbin" in text or "--diagnose-material-shader-parameters" in text:
@@ -116,8 +159,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
             "Add read-only materialbin reference and material/shader parameter diagnostic modes, "
-            "including the pinned FH6 v3.4 sampler alignment correction, after the established "
-            "W3 KFPS patch."
+            "including native UV4 pass-through and the pinned FH6 v3.4 sampler alignment "
+            "correction, after the established W3 KFPS patch."
         )
     )
     parser.add_argument("--kfps-root", required=True, type=Path)
