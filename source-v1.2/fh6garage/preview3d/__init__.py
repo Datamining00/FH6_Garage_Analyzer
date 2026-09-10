@@ -48,8 +48,10 @@ def _install_native_transform_chain_preview() -> bool:
     # sections under LocalAppData. Cold renders first narrow the pinned KFPS section
     # list to sections that actually contain decoded layers; the livery cache wraps
     # that production-visible fast path so subsequent opens skip decode/render too.
-    # Hybrid remains opt-in. Mechanical visibility filtering alters only the
-    # in-memory scene index list; it never rewrites cached GLBs. Native tire
+    # Repeated stock-tire opens reuse the already merged/baked derived GLB and the
+    # pinned wheel DB is cryptographically hashed only once per unchanged process
+    # file identity. Hybrid remains opt-in. Mechanical visibility filtering alters
+    # only the in-memory scene index list; it never rewrites cached GLBs. Native tire
     # provenance is recovered from derived GLB node extras so the wheel/tire
     # checkbox can hide the separately merged rubber geometry reliably.
     install_game_like_material_patch()
