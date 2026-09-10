@@ -8,7 +8,7 @@ from .livery_paint_provenance import diagnose_livery_paint
 from .manufacturer_colors import diagnose_manufacturer_colors_archive
 
 
-LIVERY_PAINT_RUNTIME_PATCH_REVISION = 4
+LIVERY_PAINT_RUNTIME_PATCH_REVISION = 5
 _PATCH_MARKER = "_fh6_livery_paint_provenance_runtime_patched"
 _TEXTURE_PATCH_MARKER = "_fh6_livery_paint_provenance_texture_patched"
 
@@ -49,8 +49,9 @@ def install_livery_paint_provenance_runtime_patch() -> bool:
     the selected vehicle archive's ManufacturerColors.bin and carries the full
     group/entry structure as transient state. Paint P3B allows the downstream
     material bridge to consume only a resolved manufacturer's FH6 group-trailer
-    primary RGB. Secondary/two-tone, entry Path/material semantics, UV4 overlays,
-    flake, and finish semantics remain deferred.
+    primary RGB. Paint P3F additionally carries the exact C_livery source, selected
+    vehicle archive, and derived cache root so a later manufacturer-overlay stage
+    can resolve the P3D/P3E contract without guessing filesystem provenance.
 
     None of these wrappers modifies game/save files, rendered livery pixels, or
     GLB bytes.
@@ -73,9 +74,6 @@ def install_livery_paint_provenance_runtime_patch() -> bool:
                     json.dumps(report, indent=2, ensure_ascii=False) + "\n",
                     encoding="utf-8",
                 )
-                # RenderResult is a frozen dataclass for normal caller behavior, but
-                # it is not slotted. Preserve the diagnostic as private derived state
-                # without changing its public constructor or existing call sites.
                 object.__setattr__(result, "_fh6_paint_provenance", report)
                 object.__setattr__(result, "_fh6_paint_provenance_path", output_path)
                 if callable(log):
@@ -113,12 +111,30 @@ def install_livery_paint_provenance_runtime_patch() -> bool:
             textures = current_textures(render_result, *args, **kwargs)
             report = getattr(render_result, "_fh6_paint_provenance", None)
             if isinstance(report, dict):
-                # DirectLiveryTextures is frozen but not slotted. This is transient
-                # derived state only; no constructor/API change is required and
-                # rerendered textures naturally receive the current C_livery report.
                 object.__setattr__(textures, "_fh6_paint_provenance", report)
 
+            object.__setattr__(
+                textures,
+                "_fh6_paint_source",
+                str(Path(render_result.source_path).expanduser().resolve()),
+            )
+            object.__setattr__(
+                textures,
+                "_fh6_manufacturer_cache_root",
+                str(Path(render_result.output_dir).expanduser().resolve()),
+            )
+
             asset = args[0] if args else kwargs.get("asset")
+            archive_path = getattr(asset, "archive_path", None)
+            if archive_path:
+                object.__setattr__(
+                    textures,
+                    "_fh6_vehicle_archive",
+                    str(Path(archive_path).expanduser().resolve()),
+                )
+            else:
+                object.__setattr__(textures, "_fh6_vehicle_archive", None)
+
             palette_report = _manufacturer_palette_report(asset)
             object.__setattr__(textures, "_fh6_manufacturer_colors", palette_report)
             return textures
