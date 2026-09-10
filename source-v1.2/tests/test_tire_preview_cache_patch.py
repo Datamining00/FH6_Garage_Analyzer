@@ -107,7 +107,9 @@ class NativeTirePreviewCacheTests(unittest.TestCase):
             self.assertTrue(first.applied)
             self.assertTrue(second.applied)
             self.assertEqual(second.status, "stock_native_tire_preview_cache_hit")
-            self.assertEqual(Path(first.selected_vehicle_glb), Path(second.selected_vehicle_glb))
+            self.assertTrue(
+                os.path.samefile(first.selected_vehicle_glb, second.selected_vehicle_glb)
+            )
             self.assertEqual(calls.call_count, 1)
             self.assertFalse(str(first.selected_vehicle_glb).startswith(str(caller_work_root)))
 
