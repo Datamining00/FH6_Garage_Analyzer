@@ -175,13 +175,15 @@ def _build_3d_page() -> tuple[QWidget, dict[str, Any]]:
     uv.setToolTip("리버리 렌더링에 사용할 TEXCOORD 채널")
     uv.setMinimumWidth(78)
 
-    cleanup_ab = QCheckBox("A+B 정리")
+    # UI names are intentionally short; retain the established internal cleanup
+    # keys/semantics to avoid a broad migration in the preview pipeline.
+    cleanup_ab = QCheckBox("A")
     cleanup_ab.setChecked(True)
-    cleanup_ab.setToolTip("rim/presentation/support/thin cleanup")
+    cleanup_ab.setToolTip("기존 A+B 정리: rim/presentation/support/thin cleanup")
 
-    cleanup_c = QCheckBox("C 추가 정리")
+    cleanup_c = QCheckBox("B")
     cleanup_c.setChecked(False)
-    cleanup_c.setToolTip("additional alternate-presentation cleanup")
+    cleanup_c.setToolTip("기존 C 추가 정리: additional alternate-presentation cleanup")
 
     apply_button = QPushButton("3D 렌더링 / 적용")
     apply_button.setObjectName("primary3d")
