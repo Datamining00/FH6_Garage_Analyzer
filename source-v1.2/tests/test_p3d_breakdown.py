@@ -162,7 +162,7 @@ class P3dBreakdownTests(unittest.TestCase):
             "vehicle.zip",
             "cache",
         )
-        self.assertEqual(report["revision"], 3)
+        self.assertEqual(report["revision"], 4)
         self.assertEqual(report["candidate_count"], 0)
         self.assertEqual(report["p3d_breakdown"]["diagnostic_focus"], "no_paint_primitives_exported")
 
