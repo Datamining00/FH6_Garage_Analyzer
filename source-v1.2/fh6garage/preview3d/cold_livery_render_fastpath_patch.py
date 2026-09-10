@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 from threading import Lock
+import sys
 
 
 _LOCK = Lock()
@@ -107,4 +108,12 @@ def install_cold_livery_render_fastpath_patch() -> bool:
 
     backend.render_clivery_sections = wrapped
     backend._fh6_cold_livery_render_fastpath_patched = True
+
+    # integration imports the renderer into a module-level alias. Keep that alias
+    # on the same wrapper chain so the normal Preview3DController path actually
+    # uses the cold fast path. The livery cache is installed afterwards and can
+    # then wrap this function, allowing cache hits to skip this metadata decode too.
+    integration = sys.modules.get(f"{__package__}.integration")
+    if integration is not None and getattr(integration, "render_clivery_sections", None) is original:
+        integration.render_clivery_sections = wrapped
     return True
