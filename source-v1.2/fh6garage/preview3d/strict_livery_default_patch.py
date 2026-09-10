@@ -7,7 +7,7 @@ HYBRID_LABEL = "Hybrid — Strict + verified exterior recovery"
 
 
 def ensure_hybrid_livery_option(controls: dict[str, Any]) -> bool:
-    """Expose the guarded Hybrid test mode without changing the shipped default."""
+    """Expose the guarded Hybrid test mode while keeping Legacy as the default."""
     eligibility = controls.get("eligibility")
     if eligibility is None:
         return False
@@ -20,38 +20,39 @@ def ensure_hybrid_livery_option(controls: dict[str, Any]) -> bool:
     return True
 
 
-def select_strict_livery_default(controls: dict[str, Any]) -> bool:
-    """Select Strict initially while retaining Legacy/confirmed/Hybrid diagnostics.
-
-    Hybrid is intentionally opt-in until multi-car visual validation confirms that
-    its exterior-shell recovery fixes Strict false negatives without reintroducing
-    the Legacy light/accessory false positives.
-    """
+def select_legacy_livery_default(controls: dict[str, Any]) -> bool:
+    """Select Legacy initially while retaining Strict/confirmed/Hybrid diagnostics."""
     eligibility = controls.get("eligibility")
     if eligibility is None:
         return False
     try:
         current = str(eligibility.currentData() or "legacy").strip().casefold()
-        if current != "legacy":
-            return False
-        index = int(eligibility.findData("strict"))
+        index = int(eligibility.findData("legacy"))
     except Exception:
         return False
     if index < 0:
         return False
-    eligibility.setCurrentIndex(index)
+    changed = current != "legacy"
+    if changed:
+        eligibility.setCurrentIndex(index)
 
     status = controls.get("status")
     if status is not None and hasattr(status, "setText"):
         status.setText(
-            "3D 탭을 선택하면 이 리버리를 4x / UV3 / Strict로 렌더링합니다. "
-            "Hybrid는 옵션에서 비교 검증할 수 있습니다."
+            "3D 탭을 선택하면 이 리버리를 4x / UV3 / Legacy로 렌더링합니다. "
+            "Hybrid/Strict는 옵션에서 비교할 수 있습니다."
         )
-    return True
+    return changed
+
+
+# Compatibility alias retained for older imports/tests/plugins.  Its behavior now
+# follows the product decision to ship Legacy as the default.
+def select_strict_livery_default(controls: dict[str, Any]) -> bool:
+    return select_legacy_livery_default(controls)
 
 
 def install_strict_livery_default_patch() -> bool:
-    """Add Hybrid to the selector and keep initial preview on Strict."""
+    """Add Hybrid to the selector and force initial production preview to Legacy."""
     from . import integration
 
     controller = integration.Preview3DController
@@ -64,7 +65,7 @@ def install_strict_livery_default_patch() -> bool:
         controls = kwargs.get("controls")
         if isinstance(controls, dict):
             ensure_hybrid_livery_option(controls)
-            select_strict_livery_default(controls)
+            select_legacy_livery_default(controls)
         original_init(self, *args, **kwargs)
 
     controller.__init__ = patched_init
