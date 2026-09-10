@@ -4,7 +4,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 
 CACHE_SCHEMA = "fh6_native_tire_preview_cache_v1"
@@ -126,14 +126,9 @@ def _store_cache_manifest(manifest: Path, payload: dict[str, Any], result: Any) 
     temp.replace(manifest)
 
 
-def install_native_tire_preview_cache_patch() -> bool:
-    """Persist the fully merged native-tire GLB instead of rebuilding it on every open."""
-    from . import tire_preview_integration as integration
-
-    if getattr(integration, "_fh6_native_tire_preview_cache_patched", False):
-        return False
-    original = integration.try_apply_stock_native_tire_preview
-
+def make_native_tire_preview_cache_wrapper(
+    original: Callable[..., Any], integration_module: Any
+) -> Callable[..., Any]:
     def cached_try_apply(
         asset,
         *,
@@ -145,14 +140,14 @@ def install_native_tire_preview_cache_patch() -> bool:
     ):
         try:
             payload = _stable_payload(
-                integration,
+                integration_module,
                 asset,
                 carbin_entry=carbin_entry,
                 game_or_cars_path=game_or_cars_path,
                 vehicle_glb=vehicle_glb,
             )
             cache_root, manifest = _cache_paths(payload)
-            cached = _load_cached_result(integration, payload, manifest)
+            cached = _load_cached_result(integration_module, payload, manifest)
         except (OSError, ValueError, TypeError, KeyError):
             payload = None
             cache_root = None
@@ -185,6 +180,18 @@ def install_native_tire_preview_cache_patch() -> bool:
                 pass
         return result
 
-    integration.try_apply_stock_native_tire_preview = cached_try_apply
+    return cached_try_apply
+
+
+def install_native_tire_preview_cache_patch() -> bool:
+    """Persist the fully merged native-tire GLB instead of rebuilding it on every open."""
+    from . import tire_preview_integration as integration
+
+    if getattr(integration, "_fh6_native_tire_preview_cache_patched", False):
+        return False
+    original = integration.try_apply_stock_native_tire_preview
+    integration.try_apply_stock_native_tire_preview = make_native_tire_preview_cache_wrapper(
+        original, integration
+    )
     integration._fh6_native_tire_preview_cache_patched = True
     return True
