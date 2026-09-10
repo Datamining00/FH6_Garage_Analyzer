@@ -43,9 +43,9 @@ class FinalVerify1PreviewPortContractTests(unittest.TestCase):
         self.assertIn('resolution.setCurrentIndex(resolution.findData("ultra4x"))', patch)
         self.assertIn('eligibility.setCurrentIndex(eligibility.findData("legacy"))', patch)
         self.assertIn("uv.setCurrentIndex(uv.findData(3))", patch)
-        self.assertIn('cleanup_ab = QCheckBox("A+B 정리")', patch)
+        self.assertIn('cleanup_ab = QCheckBox("A")', patch)
         self.assertIn("cleanup_ab.setChecked(True)", patch)
-        self.assertIn('cleanup_c = QCheckBox("C 추가 정리")', patch)
+        self.assertIn('cleanup_c = QCheckBox("B")', patch)
         self.assertIn("cleanup_c.setChecked(False)", patch)
 
     def test_parser_supports_uv0_through_uv3_and_legacy_default(self) -> None:
