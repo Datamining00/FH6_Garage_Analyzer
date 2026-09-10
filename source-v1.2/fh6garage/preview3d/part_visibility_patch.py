@@ -1,46 +1,70 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import re
 from typing import Any
 
 import numpy as np
 from PySide6.QtWidgets import QCheckBox
 
 
-_WHEEL_TIRE_TOKENS = ("wheelstyle", "wheel", "rim", "tire", "tyre")
-_BRAKE_TOKENS = ("brakes", "brake", "caliper", "rotor", "disc")
-_UNDERBODY_TOKENS = (
-    "suspension", "controlarm", "control_arm", "knuckle", "upright",
-    "hub", "axle", "driveshaft", "drive_shaft", "shaft", "strut",
-    "tierod", "tie_rod", "wishbone", "carrier", "subframe",
-)
+_EXACT_WHEEL_TIRE_PART_TYPES = {"wheelstyle", "tire", "tyre"}
+_EXACT_OTHER_MECHANICAL_PART_TYPES = {"brakes"}
+_WHEEL_TIRE_WORDS = {"wheel", "wheels", "wheelstyle", "rim", "rims", "tire", "tires", "tyre", "tyres"}
+_OTHER_MECHANICAL_WORDS = {
+    "brake", "brakes", "caliper", "calipers", "rotor", "rotors", "disc", "discs",
+    "suspension", "controlarm", "controlarms", "knuckle", "knuckles", "upright", "uprights",
+    "hub", "hubs", "axle", "axles", "driveshaft", "driveshafts", "shaft", "shafts", "strut", "struts",
+    "tierod", "tierods", "wishbone", "wishbones", "carrier", "carriers", "subframe", "subframes",
+}
 
 
-def _identity(item: dict[str, Any]) -> str:
-    return " ".join(
-        str(item.get(key) or "")
-        for key in ("part_type", "mesh_name", "material_name", "source_entry")
-    ).casefold().replace("\\", "/")
+def _words(value: Any) -> set[str]:
+    """Tokenize identifiers without substring matches such as rim -> PrimaryLights."""
+    text = str(value or "").replace("\\", "/")
+    text = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", text)
+    return {
+        token.casefold()
+        for token in re.split(r"[^A-Za-z0-9]+", text)
+        if token
+    }
+
+
+def _fallback_words(item: dict[str, Any]) -> set[str]:
+    result: set[str] = set()
+    for key in ("mesh_name", "material_name", "source_entry", "source_tire_entry", "instance_identity"):
+        result.update(_words(item.get(key)))
+    return result
 
 
 def classify_part_group(item: dict[str, Any]) -> str:
-    text = _identity(item)
-    if any(token in text for token in _WHEEL_TIRE_TOKENS):
+    """Classify display-only mechanical groups using structured KFPS evidence first."""
+    part_type = str(item.get("part_type") or "").strip().casefold()
+
+    # Tires merged by the production native-tire path are explicitly authored as
+    # fh6_native_tire_trial nodes. Treat that provenance as authoritative even if
+    # their derivative mesh has no KFPS PartType.
+    if bool(item.get("fh6_native_tire_trial")):
         return "wheel_tire"
-    if any(token in text for token in _BRAKE_TOKENS):
-        return "brake"
-    if any(token in text for token in _UNDERBODY_TOKENS):
-        return "underbody"
+    if part_type in _EXACT_WHEEL_TIRE_PART_TYPES:
+        return "wheel_tire"
+    if part_type in _EXACT_OTHER_MECHANICAL_PART_TYPES:
+        return "other_mechanical"
+
+    words = _fallback_words(item)
+    if words & _WHEEL_TIRE_WORDS:
+        return "wheel_tire"
+    if words & _OTHER_MECHANICAL_WORDS:
+        return "other_mechanical"
     return "other"
 
 
-def filter_scene_part_visibility(scene: Any, *, show_wheel_tire: bool, show_brake: bool, show_underbody: bool) -> Any:
-    """Filter primitive index ranges only; source GLB and game data remain untouched."""
+def filter_scene_part_visibility(scene: Any, *, show_wheel_tire: bool, show_other: bool) -> Any:
+    """Filter primitive index ranges from an unfiltered scene; source data stay untouched."""
     indices = np.asarray(scene.indices, dtype=np.uint32).reshape(-1)
     diagnostics: list[dict[str, Any]] = []
     kept: list[np.ndarray] = []
     cursor = 0
-    hidden_counts = {"wheel_tire": 0, "brake": 0, "underbody": 0}
 
     for raw in tuple(getattr(scene, "primitive_diagnostics", ()) or ()):
         item = dict(raw)
@@ -51,15 +75,12 @@ def filter_scene_part_visibility(scene: Any, *, show_wheel_tire: bool, show_brak
         group = classify_part_group(item)
         visible = not (
             (group == "wheel_tire" and not show_wheel_tire)
-            or (group == "brake" and not show_brake)
-            or (group == "underbody" and not show_underbody)
+            or (group == "other_mechanical" and not show_other)
         )
         item["preview_part_group"] = group
         item["preview_part_visible"] = visible
         if visible:
             kept.append(block)
-        elif group in hidden_counts:
-            hidden_counts[group] += 1
         diagnostics.append(item)
 
     if cursor < len(indices):
@@ -83,14 +104,13 @@ def _add_visibility_controls(controller: Any) -> None:
         return
 
     specs = (
-        ("show_wheel_tire", "휠/타이어", "휠·림·타이어 표시"),
-        ("show_brake", "브레이크", "캘리퍼·브레이크 디스크 표시"),
-        ("show_underbody", "하부기계", "허브·차축·서스펜션 등 하부 기계부품 표시"),
+        ("show_wheel_tire", "휠/타이어", "휠·림·타이어 표시", True),
+        ("show_other", "기타", "브레이크·디스크·허브·차축·서스펜션 등 기타 기계부품 표시", False),
     )
     insert_at = max(0, layout.count() - 3)
-    for key, label, tip in specs:
+    for key, label, tip, checked in specs:
         box = QCheckBox(label, parent)
-        box.setChecked(True)
+        box.setChecked(bool(checked))
         box.setToolTip(tip)
         layout.insertWidget(insert_at, box)
         insert_at += 1
@@ -110,22 +130,32 @@ def install_part_visibility_patch() -> bool:
 
     def patched_init(self, *args, **kwargs):
         original_init(self, *args, **kwargs)
+        self._fh6_unfiltered_scene = None
         _add_visibility_controls(self)
 
     def patched_enable(self, enabled):
         original_enable(self, enabled)
-        for key in ("show_wheel_tire", "show_brake", "show_underbody"):
+        for key in ("show_wheel_tire", "show_other"):
             widget = self.controls.get(key)
             if widget is not None:
                 widget.setEnabled(bool(enabled))
 
     def patched_install_scene(self, scene):
         if scene is not None:
+            # SceneReloadWorker reparses the full GLB. Preserve that full source and
+            # always derive visibility from it. Never filter a previously filtered
+            # scene, so OFF -> ON restores geometry in the same session.
+            already_filtered = any(
+                isinstance(row, dict) and "preview_part_visible" in row
+                for row in tuple(getattr(scene, "primitive_diagnostics", ()) or ())
+            )
+            if not already_filtered:
+                self._fh6_unfiltered_scene = scene
+            base_scene = self._fh6_unfiltered_scene or scene
             scene = filter_scene_part_visibility(
-                scene,
+                base_scene,
                 show_wheel_tire=bool(self.controls.get("show_wheel_tire").isChecked()) if self.controls.get("show_wheel_tire") else True,
-                show_brake=bool(self.controls.get("show_brake").isChecked()) if self.controls.get("show_brake") else True,
-                show_underbody=bool(self.controls.get("show_underbody").isChecked()) if self.controls.get("show_underbody") else True,
+                show_other=bool(self.controls.get("show_other").isChecked()) if self.controls.get("show_other") else False,
             )
         return original_install_scene(self, scene)
 
