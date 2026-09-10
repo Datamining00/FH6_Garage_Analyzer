@@ -35,7 +35,7 @@ def _install_native_transform_chain_preview() -> bool:
     from .geometry_cache_patch import install_geometry_cache_patch
     from .cold_livery_render_fastpath_patch import install_cold_livery_render_fastpath_patch
     from .livery_render_cache_patch import install_livery_render_cache_patch
-    from .native_tire_preview_cache_patch import install_native_tire_preview_cache_patch
+    from .tire_preview_cache_patch import install_native_tire_preview_cache_patch
     from .native_tire_visibility_provenance_patch import install_native_tire_visibility_provenance_patch
     from .hybrid_livery_recovery_patch import install_hybrid_livery_recovery_patch
     from .strict_livery_default_patch import install_strict_livery_default_patch
