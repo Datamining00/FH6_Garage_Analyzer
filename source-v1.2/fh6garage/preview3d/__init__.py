@@ -55,6 +55,8 @@ def _install_native_transform_chain_preview() -> bool:
     # supply exact C_livery/archive/cache paths as transient read-only state.
     # Finally, production 3D preview starts from KFPS converter-declared Strict
     # livery eligibility; Legacy remains available as an explicit diagnostic mode.
+    # The selector contract has dedicated regression coverage so future UI work
+    # cannot silently restore UV3-only promotion as the shipped default.
     install_game_like_material_patch()
     install_material_runtime_wiring_patch()
     install_native_material_texture_patch()
