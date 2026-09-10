@@ -6,6 +6,13 @@ from pathlib import Path
 import sys
 from typing import Any
 
+# Direct execution from source-v1.2/tools sets sys.path[0] to this tools directory,
+# not the source-v1.2 package root. Keep the diagnostic runnable both as a
+# source script and as a PyInstaller entry point without requiring PYTHONPATH.
+_SOURCE_ROOT = Path(__file__).resolve().parents[1]
+if str(_SOURCE_ROOT) not in sys.path:
+    sys.path.insert(0, str(_SOURCE_ROOT))
+
 from fh6garage.preview3d.manufacturer_material_parameter_composition import (
     diagnose_manufacturer_material_parameter_composition,
 )
