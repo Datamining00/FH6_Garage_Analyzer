@@ -22,12 +22,6 @@ else:
     install_geometry_integrity_patch()
 
 
-# Keep the established FinalVerify1 lazy installer contract: importing preview3d
-# must not globally replace the conversion/tire APIs used by diagnostics and tests.
-# The 3D tab calls install_validated_fxx_native_tire_preview() immediately before
-# constructing Preview3DController. Redirect only that installer to the current
-# global native transform-chain path, then let the existing global installer wrap
-# integration's convert_vehicle exactly once.
 def _install_native_transform_chain_preview() -> bool:
     from .material_appearance_patch import install_game_like_material_patch
     from .material_runtime_wiring_patch import install_material_runtime_wiring_patch
@@ -39,39 +33,18 @@ def _install_native_transform_chain_preview() -> bool:
     from .livery_paint_runtime_patch import install_livery_paint_provenance_runtime_patch
     from .native_transform_chain_v3 import install_native_transform_chain_v3
     from .geometry_cache_patch import install_geometry_cache_patch
+    from .livery_render_cache_patch import install_livery_render_cache_patch
     from .hybrid_livery_recovery_patch import install_hybrid_livery_recovery_patch
     from .strict_livery_default_patch import install_strict_livery_default_patch
+    from .part_visibility_patch import install_part_visibility_patch
     from .preview_presentation_patch import install_preview_presentation_patch
     from . import tire_preview_integration as tire_preview_integration
 
-    # Viewer patches are installed before integration.py imports its load_kfps_glb
-    # / CarOpenGLWidget symbols. Native material scalars/optics are wired first;
-    # verified Texture2D sampling then layers onto that PBR shader without taking
-    # authority away from dynamic car paint or the livery composite. The narrow
-    # BC5 normal stage is installed after native Texture2D so it can reuse the
-    # verified render plan and per-primitive draw interception contract. The
-    # evidence-closed emissive stage follows the ForzaTechStudio/glTF sRGB
-    # reference contract. Manufacturer Paint P3F then applies only exact P3E
-    # primary carpaint swatches on native TEXCOORD_4, multiplying the established
-    # manufacturer tint before the C_livery composite. Glass livery compositing
-    # remains the final albedo/transmission separation. Paint provenance wrappers
-    # supply exact C_livery/archive/cache paths as transient read-only state.
-    #
-    # The earlier Strict-recovery JSON diagnostic is no longer installed on the
-    # normal production path. It remains importable for explicit investigations,
-    # but Legacy rendering must not pay the report-generation / inventory cost.
-    # Hybrid remains available as an opt-in Strict superset. Product default is
-    # Legacy, matching the current visual-completeness priority.
-    #
-    # Geometry cache is installed before Preview3DController imports/uses the
-    # converter. A verified LocalAppData GLB is reused when the FH6 archive stat,
-    # carbin entry, converter/normalization revisions, and automatic wheel-morph
-    # provenance match. The fingerprint gets its own directory while the canonical
-    # GLB basename is preserved so native material sidecars remain attached. This
-    # removes the repeated near-LOD + KFPS conversion bottleneck on subsequent
-    # opens while keeping original game data read-only. Presentation is patched
-    # last so camera reset and GL clear colour are deterministic without altering
-    # material/livery shader contracts.
+    # Normal production preview keeps game/save data read-only. Persistent caches
+    # store only derived GLBs and rendered livery sections under LocalAppData.
+    # Strict-recovery JSON inventory is intentionally not installed on the normal
+    # Legacy path. Hybrid remains opt-in. Mechanical visibility filtering alters
+    # only the in-memory scene index list; it never rewrites the cached GLB.
     install_game_like_material_patch()
     install_material_runtime_wiring_patch()
     install_native_material_texture_patch()
@@ -82,8 +55,10 @@ def _install_native_transform_chain_preview() -> bool:
     install_livery_paint_provenance_runtime_patch()
     install_native_transform_chain_v3()
     install_geometry_cache_patch()
+    install_livery_render_cache_patch()
     install_hybrid_livery_recovery_patch()
     install_strict_livery_default_patch()
+    install_part_visibility_patch()
     install_preview_presentation_patch()
     return tire_preview_integration.install_global_stock_native_tire_preview()
 
