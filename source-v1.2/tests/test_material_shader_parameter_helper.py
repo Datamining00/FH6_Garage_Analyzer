@@ -13,10 +13,17 @@ from fh6garage.preview3d.material_shader_parameter_helper import (
 
 
 class _Completed:
-    def __init__(self, payload: dict, *, returncode: int = 0):
+    def __init__(
+        self,
+        payload: dict | None = None,
+        *,
+        stdout: str | None = None,
+        stderr: str = "",
+        returncode: int = 0,
+    ):
         self.returncode = returncode
-        self.stdout = json.dumps(payload)
-        self.stderr = ""
+        self.stdout = json.dumps(payload) if stdout is None else stdout
+        self.stderr = stderr
 
 
 class MaterialShaderParameterHelperTests(unittest.TestCase):
@@ -29,17 +36,21 @@ class MaterialShaderParameterHelperTests(unittest.TestCase):
         helper.write_bytes(b"helper")
         return material, shader, helper
 
+    @staticmethod
+    def _payload() -> dict:
+        return {
+            "format": "fh6_material_shader_parameter_diagnostic_v1",
+            "revision": 1,
+            "status": "material_shader_parameters_composed",
+            "rendering_enabled": False,
+            "game_data_modified": False,
+            "effective_parameters": [],
+        }
+
     def test_invokes_exact_read_only_material_shader_mode(self):
         with tempfile.TemporaryDirectory() as temp:
             material, shader, helper = self._paths(Path(temp))
-            payload = {
-                "format": "fh6_material_shader_parameter_diagnostic_v1",
-                "revision": 1,
-                "status": "material_shader_parameters_composed",
-                "rendering_enabled": False,
-                "game_data_modified": False,
-                "effective_parameters": [],
-            }
+            payload = self._payload()
             with patch(
                 "fh6garage.preview3d.material_shader_parameter_helper.subprocess.run",
                 return_value=_Completed(payload),
@@ -78,6 +89,66 @@ class MaterialShaderParameterHelperTests(unittest.TestCase):
                 )
             self.assertFalse(report["renderingEnabled"])
             self.assertFalse(report["gameDataModified"])
+
+    def test_accepts_terminal_json_after_forzatools_bundle_stdout_diagnostics(self):
+        with tempfile.TemporaryDirectory() as temp:
+            material, shader, helper = self._paths(Path(temp))
+            payload = self._payload()
+            stdout = (
+                "Error reading blob at index 2: unsupported metadata\n"
+                "Error reading blob at index 7: unsupported metadata\n"
+                + json.dumps(payload)
+                + "\n"
+            )
+            with patch(
+                "fh6garage.preview3d.material_shader_parameter_helper.subprocess.run",
+                return_value=_Completed(stdout=stdout, stderr="helper warning\n"),
+            ):
+                report = diagnose_material_shader_parameters(
+                    material,
+                    shader,
+                    helper_path=helper,
+                )
+
+            self.assertEqual(report["status"], "material_shader_parameters_composed")
+            self.assertEqual(
+                report["stdout_diagnostics"],
+                [
+                    "Error reading blob at index 2: unsupported metadata",
+                    "Error reading blob at index 7: unsupported metadata",
+                ],
+            )
+            self.assertEqual(report["stderr_diagnostics"], ["helper warning"])
+
+    def test_rejects_terminal_json_with_non_whitespace_suffix(self):
+        with tempfile.TemporaryDirectory() as temp:
+            material, shader, helper = self._paths(Path(temp))
+            stdout = "prefix\n" + json.dumps(self._payload()) + "\ntrailing-noise"
+            with patch(
+                "fh6garage.preview3d.material_shader_parameter_helper.subprocess.run",
+                return_value=_Completed(stdout=stdout),
+            ):
+                with self.assertRaises(MaterialShaderParameterHelperError):
+                    diagnose_material_shader_parameters(
+                        material,
+                        shader,
+                        helper_path=helper,
+                    )
+
+    def test_rejects_prefixed_output_without_matching_terminal_helper_json(self):
+        with tempfile.TemporaryDirectory() as temp:
+            material, shader, helper = self._paths(Path(temp))
+            stdout = "Error reading blob at index 1: bad blob\n{\"format\":\"other\"}\n"
+            with patch(
+                "fh6garage.preview3d.material_shader_parameter_helper.subprocess.run",
+                return_value=_Completed(stdout=stdout),
+            ):
+                with self.assertRaises(MaterialShaderParameterHelperError):
+                    diagnose_material_shader_parameters(
+                        material,
+                        shader,
+                        helper_path=helper,
+                    )
 
     def test_rejects_missing_or_true_safety_contracts(self):
         cases = [
