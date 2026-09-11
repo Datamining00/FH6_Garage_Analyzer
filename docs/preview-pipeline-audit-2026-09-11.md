@@ -1,5 +1,7 @@
 # FH6 v1.4 3D preview audit — 2026-09-11
 
+후속 검증: 사용자가 기존 배포본 동작을 확인한 뒤 [native texture 최초 실행 개선](native-texture-cold-improvement-2026-09-11.md)과 [제공된 실제 리버리 검증](actual-livery-validation-2026-09-11.md)을 진행했다. 아래의 "남은 항목"은 최초 조사 시점의 기록이며, 실제 C_livery 측정 결과는 후속 문서를 기준으로 한다.
+
 ## 기준과 범위
 
 - 원격 작업 브랜치: `v1.4-rc1-wheel-morph-w3`
