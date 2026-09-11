@@ -6,6 +6,12 @@ on:
     branches:
       - v1.4-rc1-wheel-morph-w3
     paths:
+      - "source-v1.2/fh6garage/backup_transaction.py"
+      - "source-v1.2/fh6garage/card_transfer.py"
+      - "source-v1.2/fh6garage/backup_export.py"
+      - "source-v1.2/fh6garage/v1_3_4_backup_import_refinement_patch.py"
+      - "source-v1.2/fh6garage/v1_3_4_card_features_patch.py"
+      - "source-v1.2/tests/test_card_transfer.py"
       - "source-v1.2/app.py"
       - "source-v1.2/fh6garage/app_options.py"
       - "source-v1.2/fh6garage/application_controls.py"
