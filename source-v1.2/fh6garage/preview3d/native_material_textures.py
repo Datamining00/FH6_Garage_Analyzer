@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .pipeline_diagnostics import timed, stage
+
 import hashlib
 import json
 import os
@@ -738,17 +740,18 @@ def _decode_resolved_payload(
             pass
 
     try:
-        completed = subprocess.run(
-            [str(helper), "--decode-swatchbin", str(swatch), str(dds)],
-            cwd=str(directory),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=120,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-        )
+        with stage("native_texture_decoder_subprocess"):
+            completed = subprocess.run(
+                [str(helper), "--decode-swatchbin", str(swatch), str(dds)],
+                cwd=str(directory),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=120,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
     except subprocess.TimeoutExpired:
         return replace(
             item,
@@ -859,6 +862,7 @@ def _automatic_decoder_helper() -> tuple[Path | None, str | None]:
         return None, f"Bundled native texture decoder failed integrity verification: {exc}"
 
 
+@timed('native_texture_prepare')
 def resolve_native_material_textures(
     glb_path: str | Path,
     vehicle_archive: str | Path,

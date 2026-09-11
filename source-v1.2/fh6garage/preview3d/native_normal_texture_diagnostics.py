@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .pipeline_diagnostics import timed
+
 """Read-only diagnostics for native FH6 normal-map candidates.
 
 This module deliberately does not enable normal-map rendering. It records only
@@ -106,6 +108,7 @@ def _has_standard_uv_contract(selection: Any) -> bool:
     )
 
 
+@timed('native_normal_diagnostics')
 def build_native_normal_texture_diagnostics(
     plan: NativeMaterialRenderPlan,
 ) -> NativeNormalTextureDiagnostics:

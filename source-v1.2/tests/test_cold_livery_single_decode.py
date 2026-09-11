@@ -12,7 +12,7 @@ from fh6garage.preview3d.cold_livery_render_fastpath_patch import install_cold_l
 
 
 class ColdLiverySingleDecodeTests(unittest.TestCase):
-    def render_fixture(self, layers):
+    def render_fixture(self, layers, cache_roundtrip=False):
         with TemporaryDirectory() as td, ExitStack() as stack:
             root = Path(td)
             source = root / 'C_livery'
@@ -35,7 +35,17 @@ class ColdLiverySingleDecodeTests(unittest.TestCase):
             stack.enter_context(patch.object(backend, 'render_clivery_sections', original))
             stack.enter_context(patch.object(backend, '_fh6_cold_livery_render_fastpath_patched', False, create=True))
             install_cold_livery_render_fastpath_patch()
+            if cache_roundtrip:
+                from fh6garage.preview3d.livery_render_cache_patch import install_livery_render_cache_patch
+                stack.enter_context(patch.object(backend, '_app_root', return_value=root / 'cache'))
+                stack.enter_context(patch.object(backend, '_fh6_livery_render_cache_patched', False, create=True))
+                install_livery_render_cache_patch()
             result = backend.render_clivery_sections(source, output_root=root / 'render')
+            if cache_roundtrip:
+                import shutil
+                shutil.rmtree(root / 'render')
+                result = backend.render_clivery_sections(source, output_root=root / 'second-render')
+                self.assertTrue(all(path.is_file() for path in result.png_paths.values()))
             self.assertEqual(decoder.unwrap_forza_container.call_count, 1)
             self.assertEqual(decoder.clivery_to_layers.call_count, 1)
             self.assertEqual(decoder.layers_to_kfps_json_layers.call_count, 1)
@@ -54,6 +64,9 @@ class ColdLiverySingleDecodeTests(unittest.TestCase):
 
     def test_all_sections_still_decode_once(self):
         self.render_fixture([{'source_section': name} for name in backend.SECTION_NAMES])
+
+    def test_persistent_hit_survives_intermediate_cleanup_and_skips_decode(self):
+        self.render_fixture([{'source_section': 'Left'}], cache_roundtrip=True)
 
 
 if __name__ == '__main__':

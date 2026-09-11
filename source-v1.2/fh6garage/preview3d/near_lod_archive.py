@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .pipeline_diagnostics import timed
+
 import hashlib
 import json
 import os
@@ -356,6 +358,7 @@ def time_ns_token() -> str:
     return format(time.time_ns(), "x")
 
 
+@timed('near_lod_prepare')
 def prepare_near_lod_archive(
     source_archive: str | Path,
     carbin_entry: str,

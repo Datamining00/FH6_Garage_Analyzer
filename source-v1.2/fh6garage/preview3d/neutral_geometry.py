@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .pipeline_diagnostics import timed
+
 import json
 import os
 import struct
@@ -306,6 +308,7 @@ def _load_carbin_metadata(archive: zipfile.ZipFile, carbin_entry: str) -> dict[t
     return result
 
 
+@timed('neutral_geometry_annotation')
 def annotate_neutral_geometry(
     glb_path: str | Path,
     converter_archive: str | Path,

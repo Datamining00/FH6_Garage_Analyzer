@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .pipeline_diagnostics import timed
+
 import hashlib
 import json
 import math
@@ -280,6 +282,7 @@ def _material_uv_contract(mesh: dict[str, Any]) -> tuple[int, float, float, str]
     )
 
 
+@timed('native_material_render_plan')
 def build_native_material_render_plan(glb_path: str | Path) -> NativeMaterialRenderPlan:
     """Join exact mesh TextureBindings to verified decoded DDS derivatives.
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .pipeline_diagnostics import timed
+
 import json
 import os
 import struct
@@ -241,6 +243,7 @@ def _apply_document_visibility(
     )
 
 
+@timed('rim_visibility_postprocess')
 def apply_neutral_wheel_visibility(glb_path: str | Path, converter_archive: str | Path) -> WheelVisibilityResult:
     """Hide only structurally confirmed WheelStyle motion/blur draw geometry.
 
