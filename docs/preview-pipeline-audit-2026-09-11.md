@@ -141,6 +141,8 @@ geometry/tire cache는 현재 GLB magic/최소 크기 중심의 유효성 검사
 
 ## 실제 runtime 검증과 남은 항목
 
+최종 packaging 보완: `075e724`의 W3 앱 build와 다른 검증 4개는 성공했지만, wheel morph 검증 run `34562410199`의 FXX portable 진단 import가 실패했다. 새 `pipeline_diagnostics.py`와 그 의존성 `subsystem_log.py`가 수동 복사 목록에 빠진 것이 원인이다. 같은 문제가 일반 morph 진단 bundle에도 있음을 분리된 subprocess 테스트로 재현했다. 두 bundle에 의존성을 포함하고 일반 morph bundle에도 `--help` 검사를 추가했다. 전체 로컬 회귀는 974 PASS. 이 변경은 진단 패키징에만 해당하며 앱 runtime 코드는 변경하지 않는다.
+
 fixture PASS / Actions PASS / 실제 게임 데이터 parse·filter / OpenGL 화면 육안 검증은 각각 별개다. 사용자의 재현 리버리와 배포본 경로는 아직 특정되지 않았다. 실제 C_livery의 cold/warm 시간, livery가 적용된 최종 화면, 창 닫기/앱 종료 후 사용자 UI 재실행은 남아 있다. 최초 native texture 37초를 줄이는 변경은 아직 하지 않았다.
 
 추가 권고사항: geometry cold 경로는 native DDS decoder의 일괄 호출 가능성을 먼저 검토한다. 리버리는 실제 C_livery cold trace에서 가장 비싼 단계가 확인된 뒤 PNG 전달 또는 최종 texture cache 중 하나만 선택한다. 모든 캐시를 한 번에 통합하지 않는다.
