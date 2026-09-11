@@ -158,6 +158,15 @@ class ApplicationOptionsTests(unittest.TestCase):
         controller.closed()
         window.close()
 
+    def test_closing_viewer_cancels_initial_fit(self):
+        from shiboken6 import delete
+        from fh6garage.ui import ZoomableImageView
+        with patch.object(ZoomableImageView, 'fit_image') as fit:
+            viewer = ZoomableImageView(QPixmap(64, 32))
+            delete(viewer)
+            self.app.processEvents()
+            fit.assert_not_called()
+
     def test_cpu_override_clamped_to_machine(self):
         from fh6garage.preview3d.native_material_textures import _native_texture_worker_limit
         options.save_options(options.AppOptions(render_workers=8))

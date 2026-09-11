@@ -348,7 +348,11 @@ class ZoomableImageView(QGraphicsView):
 
         self._min_scale = 0.05
         self._max_scale = 16.0
-        QTimer.singleShot(0, self.fit_image)
+        # Cancel the deferred fit with the viewer when a preview closes early.
+        self._initial_fit_timer = QTimer(self)
+        self._initial_fit_timer.setSingleShot(True)
+        self._initial_fit_timer.timeout.connect(self.fit_image)
+        self._initial_fit_timer.start(0)
 
     def current_scale(self) -> float:
         return float(self.transform().m11())
