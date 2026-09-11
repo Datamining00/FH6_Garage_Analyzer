@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from .pipeline_diagnostics import timed, stage
+from .pipeline_diagnostics import timed, stage, record
 
+from concurrent.futures import ThreadPoolExecutor
+from contextvars import copy_context
 import hashlib
 import json
 import os
@@ -20,6 +22,7 @@ NATIVE_MATERIAL_TEXTURE_RESOLUTION_REVISION = 3
 _BUNDLE_TAG = 0x47727562  # Grub bundle tag used by .swatchbin
 _DDS_MAGIC = b"DDS "
 _JSON_CHUNK_TYPE = 0x4E4F534A
+_NATIVE_TEXTURE_DECODE_WORKERS = 4
 
 
 class NativeMaterialTextureError(RuntimeError):
@@ -852,6 +855,37 @@ def _decode_resolved_payload(
     )
 
 
+def _decode_resolved_payloads(
+    items: tuple[NativeTexturePayload, ...],
+    decoder_helper: Path | None,
+    cache_root: Path,
+) -> tuple[NativeTexturePayload, ...]:
+    # Only independent native helper processes overlap. Archive resolution and
+    # the livery renderer stay on the caller thread. Equal payload hashes share
+    # a DDS destination, so keep those items sequential within one group.
+    groups: dict[object, list[tuple[int, NativeTexturePayload]]] = {}
+    for index, item in enumerate(items):
+        key = item.payload_sha256 if item.payload_sha256 else index
+        groups.setdefault(key, []).append((index, item))
+    workers = min(_NATIVE_TEXTURE_DECODE_WORKERS, len(groups))
+    if decoder_helper is None or workers <= 1:
+        return tuple(_decode_resolved_payload(item, decoder_helper, cache_root) for item in items)
+
+    def decode_group(group):
+        return [(index, _decode_resolved_payload(item, decoder_helper, cache_root))
+                for index, item in group]
+
+    record('native_texture_decode_schedule', workers=workers, payload_groups=len(groups))
+    results = list(items)
+    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix='fh6-native-dds') as pool:
+        # Preserve the caller's per-preview trace without sharing an entered Context.
+        futures = [pool.submit(copy_context().run, decode_group, group) for group in groups.values()]
+        for future in futures:
+            for index, item in future.result():
+                results[index] = item
+    return tuple(results)
+
+
 def _automatic_decoder_helper() -> tuple[Path | None, str | None]:
     """Resolve only the SHA-verified bundled helper; never fall back to an arbitrary executable."""
     try:
@@ -895,10 +929,7 @@ def resolve_native_material_textures(
             decoder_path = Path(decoder_helper)
         else:
             decoder_path, decoder_detail = _automatic_decoder_helper()
-        results = tuple(
-            _decode_resolved_payload(item, decoder_path, target_root)
-            for item in resolved_items
-        )
+        results = _decode_resolved_payloads(resolved_items, decoder_path, target_root)
         if decoder_detail:
             results = tuple(
                 replace(item, decoder_detail=decoder_detail)

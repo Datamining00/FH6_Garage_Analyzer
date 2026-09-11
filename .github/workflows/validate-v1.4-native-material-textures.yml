@@ -44,6 +44,7 @@ on:
       - "source-v1.2/tests/test_materialbin_reference_helper_source.py"
       - "source-v1.2/tests/test_manufacturer_materialbin_diagnostics.py"
       - "source-v1.2/tests/test_native_material_textures.py"
+      - "source-v1.2/tests/test_native_texture_decode_workers.py"
       - "source-v1.2/tests/test_native_texture_semantics.py"
       - "source-v1.2/tests/test_native_dds.py"
       - "source-v1.2/tests/test_native_material_gl.py"
@@ -149,6 +150,8 @@ jobs:
           python -m unittest tests.test_materialbin_reference_helper_source -v
           python -m unittest tests.test_manufacturer_materialbin_diagnostics -v
           python -m unittest tests.test_native_material_textures -v
+          python -m unittest tests.test_native_texture_decode_workers -v
+          if ($LASTEXITCODE -ne 0) { throw "Native decoder concurrency regression failed." }
           python -m unittest tests.test_native_texture_semantics -v
           python -m unittest tests.test_native_dds -v
           python -m unittest tests.test_native_material_gl -v
