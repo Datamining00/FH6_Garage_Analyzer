@@ -102,7 +102,8 @@ class ApplicationOptionsTests(unittest.TestCase):
         controller.completed(SimpleNamespace(png_paths={'Front': image}, section_counts={'Front': 2}))
         controller.viewer.actual_size()
         self.assertEqual(controller.viewer._pixmap_item.pixmap().width(), 64)
-        controller.section.setCurrentIndex(1)
+        self.assertEqual(controller.section.count(), 1)
+        controller.completed(SimpleNamespace(png_paths={}, section_counts={}))
         controller.viewer.fit_image()
         self.assertTrue(controller.viewer._pixmap_item.pixmap().isNull())
         controller.closed()
@@ -132,13 +133,30 @@ class ApplicationOptionsTests(unittest.TestCase):
         controller.page.resize(600, 400)
         controller.page.show()
         self.app.processEvents()
-        controller.completed(SimpleNamespace(png_paths={'Front': path}, section_counts={}))
+        controller.completed(SimpleNamespace(png_paths={'Front': path}, section_counts={'Front': 1}))
         self.app.processEvents()
         viewer = controller.viewer
         self.assertLessEqual(1024 * viewer.transform().m11(), viewer.viewport().width())
         self.assertLessEqual(512 * viewer.transform().m22(), viewer.viewport().height())
         controller.page.close()
         controller.closed()
+
+    def test_2d_sections_only_present_and_right_default(self):
+        from fh6garage.livery_2d_view import Livery2DController
+        window, dialog = QWidget(), QDialog()
+        controller = Livery2DController(window, dialog, self.record())
+        pixmap = QPixmap(64, 32)
+        pixmap.fill(Qt.GlobalColor.red)
+        path = self.root / 'section.png'
+        pixmap.save(str(path))
+        controller.completed(SimpleNamespace(png_paths={'Front': path, 'Right': path, 'Top': path},
+                                            section_counts={'Front': 1, 'Right': 2, 'Top': 0}))
+        self.assertEqual(controller.section.count(), 2)
+        self.assertEqual(controller.section.tabData(controller.section.currentIndex()), 'Right')
+        controller.section.setCurrentIndex(0)
+        self.assertEqual(controller.selected_section, 'Front')
+        controller.closed()
+        window.close()
 
     def test_cpu_override_clamped_to_machine(self):
         from fh6garage.preview3d.native_material_textures import _native_texture_worker_limit

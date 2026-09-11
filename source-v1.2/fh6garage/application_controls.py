@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (QCheckBox, QDialog, QDialogButtonBox, QFormLayout
 from .app_options import AppOptions, load_options, save_options, options_snapshot
 from .backup_policies import record_locked
 from .models import LiveryRecord
+from .light_controls import LIGHT_CONTROLS_STYLE
 
 
 OPTION_GROUPS = (
@@ -40,6 +41,7 @@ class SettingsDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle('설정')
+        self.setStyleSheet(LIGHT_CONTROLS_STYLE)
         self.setMinimumWidth(520)
         layout = QVBoxLayout(self)
         scroll = QScrollArea()
@@ -94,6 +96,7 @@ class ExportSelectionDialog(QDialog):
     def __init__(self, records, parent=None):
         super().__init__(parent)
         self.setWindowTitle('내보낼 리버리 선택')
+        self.setStyleSheet(LIGHT_CONTROLS_STYLE)
         self.resize(600, 500)
         layout = QVBoxLayout(self)
         self.records = list(records)
@@ -379,10 +382,14 @@ def install_application_controls(MainWindow):
         controller = ApplicationController(self)
         self._fh6_application_controller = controller
         button = QPushButton('설정')
-        button.setObjectName('fh6SettingsButton')
+        button.setObjectName('nav')
+        button.setAccessibleName('설정')
+        self._fh6_settings_button = button
         button.clicked.connect(controller.settings)
         side = self.language_combo.parentWidget().layout()
-        side.insertWidget(max(0, side.indexOf(self.language_label)), button)
+        performance = getattr(self, 'performance_nav_button', None)
+        index = side.indexOf(performance) if performance is not None else -1
+        side.insertWidget(index + 1 if index >= 0 else max(0, side.indexOf(self.language_label)), button)
         self.livery_export_visible_button.setText('선택 내보내기')
         self.backup_export_button.setText('선택 내보내기')
         self.backup_export_button.setToolTip('게임 리버리를 선택해서 백업으로 내보내기')

@@ -4,10 +4,11 @@ import tempfile
 
 from PySide6.QtCore import QObject, QThread, Signal, Slot
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import QComboBox, QGraphicsPixmapItem, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QComboBox, QGraphicsPixmapItem, QHBoxLayout, QLabel, QPushButton, QTabBar, QVBoxLayout, QWidget
 
 from .app_options import options_snapshot
 from .ui import ZoomableImageView
+from .light_controls import LIGHT_CONTROLS_STYLE
 
 
 SECTION_LABELS = {
@@ -49,12 +50,15 @@ class Livery2DController(QObject):
         self.temp = tempfile.TemporaryDirectory(prefix='fh6_livery_2d_')
         self.result = None
         self.page = QWidget()
+        self.page.setStyleSheet(LIGHT_CONTROLS_STYLE)
         layout = QVBoxLayout(self.page)
         toolbar = QHBoxLayout()
-        self.section = QComboBox()
-        for key, label in SECTION_LABELS.items():
-            self.section.addItem(label, key)
-        self.section.currentIndexChanged.connect(self.show_section)
+        self.selected_section = 'Right'
+        self.section = QTabBar()
+        self.section.setExpanding(False)
+        self.section.setUsesScrollButtons(True)
+        self.section.currentChanged.connect(self.show_section)
+        layout.addWidget(self.section)
         self.resolution = QComboBox()
         for label, key in (('1x', 'normal'), ('2x', 'high'), ('4x', 'ultra4x')):
             self.resolution.addItem(label, key)
@@ -63,7 +67,6 @@ class Livery2DController(QObject):
         self.render.clicked.connect(self.start)
         fit = QPushButton('화면에 맞춤')
         actual = QPushButton('100%')
-        toolbar.addWidget(self.section)
         toolbar.addWidget(self.resolution)
         toolbar.addWidget(self.render)
         toolbar.addStretch()
@@ -113,6 +116,19 @@ class Livery2DController(QObject):
         if not self.alive:
             return
         self.result = result
+        self.section.blockSignals(True)
+        while self.section.count():
+            self.section.removeTab(0)
+        available = [key for key in SECTION_LABELS
+                     if result.section_counts.get(key, 0) > 0
+                     and result.png_paths.get(key) and Path(result.png_paths[key]).is_file()]
+        for key in available:
+            index = self.section.addTab(SECTION_LABELS[key])
+            self.section.setTabData(index, key)
+        preferred = self.selected_section if self.selected_section in available else (available[0] if available else None)
+        if preferred is not None:
+            self.section.setCurrentIndex(available.index(preferred))
+        self.section.blockSignals(False)
         self.show_section()
 
     @Slot(str)
@@ -123,14 +139,16 @@ class Livery2DController(QObject):
     def show_section(self, *_):
         if self.result is None or not self.alive:
             return
-        section = self.section.currentData()
+        section = self.section.tabData(self.section.currentIndex())
+        if section is not None:
+            self.selected_section = section
         path = self.result.png_paths.get(section)
         pixmap = QPixmap(str(path)) if path else QPixmap()
         self.viewer._pixmap_item.setPixmap(pixmap)
         self.viewer.scene().setSceneRect(self.viewer._pixmap_item.boundingRect())
         self.viewer.fit_image()
-        self.status.setText(f'{self.section.currentText()} · {self.result.section_counts.get(section, 0)} 레이어'
-                            if path else f'{self.section.currentText()} · 이 부위에는 리버리가 없습니다.')
+        self.status.setText(f'{SECTION_LABELS[section]} · {self.result.section_counts.get(section, 0)} 레이어'
+                            if path else '표시할 리버리 부위가 없습니다.')
 
     @Slot()
     def finished(self):

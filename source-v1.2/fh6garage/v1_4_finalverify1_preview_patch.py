@@ -314,6 +314,9 @@ def _show_livery_preview(window: Any, record: LiveryRecord) -> None:
     layout.setSpacing(8)
 
     tabs = QTabWidget()
+    tabs.setStyleSheet('QTabWidget::pane { background:#f7f8fb; border:0; } '
+                      'QTabBar::tab { background:#ffffff; color:#303341; padding:7px 12px; } '
+                      'QTabBar::tab:selected { background:#eee9ff; color:#5f39d8; }')
     thumbnail_page = _build_thumbnail_page(record, image)
     three_d_page, controls = _build_3d_page()
     tabs.addTab(thumbnail_page, "썸네일")
