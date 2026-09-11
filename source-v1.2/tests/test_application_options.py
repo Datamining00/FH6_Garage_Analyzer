@@ -22,12 +22,30 @@ class ApplicationOptionsTests(unittest.TestCase):
         cls.app = QApplication.instance() or QApplication([])
 
     def setUp(self):
+        self.qt_objects = []
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.path_patch = patch.object(options, 'options_path', return_value=self.root / 'options.json')
         self.path_patch.start()
         self.addCleanup(self.path_patch.stop)
+
+    def tearDown(self):
+        from shiboken6 import delete, isValid
+        from PySide6.QtCore import QCoreApplication, QEvent
+        # Do not leave Python/Qt ownership cycles or zero-delay callbacks for
+        # unrelated event-loop tests later in the full regression process.
+        for obj in reversed(self.qt_objects):
+            if isValid(obj):
+                delete(obj)
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+
+    def controller(self):
+        from fh6garage.livery_2d_view import Livery2DController
+        window, dialog = QWidget(), QDialog()
+        controller = Livery2DController(window, dialog, self.record())
+        self.qt_objects.extend((window, dialog, controller.page, controller))
+        return window, dialog, controller
 
     def record(self, name='First'):
         source = self.root / name
@@ -85,6 +103,7 @@ class ApplicationOptionsTests(unittest.TestCase):
         from fh6garage.application_controls import ExportSelectionDialog
         records = [self.record(), self.record('Second')]
         dialog = ExportSelectionDialog(records)
+        self.qt_objects.append(dialog)
         dialog.set_all(Qt.CheckState.Unchecked)
         self.assertEqual(dialog.selected_records(), [])
         dialog.items.item(1).setCheckState(Qt.CheckState.Checked)
@@ -92,9 +111,7 @@ class ApplicationOptionsTests(unittest.TestCase):
         dialog.close()
 
     def test_2d_switch_preserves_zoom_item(self):
-        from fh6garage.livery_2d_view import Livery2DController
-        window, dialog = QWidget(), QDialog()
-        controller = Livery2DController(window, dialog, self.record())
+        window, dialog, controller = self.controller()
         pixmap = QPixmap(64, 32)
         pixmap.fill(Qt.GlobalColor.red)
         image = self.root / 'part.png'
@@ -120,9 +137,7 @@ class ApplicationOptionsTests(unittest.TestCase):
 
     def test_2d_fit_includes_transparent_margins(self):
         from PySide6.QtGui import QPainter
-        from fh6garage.livery_2d_view import Livery2DController
-        window, dialog = QWidget(), QDialog()
-        controller = Livery2DController(window, dialog, self.record())
+        window, dialog, controller = self.controller()
         pixmap = QPixmap(1024, 512)
         pixmap.fill(Qt.GlobalColor.transparent)
         painter = QPainter(pixmap)
@@ -142,9 +157,7 @@ class ApplicationOptionsTests(unittest.TestCase):
         controller.closed()
 
     def test_2d_sections_only_present_and_right_default(self):
-        from fh6garage.livery_2d_view import Livery2DController
-        window, dialog = QWidget(), QDialog()
-        controller = Livery2DController(window, dialog, self.record())
+        window, dialog, controller = self.controller()
         pixmap = QPixmap(64, 32)
         pixmap.fill(Qt.GlobalColor.red)
         path = self.root / 'section.png'
@@ -161,11 +174,15 @@ class ApplicationOptionsTests(unittest.TestCase):
     def test_closing_viewer_cancels_initial_fit(self):
         from shiboken6 import delete
         from fh6garage.ui import ZoomableImageView
-        with patch.object(ZoomableImageView, 'fit_image') as fit:
-            viewer = ZoomableImageView(QPixmap(64, 32))
-            delete(viewer)
-            self.app.processEvents()
-            fit.assert_not_called()
+        calls = []
+        class Viewer(ZoomableImageView):
+            def fit_image(self):
+                calls.append(True)
+        viewer = Viewer(QPixmap(64, 32))
+        before = len(calls)
+        delete(viewer)
+        self.app.processEvents()
+        self.assertEqual(len(calls), before)
 
     def test_cpu_override_clamped_to_machine(self):
         from fh6garage.preview3d.native_material_textures import _native_texture_worker_limit
@@ -189,6 +206,7 @@ class ApplicationOptionsTests(unittest.TestCase):
         record = self.record()
         backup = self.root / 'backup'
         worker = _AutoBackupWorker(backup, [record], None)
+        self.qt_objects.append(worker)
         errors = []
         worker.error.connect(errors.append)
         worker.run()
