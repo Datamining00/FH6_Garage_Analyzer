@@ -4,7 +4,7 @@ import tempfile
 
 from PySide6.QtCore import QObject, QThread, Signal, Slot
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QComboBox, QGraphicsPixmapItem, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from .app_options import options_snapshot
 from .ui import ZoomableImageView
@@ -74,6 +74,8 @@ class Livery2DController(QObject):
         self.status.setWordWrap(True)
         layout.addWidget(self.status)
         self.viewer = ZoomableImageView(QPixmap())
+        # Fit the entire PNG canvas, including its transparent margins.
+        self.viewer._pixmap_item.setShapeMode(QGraphicsPixmapItem.ShapeMode.BoundingRectShape)
         fit.clicked.connect(self.viewer.fit_image)
         actual.clicked.connect(self.viewer.actual_size)
         layout.addWidget(self.viewer, 1)

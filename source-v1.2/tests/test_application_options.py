@@ -117,6 +117,29 @@ class ApplicationOptionsTests(unittest.TestCase):
         self.assertEqual(len(kept), 1)
         targets.assert_not_called()
 
+    def test_2d_fit_includes_transparent_margins(self):
+        from PySide6.QtGui import QPainter
+        from fh6garage.livery_2d_view import Livery2DController
+        window, dialog = QWidget(), QDialog()
+        controller = Livery2DController(window, dialog, self.record())
+        pixmap = QPixmap(1024, 512)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pixmap)
+        painter.fillRect(400, 200, 20, 20, Qt.GlobalColor.red)
+        painter.end()
+        path = self.root / 'transparent.png'
+        pixmap.save(str(path))
+        controller.page.resize(600, 400)
+        controller.page.show()
+        self.app.processEvents()
+        controller.completed(SimpleNamespace(png_paths={'Front': path}, section_counts={}))
+        self.app.processEvents()
+        viewer = controller.viewer
+        self.assertLessEqual(1024 * viewer.transform().m11(), viewer.viewport().width())
+        self.assertLessEqual(512 * viewer.transform().m22(), viewer.viewport().height())
+        controller.page.close()
+        controller.closed()
+
     def test_cpu_override_clamped_to_machine(self):
         from fh6garage.preview3d.native_material_textures import _native_texture_worker_limit
         options.save_options(options.AppOptions(render_workers=8))
