@@ -332,7 +332,8 @@ def main() -> int:
     path_edit = getattr(window, "path_edit", None)
     if path_edit is not None and hasattr(path_edit, "text"):
         saved_path = str(path_edit.text() or "").strip()
-    wait_for_scan = bool(saved_path and Path(saved_path).is_dir())
+    from fh6garage.app_options import load_options
+    wait_for_scan = bool(load_options().auto_livery_detection and saved_path and Path(saved_path).is_dir())
     _performance_metrics.set_startup_waiting_for_scan(wait_for_scan)
 
     show_started = time.perf_counter_ns()

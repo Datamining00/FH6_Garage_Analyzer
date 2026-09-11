@@ -267,6 +267,7 @@ class ApplicationController(QObject):
         self.last_result = None
         self.signature = None
         self.worker = None
+        self.auto_start_attempted = False
         timer = QTimer(self)
         timer.setInterval(3000)
         timer.timeout.connect(self.poll)
@@ -286,6 +287,7 @@ class ApplicationController(QObject):
                 if table is not None:
                     table.setColumnHidden(7, not load_options().show_download_date)
             self.last_result = None
+            self.auto_start_attempted = False
 
     @Slot()
     def poll(self):
@@ -297,9 +299,13 @@ class ApplicationController(QObject):
         if thread is not None and thread.isRunning():
             return
         result = getattr(window, 'result', None)
-        if result is None:
-            return
         options = load_options()
+        if result is None:
+            raw = window.path_edit.text().strip()
+            if options.auto_livery_detection and not self.auto_start_attempted and raw and Path(raw).is_dir():
+                self.auto_start_attempted = True
+                window.refresh_scan()
+            return
         changed_result = result is not self.last_result
         if changed_result:
             self.last_result = result
