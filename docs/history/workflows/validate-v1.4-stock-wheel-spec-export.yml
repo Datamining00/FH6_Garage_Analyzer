@@ -1,0 +1,149 @@
+name: Validate FH6 Assistant v1.4 stock wheel spec export
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - v1.4-rc1-wheel-morph-w3
+    paths:
+      - "source-v1.2/tools/export_stock_wheel_specs_real_db.py"
+      - "source-v1.2/tests/test_stock_wheel_spec_export.py"
+      - "source-v1.2/data/car_names.json"
+      - ".github/workflows/validate-v1.4-stock-wheel-spec-export.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v14-stock-wheel-spec-export-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate pinned FH6 stock wheel source
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout W3 branch
+        uses: actions/checkout@v6
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Compile and test exporter contract
+        shell: pwsh
+        run: |
+          Set-Location source-v1.2
+          python -m py_compile tools\export_stock_wheel_specs_real_db.py
+          python -m unittest tests.test_stock_wheel_spec_export -v
+
+      - name: Download pinned public FH6 DB reference
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path stock-wheel-export | Out-Null
+          $commit = "25cfd00195e74f8a85180b5f3193ee105259e2e2"
+          $uri = "https://raw.githubusercontent.com/Dr-hydra/FH6-Adjust-Tool/$commit/src/FH6AdjustTool/Data/fh6_game_db.sqlite"
+          Invoke-WebRequest -Uri $uri -OutFile "stock-wheel-export\fh6_game_db.sqlite"
+          $size = (Get-Item "stock-wheel-export\fh6_game_db.sqlite").Length
+          if ($size -ne 15773696) {
+            throw "Pinned FH6 DB size mismatch: $size"
+          }
+
+      - name: Export all complete stock wheel specs read-only
+        shell: pwsh
+        run: |
+          Set-Location source-v1.2
+          python tools\export_stock_wheel_specs_real_db.py `
+            --db ..\stock-wheel-export\fh6_game_db.sqlite `
+            --output ..\stock-wheel-export\fh6_stock_wheel_specs.json `
+            --report ..\stock-wheel-export\fh6_stock_wheel_specs_report.json `
+            --source-repository "Dr-hydra/FH6-Adjust-Tool" `
+            --source-commit "25cfd00195e74f8a85180b5f3193ee105259e2e2" `
+            --source-blob-sha1 "2cc259bd7f3815109b5f95c8e979cb5ec0b892dc" `
+            --min-complete 500
+
+      - name: Verify FER_FXX_05 stock wheel values
+        shell: pwsh
+        run: |
+          $data = Get-Content "stock-wheel-export\fh6_stock_wheel_specs.json" -Raw | ConvertFrom-Json
+          $fxx = $data.records | Where-Object { $_.car_id -eq 1006 }
+          if ($null -eq $fxx) { throw "Car ID 1006 is missing from complete stock wheel export." }
+          if ($fxx.media_name -ne "FER_FXX_05") { throw "Car ID 1006 MediaName mismatch: $($fxx.media_name)" }
+          if ([double]$fxx.front_tire_width_mm -ne 245) { throw "FXX front tire width mismatch." }
+          if ([double]$fxx.front_tire_aspect -ne 35) { throw "FXX front tire aspect mismatch." }
+          if ([double]$fxx.front_wheel_diameter_in -ne 19) { throw "FXX front wheel diameter mismatch." }
+          if ([double]$fxx.rear_tire_width_mm -ne 345) { throw "FXX rear tire width mismatch." }
+          if ([double]$fxx.rear_tire_aspect -ne 35) { throw "FXX rear tire aspect mismatch." }
+          if ([double]$fxx.rear_wheel_diameter_in -ne 19) { throw "FXX rear wheel diameter mismatch." }
+
+      - name: Compare wheel source with current 660-car catalog
+        shell: pwsh
+        run: |
+          $catalog = Get-Content "source-v1.2\data\car_names.json" -Raw | ConvertFrom-Json
+          $data = Get-Content "stock-wheel-export\fh6_stock_wheel_specs.json" -Raw | ConvertFrom-Json
+
+          $catalogMap = @{}
+          foreach ($property in $catalog.cars.PSObject.Properties) {
+            $catalogMap[[int]$property.Name] = [string]$property.Value
+          }
+          $wheelMap = @{}
+          foreach ($record in $data.records) {
+            $wheelMap[[int]$record.car_id] = [string]$record.media_name
+          }
+
+          $missing = @(
+            foreach ($id in ($catalogMap.Keys | Sort-Object)) {
+              if (-not $wheelMap.ContainsKey($id)) {
+                [ordered]@{ car_id = $id; name = $catalogMap[$id] }
+              }
+            }
+          )
+          $extra = @(
+            foreach ($id in ($wheelMap.Keys | Sort-Object)) {
+              if (-not $catalogMap.ContainsKey($id)) {
+                [ordered]@{ car_id = $id; media_name = $wheelMap[$id] }
+              }
+            }
+          )
+          $shared = @($catalogMap.Keys | Where-Object { $wheelMap.ContainsKey($_) })
+
+          $report = [ordered]@{
+            format = "fh6_stock_wheel_catalog_coverage_v1"
+            catalog_count = $catalogMap.Count
+            wheel_source_count = $wheelMap.Count
+            shared_count = $shared.Count
+            catalog_coverage_percent = [math]::Round(100.0 * $shared.Count / $catalogMap.Count, 3)
+            missing_from_wheel_source_count = $missing.Count
+            missing_from_wheel_source = $missing
+            extra_in_wheel_source_count = $extra.Count
+            extra_in_wheel_source = $extra
+          }
+          $report | ConvertTo-Json -Depth 6 | Set-Content `
+            "stock-wheel-export\fh6_stock_wheel_catalog_coverage.json" -Encoding utf8
+          $report | ConvertTo-Json -Depth 6
+          if ($shared.Count -lt 600) {
+            throw "Current stock wheel source covers only $($shared.Count) current catalog IDs."
+          }
+
+      - name: Run full regression suite
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          Set-Location source-v1.2
+          python -m pip install --disable-pip-version-check -r requirements.txt
+          python -m unittest discover -s tests -v
+
+      - name: Upload stock wheel export reports only
+        uses: actions/upload-artifact@v6
+        with:
+          name: FH6_Stock_Wheel_Spec_Export_W3
+          path: |
+            stock-wheel-export/fh6_stock_wheel_specs.json
+            stock-wheel-export/fh6_stock_wheel_specs_report.json
+            stock-wheel-export/fh6_stock_wheel_catalog_coverage.json
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,4792 @@
+from __future__ import annotations
+
+from pathlib import Path
+from datetime import datetime
+from collections import Counter
+import re
+from typing import Optional
+
+from PySide6.QtCore import QEvent, QEventLoop, QObject, QPoint, QRect, QSettings, QSize, Qt, QThread, QTimer, QUrl, Signal, Slot
+from PySide6.QtGui import QColor, QDesktopServices, QIcon, QImage, QPainter, QPen, QPixmap, QPolygon
+from PySide6.QtWidgets import (
+    QApplication,
+    QAbstractButton,
+    QAbstractItemView,
+    QButtonGroup,
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QDoubleSpinBox,
+    QFileDialog,
+    QFrame,
+    QGraphicsScene,
+    QGraphicsView,
+    QGridLayout,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QLineEdit,
+    QMainWindow,
+    QMessageBox,
+    QMenu,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
+    QSpinBox,
+    QStackedLayout,
+    QStackedWidget,
+    QTableWidget,
+    QTableWidgetItem,
+    QPlainTextEdit,
+    QProgressBar,
+    QTextEdit,
+    QToolButton,
+    QStyle,
+    QVBoxLayout,
+    QWidget,
+    QWidgetAction,
+)
+
+from .annotations import AnnotationStore, append_note
+from .car_db import CarDatabase, CarDatabaseError, REMOTE_SOURCE_PAGE
+from .game_navigation import (
+    GameGridSession,
+    GameNavigationError,
+    NavigationItem,
+    send_arrow_keys_to_fh6,
+)
+from .models import LiveryRecord, ScanResult, TuningRecord
+from .preferences import LocalPreferences
+from .scanner import SaveLayoutError, scan_save
+from .tune_data import TuneDataError, read_tune_data
+
+
+APP_STYLE = """
+QMainWindow { background: #f7f8fb; color: #171924; font-family: 'Segoe UI Variable', 'Segoe UI'; font-size: 10pt; }
+QWidget { color: #171924; font-family: 'Segoe UI Variable', 'Segoe UI'; font-size: 10pt; }
+QLabel { background: transparent; }
+QFrame#sidebar { background: #171821; border: none; }
+QLabel#brand { color: white; font-size: 15pt; font-weight: 700; padding: 8px 4px 18px 4px; }
+QPushButton#nav { color: #c7c9d4; background: transparent; border: 0; padding: 11px 14px; text-align: left; border-radius: 8px; }
+QPushButton#nav:hover { background: #242632; color: white; }
+QPushButton#nav:checked { background: #6e4bf2; color: white; font-weight: 600; }
+QFrame#card, QFrame#panel { background: white; border: 1px solid #e7e8ee; border-radius: 12px; }
+QLabel#cardTitle { color: #6c7080; font-size: 9pt; }
+QLabel#cardValue { color: #171924; font-size: 22pt; font-weight: 700; }
+QLabel#pageTitle { font-size: 18pt; font-weight: 700; }
+QLabel#muted { color: #737787; }
+QLabel#badge { background: #eee9ff; color: #5f39d8; padding: 4px 8px; border-radius: 8px; font-weight: 600; }
+QLineEdit, QPlainTextEdit, QComboBox, QSpinBox, QDoubleSpinBox { background: white; border: 1px solid #dfe1e8; border-radius: 8px; padding: 6px 9px; }
+QSpinBox:focus, QDoubleSpinBox:focus { border-color: #8c74ee; }
+QPushButton#primary { background: #6e4bf2; color: white; border: 0; border-radius: 8px; padding: 9px 14px; font-weight: 600; }
+QPushButton#secondary { background: white; color: #303341; border: 1px solid #dfe1e8; border-radius: 8px; padding: 8px 12px; }
+QPushButton#secondary:hover { border-color: #9c8cf5; }
+QPushButton#secondary:checked { background: #eee9ff; color: #5f39d8; border-color: #8c74ee; font-weight: 600; }
+QTableWidget { background: white; border: 0; gridline-color: #eceef3; selection-background-color: #f0ecff; selection-color: #171924; }
+QTableWidget::item { padding: 7px; border-bottom: 1px solid #eff0f4; }
+QHeaderView::section { background: #fafbfc; color: #6c7080; border: 0; border-bottom: 1px solid #e9eaf0; padding: 8px; font-weight: 600; }
+QTextEdit { background: #111218; color: #d9dbe5; border: 0; border-radius: 10px; padding: 10px; font-family: Consolas; }
+QDialog { background: #f7f8fb; }
+QMenu { background:#ffffff; color:#20232d; border:1px solid #d9dce5; border-radius:8px; padding:5px; }
+QMenu::item { background:transparent; color:#20232d; padding:8px 24px 8px 12px; border-radius:5px; }
+QMenu::item:selected { background:#eee9ff; color:#5335c7; }
+QMenu::item:checked { background:#eee9ff; color:#5335c7; border:1px solid #d8ceff; }
+QMenu::indicator { width:0px; height:0px; }
+QMenu::item:disabled { color:#989ca8; }
+QMenu::separator { height:1px; background:#e5e7ec; margin:5px 7px; }
+QScrollBar:vertical { background:#eef0f5; width:10px; margin:3px 1px; border:0; border-radius:5px; }
+QScrollBar::handle:vertical { background:#b8aecf; min-height:42px; border-radius:4px; }
+QScrollBar::handle:vertical:hover { background:#8c74ee; }
+QScrollBar::handle:vertical:pressed { background:#6e4bf2; }
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; border:0; }
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background:transparent; }
+QMessageBox { background: #f7f8fb; }
+QMessageBox QLabel { color: #171924; background: transparent; font-size: 10pt; }
+QMessageBox QPushButton {
+    min-width: 76px; min-height: 30px; padding: 3px 12px;
+    background: white; color: #171924;
+    border: 1px solid #cfd3dd; border-radius: 6px;
+}
+QMessageBox QPushButton:hover { background: #f2efff; border-color: #8c74ee; }
+QMessageBox QPushButton:default { background: #6e4bf2; color: white; border-color: #6e4bf2; }
+QMessageBox QPushButton:disabled { color: #8b8f9c; background: #eceef2; border-color: #d7dae2; }
+"""
+
+
+def _classification_pixmap(kind: str, active: bool, size: int = 24) -> QPixmap:
+    """Draw the exact active/inactive glyph shared by cards and filters."""
+    pixmap = QPixmap(size, size)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    colors = {
+        "check": (QColor("#20a653"), QColor("#9ba5b3")),
+        "triangle": (QColor("#d98216"), QColor("#9ba5b3")),
+        "excluded": (QColor("#df3545"), QColor("#9ba5b3")),
+        "memo": (QColor("#7656e8"), QColor("#9ba5b3")),
+        "duplicate": (QColor("#5f39d8"), QColor("#9ba5b3")),
+        "info": (QColor("#6e4bf2"), QColor("#9ba5b3")),
+        "livery_info": (QColor("#6e4bf2"), QColor("#9ba5b3")),
+        "tuning_info": (QColor("#6e4bf2"), QColor("#9ba5b3")),
+        "move": (QColor("#6e4bf2"), QColor("#6e4bf2")),
+        "search": (QColor("#626979"), QColor("#626979")),
+    }
+    color = colors.get(kind, colors["check"])[0 if active else 1]
+    pen = QPen(color, 2.0)
+    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+    pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+    painter.setPen(pen)
+    painter.setBrush(Qt.BrushStyle.NoBrush)
+
+    if kind == "check":
+        # Concentric marker: a ring plus a smaller centered circle.
+        painter.drawEllipse(QRect(3, 3, size - 6, size - 6))
+        painter.setBrush(color)
+        inner = max(5, size // 4)
+        offset = (size - inner) // 2
+        painter.drawEllipse(QRect(offset, offset, inner, inner))
+    elif kind in {"info", "livery_info"}:
+        painter.drawRoundedRect(QRect(5, 3, size - 10, size - 6), 3, 3)
+        painter.drawLine(8, 8, size - 8, 8)
+        painter.drawLine(8, 12, size - 10, 12)
+        painter.setBrush(color)
+        painter.drawEllipse(QRect(size - 9, size - 9, 6, 6))
+    elif kind == "tuning_info":
+        for y, knob_x in ((7, 10), (12, 16), (17, 8)):
+            painter.drawLine(4, y, size - 4, y)
+            painter.setBrush(QColor("#ffffff"))
+            painter.drawEllipse(QRect(knob_x - 3, y - 3, 6, 6))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+    elif kind == "move":
+        painter.drawLine(5, size // 2, size - 5, size // 2)
+        painter.drawLine(size - 10, 7, size - 5, size // 2)
+        painter.drawLine(size - 5, size // 2, size - 10, size - 7)
+    elif kind == "search":
+        painter.drawEllipse(QRect(4, 4, size - 11, size - 11))
+        painter.drawLine(size - 9, size - 9, size - 4, size - 4)
+    elif kind == "triangle":
+        points = QPolygon([QPoint(size // 2, 4), QPoint(size - 4, size - 5), QPoint(4, size - 5)])
+        if active:
+            painter.setBrush(color)
+        painter.drawPolygon(points)
+    elif kind == "excluded":
+        painter.drawLine(5, 5, size - 5, size - 5)
+        painter.drawLine(size - 5, 5, 5, size - 5)
+    elif kind == "memo":
+        painter.drawRoundedRect(QRect(5, 3, size - 10, size - 6), 2, 2)
+        painter.drawLine(8, 9, size - 8, 9)
+        painter.drawLine(8, 13, size - 8, 13)
+        painter.drawLine(8, 17, size - 10, 17)
+        if active:
+            painter.setBrush(color)
+            painter.drawEllipse(QRect(size - 8, 2, 6, 6))
+    else:
+        painter.drawRoundedRect(QRect(5, 7, size - 10, size - 10), 2, 2)
+        painter.drawRoundedRect(QRect(8, 4, size - 10, size - 10), 2, 2)
+    painter.end()
+    return pixmap
+
+
+def _classification_toggle_icon(kind: str) -> QIcon:
+    icon = QIcon()
+    icon.addPixmap(
+        _classification_pixmap(kind, False),
+        QIcon.Mode.Normal,
+        QIcon.State.Off,
+    )
+    icon.addPixmap(
+        _classification_pixmap(kind, True),
+        QIcon.Mode.Normal,
+        QIcon.State.On,
+    )
+    return icon
+
+
+class PersistentFilterMenu(QMenu):
+    """Keep checkable filter actions open so several can be selected."""
+
+    def mouseReleaseEvent(self, event) -> None:
+        action = self.actionAt(event.position().toPoint())
+        if action is not None and action.isCheckable():
+            # QAction.trigger() performs Qt's native check-state transition and
+            # emits triggered exactly once. Manually emitting the signal left
+            # the visual action and internal state out of sync on Windows.
+            action.trigger()
+            self.update()
+            return
+        super().mouseReleaseEvent(event)
+
+
+class MultiStatusFilterButton(QToolButton):
+    selectionChanged = Signal()
+
+    FILTERS = (
+        (1, "check", True, "원 표시"),
+        (5, "triangle", True, "삼각형 표시"),
+        (7, "excluded", True, "X 표시"),
+        (10, "check", False, "분류 없음"),
+        (3, "memo", True, "메모 있음"),
+        (4, "memo", False, "메모 없음"),
+    )
+
+    def __init__(self, include_duplicate: bool, parent=None) -> None:
+        super().__init__(parent)
+        self.setText("필터")
+        self.setObjectName("secondaryFilterButton")
+        self.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.setToolTip("상태 필터 · 여러 항목을 동시에 선택할 수 있습니다.")
+        self._actions: dict[int, QPushButton] = {}
+        menu = PersistentFilterMenu(self)
+        menu.setToolTipsVisible(True)
+        menu.setMinimumWidth(178)
+        entries = list(self.FILTERS)
+        if include_duplicate:
+            entries.append((9, "duplicate", True, "중복 리버리만"))
+        for mode, kind, active, meaning in entries:
+            label = "중복 리버리" if mode == 9 else meaning
+            row = QPushButton(label)
+            row.setCheckable(True)
+            row.setIcon(QIcon(_classification_pixmap(kind, active)))
+            row.setIconSize(QSize(22, 22))
+            row.setToolTip(meaning)
+            row.setFixedHeight(36)
+            row.setCursor(Qt.CursorShape.PointingHandCursor)
+            row.setStyleSheet(
+                "QPushButton { background:transparent; color:#20232d; border:1px solid transparent; "
+                "border-radius:6px; padding:5px 9px; text-align:left; }"
+                "QPushButton:hover { background:#f4f1ff; border-color:#e5deff; }"
+                "QPushButton:checked { background:#eee9ff; color:#5335c7; "
+                "border-color:#d8ceff; font-weight:600; }"
+            )
+            row.toggled.connect(
+                lambda checked=False, m=mode:
+                self._row_toggled(m, checked)
+            )
+            widget_action = QWidgetAction(menu)
+            widget_action.setDefaultWidget(row)
+            menu.addAction(widget_action)
+            self._actions[mode] = row
+        self.setMenu(menu)
+
+    def _row_toggled(self, mode: int, checked: bool) -> None:
+        """Keep logically incompatible filter choices mutually exclusive."""
+        if checked:
+            incompatible: set[int] = set()
+            if mode == 10:
+                incompatible = {1, 5, 7}
+            elif mode in {1, 5, 7}:
+                incompatible = {10}
+            elif mode == 3:
+                incompatible = {4}
+            elif mode == 4:
+                incompatible = {3}
+            for other_mode in incompatible:
+                other = self._actions.get(other_mode)
+                if other is not None and other.isChecked():
+                    other.blockSignals(True)
+                    other.setChecked(False)
+                    other.blockSignals(False)
+        self._changed()
+
+    def _changed(self) -> None:
+        selected = len(self.selected_modes())
+        self.setText("필터" if not selected else f"필터 {selected}")
+        self.selectionChanged.emit()
+
+    def selected_modes(self) -> set[int]:
+        return {
+            mode for mode, button in self._actions.items()
+            if button.isChecked()
+        }
+
+    def currentIndex(self) -> int:
+        """Compatibility for annotation refresh dependency checks."""
+        modes = self.selected_modes()
+        return next(iter(modes)) if len(modes) == 1 else 0
+
+
+class ZoomableImageView(QGraphicsView):
+    """Image viewer with wheel zoom, hand-pan, 100%, and fit-to-window."""
+
+    def __init__(self, pixmap: QPixmap, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+
+        self._scene = QGraphicsScene(self)
+        self.setScene(self._scene)
+        self._pixmap_item = self._scene.addPixmap(pixmap)
+        self._scene.setSceneRect(self._pixmap_item.boundingRect())
+
+        self.setRenderHints(
+            QPainter.RenderHint.Antialiasing
+            | QPainter.RenderHint.SmoothPixmapTransform
+        )
+        self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
+        self.setTransformationAnchor(
+            QGraphicsView.ViewportAnchor.AnchorUnderMouse
+        )
+        self.setResizeAnchor(
+            QGraphicsView.ViewportAnchor.AnchorViewCenter
+        )
+        self.setBackgroundBrush(QColor("#f1f2f6"))
+        self.setFrameShape(QFrame.Shape.NoFrame)
+
+        self._min_scale = 0.05
+        self._max_scale = 16.0
+        QTimer.singleShot(0, self.fit_image)
+
+    def current_scale(self) -> float:
+        return float(self.transform().m11())
+
+    def zoom_by(self, factor: float) -> None:
+        current = self.current_scale()
+        if current <= 0:
+            return
+
+        target = max(
+            self._min_scale,
+            min(self._max_scale, current * float(factor)),
+        )
+        self.scale(target / current, target / current)
+
+    def fit_image(self) -> None:
+        if self._pixmap_item.pixmap().isNull():
+            return
+        self.resetTransform()
+        self.fitInView(
+            self._pixmap_item,
+            Qt.AspectRatioMode.KeepAspectRatio,
+        )
+
+    def actual_size(self) -> None:
+        self.resetTransform()
+        self.centerOn(self._pixmap_item)
+
+    def wheelEvent(self, event) -> None:
+        delta = event.angleDelta().y()
+        if delta == 0:
+            super().wheelEvent(event)
+            return
+
+        steps = delta / 120.0
+        self.zoom_by(1.25 ** steps)
+        event.accept()
+
+    def mouseDoubleClickEvent(self, event) -> None:
+        self.actual_size()
+        event.accept()
+
+
+class BusyOverlay(QWidget):
+    """Blocking visual shown while a scan or synchronous rebuild is running."""
+
+    def __init__(self, parent: QWidget):
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setStyleSheet("background:rgba(23,24,33,145);")
+        layout = QVBoxLayout(self)
+        layout.addStretch(1)
+
+        panel = QFrame()
+        panel.setFixedWidth(320)
+        panel.setStyleSheet(
+            "QFrame { background:white; border:1px solid #dddfea; border-radius:14px; }"
+            "QLabel { background:transparent; color:#20232d; border:0; font-size:11pt; font-weight:650; }"
+            "QProgressBar { background:#ececf3; border:0; border-radius:4px; min-height:8px; max-height:8px; }"
+            "QProgressBar::chunk { background:#6e4bf2; border-radius:4px; }"
+        )
+        panel_layout = QVBoxLayout(panel)
+        panel_layout.setContentsMargins(24, 21, 24, 21)
+        panel_layout.setSpacing(14)
+        self.message = QLabel("처리 중…")
+        self.message.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.progress = QProgressBar()
+        self.progress.setRange(0, 0)
+        self.progress.setTextVisible(False)
+        panel_layout.addWidget(self.message)
+        panel_layout.addWidget(self.progress)
+
+        row = QHBoxLayout()
+        row.addStretch(1)
+        row.addWidget(panel)
+        row.addStretch(1)
+        layout.addLayout(row)
+        layout.addStretch(1)
+        self.hide()
+
+
+
+class DashboardSortBar(QWidget):
+    """Stable dashboard header row with label + ▲/▼ controls.
+
+    This is deliberately separate from QHeaderView.  The previous implementation
+    placed child buttons inside the header viewport, which made text/button geometry
+    depend on native header painting and caused overlap.  Here each column owns a
+    normal QWidget cell and the cell widths are synchronized with the table columns.
+    """
+
+    sortRequested = Signal(int, object)
+
+    def __init__(
+        self,
+        table: QTableWidget,
+        labels: tuple[str, str, str, str],
+        parent: Optional[QWidget] = None,
+    ):
+        super().__init__(parent)
+        self._table = table
+        self._labels = labels
+        self._cells: list[QFrame] = []
+        self._pairs: dict[int, tuple[QToolButton, QToolButton]] = {}
+
+        self.setFixedHeight(39)
+        self.setStyleSheet("background:#fafbfc; border-bottom:1px solid #e9eaf0;")
+
+        button_style = (
+            "QToolButton { background:transparent; color:#9297a7; border:0; "
+            "padding:0; font-size:7pt; font-weight:700; }"
+            "QToolButton:hover { color:#6e4bf2; background:#f0ebff; border-radius:4px; }"
+            "QToolButton:checked { color:#6e4bf2; background:#e7dfff; border-radius:4px; }"
+        )
+
+        for section, label_text in enumerate(labels):
+            cell = QFrame(self)
+            cell.setStyleSheet("background:#fafbfc; border:0;")
+            cell_layout = QHBoxLayout(cell)
+            cell_layout.setContentsMargins(8, 0, 4, 0)
+            cell_layout.setSpacing(2)
+
+            label = QLabel(label_text)
+            label.setStyleSheet(
+                "background:transparent; color:#6c7080; font-weight:600; border:0;"
+            )
+            cell_layout.addWidget(label, 0, Qt.AlignmentFlag.AlignVCenter)
+
+            up = QToolButton()
+            up.setText("▲")
+            up.setToolTip(f"{label_text} 오름차순")
+            up.setAccessibleName(f"{label_text} 오름차순")
+            up.setCheckable(True)
+            up.setAutoRaise(True)
+            up.setFixedSize(17, 22)
+            up.setCursor(Qt.CursorShape.PointingHandCursor)
+            up.setStyleSheet(button_style)
+            up.clicked.connect(
+                lambda _checked=False, s=section: self.sortRequested.emit(
+                    s, Qt.SortOrder.AscendingOrder
+                )
+            )
+
+            down = QToolButton()
+            down.setText("▼")
+            down.setToolTip(f"{label_text} 내림차순")
+            down.setAccessibleName(f"{label_text} 내림차순")
+            down.setCheckable(True)
+            down.setAutoRaise(True)
+            down.setFixedSize(17, 22)
+            down.setCursor(Qt.CursorShape.PointingHandCursor)
+            down.setStyleSheet(button_style)
+            down.clicked.connect(
+                lambda _checked=False, s=section: self.sortRequested.emit(
+                    s, Qt.SortOrder.DescendingOrder
+                )
+            )
+
+            cell_layout.addWidget(up, 0, Qt.AlignmentFlag.AlignVCenter)
+            cell_layout.addWidget(down, 0, Qt.AlignmentFlag.AlignVCenter)
+            cell_layout.addStretch(1)
+
+            self._cells.append(cell)
+            self._pairs[section] = (up, down)
+
+        # QHeaderView remains as a geometry engine only; it is hidden visually.
+        header = self._table.horizontalHeader()
+        header.sectionResized.connect(lambda *_args: self._sync_geometry())
+        self._table.verticalScrollBar().rangeChanged.connect(
+            lambda *_args: QTimer.singleShot(0, self._sync_geometry)
+        )
+        QTimer.singleShot(0, self._sync_geometry)
+
+    def set_active_sort(self, section: int, order: Qt.SortOrder) -> None:
+        for idx, (up, down) in self._pairs.items():
+            up.setChecked(
+                idx == section and order == Qt.SortOrder.AscendingOrder
+            )
+            down.setChecked(
+                idx == section and order == Qt.SortOrder.DescendingOrder
+            )
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        QTimer.singleShot(0, self._sync_geometry)
+
+    def _sync_geometry(self) -> None:
+        x = 0
+        for column, cell in enumerate(self._cells):
+            width = self._table.columnWidth(column)
+            # The final visual cell should use the remaining width so no blank
+            # strip appears beside the table's vertical scrollbar.
+            if column == len(self._cells) - 1:
+                width = max(width, self.width() - x)
+            cell.setGeometry(x, 0, max(1, width), self.height())
+            cell.show()
+            cell.raise_()
+            x += width
+
+
+class CopyValueLabel(QLabel):
+    """A metadata label that copies only its raw value when clicked."""
+
+    def __init__(self, prefix: str, value: str, parent: Optional[QWidget] = None):
+        self.prefix = prefix
+        self.copy_value = value
+        super().__init__(f"{prefix}: {value}", parent)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setToolTip(f"클릭하여 {prefix} 복사")
+
+    def setCopyValue(self, value: str) -> None:
+        self.copy_value = value
+        self.setText(f"{self.prefix}: {value}")
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            QApplication.clipboard().setText(self.copy_value)
+            window = self.window()
+            if isinstance(window, MainWindow):
+                window._show_copy_toast()
+            elif isinstance(window, QMainWindow):
+                bar = window.statusBar()
+                bar.showMessage("클립보드에 복사되었습니다", 1000)
+                QTimer.singleShot(1000, bar.hide)
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+
+class ScanWorker(QObject):
+    finished = Signal(object)
+    failed = Signal(str)
+
+    def __init__(self, path: Path, car_db: CarDatabase):
+        super().__init__()
+        self.path = path
+        self.car_db = car_db
+
+    @Slot()
+    def run(self) -> None:
+        try:
+            self.finished.emit(scan_save(self.path, self.car_db))
+        except Exception as exc:  # keep worker errors out of the GUI event loop
+            self.failed.emit(f"{type(exc).__name__}: {exc}")
+
+
+class CarDatabaseUpdateWorker(QObject):
+    finished = Signal(object)
+    failed = Signal(str)
+
+    def __init__(self, cache_path: Path):
+        super().__init__()
+        self.cache_path = cache_path
+
+    @Slot()
+    def run(self) -> None:
+        try:
+            self.finished.emit(CarDatabase.fetch_remote_update(self.cache_path))
+        except Exception as exc:
+            self.failed.emit(f"{type(exc).__name__}: {exc}")
+
+
+class SummaryCard(QFrame):
+    def __init__(self, title: str, value: str = "—", subtitle: str = ""):
+        super().__init__()
+        self.setObjectName("card")
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(18, 15, 18, 15)
+        self.title = QLabel(title)
+        self.title.setObjectName("cardTitle")
+        self.value = QLabel(value)
+        self.value.setObjectName("cardValue")
+        self.subtitle = QLabel(subtitle)
+        self.subtitle.setObjectName("muted")
+        self.subtitle.setVisible(bool(subtitle))
+        layout.addWidget(self.title)
+        layout.addWidget(self.value)
+        layout.addWidget(self.subtitle)
+
+
+class MainWindow(QMainWindow):
+    def __init__(self, project_root: Path):
+        super().__init__()
+        self.project_root = project_root
+        self.car_db = CarDatabase(project_root / "data" / "car_names.json")
+        self.settings = QSettings()
+        self.annotations = AnnotationStore()
+        self.local_preferences = LocalPreferences()
+        # Save-related persistence is path-only. Remove the old UI-mode key from
+        # v0.1.2 so no scan result, thumbnail or view state is persisted.
+        self.settings.remove("livery_view_mode")
+        self.result: Optional[ScanResult] = None
+        self._scan_thread: Optional[QThread] = None
+        self._scan_worker: Optional[ScanWorker] = None
+        self._db_update_thread: Optional[QThread] = None
+        self._db_update_worker: Optional[CarDatabaseUpdateWorker] = None
+        self._livery_grid_cards: list[QFrame] = []
+        self._livery_card_by_key: dict[str, QFrame] = {}
+        self._livery_group_headers: dict[str, QLabel] = {}
+        self._tuning_grid_cards: list[QFrame] = []
+        self._tuning_card_by_key: dict[str, QFrame] = {}
+        self._tuning_group_headers: dict[str, QLabel] = {}
+        self._saved_content_action_rows: dict[str, QHBoxLayout] = {}
+        # UI-only sort state. This is intentionally not persisted.
+        self._livery_sort_mode = "__initial__"
+        self._tuning_sort_mode = "__initial__"
+        self._livery_sort_descending = False
+        self._tuning_sort_descending = False
+        self._status_token = 0
+        self._game_navigation_sessions: dict[str, GameGridSession] = {}
+        self._game_navigation_generation = 0
+        self._game_navigation_pending = False
+        self._busy_depth = 0
+        self._search_debounce_timers: dict[int, QTimer] = {}
+
+        # Dashboard defaults:
+        #   vehicle mode -> Car ID ascending
+        #   creator mode -> creator name ascending
+        self._dashboard_car_sort_section = 0
+        self._dashboard_car_sort_order = Qt.SortOrder.AscendingOrder
+        self._dashboard_creator_sort_section = 1
+        self._dashboard_creator_sort_order = Qt.SortOrder.AscendingOrder
+
+        self.setWindowTitle("FH6 Assistant v1.1")
+        self.resize(1460, 900)
+        # Allow a narrower compact layout while preventing the two-row toolbar
+        # and card metadata from being vertically clipped.
+        self.setMinimumSize(960, 680)
+        QApplication.instance().setStyleSheet(APP_STYLE)
+        self._build_ui()
+        self._busy_overlay = BusyOverlay(self)
+        self._busy_overlay.setGeometry(self.rect())
+        self._apply_pointing_cursors(self)
+        self._refresh_db_status()
+        self._set_always_on_top(
+            self.settings.value("window_always_on_top", False, bool),
+            persist=False,
+        )
+
+        last = self.settings.value("last_save_path", "", str)
+        if last and Path(last).is_dir():
+            self.path_edit.setText(last)
+            # Persist only the path. Re-read the live save on every launch.
+            QTimer.singleShot(0, lambda saved=Path(last): self.start_scan(saved))
+
+    def _begin_busy(self, message: str = "처리 중…") -> None:
+        self._busy_depth += 1
+        if not hasattr(self, "_busy_overlay"):
+            return
+        self._busy_overlay.message.setText(message)
+        self._busy_overlay.setGeometry(self.rect())
+        self._busy_overlay.show()
+        self._busy_overlay.raise_()
+        QApplication.processEvents(
+            QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents
+        )
+
+    def _end_busy(self) -> None:
+        self._busy_depth = max(0, self._busy_depth - 1)
+        if self._busy_depth == 0 and hasattr(self, "_busy_overlay"):
+            self._busy_overlay.hide()
+
+    def _keep_busy_responsive(self, index: int, interval: int = 12) -> None:
+        """Let the indeterminate progress animation repaint during rebuilds."""
+        if self._busy_depth and index % interval == 0:
+            QApplication.processEvents(
+                QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents
+            )
+
+    def _connect_debounced_search(
+        self,
+        field: QLineEdit,
+        callback,
+        delay_ms: int = 250,
+    ) -> None:
+        """Run expensive filtering once after typing pauses, or on Enter."""
+        timer = QTimer(self)
+        timer.setSingleShot(True)
+        timer.setInterval(delay_ms)
+
+        def apply_now() -> None:
+            timer.stop()
+            callback(field.text())
+
+        timer.timeout.connect(apply_now)
+        field.textChanged.connect(lambda _text: timer.start())
+        field.returnPressed.connect(apply_now)
+        self._search_debounce_timers[id(field)] = timer
+
+    @Slot(bool)
+    def _set_always_on_top(self, enabled: bool, *, persist: bool = True) -> None:
+        """Apply the topmost flag without changing the current window size."""
+        was_visible = self.isVisible()
+        was_maximized = self.isMaximized()
+        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, enabled)
+        if persist:
+            self.settings.setValue("window_always_on_top", enabled)
+        # Changing a native window flag hides an already visible window.
+        if was_visible:
+            self.showMaximized() if was_maximized else self.show()
+
+    def _show_status(self, message: str, timeout: int = 0) -> None:
+        """Show the status bar only while a message is active.
+
+        Keeping an empty QStatusBar visible reserved a white strip across the
+        bottom of the entire window. Timed messages now release that space.
+        """
+        self._status_token += 1
+        token = self._status_token
+        bar = self.statusBar()
+        bar.setSizeGripEnabled(False)
+        bar.setStyleSheet(
+            "QStatusBar { background:#f7f8fb; color:#555a68; "
+            "border-top:1px solid #e3e5eb; padding:1px 8px; }"
+        )
+        bar.show()
+        bar.showMessage(message)
+        if timeout > 0:
+            QTimer.singleShot(
+                timeout,
+                lambda expected=token: self._hide_status(expected),
+            )
+
+    def _hide_status(self, expected_token: int) -> None:
+        if expected_token != self._status_token:
+            return
+        bar = self.statusBar()
+        bar.clearMessage()
+        bar.hide()
+
+    def _show_copy_toast(self) -> None:
+        """Show a true one-second overlay independent of mouse hover state."""
+        if not hasattr(self, "_copy_toast"):
+            toast = QLabel("클립보드에 복사되었습니다", self)
+            toast.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            toast.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+            toast.setStyleSheet(
+                "QLabel { background:rgba(32,34,42,235); color:white; "
+                "border-radius:8px; padding:8px 14px; font-weight:600; }"
+            )
+            self._copy_toast = toast
+            self._copy_toast_timer = QTimer(self)
+            self._copy_toast_timer.setSingleShot(True)
+            self._copy_toast_timer.timeout.connect(toast.hide)
+
+        toast = self._copy_toast
+        toast.adjustSize()
+        x = max(8, (self.width() - toast.width()) // 2)
+        y = max(8, self.height() - toast.height() - 52)
+        toast.move(x, y)
+        toast.show()
+        toast.raise_()
+        self._copy_toast_timer.start(1000)
+        self._show_status("클립보드에 복사되었습니다", 1000)
+
+    def _build_ui(self) -> None:
+        root = QWidget()
+        self.setCentralWidget(root)
+        outer = QHBoxLayout(root)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        sidebar = QFrame()
+        sidebar.setObjectName("sidebar")
+        sidebar.setFixedWidth(170)
+        side = QVBoxLayout(sidebar)
+        side.setContentsMargins(15, 18, 15, 18)
+        brand = QLabel("FH6\nASSISTANT")
+        brand.setObjectName("brand")
+        side.addWidget(brand)
+
+        self.nav_group = QButtonGroup(self)
+        self.nav_group.setExclusive(True)
+        self.nav_buttons: list[QPushButton] = []
+        for index, text in enumerate(("대시보드", "리버리", "튜닝")):
+            button = QPushButton(text)
+            button.setObjectName("nav")
+            button.setCheckable(True)
+            if index == 0:
+                button.setChecked(True)
+            button.clicked.connect(lambda checked=False, i=index: self.pages.setCurrentIndex(i))
+            self.nav_group.addButton(button)
+            self.nav_buttons.append(button)
+            side.addWidget(button)
+        side.addStretch(1)
+        self.always_on_top_box = QCheckBox("항상 위에 표시")
+        self.always_on_top_box.setStyleSheet(
+            "QCheckBox { color:#c7c9d4; spacing:7px; padding:7px 6px; }"
+            "QCheckBox:hover { color:white; }"
+        )
+        self.always_on_top_box.setChecked(
+            self.settings.value("window_always_on_top", False, bool)
+        )
+        self.always_on_top_box.setToolTip(
+            "인게임 이동을 시작하면 포르자 화면을 가리지 않도록 분석기 창을 최소화합니다."
+        )
+        self.always_on_top_box.toggled.connect(self._set_always_on_top)
+        side.addWidget(self.always_on_top_box)
+        version = QLabel("v1.1\nLIVERY & TUNING")
+        version.setStyleSheet("color:#777b8b; padding:8px;")
+        side.addWidget(version)
+        outer.addWidget(sidebar)
+
+        content = QWidget()
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(22, 18, 22, 18)
+        content_layout.setSpacing(14)
+
+        top = QHBoxLayout()
+        self.path_edit = QLineEdit()
+        self.path_edit.setReadOnly(True)
+        self.path_edit.setPlaceholderText("FH6 세이브 루트/current/버전/ContainersRoot 폴더를 선택하세요")
+        choose = QPushButton("세이브 폴더 선택")
+        choose.setObjectName("primary")
+        choose.clicked.connect(self.choose_save_folder)
+        refresh = QPushButton("새로고침")
+        refresh.setObjectName("secondary")
+        refresh.clicked.connect(self.refresh_scan)
+        top.addWidget(self.path_edit, 1)
+        top.addWidget(choose)
+        top.addWidget(refresh)
+        content_layout.addLayout(top)
+
+        self.pages = QStackedWidget()
+        self.pages.addWidget(self._dashboard_page())
+        self.pages.addWidget(self._livery_page())
+        self.pages.addWidget(self._tuning_page())
+        # A scan normally completes while the dashboard page is visible.  At that
+        # point the livery/tuning pages are hidden, so QWidget.isVisible() is false
+        # for every card and the lazy thumbnail pass intentionally skips them.
+        # Refresh again whenever a stacked page actually becomes current so the
+        # first visible frame already contains its thumbnails; no resize/scroll
+        # interaction should be required to trigger loading.
+        self.pages.currentChanged.connect(self._on_main_page_changed)
+        content_layout.addWidget(self.pages, 1)
+        outer.addWidget(content, 1)
+
+    def _page_header(self, title: str, subtitle: str) -> QVBoxLayout:
+        layout = QVBoxLayout()
+        title_label = QLabel(title)
+        title_label.setObjectName("pageTitle")
+        layout.addWidget(title_label)
+        if subtitle:
+            subtitle_label = QLabel(subtitle)
+            subtitle_label.setObjectName("muted")
+            layout.addWidget(subtitle_label)
+        return layout
+
+    def _dashboard_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addLayout(self._page_header("차고 분석 대시보드", ""))
+
+        cards = QGridLayout()
+        cards.setSpacing(12)
+        self.card_cars = SummaryCard("차고 차량", "—")
+        self.card_livery = SummaryCard("저장 리버리", "—")
+        self.card_tuning = SummaryCard("저장 튜닝", "—")
+        for i, card in enumerate((self.card_cars, self.card_livery, self.card_tuning)):
+            cards.addWidget(card, 0, i)
+        layout.addLayout(cards)
+
+        db_panel = QFrame(); db_panel.setObjectName("panel")
+        db_layout = QHBoxLayout(db_panel); db_layout.setContentsMargins(14, 11, 14, 11)
+        db_title = QLabel("차량 DB")
+        db_title.setStyleSheet("font-size:11pt;font-weight:700;")
+
+        self.db_last_update_label = QLabel("/ 마지막 업데이트: 확인 불가")
+        self.db_last_update_label.setObjectName("muted")
+        self.db_last_update_label.setStyleSheet(
+            "color:#737787; font-size:9.5pt; background:transparent;"
+        )
+
+        self.db_update_button = QPushButton("업데이트 확인")
+        self.db_update_button.setObjectName("secondary")
+        self.db_update_button.setToolTip("차량 DB의 새로운 버전을 확인합니다.")
+        self.db_update_button.clicked.connect(self.start_car_db_update)
+
+        self.db_source_button = QToolButton()
+        self.db_source_button.setText("DB 출처")
+        self.db_source_button.setIcon(self._external_link_icon())
+        self.db_source_button.setIconSize(QSize(18, 18))
+        self.db_source_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.db_source_button.setToolTip("차량 DB 원본 페이지를 브라우저에서 엽니다.")
+        self.db_source_button.setAccessibleName("차량 DB 출처 열기")
+        self.db_source_button.setMinimumHeight(38)
+        self.db_source_button.setStyleSheet(
+            "QToolButton { background:white; color:#303341; "
+            "border:1px solid #dfe1e8; border-radius:8px; padding:5px; }"
+            "QToolButton:hover { border-color:#9c8cf5; background:#f7f5ff; }"
+        )
+        self.db_source_button.clicked.connect(self._open_car_db_source)
+
+        self.db_override_button = QPushButton("사용자 차량 이름 지정")
+        self.db_override_button.setObjectName("secondary")
+        self.db_override_button.setToolTip("Car ID에 대응하는 차량 이름을 직접 지정하거나 수정합니다.")
+        self.db_override_button.clicked.connect(self.open_car_db_override)
+
+        db_layout.addWidget(db_title)
+        db_layout.addWidget(self.db_last_update_label)
+        db_layout.addStretch(1)
+        db_layout.addWidget(self.db_override_button)
+        db_layout.addWidget(self.db_update_button)
+        db_layout.addWidget(self.db_source_button)
+        layout.addWidget(db_panel)
+
+        body = QHBoxLayout()
+        left = QFrame(); left.setObjectName("panel")
+        left_l = QVBoxLayout(left); left_l.setContentsMargins(14, 14, 14, 14)
+        row = QHBoxLayout()
+
+        # Dashboard aggregation selector.  Vehicle aggregation remains the default,
+        # while creator aggregation summarizes custom liveries and saved tunings.
+        self.dashboard_mode_group = QButtonGroup(self)
+        self.dashboard_mode_group.setExclusive(True)
+
+        self.dashboard_car_button = QPushButton("차종별 저장 콘텐츠")
+        self.dashboard_car_button.setObjectName("secondary")
+        self.dashboard_car_button.setCheckable(True)
+        self.dashboard_car_button.setChecked(True)
+        self.dashboard_car_button.clicked.connect(lambda _checked=False: self._set_dashboard_content_mode(0))
+
+        self.dashboard_creator_button = QPushButton("제작자별 콘텐츠")
+        self.dashboard_creator_button.setObjectName("secondary")
+        self.dashboard_creator_button.setCheckable(True)
+        self.dashboard_creator_button.clicked.connect(lambda _checked=False: self._set_dashboard_content_mode(1))
+
+        self.dashboard_mode_group.addButton(self.dashboard_car_button)
+        self.dashboard_mode_group.addButton(self.dashboard_creator_button)
+
+        self.car_search = QLineEdit()
+        self.car_search.setPlaceholderText("Car ID / 차량명 검색")
+        self.car_search.setFixedWidth(260)
+        self._connect_debounced_search(
+            self.car_search,
+            self._filter_dashboard_table,
+        )
+
+        row.addWidget(self.dashboard_car_button)
+        row.addWidget(self.dashboard_creator_button)
+        row.addStretch(1)
+        row.addWidget(self.car_search)
+        left_l.addLayout(row)
+
+        self.dashboard_content_stack = QStackedWidget()
+
+        self.car_table = self._table(("Car ID", "차량", "리버리", "튜닝"))
+        self.car_table.itemSelectionChanged.connect(self._update_selected_car)
+        self._configure_dashboard_table(self.car_table)
+
+        self.car_sort_bar = DashboardSortBar(
+            self.car_table,
+            ("Car ID", "차량", "리버리", "튜닝"),
+        )
+        self.car_sort_bar.sortRequested.connect(self._sort_car_dashboard)
+        self.car_sort_bar.set_active_sort(
+            self._dashboard_car_sort_section,
+            self._dashboard_car_sort_order,
+        )
+
+        car_pane = QWidget()
+        car_pane_layout = QVBoxLayout(car_pane)
+        car_pane_layout.setContentsMargins(0, 0, 0, 0)
+        car_pane_layout.setSpacing(0)
+        car_pane_layout.addWidget(self.car_sort_bar)
+        car_pane_layout.addWidget(self.car_table, 1)
+        self.dashboard_content_stack.addWidget(car_pane)
+
+        # Exactly the same column geometry in creator mode:
+        #   Car ID -> 합계 / 차량 -> 제작자명 / 리버리 -> 리버리 / 튜닝 -> 튜닝
+        self.creator_table = self._table(("합계", "제작자명", "리버리", "튜닝"))
+        self.creator_table.itemSelectionChanged.connect(self._update_selected_creator)
+        self._configure_dashboard_table(self.creator_table)
+
+        self.creator_sort_bar = DashboardSortBar(
+            self.creator_table,
+            ("합계", "제작자명", "리버리", "튜닝"),
+        )
+        self.creator_sort_bar.sortRequested.connect(self._sort_creator_dashboard)
+        self.creator_sort_bar.set_active_sort(
+            self._dashboard_creator_sort_section,
+            self._dashboard_creator_sort_order,
+        )
+
+        creator_pane = QWidget()
+        creator_pane_layout = QVBoxLayout(creator_pane)
+        creator_pane_layout.setContentsMargins(0, 0, 0, 0)
+        creator_pane_layout.setSpacing(0)
+        creator_pane_layout.addWidget(self.creator_sort_bar)
+        creator_pane_layout.addWidget(self.creator_table, 1)
+        self.dashboard_content_stack.addWidget(creator_pane)
+
+        left_l.addWidget(self.dashboard_content_stack)
+
+        right = QFrame(); right.setObjectName("panel")
+        right_l = QVBoxLayout(right); right_l.setContentsMargins(14, 14, 14, 14)
+        self.selected_title = QLabel("차량을 선택하세요")
+        self.selected_title.setStyleSheet("font-size:13pt;font-weight:700;")
+        self.selected_hint = QLabel("")
+        self.selected_hint.setWordWrap(True); self.selected_hint.setObjectName("muted")
+        self.selected_hint.hide()
+        right_l.addWidget(self.selected_title)
+        right_l.addWidget(self.selected_hint)
+
+        self.saved_livery_section = QLabel("저장 리버리")
+        self.saved_livery_section.setStyleSheet(
+            "background:#eee9ff; color:#5f39d8; font-weight:700; "
+            "padding:6px 9px; border-radius:6px;"
+        )
+        right_l.addWidget(self.saved_livery_section)
+
+        self.selected_liveries = self._table(("", "리버리 이름", "제작자"))
+        right_l.addWidget(self.selected_liveries, 1)
+
+        self.saved_tuning_section = QLabel("저장 튜닝")
+        self.saved_tuning_section.setStyleSheet(
+            "background:#eee9ff; color:#5f39d8; font-weight:700; "
+            "padding:6px 9px; border-radius:6px;"
+        )
+        right_l.addWidget(self.saved_tuning_section)
+
+        self.selected_tunings = self._table(("", "이름", "제작자", "크기"))
+        right_l.addWidget(self.selected_tunings, 1)
+
+        body.addWidget(left, 5)
+        body.addWidget(right, 4)
+        layout.addLayout(body, 1)
+        return page
+
+    def _livery_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addLayout(self._page_header("저장 리버리", ""))
+
+        (
+            controls,
+            self.livery_search,
+            self.livery_check_filter,
+            self.livery_sort_group,
+            self.livery_sort_buttons,
+        ) = self._build_saved_content_controls("livery")
+        layout.addLayout(controls)
+
+        self.livery_table = self._saved_content_table("리버리 이름")
+        self.livery_table.setParent(page)
+        self.livery_table.hide()
+
+        self.livery_grid_scroll = QScrollArea()
+        self.livery_grid_scroll.setObjectName("liveryGridScroll")
+        self.livery_grid_scroll.setWidgetResizable(True)
+        self.livery_grid_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        # Grid cards must always fit the actual viewport. A horizontal scrollbar
+        # was a symptom of the two cards' minimum-size hints exceeding the
+        # available width and made the right-hand card look clipped.
+        self.livery_grid_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        self.livery_grid_scroll.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOn
+        )
+        self.livery_grid_scroll.setStyleSheet(
+            "QScrollArea#liveryGridScroll { background:#f7f8fb; border:0; }"
+        )
+
+        viewport = self.livery_grid_scroll.viewport()
+        viewport.setObjectName("liveryGridViewport")
+        viewport.setStyleSheet(
+            "QWidget#liveryGridViewport { background:#f7f8fb; }"
+        )
+
+        self.livery_grid_host = QWidget()
+        self.livery_grid_host.setObjectName("liveryGridHost")
+        self.livery_grid_host.setMinimumWidth(0)
+        self.livery_grid_host.setStyleSheet(
+            "QWidget#liveryGridHost { background:#f7f8fb; }"
+        )
+        self.livery_grid_layout = QGridLayout(self.livery_grid_host)
+        self.livery_grid_layout.setContentsMargins(2, 2, 2, 2)
+        self.livery_grid_layout.setHorizontalSpacing(14)
+        self.livery_grid_layout.setVerticalSpacing(14)
+        self.livery_grid_layout.setColumnStretch(0, 1)
+        self.livery_grid_layout.setColumnStretch(1, 1)
+        self.livery_grid_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.livery_grid_scroll.setWidget(self.livery_grid_host)
+        self.livery_grid_scroll.verticalScrollBar().valueChanged.connect(
+            self._schedule_visible_livery_thumbnails
+        )
+        self.livery_grid_scroll.verticalScrollBar().rangeChanged.connect(
+            lambda *_args: self._sync_livery_grid_card_widths()
+        )
+
+        # Receive the actual viewport's resize event during live Windows border
+        # dragging.  This is synchronous and does not wait for a timer tick.
+        self.livery_grid_scroll.viewport().installEventFilter(self)
+
+        layout.addWidget(self.livery_grid_scroll, 1)
+        return page
+
+    def _tuning_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addLayout(
+            self._page_header(
+                "저장 튜닝",
+                "",
+            )
+        )
+
+        (
+            controls,
+            self.tuning_search,
+            self.tuning_check_filter,
+            self.tuning_sort_group,
+            self.tuning_sort_buttons,
+        ) = self._build_saved_content_controls("tuning")
+        layout.addLayout(controls)
+        self.tuning_table = self._saved_content_table("튜닝 이름")
+        self.tuning_table.setParent(page)
+        self.tuning_table.hide()
+
+        self.tuning_grid_scroll = QScrollArea()
+        self.tuning_grid_scroll.setObjectName("tuningGridScroll")
+        self.tuning_grid_scroll.setWidgetResizable(True)
+        self.tuning_grid_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.tuning_grid_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        self.tuning_grid_scroll.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOn
+        )
+        self.tuning_grid_scroll.setStyleSheet(
+            "QScrollArea#tuningGridScroll { background:#f7f8fb; border:0; }"
+        )
+        tuning_viewport = self.tuning_grid_scroll.viewport()
+        tuning_viewport.setObjectName("tuningGridViewport")
+        tuning_viewport.setStyleSheet(
+            "QWidget#tuningGridViewport { background:#f7f8fb; }"
+        )
+        self.tuning_grid_host = QWidget()
+        self.tuning_grid_host.setObjectName("tuningGridHost")
+        self.tuning_grid_host.setMinimumWidth(0)
+        self.tuning_grid_host.setStyleSheet(
+            "QWidget#tuningGridHost { background:#f7f8fb; }"
+        )
+        self.tuning_grid_layout = QGridLayout(self.tuning_grid_host)
+        self.tuning_grid_layout.setContentsMargins(2, 2, 2, 2)
+        self.tuning_grid_layout.setHorizontalSpacing(14)
+        self.tuning_grid_layout.setVerticalSpacing(14)
+        self.tuning_grid_layout.setColumnStretch(0, 1)
+        self.tuning_grid_layout.setColumnStretch(1, 1)
+        self.tuning_grid_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.tuning_grid_scroll.setWidget(self.tuning_grid_host)
+        self.tuning_grid_scroll.verticalScrollBar().valueChanged.connect(
+            self._schedule_visible_tuning_thumbnails
+        )
+        self.tuning_grid_scroll.verticalScrollBar().rangeChanged.connect(
+            lambda *_args: self._sync_tuning_grid_card_widths()
+        )
+        self.tuning_grid_scroll.viewport().installEventFilter(self)
+        layout.addWidget(self.tuning_grid_scroll, 1)
+        return page
+
+    def _table(self, headers: tuple[str, ...]) -> QTableWidget:
+        table = QTableWidget(0, len(headers))
+        table.setHorizontalHeaderLabels(headers)
+        table.verticalHeader().setVisible(False)
+        table.setAlternatingRowColors(False)
+        table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        table.setShowGrid(False)
+        table.setIconSize(QSize(76, 48))
+        table.horizontalHeader().setStretchLastSection(True)
+        table.horizontalHeader().setDefaultAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+        )
+        for col in range(len(headers)):
+            table.horizontalHeader().setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
+        if len(headers) > 1:
+            table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        return table
+
+    def _saved_content_table(self, name_header: str) -> QTableWidget:
+        """Create the common list component used by Livery and Tuning.
+
+        Visible columns intentionally stay identical:
+        상태 | 차량명 | 제작자 | 이름 | 설명 | 메모 | 생성일 | 다운로드일
+
+        The future detail column is deliberately omitted until the supporting
+        database/schema mapping is available.
+        """
+        table = self._table(
+            (
+                "상태",
+                "차량명",
+                "제작자",
+                name_header,
+                "설명",
+                "메모",
+                "생성일",
+                "다운로드일",
+            )
+        )
+        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        table.setStyleSheet(
+            "QTableWidget::item:selected { background:#f2edff; color:#171924; border:0; }"
+            "QTableWidget::item:selected:active { background:#f2edff; color:#171924; border:0; }"
+            "QTableWidget::item:hover { background:#fbf9ff; }"
+        )
+
+        header = table.horizontalHeader()
+        header.setStretchLastSection(False)
+        header.setDefaultAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+        )
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(7, QHeaderView.ResizeMode.Fixed)
+
+        table.setColumnWidth(0, 126)
+        table.setColumnWidth(2, 150)
+        table.setColumnWidth(5, 48)
+        table.setColumnWidth(6, 104)
+        table.setColumnWidth(7, 150)
+        return table
+
+    def _build_saved_content_controls(
+        self,
+        content_type: str,
+    ) -> tuple[
+        QVBoxLayout,
+        QLineEdit,
+        MultiStatusFilterButton,
+        QButtonGroup,
+        dict[str, QPushButton],
+    ]:
+        """Create two toolbar rows: search/filter, then sort/view/actions."""
+        controls = QVBoxLayout()
+        controls.setSpacing(7)
+        search_row = QHBoxLayout()
+        action_row = QHBoxLayout()
+        action_row.setSpacing(7)
+        self._saved_content_action_rows[content_type] = action_row
+
+        search = QLineEdit()
+        search.setPlaceholderText(
+            "이름 / 제작자 / Car ID / 차량명 / 설명 / 메모 검색"
+        )
+        self._connect_debounced_search(
+            search,
+            lambda text, kind=content_type:
+            self._filter_saved_content_views(kind, text),
+        )
+        search_row.addWidget(search, 1)
+
+        status_filter = MultiStatusFilterButton(content_type == "livery", self)
+        status_filter.selectionChanged.connect(
+            lambda kind=content_type, field=search:
+            self._filter_saved_content_views(kind, field.text())
+        )
+        search_row.addWidget(status_filter)
+        controls.addLayout(search_row)
+
+        sort_label = QLabel("정렬:")
+        sort_label.setObjectName("muted")
+        action_row.addWidget(sort_label)
+
+        sort_group = QButtonGroup(self)
+        sort_group.setExclusive(True)
+        sort_buttons: dict[str, QPushButton] = {}
+
+        for mode, label_text in (
+            ("default", "기본"),
+            ("brand", "브랜드명"),
+            ("creator", "제작자명"),
+            ("download", "다운로드"),
+        ):
+            button = QPushButton(label_text)
+            button.setObjectName("secondary")
+            button.setCheckable(True)
+            if mode == "default":
+                button.setChecked(True)
+            button.clicked.connect(
+                lambda _checked=False, kind=content_type, m=mode:
+                self._set_saved_content_sort_mode(kind, m)
+            )
+            sort_group.addButton(button)
+            sort_buttons[mode] = button
+            action_row.addWidget(button)
+
+        group_button = QPushButton("동일 차량끼리 묶기")
+        group_button.setObjectName("secondary")
+        group_button.setCheckable(True)
+        group_button.setChecked(
+            self.local_preferences.get_bool(
+                f"{content_type}_group_by_vehicle",
+                False,
+            )
+        )
+        group_button.setToolTip(
+            "같은 차량의 항목을 모으고 차량명과 현재 표시 개수를 구분 제목으로 표시합니다."
+        )
+        group_button.toggled.connect(
+            lambda checked, kind=content_type:
+            self._set_vehicle_grouping(kind, checked)
+        )
+        setattr(self, f"{content_type}_group_button", group_button)
+        action_row.addWidget(group_button)
+
+        action_row.addStretch(1)
+        controls.addLayout(action_row)
+
+        return (
+            controls,
+            search,
+            status_filter,
+            sort_group,
+            sort_buttons,
+        )
+
+    @Slot(str, bool)
+    def _set_vehicle_grouping(
+        self,
+        content_type: str,
+        enabled: bool,
+    ) -> None:
+        self.local_preferences.set_bool(
+            f"{content_type}_group_by_vehicle",
+            enabled,
+        )
+        search = (
+            self.livery_search
+            if content_type == "livery"
+            else self.tuning_search
+        )
+        self._filter_saved_content_views(content_type, search.text())
+
+    @Slot()
+    def choose_save_folder(self) -> None:
+        start = self.path_edit.text() or str(Path.home())
+        path = QFileDialog.getExistingDirectory(self, "FH6 세이브 폴더 선택", start)
+        if path:
+            self.path_edit.setText(path)
+            self.settings.setValue("last_save_path", path)
+            self.start_scan(Path(path))
+
+    @Slot()
+    def refresh_scan(self) -> None:
+        self.car_db.reload()
+        self._refresh_db_status()
+        if self.path_edit.text():
+            self.start_scan(Path(self.path_edit.text()))
+
+    def start_scan(self, path: Path) -> None:
+        if self._scan_thread and self._scan_thread.isRunning():
+            return
+        self._begin_busy("세이브와 썸네일을 불러오는 중…")
+        self._show_status("세이브 스캔 중…")
+        thread = QThread(self)
+        worker = ScanWorker(path, self.car_db)
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.finished.connect(self._scan_finished)
+        worker.failed.connect(self._scan_failed)
+        worker.finished.connect(thread.quit)
+        worker.failed.connect(thread.quit)
+        thread.finished.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater)
+        self._scan_thread = thread
+        self._scan_worker = worker
+        thread.finished.connect(self._scan_cleanup)
+        thread.start()
+
+
+    @Slot()
+    def _scan_cleanup(self) -> None:
+        self._scan_thread = None
+        self._scan_worker = None
+
+    @Slot(object)
+    def _scan_finished(self, result: ScanResult) -> None:
+        try:
+            self.result = result
+            self._reset_game_navigation_sessions()
+            self._populate_all()
+        finally:
+            self._end_busy()
+        self._show_status(f"완료 — {sum(x.kind == 'Livery' for x in result.liveries)} liveries / {len(result.tunings)} tunings", 8000)
+
+    @Slot(str)
+    def _scan_failed(self, message: str) -> None:
+        self._end_busy()
+        self._show_status("스캔 실패", 5000)
+        QMessageBox.critical(self, "세이브 스캔 실패", message)
+
+    def _populate_all(self) -> None:
+        assert self.result is not None
+        r = self.result
+        meta = r.metadata
+        self.card_cars.value.setText(str(meta.reported_car_count) if meta.reported_car_count is not None else "—")
+        custom = sum(1 for x in r.liveries if x.kind == "Livery")
+        self.card_livery.value.setText(str(custom))
+        self.card_tuning.value.setText(str(len(r.tunings)))
+        self._populate_car_table()
+        self._populate_creator_table()
+        self._begin_busy("리버리 목록을 다시 구성하는 중…")
+        try:
+            self._populate_livery_table()
+        finally:
+            self._end_busy()
+        self._populate_tuning_table()
+        self._refresh_db_status(self._current_unknown_car_ids())
+
+    def _configure_dashboard_table(self, table: QTableWidget) -> None:
+        """Shared four-column dashboard geometry.
+
+        The native horizontal header is hidden.  DashboardSortBar is the only
+        visible header, eliminating native-header/button overlap completely.
+        """
+        header = table.horizontalHeader()
+        header.setVisible(False)
+        header.setStretchLastSection(False)
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+
+        table.setColumnWidth(0, 92)
+        table.setColumnWidth(2, 92)
+        table.setColumnWidth(3, 92)
+
+
+    @staticmethod
+    def _order_key(value: object) -> object:
+        if isinstance(value, str):
+            return value.casefold()
+        return value
+
+    def _car_dashboard_sort_key(self, summary) -> tuple:
+        section = self._dashboard_car_sort_section
+        if section == 0:
+            return (summary.car_id,)
+
+        if section == 1:
+            info = self.car_db.get(summary.car_id)
+            label = (info.label or summary.label or "").strip()
+            unknown = label.startswith("Car ID ")
+            manufacturer = (info.manufacturer or "").strip()
+
+            # Fallback for community/override labels such as
+            # "1969 Toyota 2000 GT": year is ignored; manufacturer is Toyota.
+            if not manufacturer:
+                parts = label.split()
+                if len(parts) >= 2 and parts[0].isdigit() and len(parts[0]) == 4:
+                    manufacturer = parts[1]
+                elif parts:
+                    manufacturer = parts[0]
+
+            return (
+                1 if unknown else 0,
+                manufacturer.casefold(),
+                re.sub(r"^\d{4}\s+", "", label).casefold(),
+                summary.car_id,
+            )
+
+        if section == 2:
+            return (summary.livery_count, summary.car_id)
+        if section == 3:
+            return (summary.tuning_count, summary.car_id)
+        return (summary.car_id,)
+
+    def _creator_dashboard_sort_key(self, row: tuple[str, int, int]) -> tuple:
+        creator, livery_count, tuning_count = row
+        total = livery_count + tuning_count
+        section = self._dashboard_creator_sort_section
+        if section == 0:
+            return (total, creator.casefold())
+        if section == 1:
+            return (creator == "(제작자 없음)", creator.casefold())
+        if section == 2:
+            return (livery_count, creator.casefold())
+        if section == 3:
+            return (tuning_count, creator.casefold())
+        return (creator.casefold(),)
+
+    @staticmethod
+    def _force_table_top(table: QTableWidget) -> None:
+        """Force the viewport to row 0 after Qt completes selection/layout work."""
+        def move_top() -> None:
+            table.scrollToTop()
+            table.verticalScrollBar().setValue(
+                table.verticalScrollBar().minimum()
+            )
+
+        move_top()
+        QTimer.singleShot(0, move_top)
+        QTimer.singleShot(40, move_top)
+
+    @Slot(int, object)
+    def _sort_car_dashboard(self, section: int, order: Qt.SortOrder) -> None:
+        self._begin_busy("차량 목록을 정렬하는 중…")
+        try:
+            self._dashboard_car_sort_section = int(section)
+            self._dashboard_car_sort_order = order
+            self.car_sort_bar.set_active_sort(section, order)
+            self._populate_car_table()
+            self._filter_dashboard_table(self.car_search.text())
+            self._force_table_top(self.car_table)
+        finally:
+            self._end_busy()
+
+    @Slot(int, object)
+    def _sort_creator_dashboard(self, section: int, order: Qt.SortOrder) -> None:
+        self._begin_busy("제작자 목록을 정렬하는 중…")
+        try:
+            self._dashboard_creator_sort_section = int(section)
+            self._dashboard_creator_sort_order = order
+            self.creator_sort_bar.set_active_sort(section, order)
+            self._populate_creator_table()
+            self._filter_dashboard_table(self.car_search.text())
+            self._force_table_top(self.creator_table)
+        finally:
+            self._end_busy()
+
+    def _populate_car_table(self) -> None:
+        table = self.car_table
+        selected_id: Optional[int] = None
+        selected_rows = table.selectionModel().selectedRows() if table.selectionModel() else []
+        if selected_rows:
+            item = table.item(selected_rows[0].row(), 0)
+            if item:
+                try:
+                    selected_id = int(item.data(Qt.ItemDataRole.UserRole))
+                except (TypeError, ValueError):
+                    selected_id = None
+
+        table.setRowCount(0)
+        if not self.result:
+            return
+
+        rows = sorted(self.result.car_summaries, key=self._car_dashboard_sort_key)
+        if self._dashboard_car_sort_order == Qt.SortOrder.DescendingOrder:
+            rows.reverse()
+
+        selected_row = -1
+        for summary in rows:
+            row = table.rowCount()
+            table.insertRow(row)
+            values = (
+                summary.car_id,
+                summary.label,
+                summary.livery_count,
+                summary.tuning_count,
+            )
+            for col, value in enumerate(values):
+                item = QTableWidgetItem(str(value))
+                item.setData(Qt.ItemDataRole.UserRole, summary.car_id)
+                item.setTextAlignment(
+                    Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+                )
+                table.setItem(row, col, item)
+            if selected_id == summary.car_id:
+                selected_row = row
+
+        if selected_row >= 0:
+            table.selectRow(selected_row)
+        elif table.rowCount():
+            table.selectRow(0)
+
+        if hasattr(self, "car_sort_bar"):
+            self.car_sort_bar.set_active_sort(
+                self._dashboard_car_sort_section,
+                self._dashboard_car_sort_order,
+            )
+
+    def _creator_content_stats(self) -> list[tuple[str, int, int]]:
+        """Return creator -> custom-livery/tuning counts.
+
+        Creator matching is case-insensitive, while the first non-empty display
+        spelling encountered is preserved for presentation.
+        """
+        if not self.result:
+            return []
+
+        stats: dict[str, dict[str, object]] = {}
+
+        def ensure_creator(raw_name: str) -> dict[str, object]:
+            display = (raw_name or "").strip() or "(제작자 없음)"
+            key = display.casefold()
+            bucket = stats.get(key)
+            if bucket is None:
+                bucket = {"name": display, "livery": 0, "tuning": 0}
+                stats[key] = bucket
+            elif bucket["name"] == "(제작자 없음)" and display != "(제작자 없음)":
+                bucket["name"] = display
+            return bucket
+
+        for record in self.result.liveries:
+            if record.kind != "Livery":
+                continue
+            bucket = ensure_creator(record.header.creator or "")
+            bucket["livery"] = int(bucket["livery"]) + 1
+
+        for record in self.result.tunings:
+            bucket = ensure_creator(record.header.creator or "")
+            bucket["tuning"] = int(bucket["tuning"]) + 1
+
+        rows = [
+            (str(bucket["name"]), int(bucket["livery"]), int(bucket["tuning"]))
+            for bucket in stats.values()
+        ]
+        rows.sort(key=lambda row: (row[0] == "(제작자 없음)", row[0].casefold()))
+        return rows
+
+    def _populate_creator_table(self) -> None:
+        table = self.creator_table
+        selected_creator = ""
+        selected_rows = table.selectionModel().selectedRows() if table.selectionModel() else []
+        if selected_rows:
+            item = table.item(selected_rows[0].row(), 1)
+            if item:
+                selected_creator = str(item.data(Qt.ItemDataRole.UserRole) or item.text())
+
+        table.setRowCount(0)
+
+        rows = sorted(self._creator_content_stats(), key=self._creator_dashboard_sort_key)
+        if self._dashboard_creator_sort_order == Qt.SortOrder.DescendingOrder:
+            rows.reverse()
+
+        selected_row = -1
+        for creator, livery_count, tuning_count in rows:
+            row = table.rowCount()
+            table.insertRow(row)
+            total = livery_count + tuning_count
+            for col, value in enumerate((total, creator, livery_count, tuning_count)):
+                item = QTableWidgetItem(str(value))
+                item.setData(Qt.ItemDataRole.UserRole, creator)
+                item.setTextAlignment(
+                    Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+                )
+                table.setItem(row, col, item)
+            if selected_creator and creator.casefold() == selected_creator.casefold():
+                selected_row = row
+
+        if selected_row >= 0:
+            table.selectRow(selected_row)
+        elif table.rowCount():
+            table.selectRow(0)
+
+        if hasattr(self, "creator_sort_bar"):
+            self.creator_sort_bar.set_active_sort(
+                self._dashboard_creator_sort_section,
+                self._dashboard_creator_sort_order,
+            )
+
+    def _custom_liveries(self) -> list[LiveryRecord]:
+        if not self.result:
+            return []
+        return [record for record in self.result.liveries if record.kind == "Livery"]
+
+    def _vehicle_brand_sort_key(
+        self,
+        record: LiveryRecord | TuningRecord,
+    ) -> tuple:
+        """Sort saved content by manufacturer-first vehicle display text."""
+        label = self._car_label(record.header.car_id).strip()
+        unknown = (
+            label.startswith("Car ID ")
+            or label == "Unknown vehicle"
+        )
+        brand_first = re.sub(
+            r"^\d{4}\s+",
+            "",
+            label,
+        ).casefold()
+        return (
+            1 if unknown else 0,
+            brand_first,
+            label.casefold(),
+            (record.header.name or "").casefold(),
+        )
+
+    def _saved_content_records(
+        self,
+        content_type: str,
+    ) -> list[LiveryRecord | TuningRecord]:
+        if not self.result:
+            return []
+        if content_type == "livery":
+            return list(self._custom_liveries())
+        if content_type == "tuning":
+            return list(self.result.tunings)
+        return []
+
+    def _sorted_saved_content(
+        self,
+        content_type: str,
+    ) -> list[LiveryRecord | TuningRecord]:
+        records = self._saved_content_records(content_type)
+        mode = (
+            self._livery_sort_mode
+            if content_type == "livery"
+            else self._tuning_sort_mode
+        )
+        descending = (
+            self._livery_sort_descending
+            if content_type == "livery"
+            else self._tuning_sort_descending
+        )
+
+        if mode == "brand":
+            ordered = sorted(
+                records,
+                key=self._vehicle_brand_sort_key,
+            )
+            return list(reversed(ordered)) if descending else ordered
+
+        if mode == "creator":
+            def creator_key(
+                record: LiveryRecord | TuningRecord,
+            ) -> tuple:
+                creator = (
+                    record.header.creator or ""
+                ).strip()
+                return (
+                    1 if not creator else 0,
+                    creator.casefold(),
+                    self._vehicle_brand_sort_key(record),
+                    (record.header.name or "").casefold(),
+                )
+
+            ordered = sorted(records, key=creator_key)
+            if not descending:
+                return ordered
+            available = [record for record in ordered if (record.header.creator or "").strip()]
+            unavailable = [record for record in ordered if not (record.header.creator or "").strip()]
+            return list(reversed(available)) + unavailable
+
+        if mode == "download":
+            available = [record for record in records if record.downloaded_at is not None]
+            unavailable = [record for record in records if record.downloaded_at is None]
+            return sorted(
+                available,
+                key=lambda record: record.downloaded_at or 0.0,
+                reverse=descending,
+            ) + unavailable
+
+        if mode == "default" and descending:
+            return list(reversed(records))
+
+        # Default preserves scanner/container order.
+        return records
+
+    def _sorted_liveries(self) -> list[LiveryRecord]:
+        return [
+            record
+            for record in self._sorted_saved_content("livery")
+            if isinstance(record, LiveryRecord)
+        ]
+
+    def _sorted_tunings(self) -> list[TuningRecord]:
+        return [
+            record
+            for record in self._sorted_saved_content("tuning")
+            if isinstance(record, TuningRecord)
+        ]
+
+    @Slot(str)
+    def _set_saved_content_sort_mode(
+        self,
+        content_type: str,
+        mode: str,
+    ) -> None:
+        if mode not in {"default", "brand", "creator", "download"}:
+            return
+
+        label = "리버리" if content_type == "livery" else "튜닝"
+        self._begin_busy(f"{label} 목록을 정렬하는 중…")
+        try:
+            # Download order is a flat chronology. Disable grouping when the
+            # mode is selected, but do not lock it: the user may re-enable the
+            # grouping button immediately afterwards.
+            if mode == "download":
+                group_button = getattr(self, f"{content_type}_group_button")
+                if group_button.isChecked():
+                    group_button.blockSignals(True)
+                    group_button.setChecked(False)
+                    group_button.blockSignals(False)
+                    self.local_preferences.set_bool(
+                        f"{content_type}_group_by_vehicle",
+                        False,
+                    )
+            if content_type == "livery":
+                self._livery_sort_descending = (
+                    not self._livery_sort_descending
+                    if self._livery_sort_mode == mode
+                    else False
+                )
+                self._livery_sort_mode = mode
+                self._update_sort_button_labels("livery")
+                if self.result is not None:
+                    self._populate_livery_table()
+                self.livery_grid_scroll.verticalScrollBar().setValue(0)
+                return
+
+            if content_type == "tuning":
+                self._tuning_sort_descending = (
+                    not self._tuning_sort_descending
+                    if self._tuning_sort_mode == mode
+                    else False
+                )
+                self._tuning_sort_mode = mode
+                self._update_sort_button_labels("tuning")
+                if self.result is not None:
+                    self._populate_tuning_table()
+                self.tuning_table.scrollToTop()
+                self.tuning_grid_scroll.verticalScrollBar().setValue(0)
+        finally:
+            self._end_busy()
+
+    def _update_sort_button_labels(self, content_type: str) -> None:
+        buttons = (
+            self.livery_sort_buttons
+            if content_type == "livery"
+            else self.tuning_sort_buttons
+        )
+        mode = self._livery_sort_mode if content_type == "livery" else self._tuning_sort_mode
+        descending = (
+            self._livery_sort_descending
+            if content_type == "livery"
+            else self._tuning_sort_descending
+        )
+        labels = {
+            "default": "기본",
+            "brand": "브랜드명",
+            "creator": "제작자명",
+            "download": "다운로드",
+        }
+        for key, button in buttons.items():
+            arrow = ("↓" if descending else "↑") if key == mode else ""
+            button.setText(labels[key] + arrow)
+
+    @Slot(str)
+    def _set_livery_sort_mode(self, mode: str) -> None:
+        # Compatibility wrapper used by older internal call sites.
+        self._set_saved_content_sort_mode("livery", mode)
+
+    def _car_label(self, car_id: Optional[int]) -> str:
+        if car_id is None:
+            return "Unknown vehicle"
+        info = self.car_db.get(car_id)
+        return info.label or f"Car ID {car_id}"
+
+    def _content_annotation_key(
+        self,
+        content_type: str,
+        record: LiveryRecord | TuningRecord,
+    ) -> str:
+        namespace = "tuning" if content_type == "tuning" else "livery"
+        return self.annotations.instance_key_for(
+            record.header.guid,
+            record.container_name,
+            namespace=namespace,
+        )
+
+    def _annotation_key(self, record: LiveryRecord) -> str:
+        # Every physical livery container has independent UI state, even when
+        # duplicate downloads share the same content GUID.
+        return self._content_annotation_key("livery", record)
+
+    def _record_for_content_key(
+        self,
+        content_type: str,
+        key: str,
+    ) -> Optional[LiveryRecord | TuningRecord]:
+        for record in self._saved_content_records(content_type):
+            if self._content_annotation_key(
+                content_type,
+                record,
+            ) == key:
+                return record
+        return None
+
+    def _record_for_annotation_key(
+        self,
+        key: str,
+    ) -> Optional[LiveryRecord]:
+        record = self._record_for_content_key("livery", key)
+        return record if isinstance(record, LiveryRecord) else None
+
+    def _reset_game_navigation_sessions(self) -> None:
+        self._game_navigation_generation += 1
+        self._game_navigation_pending = False
+        sessions: dict[str, GameGridSession] = {}
+        for content_type in ("livery", "tuning"):
+            records = self._saved_content_records(content_type)
+            sessions[content_type] = GameGridSession(
+                NavigationItem(
+                    key=self._content_annotation_key(content_type, record),
+                    car_id=record.car_id,
+                    tie_breaker="|".join(
+                        (
+                            record.container_name,
+                            record.header.guid or "",
+                            record.header.name or "",
+                        )
+                    ),
+                )
+                for record in records
+            )
+        self._game_navigation_sessions = sessions
+
+    def _request_game_navigation(
+        self,
+        content_type: str,
+        key: str,
+    ) -> None:
+        if self._game_navigation_pending:
+            QMessageBox.information(
+                self,
+                "인게임 이동 대기 중",
+                "이미 예약된 인게임 이동이 있습니다.",
+            )
+            return
+        session = self._game_navigation_sessions.get(content_type)
+        record = self._record_for_content_key(content_type, key)
+        if session is None or record is None or not session.contains(key):
+            QMessageBox.warning(
+                self,
+                "인게임 이동 불가",
+                "현재 스캔 목록에서 대상 위치를 계산할 수 없습니다. 새로고침 후 다시 시도하세요.",
+            )
+            return
+        dialog = QDialog(self)
+        dialog.setWindowTitle("리버리 위치로 이동")
+        dialog.setModal(True)
+        dialog.setMinimumWidth(520)
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setSpacing(10)
+        target_name = record.header.name or "(제목 없음)"
+        vehicle_name = self._car_label(record.car_id)
+
+        target_panel = QFrame()
+        target_panel.setObjectName("panel")
+        target_layout = QVBoxLayout(target_panel)
+        target_layout.setContentsMargins(12, 9, 12, 9)
+        target_layout.setSpacing(2)
+        vehicle_label = QLabel(vehicle_name)
+        vehicle_label.setStyleSheet("font-weight: 700; font-size: 11pt;")
+        title_label = QLabel(target_name)
+        title_label.setObjectName("muted")
+        target_layout.addWidget(vehicle_label)
+        target_layout.addWidget(title_label)
+        layout.addWidget(target_panel)
+
+        description = QLabel(
+            "FH6 리버리 목록의 첫 번째 항목을 기준으로 이동합니다. "
+            "버튼을 누르면 설정한 대기 시간 후 FH6 창을 활성화하고 "
+            "방향키 입력을 시작합니다.\n\n"
+            "리버리를 적용하고 목록으로 돌아오면 해당 항목이 선택됩니다."
+        )
+        description.setWordWrap(True)
+        layout.addWidget(description)
+
+        delete_notice = QLabel(
+            "삭제 위치로 이동한 항목은 현재 목록에서 제외됩니다. "
+            "실제 삭제를 취소한 경우 프로그램에서 목록을 새로 고치십시오."
+        )
+        delete_notice.setWordWrap(True)
+        delete_notice.setStyleSheet(
+            "background: #fff7e8; color: #7a4b00; border: 1px solid #f0d6a6; "
+            "border-radius: 8px; padding: 8px 10px;"
+        )
+        layout.addWidget(delete_notice)
+
+        settings_panel = QFrame()
+        settings_panel.setObjectName("panel")
+        settings_layout = QGridLayout(settings_panel)
+        settings_layout.setContentsMargins(12, 9, 12, 9)
+        settings_layout.setHorizontalSpacing(12)
+        settings_layout.setVerticalSpacing(7)
+        settings_title = QLabel("실행 설정")
+        settings_title.setStyleSheet("font-weight: 700;")
+        settings_layout.addWidget(settings_title, 0, 0, 1, 2)
+
+        settings_layout.addWidget(QLabel("대기 시간"), 1, 0)
+        delay_spin = QDoubleSpinBox()
+        delay_spin.setRange(0.1, 30.0)
+        delay_spin.setDecimals(1)
+        delay_spin.setSingleStep(0.1)
+        delay_spin.setSuffix("초")
+        delay_spin.setValue(
+            self.settings.value("game_navigation_delay", 1.0, float)
+        )
+        settings_layout.addWidget(delay_spin, 1, 1)
+
+        settings_layout.addWidget(QLabel("방향키 간격"), 2, 0)
+        arrow_interval_spin = QSpinBox()
+        arrow_interval_spin.setRange(20, 500)
+        arrow_interval_spin.setSuffix("밀리초")
+        arrow_interval_spin.setValue(
+            self.settings.value("game_navigation_arrow_interval_ms", 70, int)
+        )
+        settings_layout.addWidget(arrow_interval_spin, 2, 1)
+
+        auto_activate_box = QCheckBox("FH6 창 자동 활성화")
+        auto_activate_box.setChecked(
+            self.settings.value("game_navigation_auto_activate", True, bool)
+        )
+        auto_activate_box.setToolTip(
+            "대기 시간이 지나면 FH6 창을 찾아 전경으로 전환합니다.\n"
+            "항상 위 표시가 활성화된 경우 이동 전에 이 창을 최소화합니다."
+        )
+        settings_layout.addWidget(auto_activate_box, 3, 0, 1, 2)
+        settings_layout.setColumnStretch(1, 1)
+        layout.addWidget(settings_panel)
+
+        choice: dict[str, str] = {"mode": ""}
+        button_row = QHBoxLayout()
+        delete_button = QPushButton("삭제 위치로 이동")
+        delete_button.setObjectName("secondary")
+        apply_button = QPushButton("적용 위치로 이동")
+        apply_button.setObjectName("primary")
+        cancel_button = QPushButton("취소")
+        cancel_button.setObjectName("secondary")
+        delete_button.clicked.connect(
+            lambda: (choice.__setitem__("mode", "delete"), dialog.accept())
+        )
+        apply_button.clicked.connect(
+            lambda: (choice.__setitem__("mode", "apply"), dialog.accept())
+        )
+        cancel_button.clicked.connect(dialog.reject)
+        button_row.addWidget(delete_button)
+        button_row.addWidget(apply_button)
+        button_row.addStretch(1)
+        button_row.addWidget(cancel_button)
+        layout.addLayout(button_row)
+
+        if dialog.exec() != QDialog.DialogCode.Accepted or not choice["mode"]:
+            return
+        delay = delay_spin.value()
+        auto_activate = auto_activate_box.isChecked()
+        arrow_interval_ms = arrow_interval_spin.value()
+        try:
+            planned_keys = session.plan_from_first(key)
+        except GameNavigationError as exc:
+            QMessageBox.warning(self, "인게임 이동 불가", str(exc))
+            return
+        self.settings.setValue("game_navigation_delay", delay)
+        self.settings.setValue("game_navigation_auto_activate", auto_activate)
+        self.settings.setValue(
+            "game_navigation_arrow_interval_ms",
+            arrow_interval_ms,
+        )
+        self._game_navigation_pending = True
+        generation = self._game_navigation_generation
+        mode = choice["mode"]
+        delay_text = f"{delay:g}초"
+        wait_message = (
+            f"{delay_text} 후 FH6 창을 자동 활성화하여 이동합니다"
+            if auto_activate
+            else f"{delay_text} 후 이동합니다 — 지금 FH6 창으로 전환하세요"
+        )
+        self._show_status(wait_message, int((delay + 8) * 1000))
+        QTimer.singleShot(
+            int(round(delay * 1000)),
+            lambda t=content_type, k=key, keys=planned_keys, m=mode, g=generation, a=auto_activate, ar=arrow_interval_ms:
+            self._execute_game_navigation(t, k, keys, m, g, a, ar),
+        )
+        if self.always_on_top_box.isChecked():
+            self.showMinimized()
+
+    def _execute_game_navigation(
+        self,
+        content_type: str,
+        key: str,
+        planned_keys: list[str],
+        mode: str,
+        generation: int,
+        auto_activate: bool,
+        arrow_interval_ms: int,
+    ) -> None:
+        self._game_navigation_pending = False
+        if generation != self._game_navigation_generation:
+            self._show_status("새로고침으로 예약된 인게임 이동이 취소되었습니다", 5000)
+            return
+        session = self._game_navigation_sessions.get(content_type)
+        if session is None or not session.contains(key):
+            self._show_status("대상이 변경되어 인게임 이동을 취소했습니다", 5000)
+            return
+        try:
+            window_title = send_arrow_keys_to_fh6(
+                planned_keys,
+                interval=arrow_interval_ms / 1000.0,
+                auto_activate=auto_activate,
+            )
+        except GameNavigationError as exc:
+            QMessageBox.warning(self, "인게임 이동 취소", str(exc))
+            self._show_status("FH6 활성 창을 확인하지 못해 키 입력을 취소했습니다", 5000)
+            return
+
+        deleted = mode == "delete"
+        session.complete_move(
+            key,
+            deleted=deleted,
+        )
+        count = len(planned_keys)
+        if deleted:
+            message = (
+                f"{count}회 이동 완료 — 삭제 대상으로 세션 목록에 반영했습니다 "
+                f"({window_title})"
+            )
+        else:
+            message = f"{count}회 이동 완료 — 적용 대상 위치입니다 ({window_title})"
+        self._show_status(message, 8000)
+
+
+    def _populate_saved_content_table(
+        self,
+        content_type: str,
+    ) -> None:
+        table = (
+            self.livery_table
+            if content_type == "livery"
+            else self.tuning_table
+        )
+        table.setRowCount(0)
+
+        for index, record in enumerate(self._sorted_saved_content(content_type)):
+            self._keep_busy_responsive(index)
+            key = self._content_annotation_key(
+                content_type,
+                record,
+            )
+            annotation = self.annotations.get(key)
+
+            row = table.rowCount()
+            table.insertRow(row)
+            table.setRowHeight(row, 58)
+
+            check_item = QTableWidgetItem()
+            check_item.setFlags(
+                (check_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                | Qt.ItemFlag.ItemIsSelectable
+                | Qt.ItemFlag.ItemIsEnabled
+            )
+            check_item.setData(Qt.ItemDataRole.UserRole, key)
+            check_item.setText("상태")
+            check_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            table.setItem(row, 0, check_item)
+            table.setCellWidget(
+                row,
+                0,
+                self._detail_status_button_container(
+                    self._make_detail_check_button(
+                        key,
+                        annotation.checked,
+                        content_type=content_type,
+                    ),
+                    self._make_detail_triangle_button(
+                        key,
+                        annotation.triangle,
+                        content_type=content_type,
+                    ),
+                    self._make_detail_excluded_button(
+                        key,
+                        annotation.excluded,
+                        content_type=content_type,
+                    ),
+                ),
+            )
+
+            values = (
+                self._car_label(record.header.car_id),
+                record.header.creator or "—",
+                record.header.name or "(unnamed)",
+                record.header.description or "—",
+            )
+            for col, value in enumerate(values, 1):
+                item = QTableWidgetItem(str(value))
+                item.setFlags(
+                    item.flags()
+                    & ~Qt.ItemFlag.ItemIsEditable
+                )
+                item.setData(
+                    Qt.ItemDataRole.UserRole,
+                    key,
+                )
+                item.setTextAlignment(
+                    Qt.AlignmentFlag.AlignLeft
+                    | Qt.AlignmentFlag.AlignVCenter
+                )
+                item.setToolTip(str(value))
+                if col == 1 and record.header.car_id is not None:
+                    item.setToolTip(
+                        f"{value}\nCar ID: {record.header.car_id}"
+                    )
+                table.setItem(row, col, item)
+
+            memo_item = QTableWidgetItem()
+            memo_item.setFlags(
+                (memo_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                | Qt.ItemFlag.ItemIsSelectable
+                | Qt.ItemFlag.ItemIsEnabled
+            )
+            memo_item.setData(Qt.ItemDataRole.UserRole, key)
+            self._set_detail_memo_item(
+                memo_item,
+                annotation.note,
+            )
+            table.setItem(row, 5, memo_item)
+            table.setCellWidget(
+                row,
+                5,
+                self._detail_table_button_container(
+                    self._make_detail_memo_button(
+                        key,
+                        annotation.note,
+                        content_type=content_type,
+                    )
+                ),
+            )
+
+            created_item = QTableWidgetItem(
+                self._created_date_only(
+                    record.header.created
+                )
+            )
+            created_item.setFlags(
+                created_item.flags()
+                & ~Qt.ItemFlag.ItemIsEditable
+            )
+            created_item.setData(
+                Qt.ItemDataRole.UserRole,
+                key,
+            )
+            created_item.setTextAlignment(
+                Qt.AlignmentFlag.AlignLeft
+                | Qt.AlignmentFlag.AlignVCenter
+            )
+            created_item.setToolTip(
+                record.header.created or "—"
+            )
+            table.setItem(row, 6, created_item)
+
+            downloaded_text = self._downloaded_datetime(record.downloaded_at)
+            downloaded_item = QTableWidgetItem(downloaded_text)
+            downloaded_item.setFlags(
+                downloaded_item.flags() & ~Qt.ItemFlag.ItemIsEditable
+            )
+            downloaded_item.setData(Qt.ItemDataRole.UserRole, key)
+            downloaded_item.setTextAlignment(
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+            )
+            downloaded_item.setToolTip(
+                downloaded_text
+                if record.downloaded_at is not None
+                else "파일 생성 시각을 확인할 수 없습니다."
+            )
+            table.setItem(row, 7, downloaded_item)
+
+    def _populate_livery_table(self) -> None:
+        self._populate_saved_content_table("livery")
+        self._populate_livery_grid()
+        self._filter_livery_views(
+            self.livery_search.text()
+        )
+
+    @Slot(QTableWidgetItem)
+    def _livery_table_item_changed(
+        self,
+        item: QTableWidgetItem,
+    ) -> None:
+        return
+
+    @Slot(int, int)
+    def _livery_table_cell_double_clicked(
+        self,
+        row: int,
+        column: int,
+    ) -> None:
+        return
+
+
+    def _populate_livery_grid(self) -> None:
+        for card in self._livery_grid_cards:
+            card.deleteLater()
+        self._livery_grid_cards.clear()
+        self._livery_card_by_key.clear()
+        self._clear_livery_grid_layout()
+
+        for index, record in enumerate(self._sorted_liveries()):
+            self._keep_busy_responsive(index)
+            key = self._annotation_key(record)
+            card = self._make_livery_card(record, key)
+            card.setProperty("searchText", self._livery_search_text(record, self.annotations.get(key).note))
+            card.setProperty("annotationKey", key)
+            card.setProperty(
+                "vehicleGroupKey",
+                f"id:{record.car_id}"
+                if record.car_id is not None
+                else "unknown",
+            )
+            card.setProperty("vehicleGroupLabel", self._car_label(record.car_id))
+            card.setProperty("checked", self.annotations.get(key).checked)
+            card.setProperty("triangle", self.annotations.get(key).triangle)
+            card.setProperty("excluded", self.annotations.get(key).excluded)
+            self._livery_grid_cards.append(card)
+            self._livery_card_by_key[key] = card
+
+        self._relayout_livery_grid(self.livery_search.text())
+        self._apply_pointing_cursors(self.livery_grid_host)
+
+    def _populate_tuning_grid(self) -> None:
+        for card in self._tuning_grid_cards:
+            card.deleteLater()
+        self._tuning_grid_cards.clear()
+        self._tuning_card_by_key.clear()
+        self._clear_tuning_grid_layout()
+
+        for index, record in enumerate(self._sorted_tunings()):
+            self._keep_busy_responsive(index)
+            key = self._content_annotation_key("tuning", record)
+            annotation = self.annotations.get(key)
+            card = self._make_tuning_card(record, key)
+            card.setProperty(
+                "searchText",
+                self._saved_content_search_text(record, annotation.note),
+            )
+            card.setProperty("annotationKey", key)
+            card.setProperty(
+                "vehicleGroupKey",
+                f"id:{record.car_id}"
+                if record.car_id is not None
+                else "unknown",
+            )
+            card.setProperty("vehicleGroupLabel", self._car_label(record.car_id))
+            card.setProperty("checked", annotation.checked)
+            card.setProperty("triangle", annotation.triangle)
+            card.setProperty("excluded", annotation.excluded)
+            self._tuning_grid_cards.append(card)
+            self._tuning_card_by_key[key] = card
+
+        self._relayout_tuning_grid(self.tuning_search.text())
+        self._apply_pointing_cursors(self.tuning_grid_host)
+
+    def _clear_livery_grid_layout(self) -> None:
+        while self.livery_grid_layout.count():
+            item = self.livery_grid_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.setVisible(False)
+
+        for header in self._livery_group_headers.values():
+            header.setVisible(False)
+
+    def _clear_tuning_grid_layout(self) -> None:
+        while self.tuning_grid_layout.count():
+            item = self.tuning_grid_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.setVisible(False)
+
+        for header in self._tuning_group_headers.values():
+            header.setVisible(False)
+
+    def _saved_content_filter_matches(
+        self,
+        content_type: str,
+        checked: bool,
+        note: str,
+        triangle: bool = False,
+        excluded: bool = False,
+        duplicate: bool = False,
+    ) -> bool:
+        filter_box = (
+            self.livery_check_filter
+            if content_type == "livery"
+            else self.tuning_check_filter
+        )
+        modes = filter_box.selected_modes()
+        checks = {
+            1: checked,
+            2: not checked,
+            3: bool((note or "").strip()),
+            4: not bool((note or "").strip()),
+            5: triangle,
+            6: not triangle,
+            7: excluded,
+            8: not excluded,
+            9: duplicate if content_type == "livery" else True,
+            10: not checked and not triangle and not excluded,
+        }
+        return all(checks.get(mode, True) for mode in modes)
+
+    def _duplicate_livery_hashes(self) -> set[str]:
+        counts = Counter(
+            record.content_sha256
+            for record in self._custom_liveries()
+            if record.content_sha256
+        )
+        return {digest for digest, count in counts.items() if count > 1}
+
+    def _is_duplicate_livery(self, record: LiveryRecord | None) -> bool:
+        return bool(
+            record
+            and record.content_sha256
+            and record.content_sha256 in self._duplicate_livery_hashes()
+        )
+
+    def _livery_filter_matches(
+        self,
+        checked: bool,
+        note: str,
+        triangle: bool = False,
+        excluded: bool = False,
+        duplicate: bool = False,
+    ) -> bool:
+        # Compatibility wrapper for the livery grid layout code.
+        return self._saved_content_filter_matches(
+            "livery",
+            checked,
+            note,
+            triangle,
+            excluded,
+            duplicate,
+        )
+
+    def _layout_visible_grid_cards(
+        self,
+        content_type: str,
+        cards: list[QFrame],
+    ) -> None:
+        layout = (
+            self.livery_grid_layout
+            if content_type == "livery"
+            else self.tuning_grid_layout
+        )
+        group_button = getattr(self, f"{content_type}_group_button")
+        if not group_button.isChecked():
+            for index, card in enumerate(cards):
+                layout.addWidget(card, index // 2, index % 2)
+                card.setVisible(True)
+            return
+
+        grouped: dict[str, list[QFrame]] = {}
+        labels: dict[str, str] = {}
+        for card in cards:
+            group_key = str(card.property("vehicleGroupKey") or "unknown")
+            grouped.setdefault(group_key, []).append(card)
+            labels.setdefault(
+                group_key,
+                str(card.property("vehicleGroupLabel") or "Unknown vehicle"),
+            )
+
+        headers: dict[str, QLabel] = (
+            self._livery_group_headers
+            if content_type == "livery"
+            else self._tuning_group_headers
+        )
+        noun = "리버리" if content_type == "livery" else "튜닝"
+        row = 0
+        for group_key, group_cards in grouped.items():
+            header = headers.get(group_key)
+            if header is None:
+                header = QLabel()
+                header.setObjectName("vehicleGroupHeader")
+                header.setStyleSheet(
+                    "QLabel#vehicleGroupHeader { background:#eee9ff; color:#3e2a95; "
+                    "border:1px solid #d9d0ff; border-radius:8px; padding:9px 12px; "
+                    "font-size:11pt; font-weight:700; }"
+                )
+                header.setMinimumHeight(38)
+                headers[group_key] = header
+            header.setText(
+                f"{labels[group_key]} · {noun} {len(group_cards)}개"
+            )
+            layout.addWidget(header, row, 0, 1, 2)
+            header.setVisible(True)
+            row += 1
+            for index, card in enumerate(group_cards):
+                layout.addWidget(card, row + index // 2, index % 2)
+                card.setVisible(True)
+            row += (len(group_cards) + 1) // 2
+
+    def _relayout_livery_grid(self, text: str = "") -> None:
+        """Pack matching cards contiguously into two columns."""
+        needle = text.strip().lower()
+        self.livery_grid_host.setUpdatesEnabled(False)
+        self._clear_livery_grid_layout()
+
+        visible_cards: list[QFrame] = []
+        for card in self._livery_grid_cards:
+            haystack = str(card.property("searchText") or "")
+            checked = bool(card.property("checked"))
+            triangle = bool(card.property("triangle"))
+            excluded = bool(card.property("excluded"))
+            key = str(card.property("annotationKey") or "")
+            note = self.annotations.get(key).note if key else ""
+            record = self._record_for_content_key("livery", key) if key else None
+            duplicate = self._is_duplicate_livery(record if isinstance(record, LiveryRecord) else None)
+            matched = (not needle or needle in haystack) and self._livery_filter_matches(checked, note, triangle, excluded, duplicate)
+            if not matched:
+                self._unload_livery_card_thumbnail(card)
+                continue
+            visible_cards.append(card)
+
+        self._layout_visible_grid_cards("livery", visible_cards)
+        self.livery_grid_layout.activate()
+        self.livery_grid_host.setUpdatesEnabled(True)
+        self.livery_grid_host.update()
+
+        self._sync_livery_grid_card_widths()
+        QTimer.singleShot(0, self._sync_livery_grid_card_widths)
+        QTimer.singleShot(0, self._refresh_visible_livery_thumbnails)
+
+    def _relayout_tuning_grid(self, text: str = "") -> None:
+        needle = text.strip().lower()
+        self.tuning_grid_host.setUpdatesEnabled(False)
+        self._clear_tuning_grid_layout()
+        visible_cards: list[QFrame] = []
+        for card in self._tuning_grid_cards:
+            haystack = str(card.property("searchText") or "")
+            checked = bool(card.property("checked"))
+            triangle = bool(card.property("triangle"))
+            excluded = bool(card.property("excluded"))
+            key = str(card.property("annotationKey") or "")
+            note = self.annotations.get(key).note if key else ""
+            matched = (
+                (not needle or needle in haystack)
+                and self._saved_content_filter_matches(
+                    "tuning", checked, note, triangle, excluded
+                )
+            )
+            if not matched:
+                self._unload_livery_card_thumbnail(card)
+                continue
+            visible_cards.append(card)
+
+        self._layout_visible_grid_cards("tuning", visible_cards)
+        self.tuning_grid_layout.activate()
+        self.tuning_grid_host.setUpdatesEnabled(True)
+        self.tuning_grid_host.update()
+
+        self._sync_tuning_grid_card_widths()
+        QTimer.singleShot(0, self._sync_tuning_grid_card_widths)
+        QTimer.singleShot(0, self._refresh_visible_tuning_thumbnails)
+
+    def _sync_livery_grid_card_widths(self) -> None:
+        """Fit exactly two cards inside the visible QScrollArea viewport.
+
+        Use viewport.width(), not the outer QScrollArea width, so the vertical
+        scrollbar, frame, layout margins, and card gap are all accounted for.
+        """
+        if not hasattr(self, "livery_grid_scroll"):
+            return
+
+        viewport = self.livery_grid_scroll.viewport()
+        if viewport is None or viewport.width() <= 0:
+            return
+
+        margins = self.livery_grid_layout.contentsMargins()
+        gap = max(0, self.livery_grid_layout.horizontalSpacing())
+
+        available = (
+            viewport.width()
+            - margins.left()
+            - margins.right()
+            - gap
+            - 4  # small safety margin for style/border rounding
+        )
+        card_width = max(1, available // 2)
+
+        for card in self._livery_grid_cards:
+            # Child labels/text editors may have large size hints.  The card
+            # width is authoritative so those hints cannot create horizontal
+            # overflow and clip the second column.
+            card.setMinimumWidth(0)
+            card.setMaximumWidth(card_width)
+            card.setFixedWidth(card_width)
+
+        self.livery_grid_host.setMinimumWidth(0)
+        self.livery_grid_host.updateGeometry()
+
+    def _sync_tuning_grid_card_widths(self) -> None:
+        if not hasattr(self, "tuning_grid_scroll"):
+            return
+        viewport = self.tuning_grid_scroll.viewport()
+        if viewport is None or viewport.width() <= 0:
+            return
+        margins = self.tuning_grid_layout.contentsMargins()
+        gap = max(0, self.tuning_grid_layout.horizontalSpacing())
+        available = (
+            viewport.width()
+            - margins.left()
+            - margins.right()
+            - gap
+            - 4
+        )
+        card_width = max(1, available // 2)
+        for card in self._tuning_grid_cards:
+            card.setMinimumWidth(0)
+            card.setMaximumWidth(card_width)
+            card.setFixedWidth(card_width)
+        self.tuning_grid_host.setMinimumWidth(0)
+        self.tuning_grid_host.updateGeometry()
+
+    def _make_livery_card(self, record: LiveryRecord, key: str) -> QFrame:
+        return self._make_saved_content_card("livery", record, key)
+
+    def _make_tuning_card(self, record: TuningRecord, key: str) -> QFrame:
+        return self._make_saved_content_card("tuning", record, key)
+
+    def _make_saved_content_card(
+        self,
+        content_type: str,
+        record: LiveryRecord | TuningRecord,
+        key: str,
+    ) -> QFrame:
+        card = QFrame()
+        card.setObjectName("panel")
+        card.setMinimumHeight(320)
+        card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        outer = QVBoxLayout(card)
+        outer.setContentsMargins(12, 12, 12, 12)
+        outer.setSpacing(8)
+
+        # Thumbnail + check overlay.  The checkbox lives in a small boxed overlay
+        # at the upper-right instead of consuming a separate metadata row.
+        image_host = QWidget()
+        image_stack = QStackedLayout(image_host)
+        image_stack.setContentsMargins(0, 0, 0, 0)
+        image_stack.setStackingMode(QStackedLayout.StackingMode.StackAll)
+
+        image_label = QLabel()
+        image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        image_label.setMinimumHeight(210)
+        image_label.setStyleSheet("background:#f1f2f6;border-radius:9px;")
+        image_label.setText("Thumbnail")
+        image_label.setObjectName("muted")
+        image_stack.addWidget(image_label)
+
+        overlay = QWidget()
+        # APP_STYLE gives every QWidget an opaque background.  Since this widget
+        # sits above the thumbnail in StackAll mode, it must be explicitly
+        # transparent or it hides the vehicle image completely.
+        overlay.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
+        overlay.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        overlay.setStyleSheet("background: transparent;")
+        overlay_layout = QVBoxLayout(overlay)
+        overlay_layout.setContentsMargins(8, 8, 8, 8)
+        annotation = self.annotations.get(key)
+        # Icon-only check control.  The check mark always stays visible:
+        # gray = unchecked, green = checked.  There is deliberately no "체크" label.
+        check_box = QToolButton()
+        check_box.setCheckable(True)
+        check_box.setIcon(_classification_toggle_icon("check"))
+        check_box.setIconSize(QSize(22, 22))
+        check_box.setChecked(annotation.checked)
+        check_box.setToolTip("체크 상태 전환")
+        item_label = "리버리" if content_type == "livery" else "튜닝"
+        check_box.setAccessibleName(f"{item_label} 체크 상태")
+        check_box.setFixedSize(34, 34)
+        check_box.setStyleSheet(
+            "QToolButton { background:rgba(255,255,255,238); color:#9aa0aa; "
+            "border:1px solid #dfe1e8; border-radius:17px; font-size:16px; font-weight:800; padding:0; }"
+            "QToolButton:hover { border-color:#a9adb7; background:rgba(255,255,255,250); }"
+            "QToolButton:checked { color:#2e9b50; border-color:#7ac58f; background:#eef9f1; }"
+            "QToolButton:checked:hover { color:#238442; border-color:#58ad72; background:#e7f6eb; }"
+        )
+        check_box.toggled.connect(
+            lambda checked, k=key, c=card, t=content_type:
+            self._set_grid_checked(t, k, c, checked)
+        )
+
+        triangle_box = QToolButton()
+        triangle_box.setCheckable(True)
+        triangle_box.setIcon(_classification_toggle_icon("triangle"))
+        triangle_box.setIconSize(QSize(22, 22))
+        triangle_box.setChecked(annotation.triangle)
+        triangle_box.setToolTip("삼각형 분류 상태 전환")
+        triangle_box.setAccessibleName(f"{item_label} 삼각형 분류 상태")
+        triangle_box.setFixedSize(34, 34)
+        triangle_box.setStyleSheet(
+            "QToolButton { background:rgba(255,255,255,238); color:#9aa0aa; "
+            "border:1px solid #dfe1e8; border-radius:8px; font-size:17px; font-weight:800; padding:0; }"
+            "QToolButton:hover { border-color:#d4a14c; background:rgba(255,250,240,250); }"
+            "QToolButton:checked { color:#d98216; border-color:#e2a64f; background:#fff5e6; }"
+            "QToolButton:checked:hover { color:#c36f09; border-color:#d58d2c; background:#ffeed5; }"
+        )
+        triangle_box.toggled.connect(
+            lambda enabled, k=key, c=card, t=content_type:
+            self._set_grid_triangle(t, k, c, enabled)
+        )
+
+        excluded_box = QToolButton()
+        excluded_box.setCheckable(True)
+        excluded_box.setIcon(_classification_toggle_icon("excluded"))
+        excluded_box.setIconSize(QSize(22, 22))
+        excluded_box.setChecked(annotation.excluded)
+        excluded_box.setToolTip("X 분류 상태 전환")
+        excluded_box.setAccessibleName(f"{item_label} X 분류 상태")
+        excluded_box.setFixedSize(34, 34)
+        excluded_box.setStyleSheet(
+            "QToolButton { background:rgba(255,255,255,238); color:#9aa0aa; "
+            "border:1px solid #dfe1e8; border-radius:8px; font-size:18px; font-weight:800; padding:0; }"
+            "QToolButton:hover { border-color:#df7d86; background:rgba(255,247,248,250); }"
+            "QToolButton:checked { color:#c93c49; border-color:#df7d86; background:#fff0f2; }"
+            "QToolButton:checked:hover { color:#ad2936; border-color:#cf5b66; background:#ffe7ea; }"
+        )
+        excluded_box.toggled.connect(
+            lambda enabled, k=key, c=card, t=content_type:
+            self._set_grid_excluded(t, k, c, enabled)
+        )
+
+        zoom_button = QToolButton()
+        zoom_button.setIcon(QIcon(_classification_pixmap("search", True, 24)))
+        zoom_button.setIconSize(QSize(21, 21))
+        zoom_button.setToolTip("미리보기 크게 보기")
+        zoom_button.setAccessibleName("미리보기 크게 보기")
+        zoom_button.setFixedSize(34, 34)
+        zoom_button.setStyleSheet(
+            "QToolButton { background:rgba(255,255,255,238); color:#555a68; "
+            "border:1px solid #dfe1e8; border-radius:8px; padding:0; }"
+            "QToolButton:hover { border-color:#8c74ee; background:rgba(247,245,255,250); }"
+        )
+        zoom_button.clicked.connect(
+            lambda _checked=False, r=record: self._show_livery_image(r)
+        )
+
+        memo_button = QToolButton()
+        memo_button.setIcon(self._detail_memo_icon(bool(annotation.note.strip())))
+        memo_button.setIconSize(QSize(18, 18))
+        memo_button.setToolTip(
+            (annotation.note.strip() + "\n\n클릭하여 메모 수정")
+            if annotation.note.strip()
+            else "메모 없음\n\n클릭하여 메모 추가"
+        )
+        memo_button.setAccessibleName(f"{item_label} 메모")
+        memo_button.setFixedSize(34, 34)
+        memo_button.setStyleSheet(
+            "QToolButton { background:rgba(255,255,255,238); color:#555a68; "
+            "border:1px solid #dfe1e8; border-radius:8px; padding:0; }"
+            "QToolButton:hover { border-color:#8c74ee; background:rgba(247,245,255,250); }"
+        )
+        memo_button.clicked.connect(
+            lambda _checked=False, t=content_type, k=key:
+            self._handle_saved_content_memo_clicked(t, k)
+        )
+
+        game_move_button = QToolButton()
+        game_move_button.setIcon(QIcon(_classification_pixmap("move", True, 24)))
+        game_move_button.setIconSize(QSize(23, 23))
+        game_move_button.setToolTip("인게임에서 이 썸네일 위치로 이동")
+        game_move_button.setAccessibleName(f"{item_label} 인게임 위치로 이동")
+        game_move_button.setFixedSize(38, 38)
+        game_move_button.setStyleSheet(
+            "QToolButton { background:rgba(255,255,255,242); color:#5f39d8; "
+            "border:2px solid #8c74ee; border-radius:19px; padding:0; }"
+            "QToolButton:hover { color:white; border-color:#6e4bf2; background:#6e4bf2; }"
+        )
+        game_move_button.clicked.connect(
+            lambda _checked=False, t=content_type, k=key:
+            self._request_game_navigation(t, k)
+        )
+
+        if content_type == "livery":
+            info_active = bool((record.header.description or "").strip())
+            info_tooltip = "리버리 설명 및 제작자 업로드 날짜 보기"
+        else:
+            info_active = bool(
+                isinstance(record, TuningRecord)
+                and record.data_path is not None
+                and record.data_size == 598
+            )
+            info_tooltip = "튜닝 Data 세부 정보 보기"
+        info_button = QToolButton()
+        info_kind = "livery_info" if content_type == "livery" else "tuning_info"
+        info_button.setIcon(QIcon(_classification_pixmap(info_kind, info_active, 24)))
+        info_button.setIconSize(QSize(22, 22))
+        info_button.setToolTip(info_tooltip)
+        info_button.setAccessibleName(info_tooltip)
+        info_button.setFixedSize(38, 38)
+        info_button.setStyleSheet(
+            "QToolButton { background:"
+            + ("#f2edff" if info_active else "rgba(255,255,255,242)")
+            + "; border:1px solid "
+            + ("#9c86f2" if info_active else "#dfe1e8")
+            + "; border-radius:9px; padding:0; }"
+            "QToolButton:hover { border-color:#8c74ee; background:#f2edff; }"
+        )
+        if content_type == "livery":
+            info_button.clicked.connect(
+                lambda _checked=False, r=record:
+                self._show_livery_metadata(r)
+            )
+        else:
+            info_button.clicked.connect(
+                lambda _checked=False, r=record:
+                self._show_tuning_details(r)
+            )
+
+        overlay_actions = QVBoxLayout()
+        overlay_actions.setContentsMargins(0, 0, 0, 0)
+        overlay_actions.setSpacing(6)
+        overlay_actions.addWidget(check_box)
+        overlay_actions.addWidget(triangle_box)
+        overlay_actions.addWidget(excluded_box)
+        overlay_actions.addWidget(zoom_button)
+        overlay_actions.addWidget(memo_button)
+        overlay_actions.addStretch(1)
+
+        left_actions = QVBoxLayout()
+        left_actions.setContentsMargins(0, 0, 0, 0)
+        left_actions.setSpacing(6)
+        if content_type == "livery":
+            left_actions.addWidget(game_move_button, 0, Qt.AlignmentFlag.AlignTop)
+        left_actions.addStretch(1)
+        left_actions.addWidget(info_button, 0, Qt.AlignmentFlag.AlignBottom)
+
+        action_columns = QHBoxLayout()
+        action_columns.setContentsMargins(0, 0, 0, 0)
+        action_columns.setSpacing(0)
+        action_columns.addLayout(left_actions)
+        action_columns.addStretch(1)
+        action_columns.addLayout(overlay_actions)
+        overlay_layout.addLayout(action_columns)
+        image_stack.addWidget(overlay)
+        image_stack.setCurrentWidget(overlay)
+        outer.addWidget(image_host)
+
+        # Borderless hierarchy: vehicle first, then title and creator metadata.
+        content_name = record.header.name or "(unnamed)"
+        creator_name = record.header.creator or "—"
+        vehicle_name = self._car_label(record.header.car_id)
+        vehicle = CopyValueLabel("차량명", vehicle_name)
+        vehicle.setStyleSheet(
+            "QLabel { background:transparent; color:#171924; border:0; padding:4px 2px 1px 2px; "
+            "font-size:11.5pt; font-weight:700; }"
+        )
+        vehicle.setFixedHeight(31)
+        vehicle.setToolTip(f"클릭하여 차량명 복사\n{vehicle_name}")
+        vehicle.setMinimumWidth(0)
+        vehicle.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        outer.addWidget(vehicle)
+
+        meta_row = QHBoxLayout()
+        meta_row.setContentsMargins(0, 0, 0, 0)
+        meta_row.setSpacing(7)
+
+        title_box = CopyValueLabel("제목", content_name)
+        title_box.setStyleSheet(
+            "QLabel { background:transparent; color:#343744; border:0; padding:2px; "
+            "font-size:10pt; font-weight:600; }"
+        )
+        title_box.setFixedHeight(28)
+        title_box.setToolTip(f"클릭하여 제목 복사\n{content_name}")
+        title_box.setMinimumWidth(0)
+        title_box.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        meta_row.addWidget(title_box, 3)
+
+        creator_box = CopyValueLabel("제작자명", creator_name)
+        creator_box.setStyleSheet(
+            "QLabel { background:transparent; color:#6d7282; border:0; padding:2px; "
+            "font-size:9.5pt; font-weight:500; }"
+        )
+        creator_box.setFixedHeight(28)
+        creator_box.setToolTip(f"클릭하여 제작자명 복사\n{creator_name}")
+        creator_box.setMinimumWidth(0)
+        creator_box.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        meta_row.addWidget(creator_box, 2)
+        outer.addLayout(meta_row)
+
+        card._fh6_image_label = image_label
+        card._fh6_thumbnail_path = record.thumbnail_path
+        card._fh6_thumbnail_loaded = False
+        card._fh6_check_box = check_box
+        card._fh6_triangle_box = triangle_box
+        card._fh6_excluded_box = excluded_box
+        card._fh6_memo_button = memo_button
+        card._fh6_zoom_button = zoom_button
+        card._fh6_game_move_button = game_move_button
+        card._fh6_info_button = info_button
+        card._fh6_content_type = content_type
+        self._apply_pointing_cursors(card)
+        return card
+
+    def _livery_search_text(self, record: LiveryRecord, note: str = "") -> str:
+        return self._saved_content_search_text(record, note)
+
+    def _saved_content_search_text(
+        self,
+        record: LiveryRecord | TuningRecord,
+        note: str = "",
+    ) -> str:
+        return " ".join(
+            (
+                record.header.name or "",
+                record.header.creator or "",
+                str(record.header.car_id or ""),
+                self._car_label(record.header.car_id),
+                record.header.description or "",
+                note or "",
+            )
+        ).lower()
+
+    def _refresh_card_search_text(self, card: QFrame, key: str) -> None:
+        content_type = str(
+            getattr(card, "_fh6_content_type", "livery")
+        )
+        record = self._record_for_content_key(content_type, key)
+        if record is not None:
+            card.setProperty(
+                "searchText",
+                self._saved_content_search_text(
+                    record, self.annotations.get(key).note
+                ),
+            )
+
+    def _filter_saved_content_table(
+        self,
+        content_type: str,
+        text: str,
+    ) -> None:
+        table = (
+            self.livery_table
+            if content_type == "livery"
+            else self.tuning_table
+        )
+        needle = text.strip().lower()
+
+        for row in range(table.rowCount()):
+            key_item = table.item(row, 0)
+            key = (
+                str(
+                    key_item.data(Qt.ItemDataRole.UserRole)
+                    or ""
+                )
+                if key_item
+                else ""
+            )
+            annotation = (
+                self.annotations.get(key)
+                if key
+                else None
+            )
+            checked = (
+                bool(annotation.checked)
+                if annotation is not None
+                else False
+            )
+            triangle = (
+                bool(annotation.triangle)
+                if annotation is not None
+                else False
+            )
+            excluded = (
+                bool(annotation.excluded)
+                if annotation is not None
+                else False
+            )
+            memo = (
+                annotation.note or ""
+                if annotation is not None
+                else ""
+            )
+
+            record = (
+                self._record_for_content_key(
+                    content_type,
+                    key,
+                )
+                if key
+                else None
+            )
+            duplicate = self._is_duplicate_livery(record) if isinstance(record, LiveryRecord) else False
+            car_id_text = (
+                str(record.header.car_id)
+                if (
+                    record is not None
+                    and record.header.car_id is not None
+                )
+                else ""
+            )
+
+            visible_text = " ".join(
+                table.item(row, col).text()
+                if table.item(row, col)
+                else ""
+                for col in (1, 2, 3, 4, 6, 7)
+            )
+            hay = " ".join(
+                (visible_text, car_id_text, memo)
+            ).lower()
+
+            table.setRowHidden(
+                row,
+                bool(
+                    (needle and needle not in hay)
+                    or not self._saved_content_filter_matches(
+                        content_type,
+                        checked,
+                        memo,
+                        triangle,
+                        excluded,
+                        duplicate,
+                    )
+                ),
+            )
+
+    def _filter_saved_content_views(
+        self,
+        content_type: str,
+        text: str,
+        preserve_scroll: bool = False,
+    ) -> None:
+        if content_type == "livery":
+            self._filter_livery_views(
+                text,
+                preserve_scroll=preserve_scroll,
+            )
+            return
+        if content_type == "tuning":
+            scrollbar = self.tuning_grid_scroll.verticalScrollBar()
+            old_scroll = scrollbar.value()
+            self._filter_saved_content_table(
+                "tuning",
+                text,
+            )
+            self._relayout_tuning_grid(text)
+            if not preserve_scroll:
+                self.tuning_table.scrollToTop()
+                scrollbar.setValue(0)
+            else:
+                self._restore_grid_scroll(scrollbar, old_scroll)
+                QTimer.singleShot(
+                    0,
+                    self._schedule_visible_tuning_thumbnails,
+                )
+
+    @staticmethod
+    def _restore_grid_scroll(scrollbar: object, value: int) -> None:
+        """Restore after both the immediate and deferred Qt layout passes."""
+        def restore() -> None:
+            scrollbar.setValue(min(value, scrollbar.maximum()))
+
+        restore()
+        QTimer.singleShot(0, restore)
+        QTimer.singleShot(30, restore)
+
+    def _refresh_after_annotation_change(
+        self,
+        content_type: str,
+        *,
+        filter_modes: set[int],
+        search_sensitive: bool = False,
+    ) -> None:
+        """Relayout only when the changed annotation can affect visibility.
+
+        Rebuilding a grouped grid for every button click briefly collapses the
+        scroll area and causes both flicker and a jump to the first card.  In
+        the normal ``All`` view the annotation only changes the clicked card,
+        so no layout work is required.
+        """
+        filter_box = (
+            self.livery_check_filter
+            if content_type == "livery"
+            else self.tuning_check_filter
+        )
+        search = (
+            self.livery_search
+            if content_type == "livery"
+            else self.tuning_search
+        )
+        if filter_box.selected_modes().intersection(filter_modes) or (
+            search_sensitive and bool(search.text().strip())
+        ):
+            self._filter_saved_content_views(
+                content_type,
+                search.text(),
+                preserve_scroll=True,
+            )
+
+    @Slot(str)
+    def _filter_livery_views(self, text: str, preserve_scroll: bool = False) -> None:
+        # Checking/unchecking used to jump the grid to the top because every
+        # annotation refresh reset the vertical scrollbar.  Preserve the exact
+        # current position for annotation-driven refreshes; direct user searches
+        # and filter changes still start at the top intentionally.
+        scrollbar = self.livery_grid_scroll.verticalScrollBar()
+        old_scroll = scrollbar.value()
+
+        self._filter_saved_content_table(
+            "livery",
+            text,
+        )
+        self._relayout_livery_grid(text)
+
+        if preserve_scroll:
+            self._restore_grid_scroll(scrollbar, old_scroll)
+            QTimer.singleShot(0, self._schedule_visible_livery_thumbnails)
+        else:
+            scrollbar.setValue(0)
+
+    def _set_grid_checked(
+        self,
+        content_type: str,
+        key: str,
+        card: QFrame,
+        checked: bool,
+    ) -> None:
+        self.annotations.set_checked(key, checked)
+        card.setProperty("checked", checked)
+        self._sync_saved_content_annotation(content_type, key)
+        self._refresh_after_annotation_change(
+            content_type, filter_modes={1, 10}
+        )
+
+    def _set_grid_triangle(
+        self,
+        content_type: str,
+        key: str,
+        card: QFrame,
+        enabled: bool,
+    ) -> None:
+        self.annotations.set_triangle(key, enabled)
+        card.setProperty("triangle", enabled)
+        self._sync_saved_content_annotation(content_type, key)
+        self._refresh_after_annotation_change(
+            content_type, filter_modes={5, 10}
+        )
+
+    def _set_grid_excluded(
+        self,
+        content_type: str,
+        key: str,
+        card: QFrame,
+        enabled: bool,
+    ) -> None:
+        self.annotations.set_excluded(key, enabled)
+        card.setProperty("excluded", enabled)
+        self._sync_saved_content_annotation(content_type, key)
+        self._refresh_after_annotation_change(
+            content_type, filter_modes={7, 10}
+        )
+
+    def _save_grid_note(self, key: str, editor: QPlainTextEdit) -> None:
+        note = editor.toPlainText().strip()
+        self.annotations.set_note(key, note)
+        card = self._livery_card_by_key.get(key)
+        if card is not None:
+            self._refresh_card_search_text(card, key)
+        self._sync_table_annotation(key)
+        self._show_status("메모 저장 완료", 2500)
+        self._filter_livery_views(self.livery_search.text(), preserve_scroll=True)
+
+
+    def _sync_saved_content_annotation(
+        self,
+        content_type: str,
+        key: str,
+    ) -> None:
+        annotation = self.annotations.get(key)
+        table = (
+            self.livery_table
+            if content_type == "livery"
+            else self.tuning_table
+        )
+
+        for row in range(table.rowCount()):
+            item = table.item(row, 0)
+            if (
+                item is None
+                or str(
+                    item.data(Qt.ItemDataRole.UserRole)
+                    or ""
+                ) != key
+            ):
+                continue
+
+            status_widget = table.cellWidget(row, 0)
+            if status_widget is not None:
+                for object_name, enabled in (
+                    ("detailCheckButton", annotation.checked),
+                    ("detailTriangleButton", annotation.triangle),
+                    ("detailExcludedButton", annotation.excluded),
+                ):
+                    button = status_widget.findChild(QToolButton, object_name)
+                    if button is not None:
+                        button.blockSignals(True)
+                        button.setChecked(enabled)
+                        button.blockSignals(False)
+
+            memo_item = table.item(row, 5)
+            if memo_item is not None:
+                self._set_detail_memo_item(
+                    memo_item,
+                    annotation.note,
+                )
+            memo_widget = table.cellWidget(row, 5)
+            if memo_widget is not None:
+                button = memo_widget.findChild(QToolButton)
+                if button is not None:
+                    note = (
+                        annotation.note or ""
+                    ).strip()
+                    button.setIcon(
+                        self._detail_memo_icon(
+                            bool(note)
+                        )
+                    )
+                    button.setToolTip(
+                        (
+                            note
+                            + "\n\n클릭하여 메모 수정"
+                        )
+                        if note
+                        else "메모 없음\n\n클릭하여 메모 추가"
+                    )
+            break
+
+    def _sync_table_annotation(
+        self,
+        key: str,
+    ) -> None:
+        self._sync_saved_content_annotation(
+            "livery",
+            key,
+        )
+
+    def _apply_note_to_same_creator(self, source_key: str, source_note: str) -> None:
+        source_record = self._record_for_annotation_key(source_key)
+        if source_record is None:
+            return
+        creator = (source_record.header.creator or "").strip()
+        note = (source_note or "").strip()
+        if not creator:
+            QMessageBox.information(self, "제작자 정보 없음", "이 리버리에는 제작자 정보가 없어 일괄 적용할 수 없습니다.")
+            return
+        if not note:
+            QMessageBox.information(self, "메모 없음", "적용할 메모를 먼저 입력하세요.")
+            return
+
+        # Save the source editor first, then append the same note block to every
+        # livery by the same creator. Existing target notes remain untouched in front.
+        self.annotations.set(source_key, note=note, save=False)
+        affected = 0
+        creator_key = creator.casefold()
+        for record in self._custom_liveries():
+            if (record.header.creator or "").strip().casefold() != creator_key:
+                continue
+            key = self._annotation_key(record)
+            current = self.annotations.get(key).note
+            merged = append_note(current, note)
+            if merged != current:
+                affected += 1
+            self.annotations.set(key, note=merged, save=False)
+        self.annotations.save()
+        self._refresh_annotation_widgets()
+        self._show_status(f"{creator} 제작자 리버리에 메모 적용 완료", 3500)
+        QMessageBox.information(
+            self,
+            "동일 제작자 메모 적용",
+            f"제작자: {creator}\n대상 리버리: {sum(1 for r in self._custom_liveries() if (r.header.creator or '').strip().casefold() == creator_key)}개\n새로 추가된 메모: {affected}개\n\n기존 메모는 유지되었습니다.",
+        )
+
+    def _clear_notes_for_same_creator(self, source_key: str) -> None:
+        source_record = self._record_for_annotation_key(source_key)
+        if source_record is None:
+            return
+        creator = (source_record.header.creator or "").strip()
+        if not creator:
+            QMessageBox.information(self, "제작자 정보 없음", "이 리버리에는 제작자 정보가 없어 일괄 제거할 수 없습니다.")
+            return
+
+        creator_key = creator.casefold()
+        targets = [
+            record for record in self._custom_liveries()
+            if (record.header.creator or "").strip().casefold() == creator_key
+        ]
+        with_notes = sum(
+            1 for record in targets
+            if self.annotations.get(self._annotation_key(record)).note.strip()
+        )
+        if with_notes == 0:
+            QMessageBox.information(self, "제거할 메모 없음", f"{creator} 제작자의 저장된 메모가 없습니다.")
+            return
+
+        answer = QMessageBox.question(
+            self,
+            "동일 제작자 메모 전부 제거",
+            f"제작자: {creator}\n메모가 있는 리버리: {with_notes}개\n\n"
+            "이 제작자의 모든 리버리 메모를 제거하시겠습니까?\n체크 상태는 유지됩니다.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+
+        for record in targets:
+            key = self._annotation_key(record)
+            self.annotations.set(key, note="", save=False)
+        self.annotations.save()
+        self._refresh_annotation_widgets()
+        self._show_status(f"{creator} 제작자의 메모 {with_notes}개 제거 완료", 3500)
+
+
+    def _refresh_annotation_widgets(self) -> None:
+        self.livery_table.blockSignals(True)
+        try:
+            for row in range(self.livery_table.rowCount()):
+                item = self.livery_table.item(row, 0)
+                if not item:
+                    continue
+                key = str(item.data(Qt.ItemDataRole.UserRole) or "")
+                annotation = self.annotations.get(key)
+
+                status_widget = self.livery_table.cellWidget(row, 0)
+                if status_widget is not None:
+                    for object_name, enabled in (
+                        ("detailCheckButton", annotation.checked),
+                        ("detailTriangleButton", annotation.triangle),
+                        ("detailExcludedButton", annotation.excluded),
+                    ):
+                        button = status_widget.findChild(QToolButton, object_name)
+                        if button is not None:
+                            button.blockSignals(True)
+                            button.setChecked(enabled)
+                            button.blockSignals(False)
+
+                memo = self.livery_table.item(row, 5)
+                if memo is not None:
+                    self._set_detail_memo_item(memo, annotation.note)
+                memo_widget = self.livery_table.cellWidget(row, 5)
+                if memo_widget is not None:
+                    button = memo_widget.findChild(QToolButton)
+                    if button is not None:
+                        note = (annotation.note or "").strip()
+                        button.setIcon(self._detail_memo_icon(bool(note)))
+                        button.setToolTip(
+                            (note + "\\n\\n클릭하여 메모 수정") if note else "메모 없음\\n\\n클릭하여 메모 추가"
+                        )
+        finally:
+            self.livery_table.blockSignals(False)
+
+        for key, card in self._livery_card_by_key.items():
+            annotation = self.annotations.get(key)
+            checkbox = getattr(card, "_fh6_check_box", None)
+            if checkbox is not None:
+                checkbox.blockSignals(True)
+                checkbox.setChecked(annotation.checked)
+                checkbox.blockSignals(False)
+            editor = getattr(card, "_fh6_memo_editor", None)
+            if editor is not None:
+                editor.setPlainText(annotation.note)
+            card.setProperty("checked", annotation.checked)
+            triangle_box = getattr(card, "_fh6_triangle_box", None)
+            if triangle_box is not None:
+                triangle_box.blockSignals(True)
+                triangle_box.setChecked(annotation.triangle)
+                triangle_box.blockSignals(False)
+            card.setProperty("triangle", annotation.triangle)
+            excluded_box = getattr(card, "_fh6_excluded_box", None)
+            if excluded_box is not None:
+                excluded_box.blockSignals(True)
+                excluded_box.setChecked(annotation.excluded)
+                excluded_box.blockSignals(False)
+            card.setProperty("excluded", annotation.excluded)
+            self._refresh_card_search_text(card, key)
+        self._filter_livery_views(self.livery_search.text(), preserve_scroll=True)
+
+
+    @Slot()
+    def _apply_selected_table_note_to_creator(self) -> None:
+        rows = self.livery_table.selectionModel().selectedRows()
+        if not rows:
+            QMessageBox.information(self, "리버리 선택", "세부 보기에서 리버리를 하나 선택하세요.")
+            return
+        row = rows[0].row()
+        key_item = self.livery_table.item(row, 0)
+        memo_item = self.livery_table.item(row, 5)
+        if not key_item or not memo_item:
+            return
+        key = str(
+            key_item.data(Qt.ItemDataRole.UserRole) or ""
+        )
+        note = self.annotations.get(key).note
+        self._apply_note_to_same_creator(key, note)
+
+    @Slot(int)
+    def _on_main_page_changed(self, index: int) -> None:
+        """Prime lazy thumbnails when a hidden stacked page becomes visible.
+
+        QStackedWidget emits currentChanged before all child geometry has
+        necessarily completed its final layout.  Run one immediate pass and a
+        few short deferred passes; each pass is cheap because already-loaded
+        cards return immediately.  This removes the previous dependency on a
+        user-generated resize or scrollbar event.
+        """
+        if index == 1:
+            self._prime_livery_grid_thumbnails()
+            for delay_ms in (0, 40, 120):
+                QTimer.singleShot(delay_ms, self._prime_livery_grid_thumbnails)
+        elif index == 2:
+            self._prime_tuning_grid_thumbnails()
+            for delay_ms in (0, 40, 120):
+                QTimer.singleShot(delay_ms, self._prime_tuning_grid_thumbnails)
+
+    def _prime_livery_grid_thumbnails(self) -> None:
+        if not hasattr(self, "livery_grid_scroll"):
+            return
+        # Ignore delayed callbacks after the user has already changed pages.
+        if hasattr(self, "pages") and self.pages.currentIndex() != 1:
+            return
+        self.livery_grid_layout.activate()
+        self.livery_grid_host.updateGeometry()
+        self._sync_livery_grid_card_widths()
+        self._refresh_visible_livery_thumbnails()
+        self.livery_grid_scroll.viewport().update()
+
+    def _prime_tuning_grid_thumbnails(self) -> None:
+        if not hasattr(self, "tuning_grid_scroll"):
+            return
+        if hasattr(self, "pages") and self.pages.currentIndex() != 2:
+            return
+        self.tuning_grid_layout.activate()
+        self.tuning_grid_host.updateGeometry()
+        self._sync_tuning_grid_card_widths()
+        self._refresh_visible_tuning_thumbnails()
+        self.tuning_grid_scroll.viewport().update()
+
+    def _schedule_visible_livery_thumbnails(self) -> None:
+        QTimer.singleShot(0, self._refresh_visible_livery_thumbnails)
+
+    def _schedule_visible_tuning_thumbnails(self) -> None:
+        QTimer.singleShot(0, self._refresh_visible_tuning_thumbnails)
+
+    def _refresh_visible_livery_thumbnails(self) -> None:
+        if not hasattr(self, "livery_grid_scroll"):
+            return
+        viewport = self.livery_grid_scroll.viewport()
+        visible = viewport.rect().adjusted(0, -260, 0, 260)
+        for card in self._livery_grid_cards:
+            if not card.isVisible():
+                self._unload_livery_card_thumbnail(card)
+                continue
+            top_left = card.mapTo(viewport, QPoint(0, 0))
+            card_rect = QRect(top_left, card.size())
+            if card_rect.intersects(visible):
+                self._load_livery_card_thumbnail(card)
+            else:
+                self._unload_livery_card_thumbnail(card)
+
+    def _refresh_visible_tuning_thumbnails(self) -> None:
+        if not hasattr(self, "tuning_grid_scroll"):
+            return
+        viewport = self.tuning_grid_scroll.viewport()
+        visible = viewport.rect().adjusted(0, -260, 0, 260)
+        for card in self._tuning_grid_cards:
+            if not card.isVisible():
+                self._unload_livery_card_thumbnail(card)
+                continue
+            top_left = card.mapTo(viewport, QPoint(0, 0))
+            card_rect = QRect(top_left, card.size())
+            if card_rect.intersects(visible):
+                self._load_livery_card_thumbnail(card)
+            else:
+                self._unload_livery_card_thumbnail(card)
+
+    def _load_livery_card_thumbnail(self, card: QFrame) -> None:
+        if getattr(card, "_fh6_thumbnail_loaded", False):
+            return
+        label = getattr(card, "_fh6_image_label", None)
+        path = getattr(card, "_fh6_thumbnail_path", None)
+        if label is None:
+            return
+        pixmap = self._pixmap_for(path, QSize(560, 215))
+        if pixmap is None:
+            label.setPixmap(QPixmap())
+            label.setText("No thumbnail")
+            label.setObjectName("muted")
+        else:
+            label.setText("")
+            label.setPixmap(pixmap)
+        card._fh6_thumbnail_loaded = True
+
+    def _unload_livery_card_thumbnail(self, card: QFrame) -> None:
+        if not getattr(card, "_fh6_thumbnail_loaded", False):
+            return
+        label = getattr(card, "_fh6_image_label", None)
+        if label is not None:
+            label.setPixmap(QPixmap())
+            label.setText("Thumbnail")
+            label.setObjectName("muted")
+        card._fh6_thumbnail_loaded = False
+
+    def eventFilter(self, watched, event) -> bool:
+        if (
+            hasattr(self, "livery_grid_scroll")
+            and watched is self.livery_grid_scroll.viewport()
+            and event.type() in (QEvent.Type.Resize, QEvent.Type.Show)
+        ):
+            # Show is as important as Resize here: cards may have been populated
+            # while this stacked page was hidden, in which case the initial lazy
+            # load skipped them because card.isVisible() was false.
+            self._sync_livery_grid_card_widths()
+            self._refresh_visible_livery_thumbnails()
+            if event.type() == QEvent.Type.Show:
+                QTimer.singleShot(0, self._prime_livery_grid_thumbnails)
+        if (
+            hasattr(self, "tuning_grid_scroll")
+            and watched is self.tuning_grid_scroll.viewport()
+            and event.type() in (QEvent.Type.Resize, QEvent.Type.Show)
+        ):
+            self._sync_tuning_grid_card_widths()
+            self._refresh_visible_tuning_thumbnails()
+            if event.type() == QEvent.Type.Show:
+                QTimer.singleShot(0, self._prime_tuning_grid_thumbnails)
+        return super().eventFilter(watched, event)
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if hasattr(self, "_busy_overlay"):
+            self._busy_overlay.setGeometry(self.rect())
+        if hasattr(self, "livery_grid_scroll"):
+            # Immediate update for the window resize itself.  The viewport
+            # eventFilter performs the authoritative update with its final width.
+            self._sync_livery_grid_card_widths()
+            self._refresh_visible_livery_thumbnails()
+        if hasattr(self, "tuning_grid_scroll"):
+            self._sync_tuning_grid_card_widths()
+            self._refresh_visible_tuning_thumbnails()
+
+    def _populate_tuning_table(self) -> None:
+        self._populate_saved_content_table("tuning")
+        self._populate_tuning_grid()
+        self._filter_saved_content_views(
+            "tuning",
+            self.tuning_search.text(),
+        )
+
+    def _current_unknown_car_ids(self) -> list[int]:
+        if not self.result:
+            return []
+        return self.car_db.unknown_ids(summary.car_id for summary in self.result.car_summaries)
+
+    def _refresh_db_status(self, unknown_ids: Optional[list[int]] = None) -> None:
+        """Refresh the compact DB metadata shown beside the dashboard title."""
+        if not hasattr(self, "db_last_update_label"):
+            return
+
+        status = self.car_db.status
+        raw = (status.cache_updated_at or "").strip()
+
+        if raw:
+            # Stored value is UTC ISO-8601, e.g. 2026-08-12T14:21:04Z.
+            date_text = raw[:10] if len(raw) >= 10 else raw
+            self.db_last_update_label.setText(
+                f"/ 마지막 업데이트: {date_text}"
+            )
+            tooltip = f"로컬 DB 다운로드 시각: {raw}"
+            if status.cache_source_last_modified:
+                tooltip += (
+                    "\n원본 Last-Modified: "
+                    + status.cache_source_last_modified
+                )
+            self.db_last_update_label.setToolTip(tooltip)
+        else:
+            self.db_last_update_label.setText("/ 마지막 업데이트: 확인 불가")
+            self.db_last_update_label.setToolTip(
+                "아직 수동 차량 DB 업데이트를 적용하지 않았습니다."
+            )
+
+    @Slot()
+    def _open_car_db_source(self) -> None:
+        QDesktopServices.openUrl(QUrl(REMOTE_SOURCE_PAGE))
+
+    @Slot()
+    def start_car_db_update(self) -> None:
+        if self._db_update_thread and self._db_update_thread.isRunning():
+            return
+        answer = QMessageBox.question(
+            self,
+            "차량 DB 업데이트",
+            "공개 GitHub의 FH6 CarOrdinal JSON을 내려받아 LocalAppData의 차량명 캐시만 갱신합니다.\n\n"
+            "세이브 파일, 세이브 경로, XUID, 리버리/튜닝 데이터는 전송하지 않습니다. 계속하시겠습니까?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+
+        self.db_update_button.setEnabled(False)
+        self.db_update_button.setText("업데이트 확인 중…")
+        self._begin_busy("차량 DB를 내려받아 갱신하는 중…")
+        self._show_status("차량 DB 다운로드 중…")
+        thread = QThread(self)
+        worker = CarDatabaseUpdateWorker(self.car_db.cache_path)
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.finished.connect(self._car_db_update_finished)
+        worker.failed.connect(self._car_db_update_failed)
+        worker.finished.connect(thread.quit)
+        worker.failed.connect(thread.quit)
+        thread.finished.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater)
+        thread.finished.connect(self._car_db_update_cleanup)
+        self._db_update_thread = thread
+        self._db_update_worker = worker
+        thread.start()
+
+    @Slot(object)
+    def _car_db_update_finished(self, update) -> None:
+        self._end_busy()
+        self.car_db = CarDatabase(self.project_root / "data" / "car_names.json")
+        self._refresh_db_status()
+        self._show_status(f"차량 DB 업데이트 완료 — {update.count} vehicles", 8000)
+        QMessageBox.information(
+            self,
+            "차량 DB 업데이트 완료",
+            f"{update.count}개의 Car ID 매핑을 적용했습니다.\n저장 위치: {update.cache_path}",
+        )
+        if self.path_edit.text():
+            self.start_scan(Path(self.path_edit.text()))
+
+    @Slot(str)
+    def _car_db_update_failed(self, message: str) -> None:
+        self._end_busy()
+        self._show_status("차량 DB 업데이트 실패", 6000)
+        QMessageBox.critical(self, "차량 DB 업데이트 실패", message)
+
+    @Slot()
+    def _car_db_update_cleanup(self) -> None:
+        self._db_update_thread = None
+        self._db_update_worker = None
+        if hasattr(self, "db_update_button"):
+            self.db_update_button.setEnabled(True)
+            self.db_update_button.setText("차량 DB 업데이트 확인")
+
+    @Slot()
+    def open_car_db_override(self) -> None:
+        """Spreadsheet-style Car ID -> vehicle-name editor with explicit Save."""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("차량명 사용자 오버라이드")
+        dialog.resize(820, 680)
+        dialog.setStyleSheet(
+            APP_STYLE
+            + """
+            QDialog { background:#f7f8fb; }
+            QTableWidget {
+                background:white;
+                border:1px solid #dfe1e8;
+                border-radius:10px;
+                gridline-color:#e8eaf0;
+                selection-background-color:#eee9ff;
+                selection-color:#171924;
+            }
+            QTableWidget::item { padding:6px 8px; }
+            QHeaderView::section {
+                background:#fafbfc;
+                color:#5f6474;
+                border:0;
+                border-bottom:1px solid #dfe1e8;
+                padding:8px;
+                font-weight:600;
+            }
+            """
+        )
+
+        root = QVBoxLayout(dialog)
+        root.setContentsMargins(12, 12, 12, 12)
+        root.setSpacing(10)
+
+        table = self._table(("Car ID", "차량명"))
+        table.setAlternatingRowColors(True)
+        table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
+        table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        table.setEditTriggers(
+            QAbstractItemView.EditTrigger.DoubleClicked
+            | QAbstractItemView.EditTrigger.EditKeyPressed
+            | QAbstractItemView.EditTrigger.SelectedClicked
+        )
+        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        table.setColumnWidth(0, 120)
+        table.verticalHeader().setVisible(True)
+        table.verticalHeader().setDefaultSectionSize(31)
+        root.addWidget(table, 1)
+
+        # The table is the editor.  Only one explicit action remains below it.
+        footer = QHBoxLayout()
+        footer.setContentsMargins(0, 0, 0, 0)
+        footer.addStretch(1)
+
+        save_button = QPushButton("저장")
+        save_button.setObjectName("primary")
+        save_button.setEnabled(False)
+        save_button.setMinimumWidth(92)
+        footer.addWidget(save_button)
+        root.addLayout(footer)
+
+        initial_overrides = self.car_db.user_overrides()
+        effective = self.car_db.all_items()
+
+        visible_ids = set(effective)
+        if self.result is not None:
+            visible_ids.update(
+                summary.car_id for summary in self.result.car_summaries
+            )
+
+        ids = sorted(visible_ids)
+        table.setRowCount(len(ids))
+
+        for row, car_id in enumerate(ids):
+            id_item = QTableWidgetItem(str(car_id))
+            id_item.setData(Qt.ItemDataRole.UserRole, car_id)
+            id_item.setFlags(id_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            id_item.setTextAlignment(
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+            )
+
+            current_label = self.car_db.get(car_id).label
+            name_item = QTableWidgetItem(current_label)
+            name_item.setData(Qt.ItemDataRole.UserRole, car_id)
+            name_item.setTextAlignment(
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+            )
+
+            if car_id in initial_overrides:
+                name_item.setBackground(QColor("#f3efff"))
+                name_item.setToolTip("사용자 오버라이드 적용 중")
+            else:
+                name_item.setToolTip("더블클릭하여 차량명 수정")
+
+            table.setItem(row, 0, id_item)
+            table.setItem(row, 1, name_item)
+
+        dirty = {"value": False}
+        saved_any = {"value": False}
+
+        def mark_dirty(item: QTableWidgetItem) -> None:
+            if item.column() != 1:
+                return
+            dirty["value"] = True
+            save_button.setEnabled(True)
+
+        def collect_overrides() -> Optional[dict[int, str]]:
+            desired: dict[int, str] = {}
+
+            for row in range(table.rowCount()):
+                id_item = table.item(row, 0)
+                name_item = table.item(row, 1)
+                if id_item is None or name_item is None:
+                    continue
+
+                car_id = int(id_item.data(Qt.ItemDataRole.UserRole))
+                value = name_item.text().strip()
+
+                if not value:
+                    QMessageBox.warning(
+                        dialog,
+                        "차량명 확인",
+                        f"Car ID {car_id}의 차량명이 비어 있습니다.",
+                    )
+                    table.setCurrentCell(row, 1)
+                    table.editItem(name_item)
+                    return None
+
+                if value != self.car_db.base_label(car_id):
+                    desired[car_id] = value
+
+            return desired
+
+        def refresh_override_marks(
+            overrides: dict[int, str],
+        ) -> None:
+            for row in range(table.rowCount()):
+                id_item = table.item(row, 0)
+                name_item = table.item(row, 1)
+                if id_item is None or name_item is None:
+                    continue
+                car_id = int(id_item.data(Qt.ItemDataRole.UserRole))
+                if car_id in overrides:
+                    name_item.setBackground(QColor("#f3efff"))
+                    name_item.setToolTip("사용자 오버라이드 적용 중")
+                else:
+                    name_item.setBackground(
+                        QColor(Qt.GlobalColor.transparent)
+                    )
+                    name_item.setToolTip("더블클릭하여 차량명 수정")
+
+        def save_overrides() -> None:
+            desired = collect_overrides()
+            if desired is None:
+                return
+
+            try:
+                self.car_db.replace_user_overrides(desired)
+            except (OSError, ValueError) as exc:
+                QMessageBox.critical(
+                    dialog,
+                    "오버라이드 저장 실패",
+                    str(exc),
+                )
+                return
+
+            refresh_override_marks(desired)
+            dirty["value"] = False
+            saved_any["value"] = True
+            save_button.setEnabled(False)
+            self._show_status(
+                f"사용자 오버라이드 저장 완료 — {len(desired)}개",
+                2000,
+            )
+
+        table.itemChanged.connect(mark_dirty)
+        save_button.clicked.connect(save_overrides)
+        self._apply_pointing_cursors(dialog)
+        dialog.exec()
+
+        # Only saved changes are reflected in the main dashboard.
+        if saved_any["value"]:
+            self.car_db.reload()
+            self._refresh_db_status()
+            if self.path_edit.text() and Path(self.path_edit.text()).is_dir():
+                self.start_scan(Path(self.path_edit.text()))
+
+
+    def _set_dashboard_content_mode(self, index: int) -> None:
+        if index not in (0, 1):
+            return
+        self.dashboard_content_stack.setCurrentIndex(index)
+        self.car_search.blockSignals(True)
+        self.car_search.clear()
+        self.car_search.blockSignals(False)
+
+        if index == 0:
+            self.car_search.setPlaceholderText("Car ID / 차량명 검색")
+            self.selected_hint.clear()
+            self.selected_hint.hide()
+            if self.car_table.rowCount() and not self.car_table.selectionModel().selectedRows():
+                self.car_table.selectRow(0)
+            self._update_selected_car()
+        else:
+            self.car_search.setPlaceholderText("제작자명 검색")
+            self.selected_hint.clear()
+            self.selected_hint.hide()
+            if self.creator_table.rowCount() and not self.creator_table.selectionModel().selectedRows():
+                self.creator_table.selectRow(0)
+            self._update_selected_creator()
+        self._filter_dashboard_table("")
+
+    def _update_selected_car(self) -> None:
+        if not self.result or self.dashboard_content_stack.currentIndex() != 0:
+            return
+        rows=self.car_table.selectionModel().selectedRows()
+        if not rows: return
+        item=self.car_table.item(rows[0].row(),0)
+        if not item: return
+        car_id=int(item.data(Qt.ItemDataRole.UserRole))
+        summary=next((x for x in self.result.car_summaries if x.car_id==car_id),None)
+        self.selected_title.setText(
+            f"차량명: {summary.label if summary else self._car_label(car_id)}"
+        )
+        self.selected_hint.clear()
+        self.selected_hint.hide()
+        liveries=[x for x in self.result.liveries if x.car_id==car_id and x.kind=="Livery"]
+        tunings=[x for x in self.result.tunings if x.car_id==car_id]
+        self._fill_selected_liveries(liveries)
+        self._fill_selected_tunings(tunings)
+
+    def _update_selected_creator(self) -> None:
+        if not self.result or self.dashboard_content_stack.currentIndex() != 1:
+            return
+        rows = self.creator_table.selectionModel().selectedRows()
+        if not rows:
+            return
+        item = self.creator_table.item(rows[0].row(), 1)
+        if not item:
+            return
+        creator = str(item.data(Qt.ItemDataRole.UserRole) or item.text())
+        creator_key = creator.casefold()
+
+        def same_creator(raw_name: str) -> bool:
+            display = (raw_name or "").strip() or "(제작자 없음)"
+            return display.casefold() == creator_key
+
+        liveries = [
+            record for record in self.result.liveries
+            if record.kind == "Livery" and same_creator(record.header.creator or "")
+        ]
+        tunings = [
+            record for record in self.result.tunings
+            if same_creator(record.header.creator or "")
+        ]
+        self.selected_title.setText(f"제작자명: {creator}")
+        self.selected_hint.clear()
+        self.selected_hint.hide()
+        self._fill_selected_liveries(liveries)
+        self._fill_selected_tunings(tunings)
+
+    def _fill_selected_liveries(self, records: list[LiveryRecord]) -> None:
+        t=self.selected_liveries; t.setRowCount(0)
+        for r in records:
+            row=t.rowCount(); t.insertRow(row); t.setRowHeight(row,54)
+            it=QTableWidgetItem(); it.setIcon(self._icon_for(r.thumbnail_path)); t.setItem(row,0,it)
+            for c,v in enumerate((r.header.name or "(unnamed)",r.header.creator),1): t.setItem(row,c,QTableWidgetItem(str(v)))
+
+    def _fill_selected_tunings(self, records: list[TuningRecord]) -> None:
+        t=self.selected_tunings; t.setRowCount(0)
+        for r in records:
+            row=t.rowCount(); t.insertRow(row); t.setRowHeight(row,54)
+            it=QTableWidgetItem(); it.setIcon(self._icon_for(r.thumbnail_path)); t.setItem(row,0,it)
+            for c,v in enumerate((r.header.name or "(unnamed)",r.header.creator,self._fmt_bytes(r.data_size)),1): t.setItem(row,c,QTableWidgetItem(str(v)))
+
+    def _apply_pointing_cursors(self, root: QWidget) -> None:
+        """Use the hand cursor for controls that are intended to be clicked."""
+        for button in root.findChildren(QAbstractButton):
+            button.setCursor(Qt.CursorShape.PointingHandCursor)
+
+    @Slot(int, int)
+    def _update_livery_table_cursor(
+        self,
+        row: int,
+        column: int,
+    ) -> None:
+        if column in (0, 6):
+            self.livery_table.viewport().setCursor(
+                Qt.CursorShape.PointingHandCursor
+            )
+        else:
+            self.livery_table.viewport().setCursor(
+                Qt.CursorShape.ArrowCursor
+            )
+
+    @staticmethod
+    def _detail_view_icon() -> QIcon:
+        pixmap = QPixmap(24, 24)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        pen = QPen(QColor("#555a68"))
+        pen.setWidthF(1.8)
+        painter.setPen(pen)
+        for y in (6, 12, 18):
+            painter.drawRoundedRect(3, y - 2, 4, 4, 1, 1)
+            painter.drawLine(10, y, 21, y)
+        painter.end()
+        return QIcon(pixmap)
+
+    @staticmethod
+    def _grid_view_icon() -> QIcon:
+        pixmap = QPixmap(24, 24)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        pen = QPen(QColor("#555a68"))
+        pen.setWidthF(1.8)
+        painter.setPen(pen)
+        for x in (3, 13):
+            for y in (3, 13):
+                painter.drawRoundedRect(x, y, 8, 8, 1.5, 1.5)
+        painter.end()
+        return QIcon(pixmap)
+
+    @staticmethod
+    def _external_link_icon() -> QIcon:
+        pixmap = QPixmap(24, 24)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        pen = QPen(QColor("#555a68"))
+        pen.setWidthF(1.8)
+        painter.setPen(pen)
+
+        # Window/body
+        painter.drawRoundedRect(4, 8, 12, 11, 2, 2)
+
+        # External arrow
+        painter.drawLine(11, 13, 20, 4)
+        painter.drawLine(14, 4, 20, 4)
+        painter.drawLine(20, 4, 20, 10)
+
+        painter.end()
+        return QIcon(pixmap)
+
+    def _show_livery_metadata(self, record: LiveryRecord) -> None:
+        dialog = QDialog(self)
+        dialog.setWindowTitle("리버리 정보")
+        dialog.setModal(True)
+        dialog.resize(560, 360)
+        dialog.setStyleSheet(APP_STYLE)
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setSpacing(10)
+
+        vehicle = QLabel(self._car_label(record.header.car_id))
+        vehicle.setStyleSheet("font-size:13pt;font-weight:700;")
+        layout.addWidget(vehicle)
+        title = QLabel(f"리버리: {record.header.name or '(제목 없음)'}")
+        title.setObjectName("muted")
+        layout.addWidget(title)
+        layout.addWidget(QLabel("설명"))
+        description = QPlainTextEdit()
+        description.setReadOnly(True)
+        description.setPlainText(
+            (record.header.description or "").strip() or "설명 없음"
+        )
+        layout.addWidget(description, 1)
+        uploaded = record.header.created or "확인 불가"
+        layout.addWidget(QLabel(f"제작자 업로드 날짜: {uploaded}"))
+        close_button = QPushButton("닫기")
+        close_button.setObjectName("primary")
+        close_button.clicked.connect(dialog.accept)
+        row = QHBoxLayout()
+        row.addStretch(1)
+        row.addWidget(close_button)
+        layout.addLayout(row)
+        dialog.exec()
+
+    def _show_tuning_details(self, record: TuningRecord) -> None:
+        dialog = QDialog(self)
+        dialog.setWindowTitle("튜닝 세부 정보")
+        dialog.setModal(True)
+        dialog.resize(720, 720)
+        dialog.setStyleSheet(APP_STYLE)
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setSpacing(10)
+
+        heading = QLabel(self._car_label(record.header.car_id))
+        heading.setStyleSheet("font-size:13pt;font-weight:700;")
+        layout.addWidget(heading)
+        details = QPlainTextEdit()
+        details.setReadOnly(True)
+        details.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
+
+        lines = [
+            "[기본 정보]",
+            f"제목: {record.header.name or '(제목 없음)'}",
+            f"제작자: {record.header.creator or '—'}",
+            f"설명: {(record.header.description or '').strip() or '설명 없음'}",
+            f"제작자 업로드 날짜: {record.header.created or '확인 불가'}",
+            "",
+        ]
+        if record.data_path is None:
+            lines.extend(("[Data 파일]", "Data 파일을 찾을 수 없습니다."))
+        else:
+            try:
+                parsed = read_tune_data(record.data_path)
+            except TuneDataError as exc:
+                lines.extend(("[Data 파일]", f"세부 정보를 읽을 수 없습니다: {exc}"))
+            else:
+                lines.extend(
+                    (
+                        "[Data 파일]",
+                        f"형식 버전: {parsed.format_version}",
+                        f"잠금 상태: {'잠김' if parsed.locked else '잠기지 않음'}",
+                        f"차량 Ordinal ID: {parsed.car_ordinal_id}",
+                        "",
+                        "[장착 부품 ID]",
+                    )
+                )
+                lines.extend(
+                    f"0x{offset:04X}  {label}: 0x{value:08X}"
+                    for offset, label, value in parsed.parts
+                )
+                lines.extend(("", "[세부 튜닝 값]"))
+                lines.extend(
+                    f"0x{offset:04X}  {label}: {value:.6g}"
+                    for offset, label, value in parsed.values
+                )
+                if record.header.car_id is not None:
+                    lines.extend(
+                        (
+                            "",
+                            "[검증 참고]",
+                            f"header Car ID: {record.header.car_id}",
+                            f"Data Ordinal ID: {parsed.car_ordinal_id}",
+                        )
+                    )
+        details.setPlainText("\n".join(lines))
+        layout.addWidget(details, 1)
+        close_button = QPushButton("닫기")
+        close_button.setObjectName("primary")
+        close_button.clicked.connect(dialog.accept)
+        row = QHBoxLayout()
+        row.addStretch(1)
+        row.addWidget(close_button)
+        layout.addLayout(row)
+        dialog.exec()
+
+    @staticmethod
+    def _magnifier_icon() -> QIcon:
+        pixmap = QPixmap(24, 24)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        pen = QPen(QColor("#555a68"))
+        pen.setWidthF(2.0)
+        painter.setPen(pen)
+        painter.drawEllipse(4, 4, 11, 11)
+        painter.drawLine(14, 14, 21, 21)
+        painter.end()
+        return QIcon(pixmap)
+
+    @staticmethod
+    def _creator_apply_icon() -> QIcon:
+        """Two-person + arrow glyph for 'apply this memo to same creator'."""
+        pixmap = QPixmap(24, 24)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        pen = QPen(QColor("#555a68"))
+        pen.setWidthF(1.7)
+        painter.setPen(pen)
+
+        # Two compact user silhouettes.
+        painter.drawEllipse(2, 4, 5, 5)
+        painter.drawArc(1, 10, 8, 7, 0, 180 * 16)
+        painter.drawEllipse(8, 5, 5, 5)
+        painter.drawArc(7, 11, 8, 7, 0, 180 * 16)
+
+        # Arrow to the right = propagate/apply.
+        painter.drawLine(14, 12, 22, 12)
+        painter.drawLine(18, 8, 22, 12)
+        painter.drawLine(18, 16, 22, 12)
+        painter.end()
+        return QIcon(pixmap)
+
+    def _show_livery_image(
+        self,
+        record: LiveryRecord | TuningRecord,
+    ) -> None:
+        path = record.thumbnail_path
+        if not path or not path.is_file():
+            QMessageBox.information(
+                self,
+                "이미지 없음",
+                "이 항목의 썸네일을 찾을 수 없습니다.",
+            )
+            return
+
+        try:
+            image = QImage.fromData(path.read_bytes())
+        except OSError as exc:
+            QMessageBox.warning(self, "이미지 읽기 실패", str(exc))
+            return
+
+        if image.isNull():
+            QMessageBox.warning(
+                self,
+                "이미지 읽기 실패",
+                "썸네일 이미지 형식을 읽을 수 없습니다.",
+            )
+            return
+
+        dialog = QDialog(self)
+        livery_name = record.header.name or "(unnamed)"
+        car_name = self._car_label(record.header.car_id)
+        dialog.setWindowTitle(f"{livery_name} — {car_name}")
+        dialog.setModal(True)
+        dialog.setStyleSheet(
+            APP_STYLE
+            + "QDialog { background:#f7f8fb; }"
+        )
+
+        available = self.screen().availableGeometry()
+        target_w = max(900, min(1500, int(available.width() * 0.92)))
+        target_h = max(620, min(960, int(available.height() * 0.90)))
+        dialog.resize(target_w, target_h)
+
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(8)
+
+        viewer = ZoomableImageView(QPixmap.fromImage(image))
+        layout.addWidget(viewer, 1)
+
+        controls = QHBoxLayout()
+        controls.setContentsMargins(0, 0, 0, 0)
+        controls.setSpacing(6)
+        controls.addStretch(1)
+
+        minus_button = QToolButton()
+        minus_button.setText("−")
+        minus_button.setToolTip("축소")
+        minus_button.setAccessibleName("이미지 축소")
+        minus_button.setFixedSize(38, 34)
+        minus_button.clicked.connect(lambda: viewer.zoom_by(0.8))
+
+        actual_button = QPushButton("100%")
+        actual_button.setObjectName("secondary")
+        actual_button.setToolTip("원본 픽셀 크기")
+        actual_button.clicked.connect(viewer.actual_size)
+
+        fit_button = QPushButton("맞춤")
+        fit_button.setObjectName("secondary")
+        fit_button.setToolTip("창에 맞추기")
+        fit_button.clicked.connect(viewer.fit_image)
+
+        plus_button = QToolButton()
+        plus_button.setText("+")
+        plus_button.setToolTip("확대")
+        plus_button.setAccessibleName("이미지 확대")
+        plus_button.setFixedSize(38, 34)
+        plus_button.clicked.connect(lambda: viewer.zoom_by(1.25))
+
+        for button in (minus_button, plus_button):
+            button.setStyleSheet(
+                "QToolButton { background:white; color:#303341; "
+                "border:1px solid #dfe1e8; border-radius:8px; "
+                "font-size:16pt; font-weight:600; padding:0; }"
+                "QToolButton:hover { border-color:#8c74ee; "
+                "background:#f5f2ff; }"
+            )
+
+        controls.addWidget(minus_button)
+        controls.addWidget(actual_button)
+        controls.addWidget(fit_button)
+        controls.addWidget(plus_button)
+        controls.addStretch(1)
+
+        hint = QLabel(
+            "마우스 휠: 확대/축소 · 드래그: 이동 · 더블클릭: 100%"
+        )
+        hint.setObjectName("muted")
+        hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        layout.addLayout(controls)
+        layout.addWidget(hint)
+
+        self._apply_pointing_cursors(dialog)
+        dialog.exec()
+
+    @staticmethod
+    def _detail_check_icon(checked: bool) -> QIcon:
+        pixmap = QPixmap(22, 22)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        border = QColor("#d8dbe5")
+        fill = QColor("#f4f5f8")
+        mark = QColor("#9aa0af")
+
+        if checked:
+            border = QColor("#d9d1ff")
+            fill = QColor("#f2edff")
+            mark = QColor("#6e4bf2")
+
+        painter.setPen(QPen(border, 1.2))
+        painter.setBrush(fill)
+        painter.drawRoundedRect(2, 2, 18, 18, 6, 6)
+
+        painter.setPen(QPen(mark, 2.0))
+        painter.drawLine(7, 11, 10, 14)
+        painter.drawLine(10, 14, 15, 8)
+        painter.end()
+        return QIcon(pixmap)
+
+    @staticmethod
+    def _detail_memo_icon(has_note: bool) -> QIcon:
+        return QIcon(_classification_pixmap("memo", has_note, 22))
+
+    @staticmethod
+    def _created_date_only(value: str) -> str:
+        raw = (value or "").strip()
+        match = re.match(r"^(\\d{4}-\\d{2}-\\d{2})", raw)
+        if match:
+            return match.group(1)
+        return raw or "—"
+
+    @staticmethod
+    def _downloaded_datetime(timestamp: float | None) -> str:
+        if timestamp is None:
+            return "—"
+        try:
+            return datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M:%S")
+        except (OSError, OverflowError, ValueError):
+            return "—"
+
+    def _edit_content_note_dialog(
+        self,
+        current_note: str,
+        content_type: str,
+    ) -> Optional[str]:
+        dialog = QDialog(self)
+        dialog.setWindowTitle(
+            "리버리 메모"
+            if content_type == "livery"
+            else "튜닝 메모"
+        )
+        dialog.setModal(True)
+        dialog.resize(520, 260)
+        dialog.setStyleSheet(
+            APP_STYLE
+            + """
+            QDialog { background:#f7f8fb; }
+            QTextEdit {
+                background:white;
+                border:1px solid #dfe1e8;
+                border-radius:10px;
+                padding:10px;
+                color:#171924;
+            }
+            """
+        )
+
+        root = QVBoxLayout(dialog)
+        root.setContentsMargins(14, 14, 14, 14)
+        root.setSpacing(10)
+
+        label = QLabel("메모")
+        label.setStyleSheet("font-weight:600; color:#4f5567;")
+        root.addWidget(label)
+
+        editor = QTextEdit()
+        editor.setPlaceholderText("메모")
+        editor.setPlainText(current_note or "")
+        root.addWidget(editor, 1)
+
+        buttons = QHBoxLayout()
+        buttons.addStretch(1)
+
+        cancel_btn = QPushButton("취소")
+        cancel_btn.setObjectName("secondary")
+        save_btn = QPushButton("저장")
+        save_btn.setObjectName("primary")
+
+        buttons.addWidget(cancel_btn)
+        buttons.addWidget(save_btn)
+        root.addLayout(buttons)
+
+        cancel_btn.clicked.connect(dialog.reject)
+        save_btn.clicked.connect(dialog.accept)
+
+        self._apply_pointing_cursors(dialog)
+        editor.setFocus()
+
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            return editor.toPlainText().strip()
+        return None
+
+    def _edit_livery_note_dialog(
+        self,
+        current_note: str,
+    ) -> Optional[str]:
+        return self._edit_content_note_dialog(
+            current_note,
+            "livery",
+        )
+
+
+    def _detail_table_button_container(self, button: QWidget) -> QWidget:
+        container = QWidget()
+        container.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        container.setStyleSheet("background: transparent;")
+        layout = QHBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(button)
+        return container
+
+    def _detail_status_button_container(
+        self,
+        check_button: QToolButton,
+        triangle_button: QToolButton,
+        excluded_button: QToolButton,
+    ) -> QWidget:
+        container = QWidget()
+        container.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        container.setStyleSheet("background:transparent;")
+        layout = QHBoxLayout(container)
+        layout.setContentsMargins(4, 0, 4, 0)
+        layout.setSpacing(5)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(check_button)
+        layout.addWidget(triangle_button)
+        layout.addWidget(excluded_button)
+        return container
+
+    def _make_detail_check_button(
+        self,
+        key: str,
+        checked: bool,
+        content_type: str = "livery",
+    ) -> QToolButton:
+        button = QToolButton()
+        button.setObjectName("detailCheckButton")
+        button.setCheckable(True)
+        button.setIcon(_classification_toggle_icon("check"))
+        button.setIconSize(QSize(22, 22))
+        button.setChecked(bool(checked))
+        button.setToolTip("체크 상태 전환")
+        button.setAccessibleName(
+            "리버리 체크 상태"
+            if content_type == "livery"
+            else "튜닝 체크 상태"
+        )
+        button.setFixedSize(34, 34)
+        button.setStyleSheet(
+            "QToolButton { background:rgba(255,255,255,238); color:#9aa0aa; "
+            "border:1px solid #dfe1e8; border-radius:17px; font-size:16px; font-weight:800; padding:0; }"
+            "QToolButton:hover { border-color:#a9adb7; background:rgba(255,255,255,250); }"
+            "QToolButton:checked { color:#2e9b50; border-color:#7ac58f; background:#eef9f1; }"
+            "QToolButton:checked:hover { color:#238442; border-color:#58ad72; background:#e7f6eb; }"
+        )
+        button.clicked.connect(
+            lambda _=False, kind=content_type, k=key, b=button:
+            self._handle_saved_content_check_clicked(
+                kind,
+                k,
+                b.isChecked(),
+            )
+        )
+        return button
+
+    def _make_detail_triangle_button(
+        self,
+        key: str,
+        enabled: bool,
+        content_type: str = "livery",
+    ) -> QToolButton:
+        button = QToolButton()
+        button.setObjectName("detailTriangleButton")
+        button.setCheckable(True)
+        button.setIcon(_classification_toggle_icon("triangle"))
+        button.setIconSize(QSize(22, 22))
+        button.setChecked(bool(enabled))
+        button.setToolTip("삼각형 분류 상태 전환")
+        button.setAccessibleName(
+            "리버리 삼각형 분류 상태"
+            if content_type == "livery"
+            else "튜닝 삼각형 분류 상태"
+        )
+        button.setFixedSize(34, 34)
+        button.setStyleSheet(
+            "QToolButton { background:rgba(255,255,255,238); color:#9aa0aa; "
+            "border:1px solid #dfe1e8; border-radius:8px; font-size:17px; font-weight:800; padding:0; }"
+            "QToolButton:hover { border-color:#d4a14c; background:rgba(255,250,240,250); }"
+            "QToolButton:checked { color:#d98216; border-color:#e2a64f; background:#fff5e6; }"
+            "QToolButton:checked:hover { color:#c36f09; border-color:#d58d2c; background:#ffeed5; }"
+        )
+        button.clicked.connect(
+            lambda _=False, kind=content_type, k=key, b=button:
+            self._handle_saved_content_triangle_clicked(
+                kind,
+                k,
+                b.isChecked(),
+            )
+        )
+        return button
+
+    def _make_detail_memo_button(
+        self,
+        key: str,
+        note: str,
+        content_type: str = "livery",
+    ) -> QToolButton:
+        note = (note or "").strip()
+        button = QToolButton()
+        button.setIcon(self._detail_memo_icon(bool(note)))
+        button.setIconSize(QSize(18, 18))
+        button.setToolTip(
+            (note + "\\n\\n클릭하여 메모 수정") if note else "메모 없음\\n\\n클릭하여 메모 추가"
+        )
+        button.setAccessibleName(
+            "리버리 메모"
+            if content_type == "livery"
+            else "튜닝 메모"
+        )
+        button.setFixedSize(34, 34)
+        button.setStyleSheet(
+            "QToolButton { background:rgba(255,255,255,238); color:#555a68; "
+            "border:1px solid #dfe1e8; border-radius:8px; padding:0; }"
+            "QToolButton:hover { border-color:#8c74ee; background:rgba(247,245,255,250); }"
+        )
+        button.clicked.connect(
+            lambda _=False, kind=content_type, k=key:
+            self._handle_saved_content_memo_clicked(
+                kind,
+                k,
+            )
+        )
+        return button
+
+    def _make_detail_excluded_button(
+        self,
+        key: str,
+        enabled: bool,
+        content_type: str = "livery",
+    ) -> QToolButton:
+        button = QToolButton()
+        button.setObjectName("detailExcludedButton")
+        button.setCheckable(True)
+        button.setIcon(_classification_toggle_icon("excluded"))
+        button.setIconSize(QSize(22, 22))
+        button.setChecked(bool(enabled))
+        button.setToolTip("X 분류 상태 전환")
+        button.setAccessibleName(
+            "리버리 X 분류 상태" if content_type == "livery" else "튜닝 X 분류 상태"
+        )
+        button.setFixedSize(34, 34)
+        button.setStyleSheet(
+            "QToolButton { background:rgba(255,255,255,238); color:#9aa0aa; "
+            "border:1px solid #dfe1e8; border-radius:8px; font-size:18px; font-weight:800; padding:0; }"
+            "QToolButton:hover { border-color:#df7d86; background:rgba(255,247,248,250); }"
+            "QToolButton:checked { color:#c93c49; border-color:#df7d86; background:#fff0f2; }"
+            "QToolButton:checked:hover { color:#ad2936; border-color:#cf5b66; background:#ffe7ea; }"
+        )
+        button.clicked.connect(
+            lambda _=False, kind=content_type, k=key, b=button:
+            self._handle_saved_content_excluded_clicked(kind, k, b.isChecked())
+        )
+        return button
+
+    def _handle_saved_content_check_clicked(
+        self,
+        content_type: str,
+        key: str,
+        checked: bool,
+    ) -> None:
+        self.annotations.set_checked(key, checked)
+        self._sync_saved_content_annotation(
+            content_type,
+            key,
+        )
+
+        cards = (
+            self._livery_card_by_key
+            if content_type == "livery"
+            else self._tuning_card_by_key
+        )
+        card = cards.get(key)
+        if card is not None:
+            checkbox = getattr(card, "_fh6_check_box", None)
+            if checkbox is not None:
+                checkbox.blockSignals(True)
+                checkbox.setChecked(checked)
+                checkbox.blockSignals(False)
+            card.setProperty("checked", checked)
+
+        self._refresh_after_annotation_change(
+            content_type, filter_modes={1, 10}
+        )
+
+    def _handle_saved_content_triangle_clicked(
+        self,
+        content_type: str,
+        key: str,
+        enabled: bool,
+    ) -> None:
+        self.annotations.set_triangle(key, enabled)
+        self._sync_saved_content_annotation(content_type, key)
+
+        cards = (
+            self._livery_card_by_key
+            if content_type == "livery"
+            else self._tuning_card_by_key
+        )
+        card = cards.get(key)
+        if card is not None:
+            triangle_box = getattr(card, "_fh6_triangle_box", None)
+            if triangle_box is not None:
+                triangle_box.blockSignals(True)
+                triangle_box.setChecked(enabled)
+                triangle_box.blockSignals(False)
+            card.setProperty("triangle", enabled)
+
+        self._refresh_after_annotation_change(
+            content_type, filter_modes={5, 10}
+        )
+
+    def _handle_saved_content_excluded_clicked(
+        self,
+        content_type: str,
+        key: str,
+        enabled: bool,
+    ) -> None:
+        self.annotations.set_excluded(key, enabled)
+        self._sync_saved_content_annotation(content_type, key)
+        cards = self._livery_card_by_key if content_type == "livery" else self._tuning_card_by_key
+        card = cards.get(key)
+        if card is not None:
+            excluded_box = getattr(card, "_fh6_excluded_box", None)
+            if excluded_box is not None:
+                excluded_box.blockSignals(True)
+                excluded_box.setChecked(enabled)
+                excluded_box.blockSignals(False)
+            card.setProperty("excluded", enabled)
+        self._refresh_after_annotation_change(
+            content_type, filter_modes={7, 10}
+        )
+
+    def _handle_saved_content_memo_clicked(
+        self,
+        content_type: str,
+        key: str,
+    ) -> None:
+        current = self.annotations.get(key).note
+        note = self._edit_content_note_dialog(
+            current,
+            content_type,
+        )
+        if note is None:
+            return
+
+        self.annotations.set_note(key, note)
+        self._sync_saved_content_annotation(
+            content_type,
+            key,
+        )
+
+        cards = (
+            self._livery_card_by_key
+            if content_type == "livery"
+            else self._tuning_card_by_key
+        )
+        card = cards.get(key)
+        if card is not None:
+            self._refresh_card_search_text(card, key)
+            memo_button = getattr(card, "_fh6_memo_button", None)
+            if memo_button is not None:
+                clean_note = (note or "").strip()
+                memo_button.setIcon(self._detail_memo_icon(bool(clean_note)))
+                memo_button.setToolTip(
+                    (clean_note + "\n\n클릭하여 메모 수정")
+                    if clean_note
+                    else "메모 없음\n\n클릭하여 메모 추가"
+                )
+
+        self._show_status(
+            "메모 저장 완료",
+            1800,
+        )
+        self._refresh_after_annotation_change(
+            content_type,
+            filter_modes={3, 4},
+            search_sensitive=True,
+        )
+
+    def _handle_detail_check_clicked(
+        self,
+        key: str,
+        checked: bool,
+    ) -> None:
+        self._handle_saved_content_check_clicked(
+            "livery",
+            key,
+            checked,
+        )
+
+    def _handle_detail_memo_clicked(
+        self,
+        key: str,
+    ) -> None:
+        self._handle_saved_content_memo_clicked(
+            "livery",
+            key,
+        )
+
+    def _set_detail_check_item(
+        self,
+        item: QTableWidgetItem,
+        checked: bool,
+    ) -> None:
+        item.setText("")
+        item.setData(Qt.ItemDataRole.UserRole + 1, bool(checked))
+        item.setTextAlignment(
+            Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter
+        )
+        item.setToolTip("체크됨" if checked else "미체크")
+
+    def _set_detail_memo_item(
+        self,
+        item: QTableWidgetItem,
+        note: str,
+    ) -> None:
+        note = (note or "").strip()
+        item.setText("")
+        item.setTextAlignment(
+            Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter
+        )
+        item.setData(Qt.ItemDataRole.UserRole + 1, note)
+        if note:
+            item.setToolTip(note + "\\n\\n클릭하여 메모 수정")
+        else:
+            item.setToolTip("메모 없음\\n\\n클릭하여 메모 추가")
+
+
+    def _icon_for(self, path: Optional[Path]) -> QIcon:
+        # Small table icons are owned by their table items. Do not keep a second
+        # application-wide image cache across rescans.
+        if not path or not path.is_file():
+            return QIcon()
+        try:
+            image = QImage.fromData(path.read_bytes())
+            if image.isNull():
+                return QIcon()
+            pix = QPixmap.fromImage(image).scaled(
+                76, 48, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
+            )
+            return QIcon(pix)
+        except OSError:
+            return QIcon()
+
+    def _pixmap_for(self, path: Optional[Path], size: QSize) -> Optional[QPixmap]:
+        if not path or not path.is_file():
+            return None
+        try:
+            image = QImage.fromData(path.read_bytes())
+            if image.isNull():
+                return None
+            return QPixmap.fromImage(image).scaled(
+                size,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+        except OSError:
+            return None
+
+    def _filter_dashboard_table(self, text: str) -> None:
+        if self.dashboard_content_stack.currentIndex() == 0:
+            self._filter_table(self.car_table, text, (0, 1))
+        else:
+            self._filter_table(self.creator_table, text, (1,))
+
+    def _filter_car_table(self, text: str) -> None:
+        # Compatibility alias for older internal call sites.
+        self._filter_table(self.car_table, text, (0, 1))
+
+    @staticmethod
+    def _filter_table(table: QTableWidget, text: str, columns: tuple[int,...]) -> None:
+        needle=text.strip().lower()
+        for row in range(table.rowCount()):
+            hay=" ".join((table.item(row,c).text() if table.item(row,c) else "") for c in columns).lower()
+            table.setRowHidden(row,bool(needle and needle not in hay))
+
+    @staticmethod
+    def _fmt_bytes(size: int) -> str:
+        if size < 1024: return f"{size} B"
+        if size < 1024*1024: return f"{size/1024:.1f} KiB"
+        return f"{size/(1024*1024):.2f} MiB"

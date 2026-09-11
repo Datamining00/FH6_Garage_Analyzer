@@ -139,3 +139,7 @@ C:\XboxGames\GameSave\pgs\u_XXXXXXXXXXXX_XXXXXX
 원저작자와 기여자에게 감사드립니다. 개발 과정에는 OpenAI ChatGPT를 보조적으로 활용했습니다.
 
 프로젝트 자체에는 별도의 전체 오픈소스 라이선스를 지정하지 않았으며, **외부 구성요소에는 각각의 라이선스가 적용됩니다.** 자세한 고지와 소스·라이브러리 교체 안내는 `설정 → 오픈소스 및 라이선스`에서 확인할 수 있습니다.
+
+## 개발 및 문서
+
+[개발·빌드 안내](DEVELOPING.md) · [알려진 문제](KNOWN_ISSUES.md) · [변경 사항](CHANGELOG.md) · [외부 라이선스](THIRD_PARTY_NOTICES.md) · [자료 출처 확인](DATA_PROVENANCE_REVIEW.md)

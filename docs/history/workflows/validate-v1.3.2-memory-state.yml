@@ -1,0 +1,64 @@
+name: Validate v1.3.2 memory-state integration
+
+on:
+  push:
+    branches:
+      - v1.3.2-memory-applied-state-integration
+    paths:
+      - "source-v1.2/**"
+      - ".github/workflows/validate-v1.3.2-memory-state.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v132-memory-state-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-regression:
+    name: Windows regression (Python ${{ matrix.python-version }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: source-v1.2/requirements.txt
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          Set-Location source-v1.2
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Compile and run regression suite
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          Set-Location source-v1.2
+          python -m compileall -q .
+          python -m unittest discover -s tests -v
+
+      - name: Smoke-start real application
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+          PYTHONDONTWRITEBYTECODE: "1"
+          FH6_ASSISTANT_SMOKE_TEST_MS: "1500"
+        run: |
+          Set-Location source-v1.2
+          python app.py
