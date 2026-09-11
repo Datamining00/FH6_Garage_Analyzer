@@ -520,6 +520,9 @@ def _clear_backup_grid(window: Any) -> None:
     for card in getattr(window, "_fh6_backup_cards", []):
         card.deleteLater()
     window._fh6_backup_cards = []
+    for card in getattr(window, '_fh6_backup_deleted_slots', []):
+        card.deleteLater()
+    window._fh6_backup_deleted_slots = []
     for header in getattr(window, "_fh6_backup_headers", {}).values():
         header.hide()
 

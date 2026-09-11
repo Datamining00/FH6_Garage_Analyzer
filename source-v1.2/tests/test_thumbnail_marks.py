@@ -12,6 +12,33 @@ from fh6garage.app_options import AppOptions
 
 
 class ThumbnailMarkTests(unittest.TestCase):
+    def test_folder_lock_survives_cache_lookup_error(self):
+        containers = self.root / 'containers'; containers.mkdir()
+        folder = containers / 'Livery_1'; folder.mkdir()
+        thumb = folder / 'bigThumb.webp'; thumb.write_bytes(self.original)
+        record = NS(kind='Livery', container_path=folder, container_name=folder.name)
+        with patch('fh6garage.auction_thumbnails._header_livery_token', side_effect=ValueError('bad cache link')):
+            targets, failures = plan([record], containers, None, AppOptions(), [True])
+        self.assertEqual(targets, {str(thumb): (False, True)})
+        self.assertTrue(failures)
+        self.assertEqual(self.store.apply(targets)['written'], 1)
+
+    def test_unapplied_auction_folder_lock_and_unlock_without_cache_work(self):
+        containers = self.root / 'containers'; containers.mkdir()
+        folder = containers / 'SoulBoundLivery_1'; folder.mkdir()
+        thumb = folder / 'bigThumb.webp'; thumb.write_bytes(self.original)
+        record = NS(kind='SoulBoundLivery', container_path=folder, container_name=folder.name)
+        with patch('fh6garage.auction_thumbnails._read_manifest_bytes') as manifest, patch('fh6garage.auction_thumbnails._header_livery_token') as token:
+            for lock in (True, False):
+                targets, failures = plan([record], containers, self.root / 'cache', AppOptions(show_auction_badge=True), [lock], entries=self.store.load(), folder_only=[folder])
+                self.assertEqual(targets, {str(thumb): (False, lock)})
+                self.assertFalse(failures)
+                result = self.store.apply(targets, partial=True)
+                self.assertFalse(result['failures'])
+            manifest.assert_not_called()
+            token.assert_not_called()
+        self.assertEqual(thumb.read_bytes(), self.original)
+
     def test_both_kinds_write_folder_and_exact_cache_and_skip_multiple_cache(self):
         containers = self.root/'containers'; containers.mkdir()
         cache = self.root/'cache'; cache.mkdir()

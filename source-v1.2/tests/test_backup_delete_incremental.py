@@ -75,7 +75,7 @@ class BackupDeleteIncrementalTests(unittest.TestCase):
         with patch.object(lazy, '_record_from_entry', side_effect=AssertionError('Re-decode')):
             self.remove_first()
         self.assertEqual(self.window._fh6_backup_cards, survivors)
-        self.assertEqual(self.window.backup_grid_layout.count(), 2)
+        self.assertEqual(self.window.backup_grid_layout.count(), 3)
         self.assertEqual(self.window.backup_grid_layout.getItemPosition(0)[:2], (0, 0))
         self.assertTrue(survivors[-1].property('selected'))
         self.assertEqual(self.window.backup_grid_scroll.verticalScrollBar().value(), 350)
@@ -124,7 +124,7 @@ class BackupDeleteIncrementalTests(unittest.TestCase):
         self.assertEqual(self.window._fh6_backup_cached_status, (0, 1, 0))
         self.assertEqual(self.window._fh6_backup_presence_cache[2], set())
 
-    def test_empty_group_header_removed_and_surviving_group_count_retained(self):
+    def test_group_headers_and_cells_remain_in_place_until_refresh(self):
         w = self.window
         first, second = QLabel('first', w), QLabel('second', w)
         w._fh6_backup_headers = {'first': first, 'second': second}
@@ -136,9 +136,9 @@ class BackupDeleteIncrementalTests(unittest.TestCase):
             card.setProperty('vehicleGroupLabel', 'Car')
             w.backup_grid_layout.addWidget(card, 3, i)
         self.remove_first()
-        self.assertEqual(w.backup_grid_layout.indexOf(first), -1)
-        self.assertIn('2', second.text())
-        self.assertEqual(w.backup_grid_layout.count(), 3)
+        self.assertGreaterEqual(w.backup_grid_layout.indexOf(first), 0)
+        self.assertEqual(second.text(), 'second')
+        self.assertEqual(w.backup_grid_layout.count(), 5)
 
     def test_filtered_card_is_not_reintroduced(self):
         hidden = self.window._fh6_backup_cards[2]
@@ -154,3 +154,32 @@ class BackupDeleteIncrementalTests(unittest.TestCase):
         self.remove_first()
         self.question.assert_not_called()
         self.assertEqual(len(load_index(self.root)['entries']), 3)
+
+    def test_deleted_slot_is_hidden_disabled_and_alive_after_deferred_events(self):
+        from PySide6.QtCore import QCoreApplication, QEvent
+        from shiboken6 import isValid
+        deleted = self.window._fh6_backup_cards[0]
+        position = self.window.backup_grid_layout.getItemPosition(0)
+        self.remove_first()
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        self.assertTrue(isValid(deleted))
+        self.assertTrue(deleted.isHidden())
+        self.assertFalse(deleted.isEnabled())
+        self.assertTrue(deleted.sizePolicy().retainSizeWhenHidden())
+        self.assertEqual(self.window.backup_grid_layout.getItemPosition(0), position)
+        self.assertIn(deleted, self.window._fh6_backup_deleted_slots)
+        self.assertNotIn(deleted, self.window._fh6_backup_cards)
+
+    def test_refresh_releases_deleted_slots(self):
+        from PySide6.QtCore import QCoreApplication, QEvent
+        from shiboken6 import isValid
+        deleted = self.window._fh6_backup_cards[0]
+        self.remove_first()
+        items = self.window._fh6_backup_items_cache
+        survivors = list(self.window._fh6_backup_cards)
+        result = lazy._LoadResult(items, 2, 0, 2, lazy._repository_signature(self.root))
+        with patch.object(backup, '_sync_backup_widths'), patch.object(lazy.QTimer, 'singleShot'):
+            lazy._commit_cards(self.window, result, survivors, {id(c) for c in survivors})
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        self.assertFalse(isValid(deleted))
+        self.assertEqual(self.window._fh6_backup_deleted_slots, [])

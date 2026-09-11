@@ -369,6 +369,8 @@ def _commit_cards(
     reused_ids: set[int],
 ) -> None:
     old_cards = list(getattr(window, "_fh6_backup_cards", []) or [])
+    old_cards.extend(getattr(window, "_fh6_backup_deleted_slots", []) or [])
+    window._fh6_backup_deleted_slots = []
     layout = getattr(window, "backup_grid_layout", None)
     if layout is not None:
         while layout.count():
@@ -399,48 +401,6 @@ def _commit_cards(
     QTimer.singleShot(0, lambda owner=window: _backup_ui._refresh_backup_thumbnails(owner))
 
 
-def _compact_backup_layout(window: Any) -> None:
-    """Close a deleted card's gap without hiding/reloading surviving widgets."""
-    layout = window.backup_grid_layout
-    live = {id(card) for card in window._fh6_backup_cards}
-    headers = {id(header) for header in getattr(window, '_fh6_backup_headers', {}).values()}
-    placed = []
-    for index in range(layout.count()):
-        widget = layout.itemAt(index).widget()
-        if widget is not None:
-            row, column, _, _ = layout.getItemPosition(index)
-            placed.append((row, column, widget))
-    groups = []
-    header, cards = None, []
-    for _, _, widget in sorted(placed, key=lambda item: item[:2]):
-        if id(widget) in headers:
-            groups.append((header, cards))
-            header, cards = widget, []
-        elif id(widget) in live:
-            cards.append(widget)
-    groups.append((header, cards))
-    columns = _backup_ui._backup_columns(window)
-    row = 0
-    mode = getattr(window, '_fh6_backup_group_mode', 'none')
-    for header, cards in groups:
-        if not cards:
-            if header is not None:
-                layout.removeWidget(header)
-                header.hide()
-            continue
-        if header is not None:
-            prop = 'creatorGroupLabel' if mode == 'creator' else 'vehicleGroupLabel'
-            label = str(cards[0].property(prop) or '—')
-            header.setText(_txt(f'{label} · 리버리 {len(cards)}개', f'{label} · {len(cards)} liveries'))
-            layout.addWidget(header, row, 0, 1, columns)
-            row += 1
-        for index, card in enumerate(cards):
-            layout.addWidget(card, row + index // columns, index % columns)
-        row += (len(cards) + columns - 1) // columns
-    layout.activate()
-    QTimer.singleShot(0, window, lambda owner=window: _backup_ui._refresh_backup_thumbnails(owner))
-
-
 def _remove_deleted_backup(window: Any, root: Path, relative: str, previous_signature) -> None:
     """Apply a committed single deletion without decoding or recreating survivors."""
     clean = (getattr(window, '_fh6_backup_lazy_loaded', False)
@@ -450,14 +410,20 @@ def _remove_deleted_backup(window: Any, root: Path, relative: str, previous_sign
              if item[0].get('relative_path') != relative]
     window._fh6_backup_items_cache = items
     survivors = []
+    slots = list(getattr(window, '_fh6_backup_deleted_slots', []) or [])
     for card in getattr(window, '_fh6_backup_cards', []):
         if (getattr(card, '_fh6_backup_entry', None) or {}).get('relative_path') == relative:
-            window.backup_grid_layout.removeWidget(card)
+            policy = card.sizePolicy()
+            policy.setRetainSizeWhenHidden(True)
+            card.setSizePolicy(policy)
+            card.setFixedSize(card.size())
+            card.setEnabled(False)
             card.hide()
-            card.deleteLater()
+            slots.append(card)
         else:
             survivors.append(card)
     window._fh6_backup_cards = survivors
+    window._fh6_backup_deleted_slots = slots
 
     game = list(_backup_ui._game_records(window))
     by_container, by_digest = _game_maps(game)
@@ -484,12 +450,7 @@ def _remove_deleted_backup(window: Any, root: Path, relative: str, previous_sign
     else:
         window._fh6_backup_presence_cache = ('', set(), set())
     window.backup_status_label.setText(_status_text(_LoadResult(items, *status, previous_signature)))
-    scroll = getattr(window, 'backup_grid_scroll', None)
-    bar = scroll.verticalScrollBar() if scroll is not None else None
-    position = bar.value() if bar is not None else 0
-    _compact_backup_layout(window)
-    if bar is not None:
-        bar.setValue(min(position, bar.maximum()))
+    # Leave every grid cell and surviving card untouched until a refresh.
 
 
 def _build_cards_from_result(window: Any, result: _LoadResult, token: _CancelToken) -> None:

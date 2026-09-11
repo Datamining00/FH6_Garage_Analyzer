@@ -23,19 +23,23 @@ def excluded_auction(window, record):
     return _record_is_unapplied_auction(window, record)
 
 
-def plan(records, containers, cache, options, locked, *, ownership=None, allowed_cache=None, entries=None, scope_records=None):
+def plan(records, containers, cache, options, locked, *, ownership=None, allowed_cache=None, entries=None, scope_records=None, folder_only=()):
     from .auction_thumbnails import read_thumbnail_manifest, _header_livery_token
     from .auction_thumbnails import _read_manifest_bytes
     from .auction_manifest_registry import read_auction_manifest_registry
     entries = entries or {}
+    folder_only = {str(Path(p).absolute()) for p in folder_only}
+    def auction(record):
+        return (options.show_auction_badge and record.kind == 'SoulBoundLivery'
+                and str(Path(record.container_path).absolute()) not in folder_only)
     flags_by_parent = defaultdict(set)
     for r, lock in zip(records, locked):
-        flags_by_parent[str(Path(r.container_path).absolute())].add((options.show_auction_badge and r.kind == 'SoulBoundLivery', lock))
+        flags_by_parent[str(Path(r.container_path).absolute())].add((auction(r), lock))
     conflicts = {p for p, flags in flags_by_parent.items() if len(flags) > 1}
     active_paths = {str(Path(p).absolute()) for p, e in entries.items() if e.get('active')}
     cache_restore = cache is not None and any(Path(p).parent == Path(cache).absolute() for p in active_paths)
     records_and_locks = [(r, lock) for r, lock in zip(records, locked)
-                         if lock or (options.show_auction_badge and r.kind == 'SoulBoundLivery')
+                         if lock or auction(r)
                          or cache_restore or any(Path(p).parent == Path(r.container_path).absolute() for p in active_paths)]
     if not records_and_locks:
         return {}, []
@@ -43,7 +47,7 @@ def plan(records, containers, cache, options, locked, *, ownership=None, allowed
     skipped = [f'{p}: 공유 썸네일의 표시 상태가 달라 생략' for p in conflicts]
     rows = []
     registered = frozenset()
-    if cache is not None:
+    if cache is not None and any(str(Path(r.container_path).absolute()) not in folder_only for r, _ in records_and_locks):
         try:
             data = _read_manifest_bytes(Path(cache) / '.manifest')
             rows = read_thumbnail_manifest(cache, data=data)
@@ -71,13 +75,21 @@ def plan(records, containers, cache, options, locked, *, ownership=None, allowed
                 if current.guid != header.guid or current.name != header.name:
                     raise ValueError('스캔 이후 리버리가 변경되어 생략: 새로고침 필요')
             paths = set()
-            flags = (options.show_auction_badge and record.kind == 'SoulBoundLivery', lock)
+            flags = (auction(record), lock)
             # Both kinds can have an embedded thumbnail and a separately
             # materialized game-cache thumbnail. Neither substitutes the other.
             from .scanner import _detect_thumbnail
             candidate = _detect_thumbnail(parent, False)
             if candidate and safe_path(candidate).parent == parent and (any(flags) or str(Path(candidate).absolute()) in active_paths):
                 paths.add(safe_path(candidate))
+            # Commit the embedded thumbnail independently: a cache lookup or
+            # ownership error must never discard this verified local target.
+            for path in paths:
+                owners[str(path)].add(str(parent))
+                targets[str(path)].add(flags)
+            paths.clear()
+            if str(parent) in folder_only:
+                continue
             token = _header_livery_token(record)
             matches = rows_by_token.get((getattr(record, 'car_id', None), token), []) if token else []
             candidates = {safe_path(row.path) for row in matches
@@ -137,20 +149,21 @@ def plan(records, containers, cache, options, locked, *, ownership=None, allowed
 
 class Worker(QThread):
     completed = Signal(object)
-    def __init__(self, owner, records, containers, cache, options, locks, *, reapply=False, partial=False, allowed_cache=None, scope_records=None):
+    def __init__(self, owner, records, containers, cache, options, locks, *, reapply=False, partial=False, allowed_cache=None, scope_records=None, folder_only=()):
         super().__init__(owner)
         self.args = records, containers, cache, options, locks
         self.reapply = reapply
         self.partial = partial
         self.allowed_cache = allowed_cache
         self.scope_records = scope_records
+        self.folder_only = folder_only
 
     def run(self):
         records, containers, cache, options, locks = self.args
         try:
             ownership = {}
             store = MarkStore(store_root())
-            targets, skipped = plan(*self.args, ownership=ownership, allowed_cache=self.allowed_cache, entries=store.load(), scope_records=self.scope_records) if options.write_thumbnail_marks else ({}, [])
+            targets, skipped = plan(*self.args, ownership=ownership, allowed_cache=self.allowed_cache, entries=store.load(), scope_records=self.scope_records, folder_only=self.folder_only) if options.write_thumbnail_marks else ({}, [])
             result = store.apply(targets, restore_all=not options.write_thumbnail_marks, reapply=self.reapply, partial=self.partial)
             result["ownership"] = ownership
             result["partial"] = self.partial
@@ -181,8 +194,6 @@ class Controller(QObject):
     def request(self, *, reapply=False, record=None):
         if closing(self.window):
             return
-        if record is not None and excluded_auction(self.window, record):
-            return
         if record is None or reapply:
             self.pending_full = True
         else:
@@ -210,7 +221,7 @@ class Controller(QObject):
         scope_records = list(records) if partial else None
         if partial:
             records = [r for r in records if str(r.container_path) in self.pending_records]
-        records = [r for r in records if not excluded_auction(window, r)]
+        folder_only = {str(r.container_path) for r in records if excluded_auction(window, r)}
         self.active_records = {str(r.container_path) for r in records} if options.write_thumbnail_marks else None
         self.pending_records.clear()
         self.pending_full = False
@@ -222,7 +233,7 @@ class Controller(QObject):
         self.pending = False
         window._fh6_thumbnail_write_running = True
         window._begin_busy('썸네일 표시를 적용·복원하는 중…')
-        self.worker = Worker(self, records, containers, _current_cache_path(window), options, locks, reapply=self.reapply, partial=partial, allowed_cache=self.allowed_cache if partial else None, scope_records=scope_records)
+        self.worker = Worker(self, records, containers, _current_cache_path(window), options, locks, reapply=self.reapply, partial=partial, allowed_cache=self.allowed_cache if partial else None, scope_records=scope_records, folder_only=folder_only)
         self.reapply = False
         self.worker.completed.connect(self.done)
         self.worker.finished.connect(self.finished)
