@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .pipeline_diagnostics import timed, stage
+
 import hashlib
 import json
 import os
@@ -220,6 +222,7 @@ def _assert_output_separate_from_game(asset: VehicleAsset, output: Path) -> None
             )
 
 
+@timed("vehicle_conversion")
 def convert_vehicle(
     asset: VehicleAsset,
     progress: Callable[[str], None] | None = None,
@@ -323,18 +326,19 @@ def convert_vehicle(
     neutral_geometry_summary: dict = {}
     neutral_geometry_error: str | None = None
     try:
-        completed = subprocess.run(
-            [str(helper), "--request", str(request_path)],
-            cwd=str(transient_root),
-            env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=300,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-        )
+        with stage("kfps_subprocess"):
+            completed = subprocess.run(
+                [str(helper), "--request", str(request_path)],
+                cwd=str(transient_root),
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=300,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
         # FinalVerify1 ErrorFix1: WheelStyle neutral visibility is a derived-GLB
         # post-processing aid. A structural ordered-mapping validation failure is
         # fail-open and must never invalidate an otherwise valid converter GLB.

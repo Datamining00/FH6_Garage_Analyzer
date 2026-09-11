@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .pipeline_diagnostics import timed
+
 import hashlib
 import json
 import os
@@ -237,6 +239,7 @@ def _installation_candidates(preferred: str | Path | None = None) -> Iterable[Pa
                 yield child
 
 
+@timed('installation_detect')
 def detect_fh6_installation(preferred: str | Path | None = None) -> Path | None:
     """Find a full FH6 install without recursively scanning user disks."""
     seen: set[str] = set()

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .pipeline_diagnostics import timed, stage, record
+
 import hashlib
 import binascii
 import importlib
@@ -524,6 +526,7 @@ def _load_backend(root: Path):
     return decoder, renderer, raster
 
 
+@timed('raster_resource_prepare')
 def _prepare_raster_layers(
     json_layers: list[dict],
     raster_backend,
@@ -864,6 +867,7 @@ class _RgbaPngStreamWriter:
         return False
 
 
+@timed('raster_render_png_streamed')
 def _render_large_section_streamed(
     renderer,
     layers: list[dict],
@@ -965,6 +969,7 @@ def _write_large_transparent_section(path: Path, width: int, height: int) -> Non
         writer.write_transparent_rows(int(height))
 
 
+@timed("livery_render")
 def render_clivery_sections(
     source: str | Path,
     *,
@@ -991,10 +996,12 @@ def render_clivery_sections(
     try:
         if log:
             log("M6.23 stage 3/4: decoding C_livery layers")
-        payload = decoder.unwrap_forza_container(source_path)
+        with stage('clivery_unwrap'):
+            payload = decoder.unwrap_forza_container(source_path)
         if len(payload) < 0x1A or payload[:4] != b"vlrc":
             raise KfpsRenderError("The selected source is not an FH6 C_livery payload.")
-        layers, report = decoder.clivery_to_layers(payload)
+        with stage('clivery_decode'):
+            layers, report = decoder.clivery_to_layers(payload)
         standard_layers = layers
         standard_report = report
         standard_warnings = list((report or {}).get("warnings") or [])
@@ -1021,7 +1028,8 @@ def render_clivery_sections(
                         "Boundary-aware decode did not improve physical coverage; "
                         "retaining counter-driven decoder result."
                     )
-        json_layers, identity_warnings = decoder.layers_to_kfps_json_layers(layers, game="fh6")
+        with stage('layer_conversion'):
+            json_layers, identity_warnings = decoder.layers_to_kfps_json_layers(layers, game="fh6")
     except KfpsRenderError:
         raise
     except Exception as exc:
@@ -1116,7 +1124,8 @@ def render_clivery_sections(
                     buffer, format="PNG"
                 )
                 png = buffer.getvalue()
-            path.write_bytes(png)
+            with stage('png_write'):
+                path.write_bytes(png)
 
         try:
             # All section files here are generated locally by the pinned renderer
@@ -1130,7 +1139,8 @@ def render_clivery_sections(
                             f"{section} output is {image.size[0]}x{image.size[1]}, "
                             f"expected {canvas_w}x{canvas_h}."
                         )
-                    image.verify()
+                    with stage('png_verify'):
+                        image.verify()
             finally:
                 Image.MAX_IMAGE_PIXELS = old_max_pixels
         except KfpsRenderError:
@@ -1138,6 +1148,8 @@ def render_clivery_sections(
         except Exception as exc:
             raise KfpsRenderError(f"{section} output PNG is unreadable: {exc}") from exc
 
+        record("section_render_png", section=section, layer_count=len(current),
+               elapsed_ms=round((time.monotonic() - started) * 1000, 3))
         png_paths[section] = path
         if log:
             try:

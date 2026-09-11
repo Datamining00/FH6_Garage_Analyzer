@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .pipeline_diagnostics import timed
+
 from contextlib import closing
 from dataclasses import asdict, dataclass
 import hashlib
@@ -382,6 +384,7 @@ def profile_tire_morph_archive(archive_path: str | Path) -> TireMorphArchiveProf
     )
 
 
+@timed('tire_archive_resolve')
 def resolve_tire_archive(
     game_or_cars_path: str | Path,
     tire_model_name: str,

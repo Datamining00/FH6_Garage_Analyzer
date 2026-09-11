@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .pipeline_diagnostics import timed, stage
+
 from contextlib import contextmanager
 
 import importlib
@@ -59,6 +61,7 @@ def _load_contract_backend():
 
 
 
+@timed('mask_atlas_decode')
 def _archive_masks_exact(archive: Path, contract) -> dict[str, tuple[Image.Image, dict, str]]:
     """Decode the vehicle mask atlas directly from read-only game archive bytes.
 
@@ -190,6 +193,7 @@ def _scaled_warped_uv_layer(
     )
 
 
+@timed("livery_warp_crop")
 def _scaled_warped_uv_tile(
     artwork: Image.Image,
     slot: str,
@@ -273,6 +277,7 @@ def _scaled_warped_uv_tile(
     return tile
 
 
+@timed("paint_atlas_pack")
 def _pack_paint_tiles_scaled(
     tiles: list[dict],
     *,
@@ -334,6 +339,7 @@ def _scaled_bounds(
     return tuple(int(v) * int(scale) for v in native_bounds)
 
 
+@timed('direct_livery_textures')
 def build_direct_livery_textures(render_result, asset: IndexedVehicleAsset) -> DirectLiveryTextures:
     """Build the same direct-UV texture contract used by the pinned KFPS viewer.
 

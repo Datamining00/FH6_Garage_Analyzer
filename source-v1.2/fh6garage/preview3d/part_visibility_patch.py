@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .pipeline_diagnostics import trace_worker, record
+
 from dataclasses import replace
 import re
 from typing import Any
@@ -140,7 +142,11 @@ def install_part_visibility_patch() -> bool:
             if widget is not None:
                 widget.setEnabled(bool(enabled))
 
+    @trace_worker
     def patched_install_scene(self, scene):
+        record("visibility_state",
+               wheel_tire=self.controls["show_wheel_tire"].isChecked() if self.controls.get("show_wheel_tire") else True,
+               other=self.controls["show_other"].isChecked() if self.controls.get("show_other") else False)
         if scene is not None:
             # SceneReloadWorker reparses the full GLB. Preserve that full source and
             # always derive visibility from it. Never filter a previously filtered

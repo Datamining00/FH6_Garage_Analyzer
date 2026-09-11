@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .pipeline_diagnostics import timed
+
 from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
@@ -77,6 +79,7 @@ def _database_media_name(database: Path, car_id: int) -> str | None:
     return None
 
 
+@timed('automatic_wheel_morph_resolve')
 def resolve_automatic_stock_rim_morph(
     car_id: int,
     model_code: str,

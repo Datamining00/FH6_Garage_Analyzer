@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .pipeline_diagnostics import timed, record
+
 import hashlib
 import json
 import sys
@@ -66,6 +68,7 @@ def _cache_paths(asset: Any, payload: dict[str, Any]) -> tuple[Path, Path]:
     return root / f"car_{int(asset.car_id)}_{model}.glb", root / "manifest.json"
 
 
+@timed("geometry_cache_lookup")
 def _valid_cached_glb(glb: Path, manifest: Path, payload: dict[str, Any]) -> bool:
     try:
         if not glb.is_file() or glb.stat().st_size < 20:
@@ -116,6 +119,7 @@ def install_geometry_cache_patch() -> bool:
             return original(asset, progress=progress, carbin_entry=carbin_entry, work_root=work_root)
 
         if _valid_cached_glb(glb, manifest, payload):
+            record("geometry_cache", status="hit", glb_path=str(glb))
             stored = json.loads(manifest.read_text(encoding="utf-8"))
             diagnostics = dict(stored["diagnostics"])
             diagnostics.update(status="cache_hit", cache_schema=CACHE_SCHEMA)
@@ -127,6 +131,7 @@ def install_geometry_cache_patch() -> bool:
                 diagnostics=diagnostics,
             )
 
+        record("geometry_cache", status="miss", glb_path=str(glb))
         if progress:
             progress(f"3D geometry cache miss: Car ID {asset.car_id} 최초 변환을 수행합니다.")
 

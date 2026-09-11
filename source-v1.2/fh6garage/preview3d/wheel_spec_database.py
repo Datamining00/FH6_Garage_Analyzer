@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .pipeline_diagnostics import timed
+
 from dataclasses import dataclass
 import hashlib
 import os
@@ -113,6 +115,7 @@ def stock_wheel_database_is_valid(
         return False
 
 
+@timed('wheel_database_verify')
 def ensure_stock_wheel_database(
     progress: Callable[[str], None] | None = None,
     *,

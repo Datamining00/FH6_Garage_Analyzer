@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .pipeline_diagnostics import timed, record
+
 import hashlib
 import json
 import os
@@ -27,6 +29,7 @@ def _file_identity(path: str | Path) -> dict[str, Any]:
     }
 
 
+@timed('tire_cache_key')
 def _stable_payload(
     integration_module: Any,
     asset: Any,
@@ -77,6 +80,7 @@ def _valid_glb(path: Path) -> bool:
         return False
 
 
+@timed('tire_cache_lookup')
 def _load_cached_result(integration_module: Any, payload: dict[str, Any], manifest: Path):
     try:
         stored = json.loads(manifest.read_text(encoding="utf-8"))
@@ -162,6 +166,7 @@ def make_native_tire_preview_cache_wrapper(
             manifest = None
             cached = None
 
+        record('tire_cache', status="hit" if cached is not None else "miss")
         if cached is not None:
             if progress is not None:
                 progress(

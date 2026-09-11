@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .pipeline_diagnostics import timed
+
 """Global wheel/tire assembly correction for FH6 Assistant.
 
 This module replaces the four-spindle/AABB-centering trial path with a native
@@ -597,6 +599,7 @@ def _build_dynamic_attachment_contract(
     }
 
 
+@timed('tire_merge')
 def _merge_dynamic_tires(
     vehicle_glb_path: Path,
     contract: Mapping[str, Any],
@@ -681,6 +684,7 @@ def _merge_dynamic_tires(
     }
 
 
+@timed('tire_matrix_bake')
 def _bake_dynamic_tire_nodes(glb_path: Path) -> dict[str, Any]:
     path = glb_path.resolve()
     sha_before = _sha256(path)

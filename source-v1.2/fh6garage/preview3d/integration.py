@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .pipeline_diagnostics import timed, trace_worker, stage, record
+
 import re
 import shutil
 import tempfile
@@ -31,6 +33,7 @@ _INDEX_LOCK = Lock()
 _INDEX_CACHE: dict[str, dict[int, VehicleAsset]] = {}
 
 
+@timed("vehicle_index_lookup")
 def _vehicle_index(game_root: Path) -> dict[int, VehicleAsset]:
     key = str(game_root.resolve()).casefold()
     with _INDEX_LOCK:
@@ -43,6 +46,7 @@ def _vehicle_index(game_root: Path) -> dict[int, VehicleAsset]:
     return index
 
 
+@timed("asset_selection")
 def _select_asset(game_root: Path, car_id: int) -> tuple[VehicleAsset, str]:
     index = _vehicle_index(game_root)
     asset = index.get(int(car_id))
@@ -88,6 +92,7 @@ class _InitialPipelineWorker(QThread):
         self.cleanup_ab = bool(cleanup_ab)
         self.cleanup_c = bool(cleanup_c)
 
+    @trace_worker
     def run(self) -> None:
         try:
             self.progress.emit("FH6 차량 3D 데이터를 찾는 중...")
@@ -109,6 +114,10 @@ class _InitialPipelineWorker(QThread):
                 work_root=geometry_root,
             )
 
+            record("conversion_result", selected_vehicle_glb=str(conversion.output_path),
+                   geometry_status=conversion.diagnostics.get("status"),
+                   native_tire_preview=conversion.diagnostics.get("native_tire_preview"))
+
             self.progress.emit("선택한 리버리를 렌더링하는 중...")
             render_root = self.work_root / "render"
             result = render_clivery_sections(
@@ -129,15 +138,16 @@ class _InitialPipelineWorker(QThread):
             self.progress.emit(
                 f"TEXCOORD_{self.uv_channel} / {self.eligibility} 장면을 준비하는 중..."
             )
-            scene = load_kfps_glb(
-                conversion.output_path,
-                textures,
-                diagnostic_all_uv=False,
-                livery_uv_channel=self.uv_channel,
-                livery_eligibility=self.eligibility,
-                neutral_cleanup_ab=self.cleanup_ab,
-                neutral_cleanup_c=self.cleanup_c,
-            )
+            with stage("scene_parse_and_materials"):
+                scene = load_kfps_glb(
+                    conversion.output_path,
+                    textures,
+                    diagnostic_all_uv=False,
+                    livery_uv_channel=self.uv_channel,
+                    livery_eligibility=self.eligibility,
+                    neutral_cleanup_ab=self.cleanup_ab,
+                    neutral_cleanup_c=self.cleanup_c,
+                )
 
             # Section PNGs are only an intermediate transport into DirectLiveryTextures.
             # Remove them immediately; the dialog retains the in-memory texture arrays.
@@ -206,6 +216,7 @@ class _RerenderWorker(QThread):
         self.cleanup_ab = bool(cleanup_ab)
         self.cleanup_c = bool(cleanup_c)
 
+    @trace_worker
     def run(self) -> None:
         try:
             render_root = self.work_root / "render"
@@ -226,15 +237,16 @@ class _RerenderWorker(QThread):
                     f"C_livery Car ID {result.car_id} does not match selected card Car ID {self.asset.car_id}."
                 )
             textures = build_direct_livery_textures(result, self.asset)
-            scene = load_kfps_glb(
-                self.glb_path,
-                textures,
-                diagnostic_all_uv=False,
-                livery_uv_channel=self.uv_channel,
-                livery_eligibility=self.eligibility,
-                neutral_cleanup_ab=self.cleanup_ab,
-                neutral_cleanup_c=self.cleanup_c,
-            )
+            with stage("scene_parse_and_materials"):
+                scene = load_kfps_glb(
+                    self.glb_path,
+                    textures,
+                    diagnostic_all_uv=False,
+                    livery_uv_channel=self.uv_channel,
+                    livery_eligibility=self.eligibility,
+                    neutral_cleanup_ab=self.cleanup_ab,
+                    neutral_cleanup_c=self.cleanup_c,
+                )
             try:
                 shutil.rmtree(render_root, ignore_errors=True)
             except OSError:
@@ -273,17 +285,19 @@ class _SceneReloadWorker(QThread):
         self.cleanup_ab = bool(cleanup_ab)
         self.cleanup_c = bool(cleanup_c)
 
+    @trace_worker
     def run(self) -> None:
         try:
-            scene = load_kfps_glb(
-                self.glb_path,
-                self.textures,
-                diagnostic_all_uv=False,
-                livery_uv_channel=self.uv_channel,
-                livery_eligibility=self.eligibility,
-                neutral_cleanup_ab=self.cleanup_ab,
-                neutral_cleanup_c=self.cleanup_c,
-            )
+            with stage("scene_parse_and_materials"):
+                scene = load_kfps_glb(
+                    self.glb_path,
+                    self.textures,
+                    diagnostic_all_uv=False,
+                    livery_uv_channel=self.uv_channel,
+                    livery_eligibility=self.eligibility,
+                    neutral_cleanup_ab=self.cleanup_ab,
+                    neutral_cleanup_c=self.cleanup_c,
+                )
             self.completed.emit(scene)
         except Exception as exc:
             self.failed.emit(f"{type(exc).__name__}: {exc}")
@@ -569,6 +583,7 @@ class Preview3DController(QObject):
             return
         self._install_scene(scene)
 
+    @timed("final_scene_install")
     def _install_scene(self, scene: object) -> None:
         if not self.alive or scene is None:
             return

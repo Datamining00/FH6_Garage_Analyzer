@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .pipeline_diagnostics import timed, record
+
 import hashlib
 import json
 import shutil
@@ -11,6 +13,7 @@ from typing import Any
 CACHE_SCHEMA = "fh6_preview3d_livery_sections_v1"
 
 
+@timed('livery_sha256')
 def _sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -22,6 +25,7 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+@timed('livery_cache_key')
 def _cache_key(source: Path, resolution_key: str, game_folder: str | Path | None) -> tuple[str, dict[str, Any]]:
     from .kfps_render_backend import KFPS_COMMIT, RUNTIME_REVISION, _app_root
 
@@ -54,6 +58,7 @@ def _png_dimensions(path: Path) -> tuple[int, int] | None:
         return None
 
 
+@timed('livery_cache_lookup')
 def _load_cached_result(root: Path, payload: dict[str, Any]):
     from .kfps_render_backend import RenderResult
 
@@ -145,6 +150,7 @@ def install_livery_render_cache_patch() -> bool:
             root = None
             payload = None
 
+        record('livery_cache', status="hit" if cached is not None else "miss")
         if cached is not None:
             if log:
                 log(

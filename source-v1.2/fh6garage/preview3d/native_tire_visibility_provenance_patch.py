@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .pipeline_diagnostics import record
+
 import json
 import struct
 import sys
@@ -46,6 +48,7 @@ def annotate_native_tire_visibility_provenance(scene: Any, path: str | Path) -> 
     except (OSError, ValueError, TypeError, json.JSONDecodeError, struct.error):
         return scene
     if not native_meshes:
+        record("native_tire_provenance", glb_path=str(path), native_mesh_count=0)
         return scene
 
     changed = False
@@ -63,6 +66,9 @@ def annotate_native_tire_visibility_provenance(scene: Any, path: str | Path) -> 
             item["fh6_native_tire_trial"] = True
             changed = True
         diagnostics.append(item)
+    record("native_tire_provenance", glb_path=str(path), native_mesh_count=len(native_meshes),
+           native_primitive_count=sum(1 for item in diagnostics
+                                      if isinstance(item, dict) and item.get("fh6_native_tire_trial")))
     if not changed:
         return scene
     return replace(scene, primitive_diagnostics=tuple(diagnostics))

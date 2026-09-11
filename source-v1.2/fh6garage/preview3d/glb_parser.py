@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .pipeline_diagnostics import timed
+
 import json
 import mmap
 import struct
@@ -464,6 +466,7 @@ def _infer_world_projection_mask(positions: np.ndarray, normals: np.ndarray, ind
     return result
 
 
+@timed("glb_parse")
 def load_kfps_glb(
     path: Path | str,
     livery=None,

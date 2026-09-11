@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .pipeline_diagnostics import timed
+
 """Third-generation wheel/tire fit rules based on the rendered WheelStyle frame.
 
 The v2 path fixed native tire rigid-bone handling and dynamic wheel counts, but
@@ -227,6 +229,7 @@ def _rewrite_derivative_to_rim_frame(
     }
 
 
+@timed('tire_geometry_build')
 def _build_native_tire_geometry_report_v3(
     spec: Any,
     tire_archive: Path,
@@ -378,6 +381,7 @@ def _select_dynamic_derivative(
     return next(iter(candidates.values())), "only_native_model_reused_by_exact_wheel_anchor"
 
 
+@timed('tire_spindle_attachment')
 def _build_dynamic_attachment_contract_v3(
     car_id: int,
     geometry_report: Mapping[str, Any],
