@@ -22,7 +22,13 @@ NATIVE_MATERIAL_TEXTURE_RESOLUTION_REVISION = 3
 _BUNDLE_TAG = 0x47727562  # Grub bundle tag used by .swatchbin
 _DDS_MAGIC = b"DDS "
 _JSON_CHUNK_TYPE = 0x4E4F534A
-_NATIVE_TEXTURE_DECODE_WORKERS = 4
+_NATIVE_TEXTURE_DECODE_WORKERS = 12
+
+
+def _native_texture_worker_limit() -> int:
+    # Leave scheduling headroom on small CPUs; extra SMT workers showed little
+    # benefit above twelve in the measured 16-logical-processor workload.
+    return min(_NATIVE_TEXTURE_DECODE_WORKERS, max(1, (os.cpu_count() or 4) * 3 // 4))
 
 
 class NativeMaterialTextureError(RuntimeError):
@@ -867,7 +873,7 @@ def _decode_resolved_payloads(
     for index, item in enumerate(items):
         key = item.payload_sha256 if item.payload_sha256 else index
         groups.setdefault(key, []).append((index, item))
-    workers = min(_NATIVE_TEXTURE_DECODE_WORKERS, len(groups))
+    workers = min(_native_texture_worker_limit(), len(groups))
     if decoder_helper is None or workers <= 1:
         return tuple(_decode_resolved_payload(item, decoder_helper, cache_root) for item in items)
 

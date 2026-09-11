@@ -12,6 +12,11 @@ from fh6garage.preview3d.pipeline_diagnostics import preview_trace
 
 
 class NativeDecodeWorkersTest(unittest.TestCase):
+    def test_worker_limit_scales_with_cpu_and_keeps_a_hard_cap(self):
+        for logical, expected in ((None, 3), (1, 1), (2, 1), (4, 3), (8, 6), (16, 12), (64, 12)):
+            with self.subTest(logical=logical), patch.object(native.os, 'cpu_count', return_value=logical):
+                self.assertEqual(native._native_texture_worker_limit(), expected)
+
     def make_items(self, root, names):
         items = []
         for index, name in enumerate(names):
@@ -55,7 +60,9 @@ class NativeDecodeWorkersTest(unittest.TestCase):
                 return subprocess.CompletedProcess(args, 0, json.dumps({
                     'ddsSha256': hashlib.sha256(data).hexdigest()}), '')
 
-            with patch.object(native.subprocess, 'run', side_effect=run), \
+            with patch.object(native, '_NATIVE_TEXTURE_DECODE_WORKERS', 4), \
+                 patch.object(native.os, 'cpu_count', return_value=16), \
+                 patch.object(native.subprocess, 'run', side_effect=run), \
                  patch('fh6garage.preview3d.pipeline_diagnostics._persist'), \
                  patch('fh6garage.preview3d.pipeline_diagnostics.log_event'), \
                  preview_trace('workers') as trace:
