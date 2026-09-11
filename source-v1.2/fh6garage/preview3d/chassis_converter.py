@@ -513,6 +513,13 @@ def convert_vehicle(
         automatic_rim_morph.source_revision if automatic_rim_morph is not None else None
     )
 
+    from ..app_options import load_options
+    if load_options().skip_vehicle_materials:
+        diagnostics['native_material_texture_status'] = 'disabled_by_setting'
+        if progress:
+            progress('차량 재질 생략: 기본 차체와 리버리만 준비합니다.')
+        return ConversionResult(str(output), str(helper), diagnostics)
+
     # Native Texture2D resolution is an appearance enhancement, not a geometry
     # validity condition. Resolve only exact/unique provenance and keep a valid
     # GLB when a proprietary archive payload cannot yet be decoded.

@@ -226,6 +226,11 @@ def _delete_verified_sources(window: Any, records: list[LiveryRecord]) -> tuple[
     failures: list[str] = []
     for record in records:
         label = record.header.name or record.container_name or "(unnamed)"
+        from .app_options import load_options
+        from .backup_policies import record_locked
+        if load_options().disable_export_cut or record_locked(window, record):
+            failures.append(f"{label}: locked or cut disabled; source kept")
+            continue
         if _verified_backup_path(root, record) is None:
             failures.append(f"{label}: backup fingerprint verification failed")
             continue

@@ -232,16 +232,16 @@ def _set_livery_lock(window: Any, card: QWidget, key: str, locked: bool, *, pers
         )
         lock.setToolTip(
             _txt(
-                "잠금됨 · Assistant의 인게임 이동만 차단합니다. 게임에서 직접 이동하거나 삭제하는 것은 차단하지 않습니다.",
-                "Locked · Only Assistant in-game movement is blocked. Direct movement or deletion in the game is not blocked.",
+                "잠금됨 · Assistant의 이동, 잘라내기 및 백업 삭제를 차단합니다. 게임에서 직접 하는 작업에는 적용되지 않습니다.",
+                "Locked · Assistant movement, cutting and backup deletion are blocked. Direct actions in the game are unaffected.",
             )
         )
     else:
         move.setToolTip(str(move.property("fh6UnlockedTooltip") or ""))
         lock.setToolTip(
             _txt(
-                "잠그면 이 카드의 삭제용 인게임 이동만 비활성화합니다.",
-                "Lock to disable only this card's Assistant in-game movement for deletion.",
+                "잠그면 이 카드의 이동, 잘라내기 및 백업 삭제를 차단합니다.",
+                "Lock to block this card's movement, cutting and backup deletion in Assistant.",
             )
         )
     card.setProperty("fh6MoveLocked", locked)

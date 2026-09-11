@@ -29,7 +29,7 @@ def _stable_payload(asset: Any, carbin_entry: str, morph: Any) -> dict[str, Any]
             weights = asdict(morph.weights)
         except TypeError:
             weights = repr(morph.weights)
-    return {
+    payload = {
         "schema": CACHE_SCHEMA,
         "car_id": int(asset.car_id),
         "model_code": str(asset.model_code),
@@ -47,6 +47,10 @@ def _stable_payload(asset: Any, carbin_entry: str, morph: Any) -> dict[str, Any]
         "automatic_morph_source_revision": getattr(morph, "source_revision", None),
         "automatic_morph_weights": weights,
     }
+    from ..app_options import load_options
+    if load_options().skip_vehicle_materials:
+        payload['skip_vehicle_materials'] = True
+    return payload
 
 
 def _cache_paths(asset: Any, payload: dict[str, Any]) -> tuple[Path, Path]:
@@ -96,7 +100,8 @@ def install_geometry_cache_patch() -> bool:
                                rim_morph_weights=None, converter_override=None):
         # Explicit overrides/custom morph requests are diagnostic paths: do not
         # cache them because their provenance may be external or caller-defined.
-        if converter_override is not None or rim_morph_weights is not None:
+        from ..app_options import load_options
+        if not load_options().render_cache or converter_override is not None or rim_morph_weights is not None:
             return original(
                 asset,
                 progress=progress,

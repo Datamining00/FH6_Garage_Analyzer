@@ -251,6 +251,8 @@ def _apply_release_patch_stack() -> None:
     # FinalVerify1/ErrorFix1 3D livery renderer is scoped to the existing
     # livery-card magnifier. The final thread-affinity patch still runs last.
     apply_v1_4_finalverify1_preview_patch(MainWindow)
+    from fh6garage.application_controls import install_application_controls
+    install_application_controls(MainWindow)
 
 
 def _apply_runtime_patch_stack() -> None:

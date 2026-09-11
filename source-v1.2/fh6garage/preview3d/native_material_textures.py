@@ -26,6 +26,10 @@ _NATIVE_TEXTURE_DECODE_WORKERS = 12
 
 
 def _native_texture_worker_limit() -> int:
+    from ..app_options import load_options
+    requested = load_options().render_workers
+    if requested:
+        return max(1, min(requested, os.cpu_count() or 1))
     # Leave scheduling headroom on small CPUs; extra SMT workers showed little
     # benefit above twelve in the measured 16-logical-processor workload.
     return min(_NATIVE_TEXTURE_DECODE_WORKERS, max(1, (os.cpu_count() or 4) * 3 // 4))

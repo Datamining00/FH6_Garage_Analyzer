@@ -143,6 +143,12 @@ def make_native_tire_preview_cache_wrapper(
         progress=None,
         converter_diagnostics=None,
     ):
+        from ..app_options import load_options
+        options = load_options()
+        if not options.render_cache:
+            extra = {'converter_diagnostics': converter_diagnostics} if converter_diagnostics is not None else {}
+            return original(asset, carbin_entry=carbin_entry, game_or_cars_path=game_or_cars_path,
+                            vehicle_glb=vehicle_glb, work_root=work_root, progress=progress, **extra)
         try:
             payload = _stable_payload(
                 integration_module,
@@ -158,6 +164,8 @@ def make_native_tire_preview_cache_wrapper(
                     key: converter_diagnostics.get(key)
                     for key in ("wheel_style_anchors", "transform_audit")
                 }
+            if options.skip_vehicle_materials:
+                payload['skip_vehicle_materials'] = True
             cache_root, manifest = _cache_paths(payload)
             cached = _load_cached_result(integration_module, payload, manifest)
         except (OSError, ValueError, TypeError, KeyError):

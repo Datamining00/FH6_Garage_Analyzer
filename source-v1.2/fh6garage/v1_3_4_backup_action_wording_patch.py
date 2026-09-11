@@ -52,6 +52,9 @@ def _backup_confirm(window: Any, count: int) -> bool:
     box.setIcon(QMessageBox.Icon.Question)
     keep = box.addButton(_backup_ui._txt("원본 유지", "Keep source"), QMessageBox.ButtonRole.AcceptRole)
     delete = box.addButton(_backup_ui._txt("원본 삭제", "Delete source"), QMessageBox.ButtonRole.DestructiveRole)
+    from .app_options import load_options
+    delete.setText(_backup_ui._txt('잘라내기', 'Cut'))
+    delete.setEnabled(not load_options().disable_export_cut)
     delete.setToolTip(_backup_ui._txt(
         "백업 검증 성공 후 게임 쪽 원본 컨테이너를 삭제합니다.",
         "Delete the game-side source container only after backup verification succeeds.",

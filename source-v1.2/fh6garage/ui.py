@@ -692,7 +692,9 @@ class MainWindow(QMainWindow):
         if last and Path(last).is_dir():
             self.path_edit.setText(last)
             # Persist only the path. Re-read the live save on every launch.
-            QTimer.singleShot(0, lambda saved=Path(last): self.start_scan(saved))
+            from .app_options import load_options
+            if load_options().auto_livery_detection:
+                QTimer.singleShot(0, lambda saved=Path(last): self.start_scan(saved))
 
     def _begin_busy(self, message: str | None = None) -> None:
         if message is None:
@@ -2258,6 +2260,15 @@ class MainWindow(QMainWindow):
 
         if dialog.exec() != QDialog.DialogCode.Accepted or not choice["mode"]:
             return
+        from .app_options import load_options
+        from .backup_policies import record_applied
+        if choice['mode'] == 'delete' and load_options().warn_applied_delete_move and record_applied(self, record):
+            answer = QMessageBox.warning(self, '적용 중인 리버리',
+                '이 리버리는 차량에 적용 중입니다. 삭제를 위한 이동을 계속하시겠습니까?',
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No)
+            if answer != QMessageBox.StandardButton.Yes:
+                return
         delay = delay_spin.value()
         auto_activate = auto_activate_box.isChecked()
         arrow_interval_ms = arrow_interval_spin.value()

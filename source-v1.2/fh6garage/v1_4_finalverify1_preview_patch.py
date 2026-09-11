@@ -276,7 +276,7 @@ def _build_3d_page() -> tuple[QWidget, dict[str, Any]]:
 
 def _show_livery_preview(window: Any, record: LiveryRecord) -> None:
     path = record.thumbnail_path
-    if not path or not path.is_file():
+    if (not path or not path.is_file()) and not (record.livery_path and record.livery_path.is_file()):
         QMessageBox.information(
             window,
             tr("image.none_title"),
@@ -285,11 +285,11 @@ def _show_livery_preview(window: Any, record: LiveryRecord) -> None:
         return
 
     try:
-        image = QImage.fromData(path.read_bytes())
+        image = QImage.fromData(path.read_bytes()) if path and path.is_file() else QImage()
     except OSError as exc:
         QMessageBox.warning(window, tr("image.read_failed"), str(exc))
         return
-    if image.isNull():
+    if image.isNull() and not (record.livery_path and record.livery_path.is_file()):
         QMessageBox.warning(
             window,
             tr("image.read_failed"),
@@ -318,12 +318,18 @@ def _show_livery_preview(window: Any, record: LiveryRecord) -> None:
     three_d_page, controls = _build_3d_page()
     tabs.addTab(thumbnail_page, "썸네일")
     tabs.addTab(three_d_page, "3D")
+    from .livery_2d_view import Livery2DController
+    two_d = Livery2DController(window, dialog, record)
+    tabs.insertTab(1, two_d.page, '2D')
+    dialog._fh6_livery_2d_controller = two_d
     layout.addWidget(tabs, 1)
 
     controller_holder: dict[str, Any] = {"controller": None}
 
     def ensure_3d(index: int) -> None:
-        if index != 1 or controller_holder["controller"] is not None:
+        if index == 1 and not two_d.started:
+            two_d.start()
+        if index != 2 or controller_holder["controller"] is not None:
             return
         try:
             from .preview3d.tire_preview_integration import (

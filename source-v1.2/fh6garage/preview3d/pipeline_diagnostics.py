@@ -79,7 +79,8 @@ def preview_trace(kind, **fields):
 def trace_worker(function):
     @wraps(function)
     def measured(self, *args, **kwargs):
-        with preview_trace(type(self).__name__, car_id=getattr(self, 'car_id', None),
+        from ..app_options import options_snapshot
+        with options_snapshot(), preview_trace(type(self).__name__, car_id=getattr(self, 'car_id', None),
                            glb_path=getattr(self, 'glb_path', None)):
             return function(self, *args, **kwargs)
     return measured

@@ -94,8 +94,11 @@ def _safe_export_records(root: Path, records: Iterable[LiveryRecord]) -> ExportS
     root = root.expanduser().resolve()
     root.mkdir(parents=True, exist_ok=True)
     payload, entries, index_changed = _valid_backup_entries(root)
+    from .app_options import load_options
+    from .backup_policies import duplicate_key
+    options = load_options()
     existing = {
-        _entry_identity(entry)
+        duplicate_key(entry.get('kind'), entry.get('content_sha256'), entry.get('name'), options)
         for entry in entries
         if _entry_identity(entry)[0] and _entry_identity(entry)[1]
     }
@@ -115,8 +118,8 @@ def _safe_export_records(root: Path, records: Iterable[LiveryRecord]) -> ExportS
             digest = content_sha256(record)
             if not digest:
                 raise BackupRepositoryError("C_livery SHA-256 is unavailable")
-            identity = (str(record.kind or "").strip().casefold(), digest.casefold())
-            if identity in existing:
+            identity = duplicate_key(record.kind, digest, record.header.name, options)
+            if not options.backup_allow_duplicates and identity in existing:
                 summary.skipped.append(
                     {
                         "container_name": record.container_name,
@@ -893,7 +896,7 @@ def _confirm_import_policy(window: Any, record: LiveryRecord, save_root: Path, a
 
 
 def _request_import(window: Any, record: LiveryRecord, entry: dict[str, Any]) -> None:
-    if getattr(window, "_fh6_import_running", False) or getattr(window, "_fh6_export_running", False):
+    if any(getattr(window, flag, False) for flag in ('_fh6_import_running', '_fh6_export_running', '_fh6_auto_backup_running')):
         return
     scan_thread = getattr(window, "_scan_thread", None)
     if scan_thread is not None and scan_thread.isRunning():

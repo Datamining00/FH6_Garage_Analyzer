@@ -68,7 +68,7 @@ def _set_export_state(window: Any, card: Any, record: LiveryRecord) -> None:
 
 
 def _request_export(window: Any, records: list[LiveryRecord]) -> None:
-    if getattr(window, "_fh6_export_running", False) or not records:
+    if getattr(window, "_fh6_export_running", False) or getattr(window, '_fh6_auto_backup_running', False) or not records:
         return
     root = _backup_ui._ensure_backup_root(window)
     if root is None:

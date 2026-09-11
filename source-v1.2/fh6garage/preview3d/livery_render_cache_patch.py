@@ -139,6 +139,10 @@ def install_livery_render_cache_patch() -> bool:
     original = kfps_render_backend.render_clivery_sections
 
     def cached_render_clivery_sections(source, *, game_folder=None, resolution=None, output_root=None, log=None):
+        from ..app_options import load_options
+        if not load_options().render_cache:
+            return original(source, game_folder=game_folder, resolution=resolution,
+                            output_root=output_root, log=log)
         source_path = Path(source)
         try:
             spec = resolve_livery_resolution(resolution)
