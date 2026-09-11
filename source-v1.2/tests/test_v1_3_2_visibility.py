@@ -25,10 +25,8 @@ class V132VisibilityContractTests(unittest.TestCase):
         self.assertIn("path.is_file()", source)
         self.assertNotIn("container_download_timestamp", source)
 
-    def test_hidden_liveries_are_removed_from_navigation_sessions(self) -> None:
+    def test_hidden_liveries_still_block_direct_navigation(self) -> None:
         source = self._source()
-        self.assertIn("_fh6_hidden_navigation_scope", source)
-        self.assertIn("original_reset_game_navigation_sessions", source)
         self.assertIn("if content_type == \"livery\" and is_hidden(self, key)", source)
 
     def test_hidden_filter_is_default_exclusion_and_explicit_recovery(self) -> None:

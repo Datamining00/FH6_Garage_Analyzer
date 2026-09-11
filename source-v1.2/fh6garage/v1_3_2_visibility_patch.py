@@ -130,7 +130,7 @@ def apply_v1_3_2_visibility_patches(MainWindow) -> None:
 
     This is intentionally a cache-state rule, not a claim that ProfileData was
     decoded. Hidden liveries remain in counts and storage but are omitted from
-    normal list views and all game-navigation sessions.
+    normal list views. They still occupy slots in game-navigation sessions.
     """
     if getattr(MainWindow, "_fh6_v132_visibility_patched", False):
         return
@@ -248,25 +248,12 @@ def apply_v1_3_2_visibility_patches(MainWindow) -> None:
 
     def saved_content_records(self, content_type: str):
         records = original_saved_content_records(self, content_type)
-        if content_type != "livery" or not getattr(
-            self, "_fh6_hidden_navigation_scope", False
-        ):
-            return records
-        return [
-            record
-            for record in records
-            if not is_hidden(
-                self,
-                self._content_annotation_key("livery", record),
-            )
-        ]
+        # Hidden is an app display preference. FH6 still has these entries,
+        # so removing them here shifts every subsequent game-grid position.
+        return records
 
     def reset_game_navigation_sessions(self) -> None:
-        self._fh6_hidden_navigation_scope = True
-        try:
-            original_reset_game_navigation_sessions(self)
-        finally:
-            self._fh6_hidden_navigation_scope = False
+        original_reset_game_navigation_sessions(self)
 
     def request_game_navigation(self, content_type: str, key: str) -> None:
         if content_type == "livery" and is_hidden(self, key):
