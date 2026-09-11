@@ -64,7 +64,8 @@ class V134AuctionCardRecentCleanupTests(unittest.TestCase):
         grid = card._fh6_v134_action_grid
         self.assertIs(grid, card._fh6_action_grid)
         self.assertIsInstance(card._fh6_export_placeholder_button, QToolButton)
-        self.assertFalse(hasattr(card, "_fh6_lock_placeholder_button"))
+        self.assertTrue(hasattr(card, "_fh6_lock_placeholder_button"))
+        self.assertTrue(card._fh6_lock_placeholder_button.isCheckable())
 
         expected = (
             (card._fh6_applied_state_button, 0, 1),

@@ -1,4 +1,6 @@
 """Remove an explicitly selected indexed backup, never a game-side source."""
+from .backup_transaction import repository_transaction
+
 import os
 from pathlib import Path
 import shutil
@@ -7,6 +9,7 @@ import uuid
 from .backup_export import BackupRepositoryError, load_index, save_index
 
 
+@repository_transaction
 def delete_backup(root: Path, relative: str) -> None:
     root = root.resolve()
     payload = load_index(root)

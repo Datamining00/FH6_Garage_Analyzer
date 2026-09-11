@@ -210,7 +210,7 @@ def _lock_pref_key(key: str) -> str:
 def _set_livery_lock(window: Any, card: QWidget, key: str, locked: bool, *, persist: bool) -> None:
     lock = getattr(card, "_fh6_lock_placeholder_button", None)
     move = getattr(card, "_fh6_game_move_button", None)
-    if not isinstance(lock, QToolButton) or not isinstance(move, QToolButton):
+    if not isinstance(lock, QToolButton):
         return
 
     locked = bool(locked)
@@ -220,16 +220,18 @@ def _set_livery_lock(window: Any, card: QWidget, key: str, locked: bool, *, pers
         if callable(setter):
             setter(_lock_pref_key(key), locked)
 
-    if move.property("fh6UnlockedTooltip") is None:
+    if move is not None and move.property("fh6UnlockedTooltip") is None:
         move.setProperty("fh6UnlockedTooltip", move.toolTip())
-    move.setEnabled(not locked)
+    if move is not None:
+        move.setEnabled(not locked)
     if locked:
-        move.setToolTip(
-            _txt(
-                "잠금됨: FH6 Assistant의 삭제용 인게임 이동이 비활성화되었습니다.",
-                "Locked: FH6 Assistant in-game movement for deletion is disabled.",
+        if move is not None:
+            move.setToolTip(
+                _txt(
+                    "잠금됨: FH6 Assistant의 삭제용 인게임 이동이 비활성화되었습니다.",
+                    "Locked: FH6 Assistant in-game movement for deletion is disabled.",
+                )
             )
-        )
         lock.setToolTip(
             _txt(
                 "잠금됨 · Assistant의 이동, 잘라내기 및 백업 삭제를 차단합니다. 게임에서 직접 하는 작업에는 적용되지 않습니다.",
@@ -237,7 +239,8 @@ def _set_livery_lock(window: Any, card: QWidget, key: str, locked: bool, *, pers
             )
         )
     else:
-        move.setToolTip(str(move.property("fh6UnlockedTooltip") or ""))
+        if move is not None:
+            move.setToolTip(str(move.property("fh6UnlockedTooltip") or ""))
         lock.setToolTip(
             _txt(
                 "잠그면 이 카드의 이동, 잘라내기 및 백업 삭제를 차단합니다.",
@@ -250,9 +253,10 @@ def _set_livery_lock(window: Any, card: QWidget, key: str, locked: bool, *, pers
 def _install_livery_lock(window: Any, card: QWidget, key: str) -> None:
     lock = getattr(card, "_fh6_lock_placeholder_button", None)
     move = getattr(card, "_fh6_game_move_button", None)
-    if not isinstance(lock, QToolButton) or not isinstance(move, QToolButton):
+    if not isinstance(lock, QToolButton):
         return
 
+    card.setProperty("fh6LockIdentity", key)
     preferences = getattr(window, "local_preferences", None)
     getter = getattr(preferences, "get_bool", None)
     locked = bool(getter(_lock_pref_key(key), False)) if callable(getter) and key else False
@@ -261,7 +265,7 @@ def _install_livery_lock(window: Any, card: QWidget, key: str) -> None:
         lock.setProperty("fh6FunctionalLockInstalled", True)
         lock.toggled.connect(
             lambda active=False, owner=window, target=card, item_key=key: _set_livery_lock(
-                owner, target, item_key, active, persist=True
+                owner, target, str(target.property("fh6LockIdentity") or item_key), active, persist=True
             )
         )
 

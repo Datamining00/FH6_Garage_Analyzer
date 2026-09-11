@@ -165,6 +165,10 @@ def _refresh_main_export_states(window: Any) -> None:
     apply_chunk(0)
 
 
+from .backup_transaction import repository_transaction
+
+
+@repository_transaction
 def _fast_export_records(root: Path, records: Iterable[LiveryRecord]) -> ExportSummary:
     """Export with one verified copy pass and no redundant post-rename reread.
 

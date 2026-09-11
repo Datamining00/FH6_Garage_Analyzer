@@ -201,19 +201,17 @@ def _arrange_card(card: Any) -> None:
         card_toggle_icon("excluded", on_color=CLASSIFICATION_ACTIVE_COLORS["excluded"])
     )
 
-    lock = None
-    if move is not None:
-        lock = _unique_placeholder(
-            card, overlay, "_fh6_lock_placeholder_button", "fh6LockPlaceholderButton", "lock", "잠금 기능 준비 중"
+    lock = _unique_placeholder(
+        card, overlay, "_fh6_lock_placeholder_button", "fh6LockPlaceholderButton", "lock", "잠금 기능 준비 중"
+    )
+    if not lock.isCheckable():
+        lock.setCheckable(True)
+        lock.toggled.connect(lambda active, target=lock: target.setIcon(_line_icon("lock", active=active)))
+    lock.setIcon(
+        card_toggle_icon(
+            "unlock", "lock", on_color=LOCK_ACTIVE_ICON
         )
-        if not lock.isCheckable():
-            lock.setCheckable(True)
-            lock.toggled.connect(lambda active, target=lock: target.setIcon(_line_icon("lock", active=active)))
-        lock.setIcon(
-            card_toggle_icon(
-                "unlock", "lock", on_color=LOCK_ACTIVE_ICON
-            )
-        )
+    )
     export = _unique_placeholder(
         card, overlay, "_fh6_export_placeholder_button", "fh6ExportPlaceholderButton", "export", "내보내기 기능 준비 중"
     )

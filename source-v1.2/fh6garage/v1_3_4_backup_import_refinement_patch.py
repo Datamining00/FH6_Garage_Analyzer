@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .backup_transaction import repository_transaction
+
 import os
 import shutil
 import uuid
@@ -89,6 +91,7 @@ def _valid_backup_entries(root: Path) -> tuple[dict[str, Any], list[dict[str, An
     return payload, entries, changed
 
 
+@repository_transaction
 def _safe_export_records(root: Path, records: Iterable[LiveryRecord]) -> ExportSummary:
     """Verified batch export with stale-index pruning and one atomic index commit."""
     root = root.expanduser().resolve()
@@ -261,6 +264,7 @@ def _cleanup_empty_staging(root: Path) -> None:
         pass
 
 
+@repository_transaction
 def _delete_backup_source(root: Path, entry: dict[str, Any], source: Path) -> None:
     """Remove one backup only after moving it aside and committing the index."""
     payload = load_index(root)
@@ -296,6 +300,7 @@ def _delete_backup_source(root: Path, entry: dict[str, Any], source: Path) -> No
     _cleanup_empty_staging(trash_root)
 
 
+@repository_transaction
 def import_backup_entry(
     backup_root: Path,
     entry: dict[str, Any],
@@ -364,7 +369,8 @@ def import_backup_entry(
                 shutil.rmtree(stage, ignore_errors=True)
             _cleanup_empty_staging(staging_root)
 
-    if delete_source:
+    from .app_options import load_options
+    if delete_source and not load_options().disable_export_cut:
         _delete_backup_source(backup_root, entry, source)
         summary.source_deleted = True
     return summary
@@ -880,8 +886,11 @@ def _confirm_import_policy(window: Any, record: LiveryRecord, save_root: Path, a
             "Avoid importing while FH6 is actively saving.",
         )
     )
-    keep = box.addButton(_txt("원본 유지", "Keep source"), QMessageBox.ButtonRole.AcceptRole)
-    delete = box.addButton(_txt("원본 삭제", "Delete source"), QMessageBox.ButtonRole.DestructiveRole)
+    keep = box.addButton(_txt("복사", "Copy"), QMessageBox.ButtonRole.AcceptRole)
+    delete = box.addButton(_txt("잘라내기", "Cut"), QMessageBox.ButtonRole.DestructiveRole)
+    from .app_options import load_options
+    from .backup_policies import record_locked
+    delete.setEnabled(not load_options().disable_export_cut and not record_locked(window, record))
     cancel = box.addButton(_txt("취소", "Cancel"), QMessageBox.ButtonRole.RejectRole)
     box.setDefaultButton(keep)
     box.exec()
@@ -896,7 +905,7 @@ def _confirm_import_policy(window: Any, record: LiveryRecord, save_root: Path, a
 
 
 def _request_import(window: Any, record: LiveryRecord, entry: dict[str, Any]) -> None:
-    if any(getattr(window, flag, False) for flag in ('_fh6_import_running', '_fh6_export_running', '_fh6_auto_backup_running')):
+    if any(getattr(window, flag, False) for flag in ('_fh6_import_running', '_fh6_export_running', '_fh6_auto_backup_running', '_fh6_external_import_running')):
         return
     scan_thread = getattr(window, "_scan_thread", None)
     if scan_thread is not None and scan_thread.isRunning():
@@ -911,7 +920,13 @@ def _request_import(window: Any, record: LiveryRecord, entry: dict[str, Any]) ->
     except BackupRepositoryError as exc:
         QMessageBox.warning(window, _txt("들여오기 준비 실패", "Import preparation failed"), str(exc))
         return
-    if policy == "cancel":
+    from .backup_transaction import backup_busy
+    from .backup_policies import record_locked
+    from .app_options import load_options
+    if policy == "cancel" or backup_busy(window):
+        return
+    if policy == 'delete' and (load_options().disable_export_cut or record_locked(window, record)):
+        window._show_status('잠금 또는 잘라내기 설정으로 작업을 취소했습니다.', 4000)
         return
 
     window._fh6_import_running = True

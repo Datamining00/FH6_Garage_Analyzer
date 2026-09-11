@@ -281,6 +281,9 @@ def apply_v1_3_4_card_polish_export_delete_patch(MainWindow: Any) -> None:
     original_export_failed = _backup_ui._export_failed
 
     def request_export(window: Any, records: list[LiveryRecord]) -> None:
+        from .backup_transaction import backup_busy
+        if backup_busy(window):
+            return
         window._fh6_export_source_candidates = list(records)
         window._fh6_export_delete_source_requested = False
         original_request_export(window, records)

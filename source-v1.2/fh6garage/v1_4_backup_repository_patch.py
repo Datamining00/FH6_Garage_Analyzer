@@ -363,7 +363,8 @@ def _external_import_failed(window: Any, message: str) -> None:
 
 
 def _request_external_import(window: Any) -> None:
-    if getattr(window, "_fh6_external_import_running", False):
+    from .backup_transaction import backup_busy
+    if backup_busy(window):
         return
     destination = _backup_root_with_default(window)
     if destination is None:
@@ -378,7 +379,7 @@ def _request_external_import(window: Any) -> None:
         _txt("외부 FH6 폴더 선택", "Choose external FH6 folder"),
         str(Path.home()),
     )
-    if not chosen:
+    if not chosen or backup_busy(window):
         return
     source = Path(chosen).expanduser().resolve()
     if _backup_ui._paths_overlap(source, destination):

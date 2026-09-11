@@ -185,7 +185,7 @@ def apply_card_options(card, record):
             text = datetime.fromtimestamp(value).strftime('%Y-%m-%d') if value is not None else ''
         except (ValueError, OSError, OverflowError):
             text = ''
-        label.setText('다운 ' + text if text else '')
+        label.setText('다운로드:' + text if text else '')
         label.setVisible(options.show_download_date and bool(text))
         card._fh6_date_positioner.position()
 
@@ -197,7 +197,7 @@ def _delete_card_backup(window, card):
     if not isinstance(record, LiveryRecord) or record_locked(window, record) or card.property('fh6MoveLocked'):
         window._show_status('잠긴 백업은 삭제하지 않습니다.', 4000)
         return
-    if any(getattr(window, attr, False) for attr in ('_fh6_export_running', '_fh6_import_running', '_fh6_auto_backup_running')):
+    if any(getattr(window, attr, False) for attr in ('_fh6_export_running', '_fh6_import_running', '_fh6_auto_backup_running', '_fh6_external_import_running')):
         window._show_status('백업 작업이 끝난 뒤 다시 시도해 주세요.', 4000)
         return
     root = backup._backup_root(window)
@@ -208,6 +208,10 @@ def _delete_card_backup(window, card):
         f'{record.header.name or record.container_name}\n\n선택한 백업을 삭제하시겠습니까? 게임 원본은 유지됩니다.',
         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
     if answer != QMessageBox.StandardButton.Yes:
+        return
+    from .backup_transaction import backup_busy
+    if backup_busy(window) or record_locked(window, record):
+        window._show_status('작업 상태 또는 잠금이 변경되어 삭제를 취소했습니다.', 4000)
         return
     try:
         delete_backup(root, entry['relative_path'])
@@ -295,8 +299,11 @@ class ApplicationController(QObject):
     @Slot()
     def poll(self):
         window = self.window
+        from PySide6.QtWidgets import QApplication
+        if QApplication.activeModalWidget() is not None or getattr(window, '_fh6_card_selection', None):
+            return
         if getattr(window, '_busy_depth', 0) or any(getattr(window, flag, False) for flag in
-                ('_fh6_export_running', '_fh6_import_running', '_fh6_auto_backup_running')):
+                ('_fh6_export_running', '_fh6_import_running', '_fh6_auto_backup_running', '_fh6_external_import_running')):
             return
         thread = getattr(window, '_scan_thread', None)
         if thread is not None and thread.isRunning():
@@ -322,9 +329,10 @@ class ApplicationController(QObject):
             values = []
             for entry in os.scandir(root):
                 if entry.name.startswith(('Livery_', 'SoulBoundLivery_')) and entry.is_dir(follow_symlinks=False):
-                    payload = Path(entry.path) / 'C_livery'
-                    stat = payload.stat() if payload.is_file() else entry.stat()
-                    values.append((entry.name, stat.st_size, stat.st_mtime_ns))
+                    for name in ('C_livery', 'header'):
+                        payload = Path(entry.path) / name
+                        stat = payload.stat() if payload.is_file() else entry.stat()
+                        values.append((entry.name, name, stat.st_size, stat.st_mtime_ns))
             signature = tuple(sorted(values))
         except OSError:
             return
@@ -390,9 +398,9 @@ def install_application_controls(MainWindow):
         performance = getattr(self, 'performance_nav_button', None)
         index = side.indexOf(performance) if performance is not None else -1
         side.insertWidget(index + 1 if index >= 0 else max(0, side.indexOf(self.language_label)), button)
-        self.livery_export_visible_button.setText('선택 내보내기')
-        self.backup_export_button.setText('선택 내보내기')
-        self.backup_export_button.setToolTip('게임 리버리를 선택해서 백업으로 내보내기')
+        self.livery_export_visible_button.setText('내보내기')
+        self.backup_export_button.setText('내보내기')
+        self.backup_export_button.setToolTip('현재 백업 목록을 리버리로 내보내기')
         for name in ('livery_table', 'tuning_table'):
             table = getattr(self, name, None)
             if table is not None:
@@ -405,25 +413,25 @@ def install_application_controls(MainWindow):
 
     def backup_card(window, card, record, *args, **kwargs):
         original_backup(window, card, record, *args, **kwargs)
+        paths = getattr(window, '_fh6_backup_lock_paths', set())
+        paths.add(str(record.container_path.resolve()).casefold())
+        window._fh6_backup_lock_paths = paths
         configure_backup_delete(window, card, record)
+        from .v1_3_4_card_features_patch import _install_livery_lock
+        _install_livery_lock(window, card, 'backup-path::' + str(record.container_path.resolve()).casefold())
+        lock = getattr(card, '_fh6_lock_placeholder_button', None)
+        if lock is not None:
+            lock.setEnabled(True)
+            lock.show()
         apply_card_options(card, record)
 
     def export_selected(window):
-        records = backup._visible_game_liveries(window)
-        dialog = ExportSelectionDialog(records, window)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            backup._request_export(window, dialog.selected_records())
+        from .card_transfer import request_transfer
+        request_transfer(window, 'game')
 
     def export_backup_selected(window):
-        # Include already backed-up records so the duplicate options are usable.
-        kind = toolbar._selected_source_kind(window)
-        needle = window.backup_search.text().strip().casefold()
-        records = [r for r in getattr(getattr(window, 'result', None), 'liveries', [])
-                   if r.kind == kind and (not needle or needle in
-                       f'{r.header.name} {r.header.creator} {window._car_label(r.car_id)} {r.car_id}'.casefold())]
-        dialog = ExportSelectionDialog(records, window)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            backup._request_export(window, dialog.selected_records())
+        from .card_transfer import request_transfer
+        request_transfer(window, 'backup')
 
     def close(self, event):
         from .livery_2d_view import Livery2DController
@@ -431,9 +439,9 @@ def install_application_controls(MainWindow):
             event.ignore()
             self._show_status('2D 렌더링을 마친 뒤 종료할 수 있습니다.', 4000)
             return
-        if getattr(self, '_fh6_auto_backup_running', False):
+        if any(getattr(self, name, False) for name in ('_fh6_auto_backup_running', '_fh6_export_running', '_fh6_import_running', '_fh6_external_import_running')):
             event.ignore()
-            self._show_status('자동 백업을 마친 뒤 종료할 수 있습니다.', 4000)
+            self._show_status('백업·이동 작업을 마친 뒤 종료할 수 있습니다.', 4000)
             return
         original_close(self, event)
 

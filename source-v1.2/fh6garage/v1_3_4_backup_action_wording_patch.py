@@ -41,6 +41,10 @@ install_performance_measurement_guard(_performance_metrics)
 
 
 def _backup_confirm(window: Any, count: int) -> bool:
+    preset = getattr(window, '_fh6_transfer_policy', None)
+    if preset in ('copy', 'cut'):
+        window._fh6_export_delete_source_requested = preset == 'cut'
+        return True
     box = QMessageBox(window)
     box.setWindowTitle(_backup_ui._txt("백업하기", "Back up"))
     box.setText(_backup_ui._txt(
@@ -50,7 +54,7 @@ def _backup_confirm(window: Any, count: int) -> bool:
         "Source deletion is performed only after the backup data and folder fingerprint are verified again.",
     ))
     box.setIcon(QMessageBox.Icon.Question)
-    keep = box.addButton(_backup_ui._txt("원본 유지", "Keep source"), QMessageBox.ButtonRole.AcceptRole)
+    keep = box.addButton(_backup_ui._txt("복사", "Copy"), QMessageBox.ButtonRole.AcceptRole)
     delete = box.addButton(_backup_ui._txt("원본 삭제", "Delete source"), QMessageBox.ButtonRole.DestructiveRole)
     from .app_options import load_options
     delete.setText(_backup_ui._txt('잘라내기', 'Cut'))

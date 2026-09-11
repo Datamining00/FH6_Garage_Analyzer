@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .backup_transaction import repository_transaction
+
 import hashlib
 import json
 import os
@@ -235,6 +237,7 @@ def _entry_for(
     }
 
 
+@repository_transaction
 def export_records(root: Path, records: Iterable[LiveryRecord]) -> ExportSummary:
     root = root.expanduser().resolve()
     root.mkdir(parents=True, exist_ok=True)

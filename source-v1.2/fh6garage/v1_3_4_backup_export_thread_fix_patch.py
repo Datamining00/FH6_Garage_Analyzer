@@ -76,6 +76,9 @@ def _request_export(window: Any, records: list[LiveryRecord]) -> None:
     if not _backup_ui._confirm_keep_source(window, len(records), operation="export"):
         return
 
+    from .backup_transaction import backup_busy
+    if backup_busy(window):
+        return
     window._fh6_export_running = True
     bulk = getattr(window, "livery_export_visible_button", None)
     choose = getattr(window, "backup_choose_button", None)
