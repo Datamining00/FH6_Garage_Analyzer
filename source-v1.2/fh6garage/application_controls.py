@@ -256,7 +256,7 @@ def _delete_card_backup(window, card):
     if not isinstance(record, LiveryRecord) or record_locked(window, record) or card.property('fh6MoveLocked'):
         window._show_status('잠긴 백업은 삭제하지 않습니다.', 4000)
         return
-    if any(getattr(window, attr, False) for attr in ('_fh6_export_running', '_fh6_import_running', '_fh6_auto_backup_running', '_fh6_external_import_running')):
+    if any(getattr(window, attr, False) for attr in ('_fh6_export_running', '_fh6_import_running', '_fh6_auto_backup_running', '_fh6_external_import_running', '_fh6_backup_load_running', '_fh6_backup_relayout_active')):
         window._show_status('백업 작업이 끝난 뒤 다시 시도해 주세요.', 4000)
         return
     root = backup._backup_root(window)
@@ -269,16 +269,35 @@ def _delete_card_backup(window, card):
     if answer != QMessageBox.StandardButton.Yes:
         return
     from .backup_transaction import backup_busy
-    if backup_busy(window) or record_locked(window, record):
+    if (backup_busy(window) or getattr(window, '_fh6_backup_load_running', False)
+            or getattr(window, '_fh6_backup_relayout_active', False)
+            or record_locked(window, record) or card.property('fh6MoveLocked')
+            or backup._backup_root(window) != root):
         window._show_status('작업 상태 또는 잠금이 변경되어 삭제를 취소했습니다.', 4000)
         return
+    from . import v1_3_4_backup_lazy_load_patch as lazy
+    signature = lazy._repository_signature(root)
+    cleanup_error = None
     try:
         delete_backup(root, entry['relative_path'])
     except Exception as exc:
-        QMessageBox.warning(window, '백업 삭제 실패', str(exc))
-    window._fh6_backup_presence_cache = ('', set(), set())
-    backup._rebuild_backup_cards(window)
+        # Cleanup can fail after the index deletion has committed. Reflect only
+        # confirmed removal; an index/rename failure keeps every card intact.
+        from .backup_export import load_index
+        try:
+            removed = not any(e.get('relative_path') == entry['relative_path']
+                              for e in load_index(root).get('entries', []))
+        except Exception:
+            removed = False
+        if not removed:
+            QMessageBox.warning(window, '백업 삭제 실패', str(exc))
+            return
+        cleanup_error = exc
+    lazy._remove_deleted_backup(window, root, entry['relative_path'], signature)
     backup._refresh_main_export_states(window)
+    if cleanup_error is not None:
+        QMessageBox.warning(window, '백업 정리 일부 실패',
+                            f'백업 목록에서는 삭제되었습니다. 남은 파일 정리에 실패했습니다.\n{cleanup_error}')
 
 
 def configure_backup_delete(window, card, record):

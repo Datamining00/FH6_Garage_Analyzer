@@ -399,6 +399,99 @@ def _commit_cards(
     QTimer.singleShot(0, lambda owner=window: _backup_ui._refresh_backup_thumbnails(owner))
 
 
+def _compact_backup_layout(window: Any) -> None:
+    """Close a deleted card's gap without hiding/reloading surviving widgets."""
+    layout = window.backup_grid_layout
+    live = {id(card) for card in window._fh6_backup_cards}
+    headers = {id(header) for header in getattr(window, '_fh6_backup_headers', {}).values()}
+    placed = []
+    for index in range(layout.count()):
+        widget = layout.itemAt(index).widget()
+        if widget is not None:
+            row, column, _, _ = layout.getItemPosition(index)
+            placed.append((row, column, widget))
+    groups = []
+    header, cards = None, []
+    for _, _, widget in sorted(placed, key=lambda item: item[:2]):
+        if id(widget) in headers:
+            groups.append((header, cards))
+            header, cards = widget, []
+        elif id(widget) in live:
+            cards.append(widget)
+    groups.append((header, cards))
+    columns = _backup_ui._backup_columns(window)
+    row = 0
+    mode = getattr(window, '_fh6_backup_group_mode', 'none')
+    for header, cards in groups:
+        if not cards:
+            if header is not None:
+                layout.removeWidget(header)
+                header.hide()
+            continue
+        if header is not None:
+            prop = 'creatorGroupLabel' if mode == 'creator' else 'vehicleGroupLabel'
+            label = str(cards[0].property(prop) or '—')
+            header.setText(_txt(f'{label} · 리버리 {len(cards)}개', f'{label} · {len(cards)} liveries'))
+            layout.addWidget(header, row, 0, 1, columns)
+            row += 1
+        for index, card in enumerate(cards):
+            layout.addWidget(card, row + index // columns, index % columns)
+        row += (len(cards) + columns - 1) // columns
+    layout.activate()
+    QTimer.singleShot(0, window, lambda owner=window: _backup_ui._refresh_backup_thumbnails(owner))
+
+
+def _remove_deleted_backup(window: Any, root: Path, relative: str, previous_signature) -> None:
+    """Apply a committed single deletion without decoding or recreating survivors."""
+    clean = (getattr(window, '_fh6_backup_lazy_loaded', False)
+             and not getattr(window, '_fh6_backup_cache_dirty', True)
+             and getattr(window, '_fh6_backup_cache_signature', None) == previous_signature)
+    items = [item for item in getattr(window, '_fh6_backup_items_cache', [])
+             if item[0].get('relative_path') != relative]
+    window._fh6_backup_items_cache = items
+    survivors = []
+    for card in getattr(window, '_fh6_backup_cards', []):
+        if (getattr(card, '_fh6_backup_entry', None) or {}).get('relative_path') == relative:
+            window.backup_grid_layout.removeWidget(card)
+            card.hide()
+            card.deleteLater()
+        else:
+            survivors.append(card)
+    window._fh6_backup_cards = survivors
+
+    game = list(_backup_ui._game_records(window))
+    by_container, by_digest = _game_maps(game)
+    represented = set()
+    both = 0
+    containers, identities = set(), set()
+    for entry, _record, _location in items:
+        matches = _matched_game_records(entry, by_container, by_digest)
+        both += bool(matches)
+        represented.update(id(record) for record in matches)
+        kind = str(entry.get('kind') or '').strip().casefold()
+        container = str(entry.get('original_container_name') or '').strip().casefold()
+        digest = str(entry.get('content_sha256') or '').strip().casefold()
+        if kind and container:
+            containers.add((kind, container))
+        if kind and digest:
+            identities.add((kind, digest))
+    status = (len(items), sum(id(record) not in represented for record in game), both)
+    window._fh6_backup_cached_status = status
+    window._fh6_backup_cache_dirty = not clean
+    if clean:
+        window._fh6_backup_cache_signature = _repository_signature(root)
+        window._fh6_backup_presence_cache = (str(root.resolve()), containers, identities)
+    else:
+        window._fh6_backup_presence_cache = ('', set(), set())
+    window.backup_status_label.setText(_status_text(_LoadResult(items, *status, previous_signature)))
+    scroll = getattr(window, 'backup_grid_scroll', None)
+    bar = scroll.verticalScrollBar() if scroll is not None else None
+    position = bar.value() if bar is not None else 0
+    _compact_backup_layout(window)
+    if bar is not None:
+        bar.setValue(min(position, bar.maximum()))
+
+
 def _build_cards_from_result(window: Any, result: _LoadResult, token: _CancelToken) -> None:
     items = list(result.items)
     items.sort(key=lambda item: _backup_ui._backup_sort_key(window, item))
