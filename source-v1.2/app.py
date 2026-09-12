@@ -297,7 +297,7 @@ def main() -> int:
     # Use a concrete positive base point size before applying application QSS.
     app.setFont(QFont("Segoe UI", 10))
     app.setApplicationName("FH6 Assistant")
-    app.setApplicationVersion("1.5")
+    app.setApplicationVersion("1.5.1")
     app.setOrganizationName("LocalOnly")
     _performance_metrics.record_startup("startup.qapplication", _elapsed_ms(qapp_started))
 

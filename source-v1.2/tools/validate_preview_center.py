@@ -23,9 +23,9 @@ with tempfile.TemporaryDirectory() as state:
  Image.new('RGB',(540,300),'white').save(record.thumbnail_path,'WEBP')
  window=app.MainWindow(project_root=source);window.show();window.move(35,55);q.processEvents()
  from PySide6.QtWidgets import QLabel
- assert window.windowTitle()=='FH6 Assistant v1.5'
- assert q.applicationVersion()=='1.5'
- assert any(label.text()=='v1.5\nLIVERY & TUNING' for label in window.findChildren(QLabel))
+ assert window.windowTitle()=='FH6 Assistant v1.5.1'
+ assert q.applicationVersion()=='1.5.1'
+ assert any(label.text()=='v1.5.1\nLIVERY & TUNING' for label in window.findChildren(QLabel))
  import runpy
  identity_checks=runpy.run_path(str(source/'tests/test_v1_4_rc1_identity_contract.py'))
  identity_checks['test_v1_4_rc1_identity_is_explicit_and_consistent']()

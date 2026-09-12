@@ -1,4 +1,4 @@
-"""Build v1.5 locally without inheriting unrelated Qt DLL directories."""
+"""Build v1.5.1 locally without inheriting unrelated Qt DLL directories."""
 import argparse
 import os
 from pathlib import Path
@@ -22,8 +22,8 @@ def main():
         Path(sys.base_prefix), windows / 'System32', windows)))
     logs = ROOT / 'artifacts/validation'
     logs.mkdir(parents=True, exist_ok=True)
-    for kind, spec in (('standard', 'FH6_Assistant_v1.5.spec'),
-                       ('portable', 'FH6_Assistant_v1.5_portable.spec')):
+    for kind, spec in (('standard', 'FH6_Assistant_v1.5.1.spec'),
+                       ('portable', 'FH6_Assistant_v1.5.1_portable.spec')):
         if args.distribution not in ('all', kind):
             continue
         print(f'Building {kind}; log: {logs / (kind + ".log")}', flush=True)

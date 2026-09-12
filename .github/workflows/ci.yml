@@ -1,4 +1,4 @@
-name: v1.5 Windows tests
+name: v1.5.1 Windows tests
 on:
   push:
   pull_request:

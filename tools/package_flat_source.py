@@ -56,7 +56,7 @@ runpy.run_path(str(Path(__file__).resolve().parents[1] / 'repository/tools/build
                 raise ValueError(f'Expected path missing: {name}: {old}')
             text = text.replace(old, new)
         files[name] = text.encode('utf-8')
-    files['README.txt'] = '''FH6 Assistant v1.5 소스
+    files['README.txt'] = '''FH6 Assistant v1.5.1 소스
 ========================
 
 압축을 C:\\FH6src처럼 짧은 경로에 모두 풀어 사용하세요.
@@ -72,7 +72,7 @@ py -3.12 -m venv .build-venv
 
 일반판·포터블 빌드:
 powershell -ExecutionPolicy Bypass -File build_exe.ps1
-결과는 dist에 저장됩니다. 현재 버전 spec은 FH6_Assistant_v1.5*.spec입니다.
+결과는 dist에 저장됩니다. 현재 버전 spec은 FH6_Assistant_v1.5.1*.spec입니다.
 
 FH6 Assistant.vbs 또는 run.bat으로 실행할 수도 있습니다.
 기존 실행기는 LocalAppData의 공유 Python 환경을 사용합니다.
@@ -92,7 +92,7 @@ repository 안의 경로 설명은 원래 GitHub 저장소 구조 기준입니�
         + files['SOURCE_AND_RELINKING.md'])
     digest_lines = [f'{hashlib.sha256(data).hexdigest()}  {name}\n' for name, data in sorted(files.items())]
     files['FILES_SHA256.txt'] = ''.join(digest_lines).encode('utf-8')
-    output = ROOT / 'artifacts/release/FH6-Assistant-v1.5-Source.zip'
+    output = ROOT / 'artifacts/release/FH6-Assistant-v1.5.1-Source.zip'
     pending = output.with_suffix('.zip.pending')
     with zipfile.ZipFile(pending, 'w', allowZip64=True) as archive:
         for name, data in sorted(files.items()):

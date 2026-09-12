@@ -1,13 +1,13 @@
-FH6 Assistant v1.5
+FH6 Assistant v1.5.1
 =================
 
 배포판별 실행 방법
 ------------------
 Standard
-- `FH6 Assistant v1.5.exe`를 실행합니다.
+- `FH6 Assistant v1.5.1.exe`를 실행합니다.
 
 Portable
-- `FH6 Assistant v1.5 Portable` 폴더를 유지한 상태에서 내부의 `FH6 Assistant v1.5.exe`를 실행합니다.
+- `FH6 Assistant v1.5.1 Portable` 폴더를 유지한 상태에서 내부의 `FH6 Assistant v1.5.1.exe`를 실행합니다.
 
 Source
 - 압축을 쓰기 가능한 일반 폴더에 완전히 푼 뒤 `FH6 Assistant.vbs`를 실행합니다.

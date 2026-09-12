@@ -43,8 +43,8 @@ def main():
     for name in NOTICES:
         if (ROOT / name).read_bytes() != (ROOT / 'source-v1.2' / name).read_bytes():
             raise ValueError(f'Root and app notice differ: {name}')
-    standard = ROOT / 'dist/FH6 Assistant v1.5.exe'
-    portable = ROOT / 'dist/FH6 Assistant v1.5 Portable'
+    standard = ROOT / 'dist/FH6 Assistant v1.5.1.exe'
+    portable = ROOT / 'dist/FH6 Assistant v1.5.1 Portable'
     if not standard.is_file() or not (portable / standard.name).is_file():
         raise ValueError('Build both distributions before packaging.')
     portable_files = [p for p in sorted(portable.rglob('*')) if p.is_file()]
@@ -81,14 +81,14 @@ def main():
     output = ROOT / 'artifacts/release'
     output.mkdir(parents=True, exist_ok=True)
     shutil.copy2(standard, output / standard.name)
-    portable_zip = output / 'FH6-Assistant-v1.5-Portable.zip'
-    source_zip = output / 'FH6-Assistant-v1.5-Full-Source.zip'
+    portable_zip = output / 'FH6-Assistant-v1.5.1-Portable.zip'
+    source_zip = output / 'FH6-Assistant-v1.5.1-Full-Source.zip'
     write_zip(portable_zip, portable_files, portable, portable.name + '/')
-    write_zip(source_zip, source_files(archives), ROOT, 'FH6-Assistant-v1.5-Source/')
+    write_zip(source_zip, source_files(archives), ROOT, 'FH6-Assistant-v1.5.1-Source/')
     files = [output / standard.name, portable_zip, source_zip]
     entries = [{'filename': p.name, 'size': p.stat().st_size, 'sha256': sha256(p)} for p in files]
     (output / 'SHA256SUMS.txt').write_text(''.join(f"{e['sha256']}  {e['filename']}\n" for e in entries), encoding='utf-8')
-    (output / 'manifest.json').write_text(json.dumps({'version': '1.5',
+    (output / 'manifest.json').write_text(json.dumps({'version': '1.5.1',
         'release_status': 'pending_data_rights_confirmation', 'files': entries}, indent=2) + '\n', encoding='utf-8')
     for name in NOTICES:
         shutil.copy2(ROOT / name, output / name)

@@ -3,13 +3,13 @@ from __future__ import annotations
 from PySide6.QtWidgets import QApplication, QLabel
 
 
-VERSION_TEXT = "v1.5"
-APP_VERSION = "1.5"
-WINDOW_TITLE = "FH6 Assistant v1.5"
+VERSION_TEXT = "v1.5.1"
+APP_VERSION = "1.5.1"
+WINDOW_TITLE = "FH6 Assistant v1.5.1"
 
 
 def apply_v1_4_identity_patch(MainWindow) -> None:
-    """Apply the v1.5 identity on top of the verified v1.4 stack."""
+    """Apply the v1.5.1 identity on top of the verified v1.4 stack."""
     if getattr(MainWindow, "_fh6_v14_identity_patched", False):
         return
 

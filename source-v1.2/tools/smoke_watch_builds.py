@@ -9,8 +9,8 @@ import time
 
 root = Path(sys.argv[1]).resolve()
 results = []
-for exe in (root / 'FH6 Assistant v1.5.exe',
-            root / 'FH6 Assistant v1.5 Portable' / 'FH6 Assistant v1.5.exe'):
+for exe in (root / 'FH6 Assistant v1.5.1.exe',
+            root / 'FH6 Assistant v1.5.1 Portable' / 'FH6 Assistant v1.5.1.exe'):
     with tempfile.TemporaryDirectory(prefix='fh6-smoke-') as state:
         settings = Path(state) / 'FH6GarageAnalyzer' / 'app_options.json'
         settings.parent.mkdir()
