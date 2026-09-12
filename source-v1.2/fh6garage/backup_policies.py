@@ -2,10 +2,19 @@
 from .app_options import load_options
 
 
-def duplicate_key(kind, digest, name, options=None):
+def backup_identity(kind, digest):
+    return (str(kind or '').strip().casefold(), str(digest or '').strip().casefold())
+
+
+def duplicate_allowed(existing_names, name, options=None):
+    """Match names only within the same kind/hash; exact-name match wins."""
     options = options or load_options()
-    key = (str(kind or '').strip().casefold(), str(digest or '').strip().casefold())
-    return (*key, str(name or '').strip()) if options.backup_allow_different_name else key
+    if not existing_names:
+        return True
+    name = str(name or '').strip()
+    if name in existing_names:
+        return options.backup_allow_duplicates
+    return options.backup_allow_different_name
 
 
 def record_locked(window, record):

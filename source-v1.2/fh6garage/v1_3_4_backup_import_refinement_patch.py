@@ -98,13 +98,13 @@ def _safe_export_records(root: Path, records: Iterable[LiveryRecord]) -> ExportS
     root.mkdir(parents=True, exist_ok=True)
     payload, entries, index_changed = _valid_backup_entries(root)
     from .app_options import load_options
-    from .backup_policies import duplicate_key
+    from .backup_policies import backup_identity, duplicate_allowed
     options = load_options()
-    existing = {
-        duplicate_key(entry.get('kind'), entry.get('content_sha256'), entry.get('name'), options)
-        for entry in entries
-        if _entry_identity(entry)[0] and _entry_identity(entry)[1]
-    }
+    existing = {}
+    for entry in entries:
+        identity = backup_identity(entry.get('kind'), entry.get('content_sha256'))
+        if identity[0] and identity[1]:
+            existing.setdefault(identity, set()).add(str(entry.get('name') or '').strip())
     summary = ExportSummary()
     staging_root = root / STAGING_NAME
     staging_root.mkdir(parents=True, exist_ok=True)
@@ -121,8 +121,8 @@ def _safe_export_records(root: Path, records: Iterable[LiveryRecord]) -> ExportS
             digest = content_sha256(record)
             if not digest:
                 raise BackupRepositoryError("C_livery SHA-256 is unavailable")
-            identity = duplicate_key(record.kind, digest, record.header.name, options)
-            if not options.backup_allow_duplicates and identity in existing:
+            identity = backup_identity(record.kind, digest)
+            if not duplicate_allowed(existing.get(identity, set()), record.header.name, options):
                 summary.skipped.append(
                     {
                         "container_name": record.container_name,
@@ -166,7 +166,7 @@ def _safe_export_records(root: Path, records: Iterable[LiveryRecord]) -> ExportS
                 preview_relative,
             )
             entries.append(entry)
-            existing.add(identity)
+            existing.setdefault(identity, set()).add(str(record.header.name or '').strip())
             published.append((final_path, preview_relative))
             summary.exported.append(entry)
         except Exception as exc:  # noqa: BLE001 - isolate one failed batch item
