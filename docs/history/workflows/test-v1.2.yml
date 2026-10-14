@@ -1,0 +1,44 @@
+name: Test FH6 Assistant v1.2 source
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - v1.2-work
+    paths:
+      - "source-v1.2/**"
+      - ".github/workflows/test-v1.2.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout work branch
+        uses: actions/checkout@v6
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Compile source
+        shell: pwsh
+        run: |
+          Set-Location source-v1.2
+          python -m compileall -q .
+
+      - name: Validate bundled car database
+        shell: pwsh
+        run: |
+          Set-Location source-v1.2
+          python -c "import json,pathlib; d=json.loads(pathlib.Path('data/car_names.json').read_text(encoding='utf-8')); cars=d.get('cars',{}); assert d.get('count')==660; assert len(cars)==660; assert '1229' in cars; print('Embedded car database:', len(cars), 'entries; Furai:', cars['1229'])"
+
+      - name: Run regression tests
+        shell: pwsh
+        run: |
+          Set-Location source-v1.2
+          python -m unittest discover -s tests -v

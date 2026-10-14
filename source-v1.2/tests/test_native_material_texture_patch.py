@@ -1,0 +1,267 @@
+from __future__ import annotations
+
+import json
+import tempfile
+import unittest
+from pathlib import Path
+from types import SimpleNamespace
+
+import numpy as np
+
+from fh6garage.preview3d.native_material_render_plan import (
+    NativeMaterialRenderPlan,
+    NativeMaterialTextureSelection,
+)
+from fh6garage.preview3d.native_material_texture_patch import (
+    _copy_native_texture_sidecar,
+    build_native_base_color_draw_ranges,
+    upgrade_native_texture_fragment_shader,
+    upgrade_native_texture_vertex_shader,
+)
+
+
+def _selection(
+    mesh_index: int,
+    path: str,
+    semantic: str = "base_color",
+    *,
+    role: str = "trim",
+    dxgi_format: int = 99,
+    is_srgb: bool | None = None,
+) -> NativeMaterialTextureSelection:
+    if is_srgb is None:
+        is_srgb = dxgi_format in {29, 72, 75, 78, 99}
+    parameter_hash = {
+        "roughness": "ECE98535",
+        "gloss": "7E4A41E1",
+    }.get(semantic, "85F59336")
+    parameter_name = {
+        "roughness": "GlassRoughnessTexture",
+        "gloss": "GlossTexture",
+    }.get(semantic, "DiffuseTexture")
+    return NativeMaterialTextureSelection(
+        mesh_index=mesh_index,
+        mesh_name=f"mesh_{mesh_index}",
+        mesh_role=role,
+        material_name=f"{role}_material",
+        semantic=semantic,
+        parameter_hash=parameter_hash,
+        parameter_name=parameter_name,
+        texture_path=rf"Game:\media\textures\{role}\body.swatchbin",
+        dds_path=path,
+        dds_sha256="a" * 64,
+        width=4,
+        height=4,
+        mip_levels=1,
+        dxgi_format=dxgi_format,
+        compression_family="bc4" if dxgi_format == 80 else "r8" if dxgi_format == 61 else "bc7",
+        is_srgb=bool(is_srgb),
+        uv_channel=0,
+        uv_tiling_u=2.0,
+        uv_tiling_v=3.0,
+        uv_transform_mode="kfps_baked_texcoord_transform_vflip_plus_material_tiling",
+    )
+
+
+def _plan(*selections: NativeMaterialTextureSelection) -> NativeMaterialRenderPlan:
+    return NativeMaterialRenderPlan(
+        revision=2,
+        status="ready",
+        manifest_path="manifest.json",
+        binding_count=len(selections),
+        recognized_binding_count=len(selections),
+        unknown_binding_count=0,
+        selection_count=len(selections),
+        issue_count=0,
+        selections=tuple(selections),
+        issues=(),
+        game_data_modified=False,
+    )
+
+
+def _scene(indices: int = 3, mesh_index: int = 1) -> SimpleNamespace:
+    return SimpleNamespace(
+        indices=np.zeros(indices, dtype=np.uint32),
+        primitive_diagnostics=(
+            {"mesh_index": mesh_index, "primitive_index": 0, "triangle_count": indices // 3},
+        ),
+    )
+
+
+class NativeMaterialTexturePatchTests(unittest.TestCase):
+    def test_shader_layers_native_base_texture_before_livery_and_surface_before_pbr(self):
+        vertex = """            layout(location=11) in vec4 inMaterialEmission;
+            out vec4 vMaterialEmission;
+                vMaterialEmission = inMaterialEmission;
+"""
+        upgraded_vertex = upgrade_native_texture_vertex_shader(vertex)
+        self.assertIn("layout(location=12) in vec2 inMaterialUV", upgraded_vertex)
+        self.assertIn("out vec2 vMaterialUV", upgraded_vertex)
+        self.assertIn("vMaterialUV = inMaterialUV", upgraded_vertex)
+
+        fragment = """            in vec4 vMaterialEmission;
+            uniform vec3 uEye;
+                vec3 albedo = vMaterialAux.y >= 0.0
+                    ? clamp(vMaterialAux.yzw, 0.0, 1.0)
+                    : pow(clamp(vColor, 0.0, 1.0), vec3(2.2));
+                albedo = mix(albedo, decalLinear, decal.a);
+                vec3 shaded = fh6ShadeMaterial(
+                    albedo,
+                    N,
+                    V,
+                    vMaterialParams,
+"""
+        upgraded = upgrade_native_texture_fragment_shader(fragment)
+        self.assertIn("uNativeBaseColorEnabled", upgraded)
+        self.assertIn("sampler2D uNativeBaseColor", upgraded)
+        self.assertIn("uNativeSurfaceRoughnessEnabled", upgraded)
+        self.assertIn("sampler2D uNativeSurfaceRoughness", upgraded)
+        self.assertIn("uNativeSurfaceRoughnessMode == 2", upgraded)
+        self.assertIn("effectiveMaterialParams.y = clamp(nativeRoughness", upgraded)
+        self.assertIn("vMaterialUV * uNativeBaseColorTiling", upgraded)
+        base_pos = upgraded.index("texture(uNativeBaseColor")
+        livery_pos = upgraded.index("albedo = mix(albedo, decalLinear")
+        surface_pos = upgraded.index("float nativeSurfaceValue")
+        pbr_pos = upgraded.index("vec3 shaded = fh6ShadeMaterial")
+        self.assertLess(base_pos, livery_pos)
+        self.assertLess(livery_pos, surface_pos)
+        self.assertLess(surface_pos, pbr_pos)
+
+    def test_draw_ranges_follow_flattened_primitive_index_order(self):
+        scene = SimpleNamespace(
+            indices=np.zeros(15, dtype=np.uint32),
+            primitive_diagnostics=(
+                {"mesh_index": 2, "primitive_index": 0, "triangle_count": 2},
+                {"mesh_index": 7, "primitive_index": 0, "triangle_count": 3},
+            ),
+        )
+        ranges, issues = build_native_base_color_draw_ranges(scene, _plan(_selection(7, "B.dds")))
+        self.assertEqual(issues, ())
+        self.assertEqual(len(ranges), 2)
+        self.assertEqual((ranges[0].first_index, ranges[0].index_count), (0, 6))
+        self.assertIsNone(ranges[0].dds_path)
+        self.assertEqual((ranges[1].first_index, ranges[1].index_count), (6, 9))
+        self.assertTrue(ranges[1].dds_path.endswith("B.dds"))
+        self.assertEqual((ranges[1].uv_tiling_u, ranges[1].uv_tiling_v), (2.0, 3.0))
+
+    def test_two_base_semantics_with_different_dds_fail_closed_per_mesh(self):
+        plan = _plan(
+            _selection(1, "base.dds", "base_color"),
+            _selection(1, "alpha.dds", "base_color_alpha"),
+        )
+        ranges, issues = build_native_base_color_draw_ranges(_scene(), plan)
+        self.assertEqual(len(issues), 1)
+        self.assertIsNone(ranges[0].dds_path)
+
+    def test_base_color_does_not_accept_single_channel_surface_format(self):
+        ranges, issues = build_native_base_color_draw_ranges(
+            _scene(), _plan(_selection(1, "red.dds", dxgi_format=80, is_srgb=False))
+        )
+        self.assertEqual(len(issues), 1)
+        self.assertIsNone(ranges[0].dds_path)
+
+    def test_valid_base_binding_is_disabled_if_same_mesh_has_invalid_base_binding(self):
+        plan = _plan(
+            _selection(1, "base.dds", "base_color", dxgi_format=99, is_srgb=True),
+            _selection(1, "red.dds", "base_color_alpha", dxgi_format=80, is_srgb=False),
+        )
+        ranges, issues = build_native_base_color_draw_ranges(_scene(), plan)
+        self.assertEqual(len(issues), 1)
+        self.assertIn("RGB material sampling", issues[0])
+        self.assertIsNone(ranges[0].dds_path)
+
+    def test_single_channel_roughness_and_gloss_are_explicit_surface_modes(self):
+        rough_ranges, rough_issues = build_native_base_color_draw_ranges(
+            _scene(),
+            _plan(_selection(1, "rough.dds", "roughness", dxgi_format=80, is_srgb=False)),
+        )
+        self.assertEqual(rough_issues, ())
+        self.assertIsNone(rough_ranges[0].dds_path)
+        self.assertTrue(rough_ranges[0].surface_dds_path.endswith("rough.dds"))
+        self.assertEqual(rough_ranges[0].surface_mode, "roughness")
+        self.assertEqual((rough_ranges[0].uv_tiling_u, rough_ranges[0].uv_tiling_v), (2.0, 3.0))
+
+        gloss_ranges, gloss_issues = build_native_base_color_draw_ranges(
+            _scene(),
+            _plan(_selection(1, "gloss.dds", "gloss", dxgi_format=61, is_srgb=False)),
+        )
+        self.assertEqual(gloss_issues, ())
+        self.assertEqual(gloss_ranges[0].surface_mode, "gloss")
+
+    def test_surface_map_rejects_multichannel_srgb_and_paint(self):
+        for selection in (
+            _selection(1, "rough_bc7.dds", "roughness", dxgi_format=99, is_srgb=True),
+            _selection(1, "paint_rough.dds", "roughness", role="paint", dxgi_format=80, is_srgb=False),
+        ):
+            ranges, issues = build_native_base_color_draw_ranges(_scene(), _plan(selection))
+            self.assertEqual(len(issues), 1)
+            self.assertIsNone(ranges[0].surface_dds_path)
+
+    def test_roughness_and_gloss_conflict_fails_closed_instead_of_choosing(self):
+        plan = _plan(
+            _selection(1, "rough.dds", "roughness", dxgi_format=80, is_srgb=False),
+            _selection(1, "gloss.dds", "gloss", dxgi_format=80, is_srgb=False),
+        )
+        ranges, issues = build_native_base_color_draw_ranges(_scene(), plan)
+        self.assertEqual(len(issues), 1)
+        self.assertIn("ambiguous", issues[0])
+        self.assertIsNone(ranges[0].surface_dds_path)
+
+    def test_valid_surface_binding_is_disabled_if_same_mesh_has_invalid_surface_binding(self):
+        plan = _plan(
+            _selection(1, "rough.dds", "roughness", dxgi_format=80, is_srgb=False),
+            _selection(1, "rough_bc7.dds", "roughness", dxgi_format=99, is_srgb=True),
+        )
+        ranges, issues = build_native_base_color_draw_ranges(_scene(), plan)
+        self.assertEqual(len(issues), 1)
+        self.assertIn("single-channel", issues[0])
+        self.assertIsNone(ranges[0].surface_dds_path)
+        self.assertIsNone(ranges[0].surface_mode)
+
+    def test_draw_range_mismatch_is_rejected(self):
+        scene = SimpleNamespace(
+            indices=np.zeros(6, dtype=np.uint32),
+            primitive_diagnostics=({"mesh_index": 1, "primitive_index": 0, "triangle_count": 1},),
+        )
+        with self.assertRaisesRegex(ValueError, "cover 3 indices"):
+            build_native_base_color_draw_ranges(scene, _plan())
+
+    def test_read_only_texture_manifest_propagates_to_native_tire_derivative(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "car.glb"
+            selected = root / "trial" / "car__native_tires.glb"
+            source.write_bytes(b"glTF")
+            selected.parent.mkdir()
+            selected.write_bytes(b"glTF")
+            source_manifest = source.with_suffix(source.suffix + ".native_textures.json")
+            payload = {
+                "format": "fh6_native_material_texture_resolution_v3",
+                "game_data_modified": False,
+                "textures": [],
+            }
+            source_manifest.write_text(json.dumps(payload), encoding="utf-8")
+            self.assertTrue(_copy_native_texture_sidecar(source, selected))
+            copied = selected.with_suffix(selected.suffix + ".native_textures.json")
+            self.assertEqual(json.loads(copied.read_text(encoding="utf-8")), payload)
+
+            payload["game_data_modified"] = True
+            source_manifest.write_text(json.dumps(payload), encoding="utf-8")
+            copied.unlink()
+            self.assertFalse(_copy_native_texture_sidecar(source, selected))
+            self.assertFalse(copied.exists())
+
+    def test_lazy_installer_orders_texture_after_material_stream_wiring(self):
+        root = Path(__file__).resolve().parents[1]
+        text = (root / "fh6garage" / "preview3d" / "__init__.py").read_text(encoding="utf-8")
+        pbr = text.index("install_game_like_material_patch()")
+        wiring = text.index("install_material_runtime_wiring_patch()")
+        texture = text.index("install_native_material_texture_patch()")
+        transform = text.index("install_native_transform_chain_v3()")
+        self.assertLess(pbr, wiring)
+        self.assertLess(wiring, texture)
+        self.assertLess(texture, transform)
+
+
+if __name__ == "__main__":
+    unittest.main()

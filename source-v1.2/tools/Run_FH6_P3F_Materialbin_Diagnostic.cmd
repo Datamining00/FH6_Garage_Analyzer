@@ -1,0 +1,149 @@
+@echo off
+setlocal EnableExtensions DisableDelayedExpansion
+
+set "APP=%~dp0FH6 Assistant v1.4.exe"
+if not exist "%APP%" set "APP=%~dp0FH6 Assistant v1.4 Portable\FH6 Assistant v1.4.exe"
+if not exist "%APP%" (
+  echo ERROR: FH6 Assistant v1.4.exe was not found beside this launcher.
+  echo Use this launcher from the W3 build artifact root or Portable folder.
+  pause
+  exit /b 2
+)
+
+if defined LOCALAPPDATA (
+  set "OUTDIR=%LOCALAPPDATA%\FH6 Assistant\Diagnostics"
+) else (
+  set "OUTDIR=%TEMP%\FH6 Assistant\Diagnostics"
+)
+set "CACHE=%OUTDIR%\P3FCache"
+if not exist "%OUTDIR%" mkdir "%OUTDIR%" >nul 2>&1
+if not exist "%CACHE%" mkdir "%CACHE%" >nul 2>&1
+set "SELFCHECK=%OUTDIR%\p3f_packaged_self_check.json"
+
+start "" /wait "%APP%" --p3f-materialbin-diagnostic --self-check --output "%SELFCHECK%"
+set "RC=%ERRORLEVEL%"
+if not "%RC%"=="0" (
+  echo ERROR: Packaged Paint P3F self-check failed with exit code %RC%.
+  if exist "%SELFCHECK%" echo Self-check: %SELFCHECK%
+  echo The diagnostic will not inspect FH6 inputs with an unavailable or unverified helper.
+  pause
+  exit /b %RC%
+)
+if not exist "%SELFCHECK%" (
+  echo ERROR: Packaged Paint P3F self-check produced no JSON evidence.
+  pause
+  exit /b 3
+)
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$r = Get-Content -LiteralPath $env:SELFCHECK -Raw | ConvertFrom-Json; if ($r.status -ne 'packaged_p3f_self_check_passed' -or $r.validation_status -ne 'packaged_contract_ready') { exit 4 }"
+if errorlevel 1 (
+  echo ERROR: Packaged Paint P3F self-check JSON did not report a ready contract.
+  pause
+  exit /b 4
+)
+
+set "VEHICLE=%~1"
+if not defined VEHICLE call :pick_vehicle
+if not defined VEHICLE exit /b 1
+if not exist "%VEHICLE%" (
+  echo ERROR: Vehicle ZIP does not exist:
+  echo %VEHICLE%
+  pause
+  exit /b 2
+)
+
+set "SAVEROOT=%~2"
+if defined SAVEROOT if not exist "%SAVEROOT%\." (
+  echo ERROR: Optional FH6 save root does not exist:
+  echo %SAVEROOT%
+  pause
+  exit /b 2
+)
+
+for %%F in ("%VEHICLE%") do set "STEM=%%~nF"
+set "OUTPUT=%OUTDIR%\%STEM%_manufacturer_materialbin_p3f.json"
+
+echo FH6 Paint P3F Automatic Real-Data Diagnostic
+echo ------------------------------------------------------------
+echo Vehicle : %VEHICLE%
+echo GLB     : AUTO - generated from vehicle ZIP into diagnostic cache
+echo C_livery: AUTO - matched by Car ID from FH6 Assistant last save path
+if defined SAVEROOT echo Save root: %SAVEROOT%
+echo Cache   : %CACHE%
+echo Output  : %OUTPUT%
+echo Mode    : FH6 GAME/SAVE READ-ONLY; derived GLB/JSON only
+echo.
+
+call :run_diagnostic
+set "RC=%ERRORLEVEL%"
+
+rem A fresh Portable build may not have a persisted last_save_path yet.
+rem Retry only the specific missing-save-path failure with a save-root picker;
+rem GLB conversion/livery parse failures stay fail-closed and are not hidden.
+if "%RC%"=="6" if not defined SAVEROOT if exist "%OUTPUT%" (
+  findstr /c:"No FH6 save path is available" "%OUTPUT%" >nul 2>&1
+  if not errorlevel 1 (
+    echo.
+    echo FH6 save path has not been configured yet.
+    echo Select the FH6 save root once; the matching C_livery is still chosen automatically.
+    call :pick_save_root
+    if defined SAVEROOT (
+      call :run_diagnostic
+      call set "RC=%%ERRORLEVEL%%"
+    )
+  )
+)
+
+if not "%RC%"=="0" (
+  echo.
+  echo ERROR: Paint P3F diagnostic failed with exit code %RC%.
+  if "%RC%"=="6" echo Automatic input preparation failed. See the diagnostic JSON detail above.
+  if exist "%OUTPUT%" echo Diagnostic evidence: %OUTPUT%
+  echo FH6 game/save inputs were not modified.
+  pause
+  exit /b %RC%
+)
+
+if not exist "%OUTPUT%" (
+  echo.
+  echo ERROR: Diagnostic process returned success but no JSON output was created.
+  pause
+  exit /b 3
+)
+
+echo.
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$r = Get-Content -LiteralPath $env:OUTPUT -Raw | ConvertFrom-Json; Write-Host ('Validation : ' + $r.validation_status); Write-Host ('P3D       : ' + $r.p3d_status); Write-Host ('Candidates: ' + $r.candidate_count); Write-Host ('Resolved  : ' + $r.exact_resolved_count); Write-Host ('Blocked   : ' + $r.blocked_count); Write-Host ('Unresolved: ' + $r.unresolved_count); Write-Host ('GLB       : ' + $r.glb_file); Write-Host ('C_livery  : ' + $r.paint_source); Write-Host ('Helper    : ' + $r.helper_revision)"
+echo.
+echo Result: %OUTPUT%
+start "" explorer.exe /select,"%OUTPUT%"
+pause
+exit /b 0
+
+:run_diagnostic
+if defined SAVEROOT (
+  start "" /wait "%APP%" --p3f-materialbin-diagnostic --vehicle "%VEHICLE%" --save-root "%SAVEROOT%" --cache "%CACHE%" --output "%OUTPUT%"
+) else (
+  start "" /wait "%APP%" --p3f-materialbin-diagnostic --vehicle "%VEHICLE%" --cache "%CACHE%" --output "%OUTPUT%"
+)
+exit /b %ERRORLEVEL%
+
+:pick_save_root
+set "PICKDIR=%TEMP%\fh6_p3f_save_%RANDOM%_%RANDOM%.txt"
+if exist "%PICKDIR%" del /q "%PICKDIR%" >nul 2>&1
+powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -Command ^
+  "Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.FolderBrowserDialog; $d.Description = 'Select FH6 save root or current/ContainersRoot folder'; if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { [System.IO.File]::WriteAllText($env:PICKDIR, $d.SelectedPath) }"
+if not exist "%PICKDIR%" exit /b 1
+set /p "SAVEROOT="<"%PICKDIR%"
+del /q "%PICKDIR%" >nul 2>&1
+exit /b 0
+
+:pick_vehicle
+set "PICKFILE=%TEMP%\fh6_p3f_vehicle_%RANDOM%_%RANDOM%.txt"
+if exist "%PICKFILE%" del /q "%PICKFILE%" >nul 2>&1
+powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -Command ^
+  "Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.OpenFileDialog; $d.Filter = 'FH6 vehicle archive (*.zip)|*.zip|All files (*.*)|*.*'; $d.Title = 'Select FH6 vehicle ZIP - GLB and C_livery will be prepared automatically'; if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { [System.IO.File]::WriteAllText($env:PICKFILE, $d.FileName) }"
+if not exist "%PICKFILE%" exit /b 1
+set /p "VEHICLE="<"%PICKFILE%"
+del /q "%PICKFILE%" >nul 2>&1
+exit /b 0

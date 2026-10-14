@@ -1,0 +1,411 @@
+name: Build FH6 Assistant v1.4 Wheel Morph W3
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - v1.4-rc1-wheel-morph-w3
+    paths:
+      - "source-v1.2/fh6garage/backup_transaction.py"
+      - "source-v1.2/fh6garage/card_transfer.py"
+      - "source-v1.2/fh6garage/backup_export.py"
+      - "source-v1.2/fh6garage/v1_3_4_backup_import_refinement_patch.py"
+      - "source-v1.2/fh6garage/v1_3_4_card_features_patch.py"
+      - "source-v1.2/tests/test_card_transfer.py"
+      - "source-v1.2/app.py"
+      - "source-v1.2/fh6garage/app_options.py"
+      - "source-v1.2/fh6garage/application_controls.py"
+      - "source-v1.2/fh6garage/backup_delete.py"
+      - "source-v1.2/fh6garage/backup_policies.py"
+      - "source-v1.2/fh6garage/livery_2d_view.py"
+      - "source-v1.2/fh6garage/light_controls.py"
+      - "source-v1.2/tests/test_application_options.py"
+      - "source-v1.2/FH6_Assistant_v1.4.spec"
+      - "source-v1.2/FH6_Assistant_v1.4_portable.spec"
+      - "source-v1.2/fh6garage/v1_4_finalverify1_preview_patch.py"
+      - "source-v1.2/fh6garage/preview3d/__init__.py"
+      - "source-v1.2/fh6garage/preview3d/chassis_converter.py"
+      - "source-v1.2/fh6garage/preview3d/glb_parser.py"
+      - "source-v1.2/fh6garage/preview3d/glb_viewer.py"
+      - "source-v1.2/fh6garage/preview3d/material_appearance_patch.py"
+      - "source-v1.2/fh6garage/preview3d/material_runtime_wiring_patch.py"
+      - "source-v1.2/fh6garage/preview3d/livery_paint_provenance.py"
+      - "source-v1.2/fh6garage/preview3d/livery_paint_runtime_patch.py"
+      - "source-v1.2/fh6garage/preview3d/livery_paint_binding.py"
+      - "source-v1.2/fh6garage/preview3d/livery_paint_secondary_diagnostics.py"
+      - "source-v1.2/fh6garage/preview3d/manufacturer_colors.py"
+      - "source-v1.2/fh6garage/preview3d/manufacturer_overlay_diagnostics.py"
+      - "source-v1.2/fh6garage/preview3d/manufacturer_overlay_texture_diagnostics.py"
+      - "source-v1.2/fh6garage/preview3d/exact_game_asset.py"
+      - "source-v1.2/fh6garage/preview3d/materialbin_reference_helper.py"
+      - "source-v1.2/fh6garage/preview3d/manufacturer_materialbin_diagnostics.py"
+      - "source-v1.2/fh6garage/preview3d/native_dds.py"
+      - "source-v1.2/fh6garage/preview3d/native_material_gl.py"
+      - "source-v1.2/fh6garage/preview3d/native_material_render_plan.py"
+      - "source-v1.2/fh6garage/preview3d/native_material_texture_patch.py"
+      - "source-v1.2/fh6garage/preview3d/native_material_textures.py"
+      - "source-v1.2/fh6garage/preview3d/native_normal_texture_diagnostics.py"
+      - "source-v1.2/fh6garage/preview3d/native_texture_semantics.py"
+      - "source-v1.2/fh6garage/preview3d/native_transform_chain_patch.py"
+      - "source-v1.2/fh6garage/preview3d/native_transform_chain_v2.py"
+      - "source-v1.2/fh6garage/preview3d/native_transform_chain_v3.py"
+      - "source-v1.2/fh6garage/preview3d/tire_asset.py"
+      - "source-v1.2/fh6garage/preview3d/tire_morph_boundary_roles.py"
+      - "source-v1.2/fh6garage/preview3d/tire_morph_geometry.py"
+      - "source-v1.2/fh6garage/preview3d/tire_morph_geometry_impl.py"
+      - "source-v1.2/fh6garage/preview3d/tire_preview_integration.py"
+      - "source-v1.2/fh6garage/preview3d/tire_production_policy.py"
+      - "source-v1.2/fh6garage/preview3d/tire_production_trial_geometry.py"
+      - "source-v1.2/fh6garage/preview3d/tire_spindle_attachment.py"
+      - "source-v1.2/fh6garage/preview3d/tire_spindle_glb_merge.py"
+      - "source-v1.2/fh6garage/preview3d/tire_viewer_matrix_bake.py"
+      - "source-v1.2/fh6garage/preview3d/wheel_morph_auto.py"
+      - "source-v1.2/fh6garage/preview3d/wheel_morph_helper.py"
+      - "source-v1.2/fh6garage/preview3d/wheel_morph_runtime.py"
+      - "source-v1.2/fh6garage/preview3d/wheel_morph_weights.py"
+      - "source-v1.2/fh6garage/preview3d/wheel_spec.py"
+      - "source-v1.2/fh6garage/preview3d/wheel_spec_database.py"
+      - "source-v1.2/tests/test_chassis_converter_auto_rim_morph.py"
+      - "source-v1.2/tests/test_chassis_converter_wheel_morph_helper.py"
+      - "source-v1.2/tests/test_glb_livery_structural_exclusion.py"
+      - "source-v1.2/tests/test_kfps_wheel_morph_diagnostic_patch.py"
+      - "source-v1.2/tests/test_material_appearance_patch.py"
+      - "source-v1.2/tests/test_material_provenance_bridge.py"
+      - "source-v1.2/tests/test_material_runtime_wiring_patch.py"
+      - "source-v1.2/tests/test_livery_paint_provenance.py"
+      - "source-v1.2/tests/test_livery_paint_runtime_patch.py"
+      - "source-v1.2/tests/test_livery_paint_binding.py"
+      - "source-v1.2/tests/test_livery_paint_binding_global_gate.py"
+      - "source-v1.2/tests/test_livery_paint_secondary_diagnostics.py"
+      - "source-v1.2/tests/test_manufacturer_colors.py"
+      - "source-v1.2/tests/test_manufacturer_overlay_diagnostics.py"
+      - "source-v1.2/tests/test_manufacturer_overlay_texture_diagnostics.py"
+      - "source-v1.2/tests/test_exact_game_asset.py"
+      - "source-v1.2/tests/test_materialbin_reference_helper_source.py"
+      - "source-v1.2/tests/test_manufacturer_materialbin_diagnostics.py"
+      - "source-v1.2/tests/test_native_dds.py"
+      - "source-v1.2/tests/test_native_material_gl.py"
+      - "source-v1.2/tests/test_native_material_render_plan.py"
+      - "source-v1.2/tests/test_native_material_texture_patch.py"
+      - "source-v1.2/tests/test_native_material_textures.py"
+      - "source-v1.2/tests/test_native_normal_texture_diagnostics.py"
+      - "source-v1.2/tests/test_native_swatchbin_decoder_source.py"
+      - "source-v1.2/tests/test_native_texture_semantics.py"
+      - "source-v1.2/tests/test_native_transform_chain_patch.py"
+      - "source-v1.2/tests/test_native_transform_chain_v2.py"
+      - "source-v1.2/tests/test_native_transform_chain_v3.py"
+      - "source-v1.2/tests/test_tire_morph_boundary_roles.py"
+      - "source-v1.2/tests/test_tire_morph_geometry.py"
+      - "source-v1.2/tests/test_tire_preview_integration.py"
+      - "source-v1.2/tests/test_tire_preview_structural_fallback_diagnostics.py"
+      - "source-v1.2/tests/test_tire_production_policy.py"
+      - "source-v1.2/tests/test_tire_production_trial_geometry.py"
+      - "source-v1.2/tests/test_tire_spindle_attachment.py"
+      - "source-v1.2/tests/test_tire_spindle_glb_merge.py"
+      - "source-v1.2/tests/test_tire_viewer_matrix_bake.py"
+      - "source-v1.2/tests/test_wheel_morph_auto.py"
+      - "source-v1.2/tests/test_wheel_morph_helper.py"
+      - "source-v1.2/tests/test_wheel_morph_runtime.py"
+      - "source-v1.2/tests/test_wheel_spec_database.py"
+      - "source-v1.2/tools/analyze_manufacturer_overlay.py"
+      - "source-v1.2/tools/analyze_manufacturer_overlay_texture.py"
+      - "source-v1.2/tools/analyze_manufacturer_materialbin.py"
+      - "source-v1.2/tools/patch_kfps_wheel_morph_diagnostic.py"
+      - "source-v1.2/tools/patch_kfps_materialbin_diagnostic.py"
+      - "source-v1.2/tools/kfps_wheel_morph/MaterialAppearanceDiagnostic.cs"
+      - "source-v1.2/tools/kfps_wheel_morph/NativeSwatchbinDecoder.cs"
+      - "source-v1.2/tools/kfps_wheel_morph/MaterialbinReferenceDiagnostic.cs"
+      - "source-v1.2/tools/kfps_wheel_morph/WheelMorphDiagnostic.cs"
+      - "source-v1.2/tools/kfps_wheel_morph/TransformAudit.cs"
+      - ".github/workflows/build-v1.4-wheel-morph-w3.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v14-wheel-morph-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Standard and Portable with verified rim/native tire/material preview
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout W3 branch
+        uses: actions/checkout@v6
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: source-v1.2/requirements.txt
+
+      - name: Set up .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Install Python dependencies
+        shell: pwsh
+        run: |
+          Set-Location source-v1.2
+          python -m pip install --disable-pip-version-check -r requirements.txt
+          python -m pip install --disable-pip-version-check --upgrade pyinstaller
+
+      - name: Run complete regression including production cache restart tests
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          Set-Location source-v1.2
+          python -m unittest discover -s tests -v
+
+      - name: Validate production rim native tire and material preview before packaging
+        shell: pwsh
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          Set-Location source-v1.2
+          python -m py_compile fh6garage/v1_4_finalverify1_preview_patch.py
+          python -m py_compile fh6garage/preview3d/__init__.py
+          python -m py_compile fh6garage/preview3d/glb_parser.py
+          python -m py_compile fh6garage/preview3d/material_appearance_patch.py
+          python -m py_compile fh6garage/preview3d/material_runtime_wiring_patch.py
+          python -m py_compile fh6garage/preview3d/livery_paint_provenance.py
+          python -m py_compile fh6garage/preview3d/livery_paint_runtime_patch.py
+          python -m py_compile fh6garage/preview3d/livery_paint_binding.py
+          python -m py_compile fh6garage/preview3d/livery_paint_secondary_diagnostics.py
+          python -m py_compile fh6garage/preview3d/manufacturer_colors.py
+          python -m py_compile fh6garage/preview3d/manufacturer_overlay_diagnostics.py
+          python -m py_compile fh6garage/preview3d/manufacturer_overlay_texture_diagnostics.py
+          python -m py_compile fh6garage/preview3d/exact_game_asset.py
+          python -m py_compile fh6garage/preview3d/materialbin_reference_helper.py
+          python -m py_compile fh6garage/preview3d/manufacturer_materialbin_diagnostics.py
+          python -m py_compile tools/analyze_manufacturer_overlay.py
+          python -m py_compile tools/analyze_manufacturer_overlay_texture.py
+          python -m py_compile tools/analyze_manufacturer_materialbin.py
+          python -m py_compile fh6garage/preview3d/native_dds.py
+          python -m py_compile fh6garage/preview3d/native_material_gl.py
+          python -m py_compile fh6garage/preview3d/native_material_render_plan.py
+          python -m py_compile fh6garage/preview3d/native_material_texture_patch.py
+          python -m py_compile fh6garage/preview3d/native_material_textures.py
+          python -m py_compile fh6garage/preview3d/native_normal_texture_diagnostics.py
+          python -m py_compile fh6garage/preview3d/native_texture_semantics.py
+          python -m py_compile fh6garage/preview3d/wheel_spec_database.py
+          python -m py_compile fh6garage/preview3d/wheel_morph_auto.py
+          python -m py_compile fh6garage/preview3d/chassis_converter.py
+          python -m py_compile fh6garage/preview3d/native_transform_chain_patch.py
+          python -m py_compile fh6garage/preview3d/native_transform_chain_v2.py
+          python -m py_compile fh6garage/preview3d/native_transform_chain_v3.py
+          python -m py_compile fh6garage/preview3d/tire_morph_boundary_roles.py
+          python -m py_compile fh6garage/preview3d/tire_morph_geometry.py
+          python -m py_compile fh6garage/preview3d/tire_morph_geometry_impl.py
+          python -m py_compile fh6garage/preview3d/tire_preview_integration.py
+          python -m py_compile fh6garage/preview3d/tire_production_policy.py
+          python -m py_compile fh6garage/preview3d/tire_production_trial_geometry.py
+          python -m py_compile fh6garage/preview3d/tire_spindle_attachment.py
+          python -m py_compile fh6garage/preview3d/tire_spindle_glb_merge.py
+          python -m py_compile fh6garage/preview3d/tire_viewer_matrix_bake.py
+          python -m unittest tests.test_glb_livery_structural_exclusion -v
+          python -m unittest tests.test_material_appearance_patch -v
+          python -m unittest tests.test_material_provenance_bridge -v
+          python -m unittest tests.test_material_runtime_wiring_patch -v
+          python -m unittest tests.test_livery_paint_provenance -v
+          python -m unittest tests.test_livery_paint_runtime_patch -v
+          python -m unittest tests.test_livery_paint_binding -v
+          python -m unittest tests.test_livery_paint_binding_global_gate -v
+          python -m unittest tests.test_livery_paint_secondary_diagnostics -v
+          python -m unittest tests.test_manufacturer_colors -v
+          python -m unittest tests.test_manufacturer_overlay_diagnostics -v
+          python -m unittest tests.test_manufacturer_overlay_texture_diagnostics -v
+          python -m unittest tests.test_exact_game_asset -v
+          python -m unittest tests.test_materialbin_reference_helper_source -v
+          python -m unittest tests.test_manufacturer_materialbin_diagnostics -v
+          python -m unittest tests.test_native_dds -v
+          python -m unittest tests.test_native_material_gl -v
+          python -m unittest tests.test_native_material_render_plan -v
+          python -m unittest tests.test_native_material_texture_patch -v
+          python -m unittest tests.test_native_material_textures -v
+          python -m unittest tests.test_native_normal_texture_diagnostics -v
+          python -m unittest tests.test_native_swatchbin_decoder_source -v
+          python -m unittest tests.test_native_texture_semantics -v
+          python -m unittest tests.test_wheel_spec_database -v
+          python -m unittest tests.test_wheel_morph_auto -v
+          python -m unittest tests.test_chassis_converter_wheel_morph_helper -v
+          python -m unittest tests.test_chassis_converter_auto_rim_morph -v
+          python -m unittest tests.test_kfps_wheel_morph_diagnostic_patch -v
+          python -m unittest tests.test_native_transform_chain_patch -v
+          python -m unittest tests.test_native_transform_chain_v2 -v
+          python -m unittest tests.test_native_transform_chain_v3 -v
+          python -m unittest tests.test_tire_morph_boundary_roles -v
+          python -m unittest tests.test_tire_morph_geometry -v
+          python -m unittest tests.test_tire_preview_integration -v
+          python -m unittest tests.test_tire_preview_structural_fallback_diagnostics -v
+          python -m unittest tests.test_tire_production_policy -v
+          python -m unittest tests.test_tire_production_trial_geometry -v
+          python -m unittest tests.test_tire_spindle_attachment -v
+          python -m unittest tests.test_tire_spindle_glb_merge -v
+          python -m unittest tests.test_tire_viewer_matrix_bake -v
+
+      - name: Validate helper locator contract
+        shell: pwsh
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          Set-Location source-v1.2
+          python -m py_compile fh6garage/preview3d/wheel_morph_helper.py
+          python -m unittest tests.test_wheel_morph_helper -v
+          $expected = (python -c "import runpy; print(runpy.run_path(r'fh6garage/preview3d/wheel_morph_helper.py')['WHEEL_MORPH_HELPER_SHA256'])").Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $expected) { throw "Could not read the pinned helper SHA-256 from wheel_morph_helper.py" }
+          Add-Content -Path $env:GITHUB_ENV -Value "EXPECTED_HELPER_SHA256=$expected"
+          Write-Host "Pinned transform-chain helper SHA-256: $expected"
+
+      - name: Checkout pinned KFPS source
+        shell: pwsh
+        run: |
+          git clone --filter=blob:none https://github.com/heyitshestia/kloudys-forza-painter-suite.git kfps-source
+          if ($LASTEXITCODE -ne 0) { throw "KFPS clone failed with exit code $LASTEXITCODE" }
+          git -C kfps-source checkout --detach 6f53ca3c584d78659d06d4b4a39561db67d79345
+          if ($LASTEXITCODE -ne 0) { throw "Pinned KFPS checkout failed with exit code $LASTEXITCODE" }
+          $actual = (git -C kfps-source rev-parse HEAD).Trim()
+          if ($actual -ne "6f53ca3c584d78659d06d4b4a39561db67d79345") { throw "Pinned KFPS commit mismatch: $actual" }
+
+      - name: Apply canonical W3 rim morph transform-chain material and P3F patches
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          python source-v1.2/tools/patch_kfps_wheel_morph_diagnostic.py --kfps-root kfps-source
+          if ($LASTEXITCODE -ne 0) { throw "Wheel morph/transform/material patcher failed with exit code $LASTEXITCODE" }
+          python source-v1.2/tools/patch_kfps_materialbin_diagnostic.py --kfps-root kfps-source
+          if ($LASTEXITCODE -ne 0) { throw "P3F materialbin patcher failed with exit code $LASTEXITCODE" }
+          git -C kfps-source diff --check
+          if ($LASTEXITCODE -ne 0) { throw "Patched KFPS diff check failed with exit code $LASTEXITCODE" }
+          $program = "kfps-source/tools/livery/chassis-converter/Program.cs"
+          $writer = "kfps-source/tools/livery/chassis-converter/GlbWriter.cs"
+          if (-not (Select-String -Path $program -SimpleMatch "WheelMorphRuntime.Configure(instances)" -Quiet)) { throw "Patched Program.cs is missing WheelMorphRuntime.Configure." }
+          if (-not (Select-String -Path $program -SimpleMatch "TransformAuditRuntime.Configure(instances, carbin.Scene.SkeletonPath)" -Quiet)) { throw "Patched Program.cs is missing scene-aware TransformAuditRuntime.Configure." }
+          if (-not (Select-String -Path $program -SimpleMatch "RegisterAuthoritativeSceneSkeleton" -Quiet)) { throw "Patched Program.cs is missing authoritative Scene.SkeletonPath registration." }
+          if (-not (Select-String -Path $program -SimpleMatch "model.SnapToParent" -Quiet)) { throw "Patched Program.cs is missing SnapToParent propagation." }
+          if (-not (Select-String -Path $program -SimpleMatch "model.AssemblyName" -Quiet)) { throw "Patched Program.cs is missing AssemblyName propagation." }
+          if (-not (Select-String -Path $program -SimpleMatch "TransformAuditRuntime.RegisterSceneSkeleton(rootEntry, rootModel.Bundle)" -Quiet)) { throw "Patched Program.cs is missing stock CarBody scene skeleton fallback registration." }
+          if (-not (Select-String -Path $program -SimpleMatch "wheel_morph_applied_meshes = WheelMorphRuntime.AppliedMeshes" -Quiet)) { throw "Patched Program.cs is missing rim morph diagnostics." }
+          if (-not (Select-String -Path $program -SimpleMatch "wheel_style_anchors = TransformAuditRuntime.WheelStyleAnchors" -Quiet)) { throw "Patched Program.cs is missing WheelStyle transform diagnostics." }
+          if (-not (Select-String -Path $program -SimpleMatch "scene_attachment_skeleton_count = TransformAuditRuntime.SceneSkeletonCount" -Quiet)) { throw "Patched Program.cs is missing scene skeleton diagnostics." }
+          if (-not (Select-String -Path $program -SimpleMatch "scene_skeleton_path = TransformAuditRuntime.RequestedSceneSkeletonPath" -Quiet)) { throw "Patched Program.cs is missing Scene.SkeletonPath diagnostics." }
+          if (-not (Select-String -Path $program -SimpleMatch "authoritative_scene_skeleton_source = TransformAuditRuntime.AuthoritativeSceneSkeletonSource" -Quiet)) { throw "Patched Program.cs is missing authoritative scene skeleton diagnostics." }
+          if (-not (Select-String -Path $program -SimpleMatch "MaterialAppearanceRuntime.Resolve" -Quiet)) { throw "Patched Program.cs is missing embedded material provenance resolution." }
+          if (-not (Select-String -Path $program -SimpleMatch "--decode-swatchbin" -Quiet)) { throw "Patched Program.cs is missing native swatchbin decode mode." }
+          if (-not (Select-String -Path $program -SimpleMatch "--diagnose-materialbin" -Quiet)) { throw "Patched Program.cs is missing P3F materialbin diagnostic mode." }
+          if (-not (Select-String -Path $program -SimpleMatch "MaterialbinReferenceRuntime.Diagnose" -Quiet)) { throw "Patched Program.cs is missing P3F materialbin diagnostic invocation." }
+          if (-not (Select-String -Path $writer -SimpleMatch "kfps_material_appearance" -Quiet)) { throw "Patched GlbWriter.cs is missing material appearance extras." }
+          if (-not (Select-String -Path $writer -SimpleMatch 'mesh.MaterialBindingHash.ToString("X16")' -Quiet)) { throw "GlbWriter.cs material binding hash is not exact unprefixed X16." }
+          if (-not (Test-Path "kfps-source/tools/livery/chassis-converter/TransformAudit.cs")) { throw "TransformAudit.cs was not staged." }
+          if (-not (Test-Path "kfps-source/tools/livery/chassis-converter/MaterialAppearanceDiagnostic.cs")) { throw "MaterialAppearanceDiagnostic.cs was not staged." }
+          if (-not (Test-Path "kfps-source/tools/livery/chassis-converter/NativeSwatchbinDecoder.cs")) { throw "NativeSwatchbinDecoder.cs was not staged." }
+          if (-not (Test-Path "kfps-source/tools/livery/chassis-converter/MaterialbinReferenceDiagnostic.cs")) { throw "MaterialbinReferenceDiagnostic.cs was not staged." }
+          if (-not (Select-String -Path "kfps-source/tools/livery/chassis-converter/MaterialAppearanceDiagnostic.cs" -SimpleMatch "TextureBindings" -Quiet)) { throw "TextureBindings provenance is missing." }
+          if (-not (Select-String -Path "kfps-source/tools/livery/chassis-converter/MaterialAppearanceDiagnostic.cs" -SimpleMatch "UvTilingVectorHashes" -Quiet)) { throw "Material UV tiling provenance is missing." }
+
+      - name: Publish and stage verified helper
+        shell: pwsh
+        run: |
+          dotnet publish kfps-source/tools/livery/chassis-converter/Kfps.ChassisConverter.csproj -c Release -o wheel-morph-converter
+          if ($LASTEXITCODE -ne 0) { throw "Diagnostic converter publish failed with exit code $LASTEXITCODE" }
+          $built = Resolve-Path "wheel-morph-converter/Kfps.ChassisConverter.exe"
+          $hash = (Get-FileHash $built -Algorithm SHA256).Hash.ToLower()
+          $expected = $env:EXPECTED_HELPER_SHA256
+          if (-not $expected) { throw "EXPECTED_HELPER_SHA256 was not propagated from the source pin." }
+          if ($hash -ne $expected) { throw "Patched helper SHA-256 mismatch: expected $expected, got $hash" }
+          $runtime = "source-v1.2/runtime"
+          New-Item -ItemType Directory -Force $runtime | Out-Null
+          Copy-Item $built "$runtime/Kfps.ChassisConverter.WheelMorph.exe" -Force
+          Write-Host "Verified staged transform-chain helper SHA-256: $hash"
+
+      - name: Build Standard OneFile
+        shell: pwsh
+        run: |
+          Set-Location source-v1.2
+          python -m PyInstaller --clean --noconfirm .\FH6_Assistant_v1.4.spec
+          if ($LASTEXITCODE -ne 0) { throw "Standard PyInstaller build failed with exit code $LASTEXITCODE" }
+          $exe = Resolve-Path "dist\FH6 Assistant v1.4.exe"
+          $listing = python -m PyInstaller.utils.cliutils.archive_viewer -l -r $exe
+          if ($LASTEXITCODE -ne 0) { throw "Could not recursively inspect Standard archive." }
+          if (-not ($listing -match "Kfps\.ChassisConverter\.WheelMorph\.exe")) { throw "Standard OneFile does not contain the wheel morph helper." }
+          if (-not ($listing -match "fh6garage\.preview3d\.material_appearance_patch")) { throw "Standard OneFile does not contain the native material appearance bridge." }
+          if (-not ($listing -match "fh6garage\.preview3d\.material_runtime_wiring_patch")) { throw "Standard OneFile does not contain direct-widget native material wiring." }
+          if (-not ($listing -match "fh6garage\.preview3d\.livery_paint_provenance")) { throw "Standard OneFile does not contain C_livery paint provenance." }
+          if (-not ($listing -match "fh6garage\.preview3d\.livery_paint_runtime_patch")) { throw "Standard OneFile does not contain Paint P3 runtime handoff." }
+          if (-not ($listing -match "fh6garage\.preview3d\.livery_paint_binding")) { throw "Standard OneFile does not contain exact Paint P3 binding." }
+          if (-not ($listing -match "fh6garage\.preview3d\.livery_paint_secondary_diagnostics")) { throw "Standard OneFile does not contain fail-closed Paint P3C secondary diagnostics." }
+          if (-not ($listing -match "fh6garage\.preview3d\.manufacturer_colors")) { throw "Standard OneFile does not contain FH6 manufacturer color provenance/resolution." }
+          if (-not ($listing -match "fh6garage\.preview3d\.manufacturer_overlay_diagnostics")) { throw "Standard OneFile does not contain exact Paint P3D manufacturer overlay diagnostics." }
+          if (-not ($listing -match "fh6garage\.preview3d\.manufacturer_overlay_texture_diagnostics")) { throw "Standard OneFile does not contain exact Paint P3E manufacturer overlay texture diagnostics." }
+          if (-not ($listing -match "fh6garage\.preview3d\.exact_game_asset")) { throw "Standard OneFile does not contain exact P3F game asset resolution." }
+          if (-not ($listing -match "fh6garage\.preview3d\.materialbin_reference_helper")) { throw "Standard OneFile does not contain the P3F materialbin helper bridge." }
+          if (-not ($listing -match "fh6garage\.preview3d\.manufacturer_materialbin_diagnostics")) { throw "Standard OneFile does not contain P3F materialbin traversal diagnostics." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_dds")) { throw "Standard OneFile does not contain native DDS parsing." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_material_gl")) { throw "Standard OneFile does not contain native DDS OpenGL upload." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_material_render_plan")) { throw "Standard OneFile does not contain native material render planning." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_material_texture_patch")) { throw "Standard OneFile does not contain native Texture2D rendering." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_material_textures")) { throw "Standard OneFile does not contain native material texture resolution." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_normal_texture_diagnostics")) { throw "Standard OneFile does not contain read-only native normal diagnostics." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_texture_semantics")) { throw "Standard OneFile does not contain exact native texture semantics." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_transform_chain_patch")) { throw "Standard OneFile does not contain the native transform-chain v1 module." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_transform_chain_v2")) { throw "Standard OneFile does not contain the native transform-chain v2 module." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_transform_chain_v3")) { throw "Standard OneFile does not contain the rendered-rim native transform-chain v3 module." }
+
+      - name: Build Portable OneDir
+        shell: pwsh
+        run: |
+          Set-Location source-v1.2
+          python -m PyInstaller --clean --noconfirm .\FH6_Assistant_v1.4_portable.spec
+          if ($LASTEXITCODE -ne 0) { throw "Portable PyInstaller build failed with exit code $LASTEXITCODE" }
+          $helper = "dist\FH6 Assistant v1.4 Portable\_internal\runtime\Kfps.ChassisConverter.WheelMorph.exe"
+          if (-not (Test-Path $helper)) { throw "Portable build does not contain the wheel morph helper." }
+          $hash = (Get-FileHash $helper -Algorithm SHA256).Hash.ToLower()
+          $expected = $env:EXPECTED_HELPER_SHA256
+          if (-not $expected) { throw "EXPECTED_HELPER_SHA256 was not propagated from the source pin." }
+          if ($hash -ne $expected) { throw "Portable bundled helper SHA-256 mismatch: expected $expected, got $hash" }
+          $portableExe = Resolve-Path "dist\FH6 Assistant v1.4 Portable\FH6 Assistant v1.4.exe"
+          $listing = python -m PyInstaller.utils.cliutils.archive_viewer -l -r $portableExe
+          if ($LASTEXITCODE -ne 0) { throw "Could not recursively inspect Portable archive." }
+          if (-not ($listing -match "fh6garage\.preview3d\.material_appearance_patch")) { throw "Portable OneDir does not contain the native material appearance bridge." }
+          if (-not ($listing -match "fh6garage\.preview3d\.material_runtime_wiring_patch")) { throw "Portable OneDir does not contain direct-widget native material wiring." }
+          if (-not ($listing -match "fh6garage\.preview3d\.livery_paint_provenance")) { throw "Portable OneDir does not contain C_livery paint provenance." }
+          if (-not ($listing -match "fh6garage\.preview3d\.livery_paint_runtime_patch")) { throw "Portable OneDir does not contain Paint P3 runtime handoff." }
+          if (-not ($listing -match "fh6garage\.preview3d\.livery_paint_binding")) { throw "Portable OneDir does not contain exact Paint P3 binding." }
+          if (-not ($listing -match "fh6garage\.preview3d\.livery_paint_secondary_diagnostics")) { throw "Portable OneDir does not contain fail-closed Paint P3C secondary diagnostics." }
+          if (-not ($listing -match "fh6garage\.preview3d\.manufacturer_colors")) { throw "Portable OneDir does not contain FH6 manufacturer color provenance/resolution." }
+          if (-not ($listing -match "fh6garage\.preview3d\.manufacturer_overlay_diagnostics")) { throw "Portable OneDir does not contain exact Paint P3D manufacturer overlay diagnostics." }
+          if (-not ($listing -match "fh6garage\.preview3d\.manufacturer_overlay_texture_diagnostics")) { throw "Portable OneDir does not contain exact Paint P3E manufacturer overlay texture diagnostics." }
+          if (-not ($listing -match "fh6garage\.preview3d\.exact_game_asset")) { throw "Portable OneDir does not contain exact P3F game asset resolution." }
+          if (-not ($listing -match "fh6garage\.preview3d\.materialbin_reference_helper")) { throw "Portable OneDir does not contain the P3F materialbin helper bridge." }
+          if (-not ($listing -match "fh6garage\.preview3d\.manufacturer_materialbin_diagnostics")) { throw "Portable OneDir does not contain P3F materialbin traversal diagnostics." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_dds")) { throw "Portable OneDir does not contain native DDS parsing." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_material_gl")) { throw "Portable OneDir does not contain native DDS OpenGL upload." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_material_render_plan")) { throw "Portable OneDir does not contain native material render planning." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_material_texture_patch")) { throw "Portable OneDir does not contain native Texture2D rendering." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_material_textures")) { throw "Portable OneDir does not contain native material texture resolution." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_normal_texture_diagnostics")) { throw "Portable OneDir does not contain read-only native normal diagnostics." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_texture_semantics")) { throw "Portable OneDir does not contain exact native texture semantics." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_transform_chain_patch")) { throw "Portable OneDir does not contain the native transform-chain v1 module." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_transform_chain_v2")) { throw "Portable OneDir does not contain the native transform-chain v2 module." }
+          if (-not ($listing -match "fh6garage\.preview3d\.native_transform_chain_v3")) { throw "Portable OneDir does not contain the rendered-rim native transform-chain v3 module." }
+
+      - name: Upload W3 build candidates
+        uses: actions/upload-artifact@v4
+        with:
+          name: FH6-Assistant-v1.4-Wheel-Morph-W3-Build-Candidates
+          path: |
+            source-v1.2/dist/FH6 Assistant v1.4.exe
+            source-v1.2/dist/FH6 Assistant v1.4 Portable
+          retention-days: 14
+          if-no-files-found: error

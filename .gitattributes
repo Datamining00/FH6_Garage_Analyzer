@@ -1,0 +1,11 @@
+* text=auto
+*.md text eol=lf
+*.py text eol=lf
+*.yml text eol=lf
+*.ps1 text eol=crlf
+*.exe binary
+*.ico binary
+*.png binary
+*.gz binary
+# Preserve upstream license bytes and formatting verbatim.
+source-v1.2/licenses/** -text -whitespace
