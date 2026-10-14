@@ -1,0 +1,121 @@
+name: Repository cleanup once
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/repository-cleanup-once.yml
+permissions:
+  contents: write
+  actions: write
+  pull-requests: write
+concurrency:
+  group: repository-cleanup-once
+  cancel-in-progress: false
+jobs:
+  cleanup:
+    if: github.repository == 'Datamining00/FH6_Garage_Analyzer'
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - name: Remove development branches and previous Actions records
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          python3 -u - <<'PY'
+          import os, json, time, urllib.request, urllib.error, urllib.parse
+          repo = os.environ["GITHUB_REPOSITORY"]
+          assert repo == "Datamining00/FH6_Garage_Analyzer", "Unexpected repository"
+          token = os.environ["GH_TOKEN"]
+          run_id = int(os.environ["GITHUB_RUN_ID"])
+          base = "https://api.github.com/repos/" + repo
+          headers = {"Authorization":"Bearer "+token,"Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2026-03-10","User-Agent":"repository-cleanup"}
+          def api(method, path, payload=None):
+              url = base + path
+              data = None if payload is None else json.dumps(payload).encode()
+              for attempt in range(30):
+                  try:
+                      req = urllib.request.Request(url, data=data, headers=headers, method=method)
+                      with urllib.request.urlopen(req, timeout=60) as response:
+                          raw = response.read()
+                          result = json.loads(raw) if raw else None
+                          remaining = int(response.headers.get("x-ratelimit-remaining", "1000"))
+                          reset = int(response.headers.get("x-ratelimit-reset", "0"))
+                      if method != "GET": time.sleep(1)
+                      return result
+                  except urllib.error.HTTPError as err:
+                      raw = err.read().decode("utf-8", errors="replace")
+                      if err.code == 404 and method == "DELETE": return None
+                      remaining = err.headers.get("x-ratelimit-remaining")
+                      retry = err.headers.get("retry-after")
+                      if err.code in (403,429) and (remaining == "0" or retry or "secondary rate limit" in raw.lower()):
+                          delay = int(retry or "60")
+                          if remaining == "0": delay = max(1,int(err.headers.get("x-ratelimit-reset","0"))-int(time.time())+5)
+                          print("API rate limit: waiting",delay,"seconds",flush=True)
+                          until = time.monotonic()+delay
+                          while time.monotonic()<until: time.sleep(min(60,max(0.1,until-time.monotonic())))
+                          continue
+                      if err.code >= 500:
+                          time.sleep(min(60,2**min(attempt,5)))
+                          continue
+                      raise RuntimeError(method+" "+path+" HTTP "+str(err.code)+" "+raw[:500]) from None
+              raise RuntimeError("API retry limit exceeded: "+path)
+          def all_pages(path, key=None):
+              found=[]
+              for page in range(1,100):
+                  result=api("GET",path+("&" if "?" in path else "?")+"per_page=100&page="+str(page))
+                  items=result[key] if key else result
+                  found.extend(items)
+                  if len(items)<100: return found
+              raise RuntimeError("Pagination limit")
+          readme_before = api("GET","/contents/README.md?ref=main")
+          assert readme_before["sha"] == "82510c6415669680456615bff2b665c53890f17a", "README changed; stopping"
+          releases_before = all_pages("/releases")
+          def release_snapshot(items):
+              return json.dumps(sorted([{"id":r["id"],"tag_name":r["tag_name"],"name":r["name"],"body":r["body"],"draft":r["draft"],"prerelease":r["prerelease"],"assets":sorted([{"id":a["id"],"name":a["name"],"size":a["size"],"digest":a.get("digest")} for a in r["assets"]],key=lambda a:a["id"])} for r in items],key=lambda r:r["id"]),sort_keys=True)
+          release_baseline=release_snapshot(releases_before)
+          preserve_tags={r["tag_name"] for r in releases_before}
+          assert len(releases_before)==11, "Releases changed; stopping"
+          pulls=all_pages("/pulls?state=open")
+          for pr in pulls:
+              api("PATCH","/pulls/"+str(pr["number"]),{"state":"closed"})
+          print("Closed open pull requests:",len(pulls),flush=True)
+          branches=all_pages("/branches")
+          remove_branches=[b["name"] for b in branches if b["name"]!="main"]
+          for index,name in enumerate(remove_branches,1):
+              api("DELETE","/git/refs/heads/"+urllib.parse.quote(name,safe="/"))
+              if index%20==0 or index==len(remove_branches): print("Deleted branches:",index,"/",len(remove_branches),flush=True)
+          tags=all_pages("/tags")
+          remove_tags=[t["name"] for t in tags if t["name"] not in preserve_tags]
+          for name in remove_tags: api("DELETE","/git/refs/tags/"+urllib.parse.quote(name,safe="/"))
+          print("Deleted non-release tags:",len(remove_tags),flush=True)
+          deleted_runs=0
+          while True:
+              page=api("GET","/actions/runs?per_page=100")
+              targets=[r for r in page["workflow_runs"] if r["id"]!=run_id]
+              if not targets: break
+              for run in targets:
+                  if run["status"]!="completed":
+                      api("POST","/actions/runs/"+str(run["id"])+"/cancel")
+                      for waiting in range(60):
+                          current=api("GET","/actions/runs/"+str(run["id"]))
+                          if current["status"]=="completed": break
+                          time.sleep(5)
+                      else: raise RuntimeError("Run did not finish cancellation: "+str(run["id"]))
+                  api("DELETE","/actions/runs/"+str(run["id"]))
+                  deleted_runs+=1
+                  if deleted_runs%100==0: print("Deleted prior workflow runs:",deleted_runs,flush=True)
+          print("Deleted prior workflow runs:",deleted_runs,flush=True)
+          for path,key in [("/actions/artifacts","artifacts"),("/actions/caches","actions_caches")]:
+              items=all_pages(path,key)
+              for item in items:
+                  api("DELETE",path+"/"+str(item["id"]))
+              print("Deleted",key+":",len(items),flush=True)
+          assert api("GET","/contents/README.md?ref=main")["sha"]==readme_before["sha"], "README verification failed"
+          assert release_snapshot(all_pages("/releases"))==release_baseline, "Release verification failed"
+          assert [b["name"] for b in all_pages("/branches")]==["main"], "Branch verification failed"
+          print("Verified README and all releases/assets unchanged. Only main remains.",flush=True)
+          print("Cleanup complete. This cleanup run itself may require separate deletion:",run_id,flush=True)
+          
+          PY
