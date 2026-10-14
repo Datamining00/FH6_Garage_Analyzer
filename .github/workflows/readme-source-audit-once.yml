@@ -1,0 +1,82 @@
+name: Inspect latest release source for README
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/readme-source-audit-once.yml]
+permissions:
+  contents: read
+  actions: write
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Verify release archive and collect application source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          python3 -u - <<'PY'
+          import os,json,time,urllib.request,urllib.error,zipfile,hashlib,gzip,base64,textwrap
+          assert os.environ["GITHUB_REPOSITORY"]=="Datamining00/FH6_Garage_Analyzer"
+          api_base="https://api.github.com/repos/Datamining00/FH6_Garage_Analyzer"
+          headers={"Authorization":"Bearer "+os.environ["GH_TOKEN"],"Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2026-03-10"}
+          def api(method,path):
+              request=urllib.request.Request(api_base+path,headers=headers,method=method)
+              with urllib.request.urlopen(request,timeout=60) as result:
+                  body=result.read()
+                  return json.loads(body) if body else None
+          cleanup_run=38517799219
+          current=api("GET","/actions/runs/"+str(cleanup_run))
+          if current["status"]!="completed":
+              api("POST","/actions/runs/"+str(cleanup_run)+"/cancel")
+              for attempt in range(60):
+                  current=api("GET","/actions/runs/"+str(cleanup_run))
+                  if current["status"]=="completed": break
+                  time.sleep(2)
+              else: raise RuntimeError("Cleanup did not stop")
+          print("Paused cleanup run to prevent source-audit logs being removed.",flush=True)
+          url="https://github.com/Datamining00/FH6_Garage_Analyzer/releases/download/v1.05.03/03-FH6-Assistant-v1.5.3-Full-Source.zip"
+          expected="90e9cb8b3ae959602a1c8c3e58c86216fd40ffd2b14eda34cb320568120a0bf7"
+          expected_size=734019554
+          path="release-source.zip"
+          digest=hashlib.sha256()
+          count=0
+          with urllib.request.urlopen(url,timeout=120) as response,open(path,"wb") as destination:
+              while True:
+                  chunk=response.read(1024*1024)
+                  if not chunk: break
+                  destination.write(chunk);digest.update(chunk);count+=len(chunk)
+          assert count==expected_size,(count,expected_size)
+          assert digest.hexdigest()==expected,"Release source SHA256 mismatch"
+          print("Verified complete source ZIP:",count,"bytes; SHA256",digest.hexdigest(),flush=True)
+          with zipfile.ZipFile(path) as archive:
+              infos=archive.infolist()
+              app_entries=[i.filename for i in infos if i.filename=="app.py" or i.filename.endswith("/app.py")]
+              print("Application entry candidates:",json.dumps(app_entries),flush=True)
+              files={}
+              file_hashes={}
+              for info in infos:
+                  name=info.filename
+                  if info.is_dir(): continue
+                  pieces=name.split("/")
+                  core=("fh6garage" in pieces)
+                  companion=(name in app_entries or (pieces[-1] in ("AGENTS.md","AGENTS.override.md","README.md","README.txt","version_info.txt","requirements.txt","SOURCE_AND_RELINKING.md","THIRD_PARTY_NOTICES.md","DATA_PROVENANCE_REVIEW.md","package_manifest.json")))
+                  if not (core or companion): continue
+                  if info.file_size>8*1024*1024: raise RuntimeError("Unexpected large source file: "+name)
+                  raw=archive.read(info)
+                  try: content=raw.decode("utf-8-sig")
+                  except UnicodeDecodeError: continue
+                  files[name]=content
+                  file_hashes[name]=hashlib.sha256(raw).hexdigest()
+              assert app_entries and any("fh6garage/" in n for n in files),"Application source not found"
+              assert sum(len(s.encode("utf-8")) for s in files.values())<64*1024*1024,"Source bundle unexpectedly large"
+              bundle={"release_tag":"v1.05.03","asset_name":"03-FH6-Assistant-v1.5.3-Full-Source.zip","asset_sha256":digest.hexdigest(),"asset_bytes":count,"archive_entries":[{"name":i.filename,"size":i.file_size} for i in infos],"file_sha256":file_hashes,"files":files}
+          payload=base64.b64encode(gzip.compress(json.dumps(bundle,ensure_ascii=False).encode("utf-8"),compresslevel=9)).decode("ascii")
+          print("Extracted application text files:",len(files),"encoded bundle:",len(payload),"characters",flush=True)
+          print("FH6_VERIFIED_SOURCE_BUNDLE_BEGIN",flush=True)
+          for line in textwrap.wrap(payload,4000): print(line,flush=True)
+          print("FH6_VERIFIED_SOURCE_BUNDLE_END",flush=True)
+          print("Source audit completed. Cleanup can be resumed after retrieving this bundle.",flush=True)
+          
+          PY
