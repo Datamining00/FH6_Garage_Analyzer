@@ -342,26 +342,18 @@ Steam 썸네일 캐시 경로의 예:
 
 썸네일 원복이 필요하다면 `thumbnail_originals`를 함께 유지하세요. 일반판이나 포터블 파일을 교체해도 이 사용자 데이터 위치는 계속 사용합니다.
 
-## 소스와 출처
-
-개발·소스 확인에는 릴리스의 `03-FH6-Assistant-v1.5.3-Full-Source.zip`을 사용하세요. 해당 ZIP에는 앱 소스·실행 및 빌드 안내·검사·외부 대응 소스가 포함되어 있습니다. GitHub가 자동으로 제공하는 `Source code (zip)`은 이 전체 소스 배포본과 다릅니다.
-
-<details>
-<summary>개발자용 차량 재질 진단</summary>
-
-실행 파일은 `--p3f-materialbin-diagnostic` 명령행 모드를 지원합니다. 선택한 차량 자산과 리버리를 대상으로 재질 진단을 수행하고 결과를 JSON으로 저장하는 기능입니다. 사용 가능한 인수는 도움말에서 확인할 수 있습니다.
-
-```powershell
-.\01-FH6.Assistant.v1.5.3.exe --p3f-materialbin-diagnostic --help
-```
+## 출처
 
 </details>
 
-이 프로그램은 Microsoft·Xbox Game Studios·Playground Games·Forza와 제휴하거나 보증받은 공식 도구가 아닙니다. 게임 업데이트에 따라 파일 해석이나 미리보기 동작이 달라질 수 있습니다.
+이 프로그램은 Microsoft·Xbox Game Studios·Playground Games·Forza와 제휴하거나 보증받은 공식 도구가 아닙니다.
+제공자는 법적·도의적 책임을 지지 않으며, 모든 책임은 사용자 본인에게 있습니다.
+게임 업데이트에 따라 파일 해석이나 미리보기 동작이 달라질 수 있습니다.
 
 참고·사용한 주요 프로젝트와 자료:
 
-- [HDR 차량 ID](https://gist.github.com/HDR/0659d1717bc61504bf83750628963f4f) · [튜닝 구조](https://gist.github.com/HDR/41426137a24ef83b3f391542ce51982d)
+- [HDR 차량 ID](https://gist.github.com/HDR/0659d1717bc61504bf83750628963f4f)
+- [HDR 튜닝 구조](https://gist.github.com/HDR/41426137a24ef83b3f391542ce51982d)
 - [Kloudy’s Forza Painter Suite](https://github.com/heyitshestia/kloudys-forza-painter-suite)
 - [ForzaTechStudio](https://github.com/D3FEKT/ForzaTechStudio)
 - [Doliman ForzaTech extraction tools](https://github.com/Doliman100/ForzaTech-extraction-tools)
