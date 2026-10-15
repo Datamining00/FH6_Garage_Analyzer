@@ -5,6 +5,8 @@ Forza Horizon 6의 PC 저장 데이터를 읽어 리버리와 튜닝을 찾고, 
 
 이 안내는 앱 v1.5.3, 릴리스 태그 `v1.05.03`의 전체 소스 배포본을 기준으로 작성했습니다.
 
+지원 언어: 한국어, English
+
 [최신 버전 다운로드](https://github.com/Datamining00/FH6_Garage_Analyzer/releases/latest)
 
 ## 다운로드
