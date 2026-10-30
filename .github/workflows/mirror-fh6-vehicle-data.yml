@@ -2,6 +2,10 @@ name: Sync FH6 Vehicle Data Gist
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/mirror-fh6-vehicle-data.yml"
+      - "scripts/sync_fh6_vehicle_data.py"
   schedule:
     # GitHub cron is UTC. These correspond to 08:50, 12:50, 17:50 Asia/Seoul.
     - cron: "50 23 * * *"
