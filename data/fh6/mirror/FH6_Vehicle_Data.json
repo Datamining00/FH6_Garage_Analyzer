@@ -1,0 +1,4103 @@
+{
+  "_meta": {
+    "updated_at": "2026-10-08",
+    "program_update": {
+      "patch_date": "2026-10-29",
+      "version": "1.6.1",
+      "comment": "FH6 Assistant v1.6.1 업데이트",
+      "download_url": "https://github.com/Datamining00/FH6_Garage_Analyzer/releases/latest"
+    }
+  },
+  "1969 Toyota 2000GT": {
+    "id": "247",
+    "acquisition": "Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1962 Ferrari 250 GTO": {
+    "id": "249",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1954 Mercedes-Benz 300 SL Coupé": {
+    "id": "251",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1994 Ferrari F355 Berlinetta": {
+    "id": "253",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1992 Ferrari 512 TR": {
+    "id": "255",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1973 Porsche 911 Carrera RS": {
+    "id": "260",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1995 Porsche 911 GT2": {
+    "id": "261",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2004 Porsche 911 GT3": {
+    "id": "262",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1982 Porsche 911 Turbo 3.3": {
+    "id": "265",
+    "acquisition": "Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1989 Porsche 944 Turbo": {
+    "id": "268",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1987 Porsche 959": {
+    "id": "269",
+    "acquisition": "Treasure",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2006 Vauxhall Astra VXR": {
+    "id": "278",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1968 Plymouth Barracuda Formula S": {
+    "id": "281",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1969 Chevrolet Camaro Super Sport Coupe": {
+    "id": "289",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2003 Porsche Carrera GT": {
+    "id": "292",
+    "acquisition": "Collection Journal, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2003 Toyota Celica Sport Specialty II": {
+    "id": "295",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1998 TVR Cerbera Speed 12": {
+    "id": "296",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1970 Chevrolet Chevelle Super Sport 454": {
+    "id": "299",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2004 Honda Civic Type R": {
+    "id": "302",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1965 Shelby Cobra 427 S/C": {
+    "id": "306",
+    "acquisition": "Collection Journal, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1995 Volkswagen Corrado VR6": {
+    "id": "309",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1967 Chevrolet Corvette Stingray 427": {
+    "id": "312",
+    "acquisition": "Collection Journal, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2002 Chevrolet Corvette Z06": {
+    "id": "314",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1970 Chevrolet Corvette ZR-1": {
+    "id": "315",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1988 Lamborghini Countach LP5000 QV": {
+    "id": "316",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1991 Honda CR-X SiR": {
+    "id": "320",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1992 Lancia Delta HF Integrale EVO": {
+    "id": "323",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1999 Lamborghini Diablo GTR": {
+    "id": "324",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1997 Lamborghini Diablo SV": {
+    "id": "325",
+    "acquisition": "Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1969 Ferrari Dino 246 GT": {
+    "id": "326",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1995 Mitsubishi Eclipse GSX": {
+    "id": "327",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2002 Ferrari Enzo Ferrari": {
+    "id": "333",
+    "acquisition": "Autoshow",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2002 Lotus Esprit V8": {
+    "id": "335",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1961 Jaguar E-type": {
+    "id": "336",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1997 McLaren F1 GT": {
+    "id": "338",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1987 Ferrari F40": {
+    "id": "340",
+    "acquisition": "Autoshow, Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1995 Ferrari F50": {
+    "id": "342",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1969 Nissan Fairlady Z 432": {
+    "id": "343",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2003 Nissan Fairlady Z": {
+    "id": "344",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1994 Nissan Fairlady Z Version S Twin Turbo": {
+    "id": "345",
+    "acquisition": "Autoshow",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2005 Ford GT": {
+    "id": "348",
+    "acquisition": "Treasure",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1992 Volkswagen Golf Gti 16v Mk2": {
+    "id": "353",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1997 Mitsubishi GTO": {
+    "id": "357",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1984 Ferrari 288 GTO": {
+    "id": "358",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1998 Subaru Impreza 22B-STi Version": {
+    "id": "363",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2004 Subaru IMPREZA WRX STI": {
+    "id": "364",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2005 Subaru IMPREZA WRX STI": {
+    "id": "365",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2001 Acura Integra Type R": {
+    "id": "368",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2006 Mitsubishi Lancer Evolution IX MR": {
+    "id": "374",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2004 Mitsubishi Lancer Evolution VIII MR": {
+    "id": "378",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2005 Subaru LEGACY B4 2.0 GT": {
+    "id": "379",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1997 BMW M3": {
+    "id": "382",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2005 BMW M3": {
+    "id": "383",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2004 Maserati MC12": {
+    "id": "391",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1995 Toyota MR2 GT": {
+    "id": "398",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2000 Ford Mustang SVT Cobra R": {
+    "id": "405",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2005 Honda NSX-R": {
+    "id": "411",
+    "acquisition": "Autoshow, Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1992 Honda NSX-R": {
+    "id": "412",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1987 Buick Regal GNX": {
+    "id": "417",
+    "acquisition": "Autoshow",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2006 Audi RS 4": {
+    "id": "419",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2003 Audi RS 6": {
+    "id": "420",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2002 Acura RSX Type S": {
+    "id": "422",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1990 Mazda Savanna RX-7": {
+    "id": "423",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2003 Honda S2000": {
+    "id": "427",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2004 Saleen S7": {
+    "id": "432",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2005 TVR Sagaris": {
+    "id": "433",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1994 Nissan Silvia K's": {
+    "id": "440",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1985 Toyota Sprinter Trueno GT Apex": {
+    "id": "455",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1974 Lancia Stratos HF Stradale": {
+    "id": "458",
+    "acquisition": "Treasure",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1992 Toyota Supra 2.0 GT": {
+    "id": "460",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1998 Toyota Supra RZ": {
+    "id": "461",
+    "acquisition": "Autoshow, Collection Journal, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1999 Dodge Viper GTS ACR": {
+    "id": "483",
+    "acquisition": "Autoshow",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1993 Jaguar XJ220": {
+    "id": "489",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1969 Dodge Charger R/T": {
+    "id": "513",
+    "acquisition": "Treasure",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1998 Nissan R390 (GT1)": {
+    "id": "567",
+    "acquisition": "Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1998 Mercedes-Benz AMG CLK GTR": {
+    "id": "568",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2005 Honda NSX-R GT": {
+    "id": "569",
+    "acquisition": "Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2007 Peugeot 207 Super 2000": {
+    "id": "615",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2007 Honda Civic Type R": {
+    "id": "625",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1984 Audi Sport quattro": {
+    "id": "633",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1980 Renault 5 Turbo": {
+    "id": "634",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1967 Lamborghini Miura P400": {
+    "id": "637",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1970 Dodge Challenger R/T": {
+    "id": "639",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1997 Porsche 911 GT1 Strassenversion": {
+    "id": "641",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2005 Ferrari FXX": {
+    "id": "1006",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2008 Koenigsegg CCGT": {
+    "id": "1007",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2008 Mitsubishi Lancer Evolution X GSR": {
+    "id": "1009",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2008 BMW M3": {
+    "id": "1011",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1996 Ferrari F50 GT": {
+    "id": "1020",
+    "acquisition": "Collection Journal, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2007 Ferrari 430 Scuderia": {
+    "id": "1022",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1989 Ferrari F40 Competizione": {
+    "id": "1023",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2007 Alfa Romeo 8C Competizione": {
+    "id": "1032",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1994 Toyota Celica GT-Four ST205": {
+    "id": "1034",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1981 BMW M1": {
+    "id": "1040",
+    "acquisition": "Treasure",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1993 Ford Mustang SVT Cobra R": {
+    "id": "1041",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1971 Nissan Skyline 2000GT-R": {
+    "id": "1042",
+    "acquisition": "Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1987 Pontiac Firebird Trans Am GTA": {
+    "id": "1045",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2008 Dodge Viper SRT-10 ACR": {
+    "id": "1046",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2006 Dodge Ram SRT-10": {
+    "id": "1052",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2008 BMW Z4 M Coupé": {
+    "id": "1059",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2008 Subaru IMPREZA WRX STI": {
+    "id": "1060",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1969 Dodge Charger Daytona HEMI": {
+    "id": "1063",
+    "acquisition": "Autoshow, Collection Journal, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1979 Chevrolet Camaro Z28": {
+    "id": "1064",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2009 Chevrolet Corvette ZR1": {
+    "id": "1069",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2009 Ford Focus RS": {
+    "id": "1086",
+    "acquisition": "Autoshow",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2009 Mercedes-Benz SL 65 AMG Black Series": {
+    "id": "1090",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1960 Chevrolet Corvette": {
+    "id": "1093",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2010 Nissan 370Z": {
+    "id": "1103",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1970 Datsun 510": {
+    "id": "1104",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1964 Aston Martin DB5": {
+    "id": "1105",
+    "acquisition": "Autoshow",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1985 Ford RS200 Evolution": {
+    "id": "1108",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1994 Mazda MX-5 Miata": {
+    "id": "1110",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1980 Abarth Fiat 131": {
+    "id": "1124",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2009 BMW M5": {
+    "id": "1126",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2011 McLaren 12C Coupé": {
+    "id": "1130",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2009 Ferrari 458 Italia": {
+    "id": "1131",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1965 Alfa Romeo Giulia Sprint GTA Stradale": {
+    "id": "1150",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1965 Shelby Cobra Daytona Coupe": {
+    "id": "1155",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2010 Ferrari 599XX": {
+    "id": "1171",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2010 Lamborghini Murciélago LP 670-4 SV": {
+    "id": "1173",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2009 Pagani Zonda R": {
+    "id": "1175",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2009 Audi RS 6": {
+    "id": "1184",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2009 Audi R8 LMS": {
+    "id": "1200",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2010 Renault Megane RS 250": {
+    "id": "1204",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "NUL_CAR_00": {
+    "id": "1215",
+    "acquisition": "-",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2011 Audi RS 3 Sportback": {
+    "id": "1216",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2010 Audi TT RS Coupé": {
+    "id": "1220",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2010 Mazda Mazdaspeed 3": {
+    "id": "1221",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2008 Mazda Furai": {
+    "id": "1229",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2010 Volkswagen Golf R": {
+    "id": "1231",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2010 Noble M600": {
+    "id": "1253",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2010 Lexus LFA": {
+    "id": "1260",
+    "acquisition": "Autoshow",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1973 BMW 2002 Turbo": {
+    "id": "1269",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1982 DeLorean DMC-12": {
+    "id": "1270",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1992 Ford Escort RS Cosworth": {
+    "id": "1272",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1997 Honda Civic Type R": {
+    "id": "1273",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1977 Pontiac Firebird Trans Am": {
+    "id": "1276",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1971 Plymouth Cuda 426 HEMI": {
+    "id": "1277",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1973 Ford XB Falcon GT": {
+    "id": "1278",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1993 Nissan 240SX": {
+    "id": "1282",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1957 Ford Thunderbird": {
+    "id": "1283",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Car Pass"
+  },
+  "1970 Chevrolet El Camino Super Sport 454": {
+    "id": "1291",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1987 Ford Sierra Cosworth RS500": {
+    "id": "1293",
+    "acquisition": "Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1991 GMC Syclone": {
+    "id": "1294",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1982 Lancia 037 Stradale": {
+    "id": "1295",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1990 Mercedes-Benz 190 E 2.5-16 Evolution II": {
+    "id": "1296",
+    "acquisition": "Autoshow",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1988 Mitsubishi Starion ESI-R": {
+    "id": "1297",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1983 Volvo 242 Turbo Evolution": {
+    "id": "1299",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1964 Chevrolet Impala Super Sport 409": {
+    "id": "1300",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1956 Jaguar D-Type": {
+    "id": "1301",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1993 McLaren F1": {
+    "id": "1314",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2011 Subaru WRX STI": {
+    "id": "1323",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1970 Chevrolet Camaro Z28": {
+    "id": "1330",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1968 Dodge Dart HEMI Super Stock": {
+    "id": "1332",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1991 Mazda #55 Mazda 787B": {
+    "id": "1335",
+    "acquisition": "Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2011 BMW X5 M": {
+    "id": "1350",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1970 Dodge Coronet Super Bee": {
+    "id": "1352",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1965 Ford Mustang GT Coupe": {
+    "id": "1355",
+    "acquisition": "Autoshow",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2003 BMW M5": {
+    "id": "1367",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1988 BMW M5": {
+    "id": "1368",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2010 Pagani Zonda Cinque Roadster": {
+    "id": "1369",
+    "acquisition": "Autoshow",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1999 Lotus Elise Series 1 Sport 190": {
+    "id": "1376",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1996 Chevrolet Impala Super Sport": {
+    "id": "1379",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1992 Mitsubishi Galant VR-4": {
+    "id": "1381",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1990 Subaru LEGACY RS": {
+    "id": "1382",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2012 BMW M5": {
+    "id": "1388",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2011 Lamborghini Sesto Elemento": {
+    "id": "1392",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1992 Alfa Romeo 155 Q4": {
+    "id": "1393",
+    "acquisition": "Autoshow",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1992 GMC Typhoon": {
+    "id": "1394",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1989 Toyota MR2 SC": {
+    "id": "1395",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2011 Koenigsegg Agera": {
+    "id": "1397",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2012 Lamborghini Aventador LP700-4": {
+    "id": "1398",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2011 Audi RS 5 Coupé": {
+    "id": "1417",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1995 BMW M5": {
+    "id": "1418",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2011 Mazda RX-8 R3": {
+    "id": "1426",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2011 Volkswagen Scirocco R": {
+    "id": "1428",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1969 Chevrolet Nova Super Sport 396": {
+    "id": "1429",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1963 Volkswagen Beetle": {
+    "id": "1435",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1957 Chevrolet Bel Air": {
+    "id": "1459",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2011 Ford Transit SuperSportVan": {
+    "id": "1477",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1986 Audi #2 Audi Sport quattro S1": {
+    "id": "1478",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1985 Mazda RX-7 GSL-SE": {
+    "id": "1480",
+    "acquisition": "Treasure",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1965 Austin-Healey 3000 MkIII": {
+    "id": "1481",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1995 BMW 850CSi": {
+    "id": "1493",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2012 Mercedes-Benz C 63 AMG Coupé Black Series": {
+    "id": "1500",
+    "acquisition": "Autoshow",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1968 Holden Monaro GTS 327": {
+    "id": "1511",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1997 Maserati Ghibli Cup": {
+    "id": "1513",
+    "acquisition": "Autoshow, Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1973 Mazda RX-3": {
+    "id": "1514",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1992 Toyota Celica GT-Four RC ST185": {
+    "id": "1517",
+    "acquisition": "Autoshow",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2012 Jeep Wrangler Rubicon": {
+    "id": "1522",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1973 Ford Capri RS3100": {
+    "id": "1529",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2012 Hennessey Venom GT": {
+    "id": "1532",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1977 Holden Torana A9X": {
+    "id": "1533",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1990 Jaguar XJ-S": {
+    "id": "1534",
+    "acquisition": "Autoshow",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1974 Toyota Corolla SR5": {
+    "id": "1537",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1968 Alfa Romeo 33 Stradale": {
+    "id": "1549",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1955 Mercedes-Benz 300 SLR": {
+    "id": "1559",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2013 SRT Viper GTS": {
+    "id": "1562",
+    "acquisition": "Autoshow, Wheelspin, Loyalty",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1953 Chevrolet Corvette": {
+    "id": "1564",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1974 Honda Civic RS": {
+    "id": "1568",
+    "acquisition": "Collection Journal, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1988 Chevrolet Monte Carlo Super Sport": {
+    "id": "1575",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1962 Ferrari 250 GT Berlinetta Lusso": {
+    "id": "1578",
+    "acquisition": "Autoshow, Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1962 Lincoln Continental": {
+    "id": "1586",
+    "acquisition": "Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1972 Mazda Cosmo 110S Series II": {
+    "id": "1587",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1984 Peugeot 205 Turbo 16": {
+    "id": "1591",
+    "acquisition": "Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1974 Toyota Celica GT": {
+    "id": "1592",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2010 BMW M3 GTS": {
+    "id": "1598",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2012 Ferrari 599XX Evolution": {
+    "id": "1599",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2012 Lamborghini Gallardo LP570-4 Spyder Performante": {
+    "id": "1601",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2013 Audi RS 4 Avant": {
+    "id": "1607",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2013 Mercedes-Benz G 65 AMG": {
+    "id": "1627",
+    "acquisition": "Autoshow, Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1986 Honda Civic Si": {
+    "id": "1650",
+    "acquisition": "Autoshow",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2013 Ariel Atom 500 V8": {
+    "id": "1651",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2013 Ford Mustang Shelby GT500": {
+    "id": "1654",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2013 Subaru BRZ": {
+    "id": "1655",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2013 Mercedes-Benz A 45 AMG": {
+    "id": "1658",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1986 Lancia Delta S4": {
+    "id": "1661",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1965 MINI Cooper S": {
+    "id": "1662",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2013 McLaren P1": {
+    "id": "1667",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1969 Ford Mustang Boss 302": {
+    "id": "1668",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2012 Nissan GT-R Black Edition (R35)": {
+    "id": "2002",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2012 MINI John Cooper Works GP": {
+    "id": "2003",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2013 Mazda MX-5": {
+    "id": "2004",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1995 Chevrolet Corvette ZR-1": {
+    "id": "2006",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2013 Toyota 86": {
+    "id": "2007",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2013 Audi RS 7 Sportback": {
+    "id": "2009",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2013 Audi R8 Coupé V10 plus 5.2 FSI quattro": {
+    "id": "2010",
+    "acquisition": "Collection Journal, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1968 Abarth 595 esseesse": {
+    "id": "2017",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2003 Ford Focus RS": {
+    "id": "2019",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2013 Ferrari LaFerrari": {
+    "id": "2034",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2014 Alfa Romeo 4C": {
+    "id": "2038",
+    "acquisition": "Autoshow",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2014 BAC Mono": {
+    "id": "2040",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2013 Lamborghini Veneno": {
+    "id": "2042",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1984 Honda Civic CRX Mugen": {
+    "id": "2119",
+    "acquisition": "Collection Journal, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1994 Honda Prelude Si": {
+    "id": "2121",
+    "acquisition": "Autoshow, Collection Journal, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2013 Cadillac XTS Limousine": {
+    "id": "2128",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2014 HSV GEN-F GTS": {
+    "id": "2131",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2015 BMW i8": {
+    "id": "2133",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1980 Subaru BRAT GL": {
+    "id": "2140",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2014 Volkswagen Golf R": {
+    "id": "2142",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2014 Ford Ranger T6 Rally Raid": {
+    "id": "2145",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1986 MG Metro 6R4": {
+    "id": "2147",
+    "acquisition": "Autoshow, Collection Journal, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2013 MINI X-Raid All4 Racing Countryman": {
+    "id": "2148",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1993 Renault Clio Williams": {
+    "id": "2149",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1963 Volkswagen Type 2 De Luxe": {
+    "id": "2151",
+    "acquisition": "Autoshow, Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2014 BMW M4 Coupé": {
+    "id": "2154",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1970 Citroën 2CV": {
+    "id": "2157",
+    "acquisition": "Treasure",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1965 Alfa Romeo Giulia TZ2": {
+    "id": "2161",
+    "acquisition": "Collection Journal, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2015 Honda Civic Type R": {
+    "id": "2163",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2014 Lamborghini Huracán LP 610-4": {
+    "id": "2164",
+    "acquisition": "Autoshow, Wheelspin, Loyalty",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2015 Subaru WRX STI": {
+    "id": "2168",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2005 Mazda Mazdaspeed MX-5": {
+    "id": "2171",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2015 Lexus RC F": {
+    "id": "2175",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2015 Chevrolet Corvette Z06": {
+    "id": "2177",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2001 Audi RS 4 Avant": {
+    "id": "2178",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2015 Audi S1": {
+    "id": "2179",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2015 Audi RS 6 Avant": {
+    "id": "2180",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2015 Chevrolet Camaro Z/28": {
+    "id": "2183",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2013 Ferrari 458 Speciale": {
+    "id": "2184",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2015 Koenigsegg One:1": {
+    "id": "2188",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1970 Honda S800": {
+    "id": "2205",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1958 Plymouth Fury": {
+    "id": "2216",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1996 Subaru SVX": {
+    "id": "2217",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2015 Jaguar XKR-S GT": {
+    "id": "2235",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2015 Mercedes-AMG GT S": {
+    "id": "2242",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2016 Cadillac ATS-V": {
+    "id": "2262",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2015 Dodge Challenger SRT Hellcat": {
+    "id": "2263",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2016 Mazda MX-5": {
+    "id": "2267",
+    "acquisition": "Autoshow",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1973 Nissan Skyline H/T 2000GT-R": {
+    "id": "2270",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1969 Datsun 2000 Roadster": {
+    "id": "2272",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2014 Porsche 918 Spyder": {
+    "id": "2290",
+    "acquisition": "Autoshow, Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2012 Porsche 911 GT3 RS 4.0": {
+    "id": "2297",
+    "acquisition": "Autoshow, Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2017 Ford Focus RS": {
+    "id": "2357",
+    "acquisition": "Autoshow, Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2017 Ford GT": {
+    "id": "2363",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2014 Ferrari FXX K": {
+    "id": "2371",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1932 Ford De Luxe Five-Window Coupe": {
+    "id": "2372",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2016 Ford Mustang Shelby GT350R": {
+    "id": "2400",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1957 BMW Isetta 300 Export": {
+    "id": "2412",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1971 Meyers Manx": {
+    "id": "2416",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1984 Opel Manta 400": {
+    "id": "2420",
+    "acquisition": "Autoshow, Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2016 Cadillac CTS-V Sedan": {
+    "id": "2421",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2014 HSV Limited Edition GEN-F GTS Maloo": {
+    "id": "2422",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2016 Ariel Nomad": {
+    "id": "2430",
+    "acquisition": "Autoshow, Collection Journal, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2015 Ferrari 488 GTB": {
+    "id": "2467",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2015 Dodge Charger SRT Hellcat": {
+    "id": "2468",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1965 Toyota Sports 800": {
+    "id": "2469",
+    "acquisition": "Collection Journal, Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2016 Aston Martin Vulcan": {
+    "id": "2470",
+    "acquisition": "Autoshow, Wheelspin, Loyalty",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2016 Mercedes-AMG C 63 S Coupé": {
+    "id": "2471",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2015 McLaren 570S Coupé": {
+    "id": "2472",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2016 Audi R8 V10 plus": {
+    "id": "2473",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2015 Radical RXC Turbo": {
+    "id": "2486",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2016 Abarth 695 Biposto": {
+    "id": "2489",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2015 Land Rover Range Rover Sport SVR": {
+    "id": "2494",
+    "acquisition": "Autoshow, Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1955 Chevrolet 150 Utility Sedan": {
+    "id": "2507",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1987 Nissan Skyline GTS-R": {
+    "id": "2512",
+    "acquisition": "Autoshow",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2011 Penhall The Cholla": {
+    "id": "2515",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2014 Ford #11 Rockstar F-150 Trophy Truck": {
+    "id": "2517",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2016 Koenigsegg Regera": {
+    "id": "2526",
+    "acquisition": "Autoshow",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2017 Aston Martin DB11": {
+    "id": "2527",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1993 Porsche 968 Turbo S": {
+    "id": "2534",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1993 Porsche 928 GTS": {
+    "id": "2535",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2017 Alfa Romeo Giulia Quadrifoglio": {
+    "id": "2542",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2016 Dodge Viper ACR": {
+    "id": "2544",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1970 Porsche #3 917 LH": {
+    "id": "2549",
+    "acquisition": "Autoshow, Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2014 Ford FPV Limited Edition Pursuit Ute": {
+    "id": "2551",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2015 Alumicraft Class 10 Race Car": {
+    "id": "2552",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1972 Reliant Supervan III": {
+    "id": "2563",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1979 Toyota FJ40": {
+    "id": "2566",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1969 Volkswagen Class 5/1600 Baja Bug": {
+    "id": "2568",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2015 Ultima Evolution Coupe 1020": {
+    "id": "2569",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2554 AMG Transport Dynamics M12S Warthog CST": {
+    "id": "2574",
+    "acquisition": "Autoshow, Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2015 Ferrari F12tdf": {
+    "id": "2577",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1970 GMC Jimmy": {
+    "id": "2613",
+    "acquisition": "Autoshow",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1968 Ford Mustang GT 2+2 Fastback": {
+    "id": "2614",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2016 Lamborghini Centenario LP 770-4": {
+    "id": "2616",
+    "acquisition": "Autoshow, Wheelspin, Loyalty",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2017 Nissan GT-R (R35)": {
+    "id": "2618",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2016 Bentley Bentayga": {
+    "id": "2625",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2016 BMW M4 GTS": {
+    "id": "2628",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1993 Toyota #1 T100 Baja Truck": {
+    "id": "2636",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2016 Pagani Huayra BC Coupe": {
+    "id": "2647",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2010 Ford Crown Victoria Police Interceptor": {
+    "id": "2649",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1997 Mitsubishi Montero Evolution": {
+    "id": "2652",
+    "acquisition": "Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2017 Mercedes-AMG GT R": {
+    "id": "2654",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1998 Nissan Silvia K's Aero": {
+    "id": "2659",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2016 RJ Anderson #37 Polaris RZR Pro 2 Truck": {
+    "id": "2663",
+    "acquisition": "Autoshow, Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2010 Mazdaspeed 3 (Traffic)": {
+    "id": "2711",
+    "acquisition": "-",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1992 Mitsubishi Galant VR-4 (Traffic)": {
+    "id": "2712",
+    "acquisition": "-",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2014 Box Truck (Traffic)": {
+    "id": "2713",
+    "acquisition": "-",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2014 Bus (Traffic)": {
+    "id": "2714",
+    "acquisition": "-",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1995 Nissan NISMO GT-R LM": {
+    "id": "2738",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2017 Chevrolet Camaro ZL1": {
+    "id": "2739",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2017 Abarth 124 Spider": {
+    "id": "2740",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2016 Jeep Trailcat": {
+    "id": "2742",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2016 Toyota Land Cruiser Arctic Trucks AT37": {
+    "id": "2743",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2015 Honda Ridgeline Baja Trophy Truck": {
+    "id": "2745",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2018 Porsche 911 GT2 RS": {
+    "id": "2755",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2018 Porsche Cayenne Turbo": {
+    "id": "2773",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1966 Ford #2 GT40 Mk II": {
+    "id": "2792",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1967 Ferrari #24 Ferrari Spa 330 P4": {
+    "id": "2793",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1993 Porsche 911 Turbo S Leichtbau": {
+    "id": "2794",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1983 Nissan #11 Tomica Skyline Turbo Super Silhouette": {
+    "id": "2801",
+    "acquisition": "Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2000 Honda Prelude Type SH": {
+    "id": "2817",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1985 Nissan Safari Turbo": {
+    "id": "2822",
+    "acquisition": "Treasure",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1997 Lotus Elise GT1": {
+    "id": "2825",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2018 Jeep Grand Cherokee Trackhawk": {
+    "id": "2841",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2018 Exomotive Exocet Sport V8 XP-5": {
+    "id": "2866",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2018 Honda Civic Type R": {
+    "id": "2870",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2018 Can-Am Maverick X RS Turbo R": {
+    "id": "2871",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2019 Hyundai Veloster N": {
+    "id": "2872",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2018 Flatbed Truck (Traffic)": {
+    "id": "2902",
+    "acquisition": "-",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2005 Subaru Legacy B4 GT (Traffic)": {
+    "id": "2903",
+    "acquisition": "-",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2018 Dodge Challenger SRT Demon": {
+    "id": "2909",
+    "acquisition": "Autoshow, Collection Journal, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2017 Koenigsegg Agera RS": {
+    "id": "2910",
+    "acquisition": "Autoshow, Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2018 Funco Motorsports F9": {
+    "id": "2935",
+    "acquisition": "Collection Journal, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2017 Ford #14 Rahal Letterman Lanigan Racing Fiesta": {
+    "id": "2937",
+    "acquisition": "Autoshow, Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2023 Aston Martin Valkyrie": {
+    "id": "2968",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2017 Ferrari 812 Superfast": {
+    "id": "2974",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2014 Mercedes-Benz Unimog U5023": {
+    "id": "2986",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1962 Peel P50": {
+    "id": "2987",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1964 Jaguar Lightweight E-Type": {
+    "id": "2992",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2018 TVR Griffith": {
+    "id": "2993",
+    "acquisition": "Autoshow",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1983 Volkswagen Golf GTI": {
+    "id": "2995",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2015 Formula Drift #13 Ford Mustang": {
+    "id": "2996",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2016 Formula Drift #530 HSV Maloo GEN-F": {
+    "id": "2997",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1997 Formula Drift #777 Nissan 240SX": {
+    "id": "3000",
+    "acquisition": "Autoshow, Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2006 Formula Drift #43 Dodge Viper SRT-10 ACR": {
+    "id": "3003",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2017 Volkswagen #34 Andretti Rally Cross Beetle": {
+    "id": "3007",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1985 Porsche #185 959 Prodrive Rally Raid": {
+    "id": "3031",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2018 KTM X-Bow GT4": {
+    "id": "3035",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1989 Formula Drift #98 BMW 325i": {
+    "id": "3037",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2017 Ford M-Sport Fiesta RS": {
+    "id": "3051",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2010 Jaguar C-X75": {
+    "id": "3055",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1970 Ferrari 512 S": {
+    "id": "3062",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2018 Mercedes-Benz X-Class": {
+    "id": "3063",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2018 Mercedes-AMG GT 4-Door Coupé": {
+    "id": "3064",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2019 Porsche 911 GT3 RS": {
+    "id": "3072",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2008 Maserati MC12 Versione Corsa": {
+    "id": "3082",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2018 DeBerti Ford Mustang GT": {
+    "id": "3085",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2014 McLaren 650S Spider": {
+    "id": "3087",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2018 DeBerti Chevrolet Silverado 1500 Drift Truck": {
+    "id": "3088",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2019 Aston Martin Vantage": {
+    "id": "3091",
+    "acquisition": "Autoshow",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2014 Mercedes-Benz G 63 AMG 6x6": {
+    "id": "3107",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2018 Ford Mustang RTR Spec 5": {
+    "id": "3108",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2013 DeBerti Jeep Wrangler Unlimited": {
+    "id": "3110",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2018 Porsche 718 Cayman GTS": {
+    "id": "3117",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2019 Chevrolet Corvette ZR1": {
+    "id": "3118",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2019 Lamborghini Urus": {
+    "id": "3120",
+    "acquisition": "Autoshow, Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2019 Porsche 911 Carrera S": {
+    "id": "3123",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2017 Ford #25 'Brocky' Ultra4 Bronco RTR": {
+    "id": "3128",
+    "acquisition": "Autoshow, Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2008 Renault Mégane R26.R": {
+    "id": "3129",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2018 MINI X-raid John Cooper Works Buggy": {
+    "id": "3132",
+    "acquisition": "Collection Journal, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2018 Renault Megane R.S.": {
+    "id": "3134",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2019 Apollo Intensa Emozione": {
+    "id": "3141",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2018 Chevrolet Camaro ZL1 1LE": {
+    "id": "3149",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2018 McLaren 600LT Coupé": {
+    "id": "3153",
+    "acquisition": "Autoshow",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2019 McLaren Speedtail": {
+    "id": "3156",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1994 Ford Supervan 3": {
+    "id": "3170",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2019 BMW Z4 Roadster": {
+    "id": "3173",
+    "acquisition": "Autoshow, Collection Journal, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1987 Mercedes-Benz AMG Hammer Coupe": {
+    "id": "3176",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1991 Peugeot 205 Rallye": {
+    "id": "3180",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1977 Ford #5 Escort RS1800 MkII": {
+    "id": "3184",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2019 Aston Martin DBS Superleggera": {
+    "id": "3185",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2018 Porsche Macan LPR Rally Raid": {
+    "id": "3187",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2019 Hennessey Ford F-150 VelociRaptor 6X6": {
+    "id": "3189",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2003 Ford F-150 SVT Lightning": {
+    "id": "3190",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1973 Lamborghini Espada 400 GT": {
+    "id": "3191",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1984 De Tomaso Pantera GT5": {
+    "id": "3198",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2017 Aston Martin Vulcan AMR Pro": {
+    "id": "3211",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2019 Zenvo TSR-S": {
+    "id": "3212",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2019 Porsche #70 Porsche Motorsport 935": {
+    "id": "3214",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2018 Ferrari Portofino": {
+    "id": "3225",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2017 Ferrari J50": {
+    "id": "3226",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2019 Ferrari 488 Pista": {
+    "id": "3227",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1999 Ford Racing Puma": {
+    "id": "3228",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2013 Formula Drift #777 Chevrolet Corvette": {
+    "id": "3232",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1982 Volkswagen Pickup LX": {
+    "id": "3235",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2018 Subaru WRX STI ARX Supercar": {
+    "id": "3241",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2007 Formula Drift #117 599 GTB Fiorano": {
+    "id": "3249",
+    "acquisition": "Autoshow, Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2018 Mercedes-AMG E 63 S": {
+    "id": "3250",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2020 Jeep JT": {
+    "id": "3255",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1990 Nissan Pulsar GTI-R": {
+    "id": "3257",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2020 Ford Mustang Shelby GT500": {
+    "id": "3277",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1987 Porsche #203 Porsche AG 961": {
+    "id": "3282",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Car Pass"
+  },
+  "1991 Jaguar Sport XJR-15": {
+    "id": "3287",
+    "acquisition": "Autoshow, Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1993 Schuppan 962CR": {
+    "id": "3288",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2018 Lamborghini Aventador SVJ": {
+    "id": "3289",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1993 Jaguar XJ220S TWR": {
+    "id": "3293",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1990 Alfa Romeo SE 048SP": {
+    "id": "3304",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Italian Passion Car Pack"
+  },
+  "2019 Nissan 370Z Nismo": {
+    "id": "3307",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2018 Ferrari FXX-K Evo": {
+    "id": "3311",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2019 Ferrari Monza SP2": {
+    "id": "3312",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2020 Koenigsegg Jesko": {
+    "id": "3315",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2018 Audi RS 4 Avant": {
+    "id": "3318",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2003 Aston Martin DB7 GT": {
+    "id": "3325",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Car Pass"
+  },
+  "2021 Audi RS e-tron GT": {
+    "id": "3359",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1998 Nissan #23 Pennzoil NISMO Skyline GT-R": {
+    "id": "3363",
+    "acquisition": "Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2019 Aston Martin Valhalla Concept Car": {
+    "id": "3364",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2019 Ferrari F8 Tributo": {
+    "id": "3367",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2020 Chevrolet Corvette Stingray Coupe": {
+    "id": "3369",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2020 Lamborghini Huracán EVO": {
+    "id": "3371",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2019 Toyota 4Runner TRD Pro": {
+    "id": "3373",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2019 Toyota Tacoma TRD Pro": {
+    "id": "3374",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1967 Renault 8 Gordini": {
+    "id": "3395",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2009 Formula Drift #99 Mazda RX-8": {
+    "id": "3400",
+    "acquisition": "Autoshow, Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2020 Toyota GR Supra": {
+    "id": "3402",
+    "acquisition": "Autoshow, Collection Journal, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2020 Ford #2069 Ford Performance Bronco R": {
+    "id": "3404",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1995 Formula Drift #34 Toyota Supra MkIV": {
+    "id": "3411",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2019 Subaru STI S209": {
+    "id": "3412",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2021 Volkswagen Golf R": {
+    "id": "3413",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2020 Land Rover Defender 110 X": {
+    "id": "3414",
+    "acquisition": "Autoshow",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2019 Ginetta G40 Junior": {
+    "id": "3429",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2020 BMW M2 Competition Coupé": {
+    "id": "3434",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2019 DeBerti Ford Super Duty F-250 Lariat 'Transformer'": {
+    "id": "3439",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2019 DeBerti Toyota Tacoma TRD ‘The Performance Truck’": {
+    "id": "3441",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2020 Porsche Taycan Turbo S": {
+    "id": "3445",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2020 Lotus Evija": {
+    "id": "3449",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2020 Audi RS 3 Sedan": {
+    "id": "3454",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2020 Ford Super Duty F-450 DRW PLATINUM": {
+    "id": "3476",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2020 Chevrolet Silverado LT Trail Boss": {
+    "id": "3477",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2021 McLaren 765LT Coupé": {
+    "id": "3482",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2012 Jeep Wrangler Rubicon (Traffic)": {
+    "id": "3486",
+    "acquisition": "-",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1968 Alfa Romeo Autodelta Tipo 33/2 Daytona": {
+    "id": "3494",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Car Pass"
+  },
+  "2017 Saleen S7 LM": {
+    "id": "3498",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2020 BMW M8 Competition Coupé": {
+    "id": "3518",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2021 Lexus LC 500": {
+    "id": "3520",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2020 Formula Drift #151 Toyota GR Supra": {
+    "id": "3523",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2019 Formula Drift #411 Toyota Corolla Hatchback": {
+    "id": "3524",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2022 Volkswagen Golf R": {
+    "id": "3533",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2021 MINI John Cooper Works GP": {
+    "id": "3534",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2020 SIERRA Cars #23 Yokohama ALPHA": {
+    "id": "3539",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2021 SIERRA Cars RX3": {
+    "id": "3540",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2021 Pagani Huayra R": {
+    "id": "3543",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2013 Wuling Sunshine S": {
+    "id": "3548",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2021 Alumicraft #122 Class 1 Buggy": {
+    "id": "3549",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2020 Formula Drift #91 BMW M2": {
+    "id": "3551",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2005 Mitsubishi #1 Sierra Sierra Enterprises Lancer Evolution Time Attack": {
+    "id": "3554",
+    "acquisition": "Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2021 Aston Martin DBX": {
+    "id": "3580",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2021 Audi RS 6 Avant": {
+    "id": "3583",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2021 Audi RS 7 Sportback": {
+    "id": "3584",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1972 Chevrolet K-10 Custom": {
+    "id": "3590",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2020 Ferrari Roma": {
+    "id": "3594",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2020 Ferrari SF90 Stradale": {
+    "id": "3595",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1986 Ford F-150 XLT Lariat": {
+    "id": "3597",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2020 Gordon Murray Automotive T.50": {
+    "id": "3599",
+    "acquisition": "Autoshow, Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2021 Hennessey Venom F5": {
+    "id": "3600",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2019 Casey Currie Motorsports #4402 Ultra 4 'Trophy Jeep'": {
+    "id": "3603",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2020 Jimco #179 Hammerhead Class 1": {
+    "id": "3604",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2019 Jimco #240 Fastball Racing Class 6100 Spec Trophy Truck": {
+    "id": "3605",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2020 Lamborghini Essenza SCV12": {
+    "id": "3606",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2020 Lamborghini Sián Roadster": {
+    "id": "3608",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2022 Maserati MC20": {
+    "id": "3611",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2020 Mercedes-AMG GT Black Series": {
+    "id": "3616",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2021 Mercedes-AMG SL 63": {
+    "id": "3617",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2020 Nissan GT-R NISMO (R35)": {
+    "id": "3622",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1987 Porsche Carrera Coupe 'Luftauto 002'": {
+    "id": "3624",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Car Pass"
+  },
+  "2021 Rimac Nevera": {
+    "id": "3625",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2021 Toyota GR Yaris": {
+    "id": "3629",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2022 Aston Martin Valkyrie AMR Pro": {
+    "id": "3631",
+    "acquisition": "Autoshow, Collection Journal, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2021 BMW M4 Competition Coupé": {
+    "id": "3645",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2021 Mercedes-AMG Mercedes-AMG ONE": {
+    "id": "3650",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2021 McLaren 620R": {
+    "id": "3655",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2022 Rivian R1T": {
+    "id": "3657",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2018 Lotus Exige Cup 430": {
+    "id": "3661",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2021 RJ Anderson #37 Polaris RZR Pro 4 Truck": {
+    "id": "3662",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2021 SIERRA Cars 700R": {
+    "id": "3665",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2021 Porsche 911 GT3": {
+    "id": "3667",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2023 McLaren Artura": {
+    "id": "3668",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2001 Ford #4 Ford Focus RS": {
+    "id": "3670",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2020 Lamborghini Huracán STO": {
+    "id": "3672",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2020 Hyundai i30 N": {
+    "id": "3678",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2021 Polaris RZR Pro XP Factory Racing Limited Edition": {
+    "id": "3686",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2021 Polaris RZR Pro XP Ultimate": {
+    "id": "3687",
+    "acquisition": "Autoshow, Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2022 Ford F-150 Lightning": {
+    "id": "3692",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2022 Alumicraft #6165 Trick Truck": {
+    "id": "3693",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2021 Porsche Mission R": {
+    "id": "3698",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2021 McLaren Sabre": {
+    "id": "3700",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2023 Lotus Emira": {
+    "id": "3716",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2022 Cadillac CT4-V Blackwing": {
+    "id": "3719",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2022 Cadillac CT5-V Blackwing": {
+    "id": "3720",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2022 GMC HUMMER EV Pickup": {
+    "id": "3722",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2022 Ferrari 296 GTB": {
+    "id": "3724",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2023 Acura Integra A-Spec": {
+    "id": "3726",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2021 Bentley Continental GT Convertible": {
+    "id": "3728",
+    "acquisition": "Autoshow, Collection Journal, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2022 Subaru BRZ": {
+    "id": "3735",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2022 Ford Bronco Raptor": {
+    "id": "3736",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2022 BMW iX xDrive50": {
+    "id": "3737",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2023 Formula Drift #64 Forsberg Racing Nissan Z": {
+    "id": "3744",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2020 Audi R8 V10 performance": {
+    "id": "3745",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1995 Mitsubishi Montero Exceed 2800 TD": {
+    "id": "3750",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2022 Lamborghini Huracán Tecnica": {
+    "id": "3753",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2022 Ford Supervan 4": {
+    "id": "3755",
+    "acquisition": "Collection Journal, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2022 Lamborghini Huracán EVO Spyder": {
+    "id": "3759",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2022 Porsche 718 Cayman GT4 RS": {
+    "id": "3760",
+    "acquisition": "Autoshow, Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2022 Toyota GR86": {
+    "id": "3761",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2023 BMW M2": {
+    "id": "3763",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2022 BMW M5 CS": {
+    "id": "3764",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2023 Chevrolet Corvette Z06": {
+    "id": "3766",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2022 Acura NSX Type S": {
+    "id": "3767",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2024 Chevrolet Corvette E-Ray": {
+    "id": "3771",
+    "acquisition": "Autoshow, Wheelspin, Loyalty",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2023 Honda Civic Type R": {
+    "id": "3773",
+    "acquisition": "Autoshow, Collection Journal, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2021 Lamborghini Countach LPI 800-4": {
+    "id": "3774",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2022 Lamborghini Aventador LP 780-4 Ultimae": {
+    "id": "3775",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2023 Porsche 911 GT3 RS": {
+    "id": "3781",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1989 Volkswagen Rallye Golf": {
+    "id": "3783",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1997 Toyota Soarer 2.5 GT-T": {
+    "id": "3785",
+    "acquisition": "Autoshow, Collection Journal, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2022 Wuling Hongguang Mini EV": {
+    "id": "3789",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2023 Meyers Manx 2.0": {
+    "id": "3795",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2017 Mazda MX-5 Cup": {
+    "id": "3798",
+    "acquisition": "Autoshow, Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2024 Lucid Air Sapphire": {
+    "id": "3811",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2022 Subaru WRX": {
+    "id": "3819",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2022 Mazda MX-5 Miata RF": {
+    "id": "3823",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2023 Hyundai IONIQ 5 N": {
+    "id": "3827",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2022 Hyundai N Vision 74": {
+    "id": "3829",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2022 Lamborghini Huracán Sterrato": {
+    "id": "3840",
+    "acquisition": "Collection Journal, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2024 Ford Mustang GT": {
+    "id": "3846",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2024 Ford Mustang Dark Horse": {
+    "id": "3847",
+    "acquisition": "Autoshow, Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2023 Toyota Camry TRD": {
+    "id": "3848",
+    "acquisition": "Autoshow",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2023 Ford F-150 Raptor R": {
+    "id": "3849",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2021 Dodge Durango SRT Hellcat": {
+    "id": "3850",
+    "acquisition": "Collection Journal, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1991 Toyota Sera": {
+    "id": "3851",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1991 Honda Beat": {
+    "id": "3852",
+    "acquisition": "Autoshow, Collection Journal, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1993 Autozam AZ-1": {
+    "id": "3854",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1991 Nissan Figaro": {
+    "id": "3855",
+    "acquisition": "Treasure",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1987 Nissan Be-1": {
+    "id": "3856",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1997 Nissan Stagea RS Four V": {
+    "id": "3858",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1984 Honda City E II": {
+    "id": "3859",
+    "acquisition": "Autoshow, Collection Journal, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1989 Nissan S-Cargo": {
+    "id": "3860",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1994 Honda Acty": {
+    "id": "3865",
+    "acquisition": "Autoshow, Collection Journal, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2023 Toyota GR Corolla": {
+    "id": "3880",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Car Pass"
+  },
+  "1995 Mitsubishi Lancer Evolution III GSR": {
+    "id": "3886",
+    "acquisition": "Treasure",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2024 Lamborghini Revuelto": {
+    "id": "3891",
+    "acquisition": "Autoshow, Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2020 Mercedes-AMG SLC 43 Final Edition": {
+    "id": "3895",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2023 Ford Fiesta ST": {
+    "id": "3903",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2022 Ford Focus ST": {
+    "id": "3904",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2022 Honda e": {
+    "id": "3908",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2023 Porsche 911 Rallye": {
+    "id": "3910",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1991 Toyota Chaser GT Twin Turbo": {
+    "id": "3914",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2023 Audi R8 Coupé V10 GT RWD": {
+    "id": "3917",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Car Pass"
+  },
+  "1995 Nissan Gloria Gran Turismo": {
+    "id": "3918",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2024 Nissan Z NISMO": {
+    "id": "3921",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2021 Hyundai i20 N": {
+    "id": "3928",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1989 Nissan PAO": {
+    "id": "3929",
+    "acquisition": "Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1997 Toyota Chaser 2.5 Tourer V": {
+    "id": "3933",
+    "acquisition": "Autoshow, Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1970 Honda N600": {
+    "id": "3937",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1967 Ferrari 275 GTB4 Spider": {
+    "id": "3950",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Italian Passion Car Pack"
+  },
+  "2023 Porsche 911 Turbo S": {
+    "id": "3953",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2024 Chevrolet Camaro ZL1": {
+    "id": "3954",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2024 Ram 1500 TRX": {
+    "id": "3955",
+    "acquisition": "Autoshow",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2023 Dodge Challenger SRT Demon 170": {
+    "id": "3958",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Car Pass"
+  },
+  "2022 Dodge Challenger SRT Super Stock": {
+    "id": "3959",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1994 Subaru Vivio RX-R": {
+    "id": "3960",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2024 Toyota Prius Prime XSE Premium": {
+    "id": "3964",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Car Pass"
+  },
+  "1998 Renault Sport Spider": {
+    "id": "3980",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Car Pass"
+  },
+  "2024 BMW X6 M Competition": {
+    "id": "3983",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2002 Nissan Silvia Spec-R": {
+    "id": "3999",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2024 Lamborghini Temerario": {
+    "id": "4002",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1972 Honda Z GT": {
+    "id": "4034",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Car Pass"
+  },
+  "1999 Toyota Altezza RS200 Z EDITION": {
+    "id": "4038",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1996 Toyota Starlet Glanza V": {
+    "id": "4055",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1997 Nissan Skyline GT-R V-Spec": {
+    "id": "4057",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2025 Bentley Continental GT Speed": {
+    "id": "4067",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1988 BMW M3": {
+    "id": "4069",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2024 Koenigsegg Gemera": {
+    "id": "4081",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Car Pass"
+  },
+  "1972 Datsun #269 Attacking the Clock Racing 240Z 'All Carbon Hill Climb Beast'": {
+    "id": "4084",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Car Pass"
+  },
+  "1990 Mitsubishi #269 Attacking the Clock Racing Minicab Time Attack": {
+    "id": "4085",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Time Attack Car Pack"
+  },
+  "2001 Mitsubishi Lancer Evolution VI GSR TM Edition": {
+    "id": "4090",
+    "acquisition": "Autoshow",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2024 Nissan GT-R Nismo": {
+    "id": "4094",
+    "acquisition": "Autoshow, Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1992 Nissan Skyline GT-R": {
+    "id": "4114",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2025 McLaren W1": {
+    "id": "4118",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Car Pass"
+  },
+  "1998 Nissan Skyline GT-R 40th Anniversary": {
+    "id": "4119",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Car Pass"
+  },
+  "2013 Mercedes-Benz G65 AMG (Traffic)": {
+    "id": "4124",
+    "acquisition": "-",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1994 Honda Acty (Traffic)": {
+    "id": "4125",
+    "acquisition": "-",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2022 Honda e (Traffic)": {
+    "id": "4126",
+    "acquisition": "-",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1995 Mitsubishi Pajero (Traffic)": {
+    "id": "4127",
+    "acquisition": "-",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2022 Subaru WRX (Traffic)": {
+    "id": "4128",
+    "acquisition": "-",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1997 Nissan Stagea (Traffic)": {
+    "id": "4129",
+    "acquisition": "-",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1992 Mazda RX-7 Type R": {
+    "id": "4144",
+    "acquisition": "Autoshow, Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1974 Mazda #123 Mad Mike 808 Wagon 'FURSTY'": {
+    "id": "4145",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Car Pass"
+  },
+  "2021 Alfa Romeo Giulia GTAm": {
+    "id": "4147",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Italian Passion Car Pack"
+  },
+  "2025 Ferrari F80": {
+    "id": "4156",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Italian Passion Car Pack"
+  },
+  "2010 Lexus LFA Forza Edition": {
+    "id": "4158",
+    "acquisition": "Collection Journal, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1989 Nissan S-Cargo Forza Edition": {
+    "id": "4160",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1985 Toyota Sprinter Trueno GT Apex Forza Edition": {
+    "id": "4162",
+    "acquisition": "Collection Journal, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2013 Wuling Sunshine S Forza Edition": {
+    "id": "4163",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2022 Subaru BRZ Forza Edition": {
+    "id": "4164",
+    "acquisition": "Aftermarket",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1973 Mazda RX-3 Forza Edition": {
+    "id": "4165",
+    "acquisition": "Aftermarket",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2023 BMW M2 Forza Edition": {
+    "id": "4166",
+    "acquisition": "Collection Journal, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2012 Nissan GT-R Black Edition (R35) Forza Edition": {
+    "id": "4167",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1968 Ford Mustang GT 2+2 Fastback Forza Edition": {
+    "id": "4168",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1990 Mercedes-Benz 190 E 2.5-16 Evolution II Forza Edition": {
+    "id": "4169",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1986 Ford F-150 XLT Lariat Forza Edition": {
+    "id": "4171",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2020 Ford Super Duty F-450 DRW PLATINUM Forza Edition": {
+    "id": "4175",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1990 Nissan #12 Skyline GT-R (BNR32 Gr.A) JTC": {
+    "id": "4179",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Car Pass"
+  },
+  "1994 Mazda MX-5 Miata Forza Edition": {
+    "id": "4197",
+    "acquisition": "Aftermarket",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1999 Dodge Viper GTS ACR Forza Edition": {
+    "id": "4198",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "VIP"
+  },
+  "2019 Toyota Tacoma TRD Pro Forza Edition": {
+    "id": "4199",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "VIP"
+  },
+  "2020 Lotus Evija Forza Edition": {
+    "id": "4200",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "VIP"
+  },
+  "1972 Nissan Patrol": {
+    "id": "4205",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Car Pass"
+  },
+  "2018 Lotus Scura Motorsports Exige WTAC": {
+    "id": "4210",
+    "acquisition": "Collection Journal, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1990 Honda #19 101 Motorsport CRX WTAC": {
+    "id": "4211",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Time Attack Car Pack"
+  },
+  "1993 Nissan #32 Skyline WTAC 'Xtreme GTR'": {
+    "id": "4212",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Time Attack Car Pack"
+  },
+  "2000 Nissan #36 Dream Project S15 Silvia WTAC": {
+    "id": "4213",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Time Attack Car Pack"
+  },
+  "1995 Toyota J&J Motorsport Supra WTAC": {
+    "id": "4214",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Time Attack Car Pack"
+  },
+  "1994 Honda Acty (RakuRaku Express)": {
+    "id": "4216",
+    "acquisition": "-",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2025 GR GT Prototype": {
+    "id": "4221",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1989 Nissan Silvia K's": {
+    "id": "4222",
+    "acquisition": "Autoshow",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2000 Nissan Skyline GT-R V Spec II": {
+    "id": "4223",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2004 Honda #52 Evasive Motorsports S2000 WTAC": {
+    "id": "4231",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Time Attack Car Pack"
+  },
+  "2005 Porsche Cayman GT3 WTAC": {
+    "id": "4232",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2008 Honda Civic Type R (FD2)": {
+    "id": "4234",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Car Pass"
+  },
+  "1983 Nissan Skyline 2000 Turbo RS": {
+    "id": "4238",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Car Pass"
+  },
+  "1985 Toyota Sprinter (Touge Edition)": {
+    "id": "4250",
+    "acquisition": "-",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2003 Honda S2000 (Touge Edition)": {
+    "id": "4251",
+    "acquisition": "-",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1998 Subaru Impreza 22B (Touge Edition)": {
+    "id": "4252",
+    "acquisition": "-",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2001 Honda #33 Integra WTAC": {
+    "id": "4254",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Time Attack Car Pack"
+  },
+  "2005 Toyota Crown Super Deluxe Taxi": {
+    "id": "4255",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2017 Toyota JPN Taxi": {
+    "id": "4257",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2013 Toyota 86 Stories": {
+    "id": "4259",
+    "acquisition": "Collection Journal, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2024 Nissan GT-R Nismo (Unobtainable)": {
+    "id": "4260",
+    "acquisition": "-",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1995 Porsche 911 GT2 (Unobtainable)": {
+    "id": "4261",
+    "acquisition": "-",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2026 Toyota Scallop (Unobtainable)": {
+    "id": "4263",
+    "acquisition": "-",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2018 Ferrari FXX-K Evo Welcome Pack": {
+    "id": "4264",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Welcome Pack"
+  },
+  "2020 Mercedes-AMG GT Black Series Welcome Pack": {
+    "id": "4265",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Welcome Pack"
+  },
+  "2021 BMW M4 Competition Coupé Welcome Pack": {
+    "id": "4266",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Welcome Pack"
+  },
+  "2004 Mitsubishi Lancer Evolution VIII MR Welcome Pack": {
+    "id": "4267",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Welcome Pack"
+  },
+  "2023 Ford F-150 Raptor R Welcome Pack": {
+    "id": "4268",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Welcome Pack"
+  },
+  "1992 Honda #21 Hardrace/JDMYard Civic WTAC": {
+    "id": "4277",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Time Attack Car Pack"
+  },
+  "2025 Toyota Land Cruiser": {
+    "id": "4278",
+    "acquisition": "Autoshow, Wheelspin",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1994 Subaru Vivio RX-R Forza Edition": {
+    "id": "4287",
+    "acquisition": "Collection Journal, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2012 Nissan GT-R Black Edition R35 (Touge Edition)": {
+    "id": "4303",
+    "acquisition": "-",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1970 Porsche #3 917 LH Forza Edition": {
+    "id": "4313",
+    "acquisition": "Wheelspin, Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1962 Peel P50 Trolli Edition": {
+    "id": "4315",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Partnership DLC"
+  },
+  "2005 Toyota Crown Taxi (Traffic)": {
+    "id": "4332",
+    "acquisition": "-",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2017 Toyota JPN Taxi (Traffic)": {
+    "id": "4333",
+    "acquisition": "-",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2017 Ferrari J50 Preorder Car": {
+    "id": "4341",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Preorder Bonus"
+  },
+  "1965 Toyota Sports 800 Fanta Edition": {
+    "id": "4342",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Partnership DLC"
+  },
+  "1990 Jaguar XJ-S Forza Edition": {
+    "id": "4354",
+    "acquisition": "Collection Journal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2025 BMW M4 CS": {
+    "id": "4122",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1972 Datsun 240Z #5 Rallye": {
+    "id": "4188",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Car Pass"
+  },
+  "1990 Eunos Cosmos": {
+    "id": "3857",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Car Pass"
+  },
+  "2024 Ferrari Purosangue": {
+    "id": "3593",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Car Pass"
+  },
+  "2024 Mercedes-AMG GT 63 4Matic+": {
+    "id": "3839",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Car Pass"
+  }
+}
