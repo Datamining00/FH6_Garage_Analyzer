@@ -27,6 +27,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Fast-forward to latest branch state
+        run: |
+          git fetch origin "${GITHUB_REF_NAME}"
+          git reset --hard "origin/${GITHUB_REF_NAME}"
+
       - name: Clone source Gist
         run: |
           rm -rf /tmp/fh6-vehicle-gist
