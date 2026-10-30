@@ -1,0 +1,15 @@
+{
+  "schema": "fh6_vehicle_sync_run_v1",
+  "executed_at": "2026-10-30T01:56:11Z",
+  "source_sha256": "0359b93c104d4530c07c9d5cefb1cf29ac6ed7bad8fe91ea51bdf08f0d5dd081",
+  "normalized_sha256": "e25a0642c50d382bf5b268ba7e0537943af185659fe476156245f27dd4c03215",
+  "vehicle_count": 682,
+  "changed": true,
+  "snapshot": "data/fh6/snapshots/by-hash/e25a0642c50d382bf5b268ba7e0537943af185659fe476156245f27dd4c03215.json",
+  "diff": "data/fh6/diffs/history/2026/10/30/015611Z.json",
+  "diff_counts": {
+    "added": 0,
+    "removed": 0,
+    "modified": 682
+  }
+}
