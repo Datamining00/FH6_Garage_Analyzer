@@ -1,6 +1,6 @@
 {
   "_meta": {
-    "updated_at": "2026-10-08",
+    "updated_at": "2026-11-04",
     "program_update": {
       "patch_date": "2026-10-29",
       "version": "1.6.1",
@@ -7509,5 +7509,104 @@
     "acquisition": "Autoshow DLC",
     "dlc": true,
     "dlc_name": "Car Pass"
+  },
+  "2011 Alfa Romeo Giulietta Quadrifoglio Verde": {
+    "id": "1325",
+    "year": 2011,
+    "manufacturer": "Alfa Romeo",
+    "model": "Giulietta Quadrifoglio Verde",
+    "country": "Italy",
+    "car_type": "Hot Hatch",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2016 Honda S660 Alpha": {
+    "id": "2487",
+    "year": 2016,
+    "manufacturer": "Honda",
+    "model": "S660 Alpha",
+    "country": "Japan",
+    "car_type": "Eclectic Domestics",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1966 Hillman Imp": {
+    "id": "3084",
+    "year": 1966,
+    "manufacturer": "Hillman",
+    "model": "Imp",
+    "country": "UK",
+    "car_type": "Cult Cars",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "1987 Fiat Panda": {
+    "id": "3978",
+    "year": 1987,
+    "manufacturer": "Fiat",
+    "model": "Panda",
+    "country": "Italy",
+    "car_type": "Cult Cars",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
+  },
+  "2025 Porsche Macan GTS": {
+    "id": "4086",
+    "year": 2025,
+    "manufacturer": "Porsche",
+    "model": "Macan GTS",
+    "country": "Germany",
+    "car_type": "Sports Utility Heroes",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Car Pass"
+  },
+  "1983 Nissan 240RS": {
+    "id": "4181",
+    "year": 1983,
+    "manufacturer": "Nissan",
+    "model": "240RS",
+    "country": "Japan",
+    "car_type": "Rally Monsters",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Car Pass"
+  },
+  "2025 Ford Mustang GTD": {
+    "id": "4270",
+    "year": 2025,
+    "manufacturer": "Ford",
+    "model": "Mustang GTD",
+    "country": "USA",
+    "car_type": "Track Toys",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Car Pass"
+  },
+  "2025 Volkswagen Electric Buzz": {
+    "id": "4282",
+    "year": 2025,
+    "manufacturer": "Volkswagen",
+    "model": "Electric Buzz",
+    "country": "Germany",
+    "car_type": "Utility Heroes",
+    "acquisition": "Autoshow DLC",
+    "dlc": true,
+    "dlc_name": "Car Pass"
+  },
+  "2025 Citroën Ami": {
+    "id": "4311",
+    "year": 2025,
+    "manufacturer": "Citroën",
+    "model": "Ami",
+    "country": "France",
+    "car_type": "Cult Cars",
+    "acquisition": "Seasonal",
+    "dlc": false,
+    "dlc_name": null
   }
 }

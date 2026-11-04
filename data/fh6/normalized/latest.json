@@ -1,16 +1,16 @@
 {
   "schema": "fh6_vehicle_normalized_snapshot_v1",
-  "generated_at": "2026-11-03T16:38:25Z",
+  "generated_at": "2026-11-04T03:22:28Z",
   "source": {
     "kind": "gist_mirror",
     "gist_id": "30fe44689fad7ba5e99e2381927b7730",
     "filename": "FH6_Vehicle_Data.json",
-    "source_sha256": "0359b93c104d4530c07c9d5cefb1cf29ac6ed7bad8fe91ea51bdf08f0d5dd081"
+    "source_sha256": "09377f709604656155aeeb31bc1ee4d60df22baaf3681f645030496641468df7"
   },
-  "normalized_sha256": "e25a0642c50d382bf5b268ba7e0537943af185659fe476156245f27dd4c03215",
-  "vehicle_count": 682,
+  "normalized_sha256": "537f132ef8af2647fa59837a32acbdcbb75dc4dc0cb39108a605cd8b52218026",
+  "vehicle_count": 691,
   "source_meta": {
-    "updated_at": "2026-10-08",
+    "updated_at": "2026-11-04",
     "program_update": {
       "patch_date": "2026-10-29",
       "version": "1.6.1",
@@ -1843,6 +1843,18 @@
       "model": "WRX STI",
       "year": 2011
     },
+    "1325": {
+      "name": "2011 Alfa Romeo Giulietta Quadrifoglio Verde",
+      "id": "1325",
+      "acquisition": "Seasonal",
+      "car_type": "Hot Hatch",
+      "country": "Italy",
+      "dlc": false,
+      "dlc_name": null,
+      "manufacturer": "Alfa Romeo",
+      "model": "Giulietta Quadrifoglio Verde",
+      "year": 2011
+    },
     "1330": {
       "name": "1970 Chevrolet Camaro Z28",
       "id": "1330",
@@ -3511,6 +3523,18 @@
       "model": "RXC Turbo",
       "year": 2015
     },
+    "2487": {
+      "name": "2016 Honda S660 Alpha",
+      "id": "2487",
+      "acquisition": "Seasonal",
+      "car_type": "Eclectic Domestics",
+      "country": "Japan",
+      "dlc": false,
+      "dlc_name": null,
+      "manufacturer": "Honda",
+      "model": "S660 Alpha",
+      "year": 2016
+    },
     "2489": {
       "name": "2016 Abarth 695 Biposto",
       "id": "2489",
@@ -4542,6 +4566,18 @@
       "manufacturer": "Maserati",
       "model": "MC12 Versione Corsa",
       "year": 2008
+    },
+    "3084": {
+      "name": "1966 Hillman Imp",
+      "id": "3084",
+      "acquisition": "Seasonal",
+      "car_type": "Cult Cars",
+      "country": "UK",
+      "dlc": false,
+      "dlc_name": null,
+      "manufacturer": "Hillman",
+      "model": "Imp",
+      "year": 1966
     },
     "3085": {
       "name": "2018 DeBerti Ford Mustang GT",
@@ -7159,6 +7195,18 @@
       "model": "Prius Prime XSE Premium",
       "year": 2024
     },
+    "3978": {
+      "name": "1987 Fiat Panda",
+      "id": "3978",
+      "acquisition": "Seasonal",
+      "car_type": "Cult Cars",
+      "country": "Italy",
+      "dlc": false,
+      "dlc_name": null,
+      "manufacturer": "Fiat",
+      "model": "Panda",
+      "year": 1987
+    },
     "3980": {
       "name": "1998 Renault Sport Spider",
       "id": "3980",
@@ -7314,6 +7362,18 @@
       "manufacturer": "Mitsubishi",
       "model": "#269 Attacking the Clock Racing Minicab Time Attack",
       "year": 1990
+    },
+    "4086": {
+      "name": "2025 Porsche Macan GTS",
+      "id": "4086",
+      "acquisition": "Autoshow DLC",
+      "car_type": "Sports Utility Heroes",
+      "country": "Germany",
+      "dlc": true,
+      "dlc_name": "Car Pass",
+      "manufacturer": "Porsche",
+      "model": "Macan GTS",
+      "year": 2025
     },
     "4090": {
       "name": "2001 Mitsubishi Lancer Evolution VI GSR TM Edition",
@@ -7662,6 +7722,18 @@
       "manufacturer": "Nissan",
       "model": "#12 Skyline GT-R (BNR32 Gr.A) JTC",
       "year": 1990
+    },
+    "4181": {
+      "name": "1983 Nissan 240RS",
+      "id": "4181",
+      "acquisition": "Autoshow DLC",
+      "car_type": "Rally Monsters",
+      "country": "Japan",
+      "dlc": true,
+      "dlc_name": "Car Pass",
+      "manufacturer": "Nissan",
+      "model": "240RS",
+      "year": 1983
     },
     "4188": {
       "name": "1972 Datsun 240Z #5 Rallye",
@@ -8071,6 +8143,18 @@
       "model": "F-150 Raptor R Welcome Pack",
       "year": 2023
     },
+    "4270": {
+      "name": "2025 Ford Mustang GTD",
+      "id": "4270",
+      "acquisition": "Autoshow DLC",
+      "car_type": "Track Toys",
+      "country": "USA",
+      "dlc": true,
+      "dlc_name": "Car Pass",
+      "manufacturer": "Ford",
+      "model": "Mustang GTD",
+      "year": 2025
+    },
     "4277": {
       "name": "1992 Honda #21 Hardrace/JDMYard Civic WTAC",
       "id": "4277",
@@ -8093,6 +8177,18 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "Land Cruiser",
+      "year": 2025
+    },
+    "4282": {
+      "name": "2025 Volkswagen Electric Buzz",
+      "id": "4282",
+      "acquisition": "Autoshow DLC",
+      "car_type": "Utility Heroes",
+      "country": "Germany",
+      "dlc": true,
+      "dlc_name": "Car Pass",
+      "manufacturer": "Volkswagen",
+      "model": "Electric Buzz",
       "year": 2025
     },
     "4287": {
@@ -8118,6 +8214,18 @@
       "manufacturer": "Nissan",
       "model": "GT-R Black Edition R35 (Touge Edition)",
       "year": 2012
+    },
+    "4311": {
+      "name": "2025 Citroën Ami",
+      "id": "4311",
+      "acquisition": "Seasonal",
+      "car_type": "Cult Cars",
+      "country": "France",
+      "dlc": false,
+      "dlc_name": null,
+      "manufacturer": "Citroën",
+      "model": "Ami",
+      "year": 2025
     },
     "4313": {
       "name": "1970 Porsche #3 917 LH Forza Edition",
