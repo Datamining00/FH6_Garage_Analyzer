@@ -1,6 +1,6 @@
 {
   "schema": "fh6_vehicle_field_diff_v1",
-  "generated_at": "2026-11-05T03:46:55Z",
+  "generated_at": "2026-11-05T11:33:02Z",
   "previous_normalized_sha256": "537f132ef8af2647fa59837a32acbdcbb75dc4dc0cb39108a605cd8b52218026",
   "current_normalized_sha256": "537f132ef8af2647fa59837a32acbdcbb75dc4dc0cb39108a605cd8b52218026",
   "changed": false,
