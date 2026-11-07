@@ -1,12 +1,12 @@
 {
   "schema": "fh6_vehicle_sync_state_v1",
-  "last_run_at": "2026-11-07T03:17:06Z",
+  "last_run_at": "2026-11-07T10:41:57Z",
   "source_sha256": "09377f709604656155aeeb31bc1ee4d60df22baaf3681f645030496641468df7",
   "normalized_sha256": "537f132ef8af2647fa59837a32acbdcbb75dc4dc0cb39108a605cd8b52218026",
   "vehicle_count": 691,
   "last_snapshot": "data/fh6/snapshots/by-hash/537f132ef8af2647fa59837a32acbdcbb75dc4dc0cb39108a605cd8b52218026.json",
-  "last_diff": "data/fh6/diffs/history/2026/11/07/031706Z.json",
-  "last_run": "data/fh6/runs/2026/11/07/031706Z.json",
+  "last_diff": "data/fh6/diffs/history/2026/11/07/104157Z.json",
+  "last_run": "data/fh6/runs/2026/11/07/104157Z.json",
   "diff_counts": {
     "added": 0,
     "removed": 0,
