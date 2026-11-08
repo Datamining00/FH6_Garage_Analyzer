@@ -1,20 +1,20 @@
 {
   "schema": "fh6_vehicle_normalized_snapshot_v1",
-  "generated_at": "2026-11-07T15:13:49Z",
+  "generated_at": "2026-11-08T02:45:00Z",
   "source": {
     "kind": "gist_mirror",
     "gist_id": "30fe44689fad7ba5e99e2381927b7730",
     "filename": "FH6_Vehicle_Data.json",
-    "source_sha256": "09377f709604656155aeeb31bc1ee4d60df22baaf3681f645030496641468df7"
+    "source_sha256": "c00bf51bbd5e8d84b516ffd6cc468676e3e09eb4fc48e09c01b63cf91b96943b"
   },
   "normalized_sha256": "537f132ef8af2647fa59837a32acbdcbb75dc4dc0cb39108a605cd8b52218026",
   "vehicle_count": 691,
   "source_meta": {
     "updated_at": "2026-11-04",
     "program_update": {
-      "patch_date": "2026-10-29",
-      "version": "1.6.1",
-      "comment": "FH6 Assistant v1.6.1 업데이트",
+      "patch_date": "2026-11-08",
+      "version": "1.6.2",
+      "comment": "v1.6.2 업데이트",
       "download_url": "https://github.com/Datamining00/FH6_Garage_Analyzer/releases/latest"
     }
   },
