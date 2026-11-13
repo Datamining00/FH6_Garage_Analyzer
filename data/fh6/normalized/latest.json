@@ -1,16 +1,16 @@
 {
   "schema": "fh6_vehicle_normalized_snapshot_v1",
-  "generated_at": "2026-11-13T03:39:02Z",
+  "generated_at": "2026-11-13T11:36:55Z",
   "source": {
     "kind": "gist_mirror",
     "gist_id": "30fe44689fad7ba5e99e2381927b7730",
     "filename": "FH6_Vehicle_Data.json",
-    "source_sha256": "c00bf51bbd5e8d84b516ffd6cc468676e3e09eb4fc48e09c01b63cf91b96943b"
+    "source_sha256": "410adf939551b64fe308462c6d5dcce44eeca4fadfea7ce20c1098183ac932e4"
   },
-  "normalized_sha256": "537f132ef8af2647fa59837a32acbdcbb75dc4dc0cb39108a605cd8b52218026",
+  "normalized_sha256": "7b6cf8d403064eb6139712314bb2cbdfc33894fe83523675dec43a1f07e2b912",
   "vehicle_count": 691,
   "source_meta": {
-    "updated_at": "2026-11-04",
+    "updated_at": "2026-11-13.2",
     "program_update": {
       "patch_date": "2026-11-08",
       "version": "1.6.2",
@@ -29,6 +29,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "2000GT",
+      "rarity": "BarnFind",
       "year": 1969
     },
     "249": {
@@ -41,6 +42,7 @@
       "dlc_name": null,
       "manufacturer": "Ferrari",
       "model": "250 GTO",
+      "rarity": "Legendary",
       "year": 1962
     },
     "251": {
@@ -53,6 +55,7 @@
       "dlc_name": null,
       "manufacturer": "Mercedes-Benz",
       "model": "300 SL Coupé",
+      "rarity": "Legendary",
       "year": 1954
     },
     "253": {
@@ -65,6 +68,7 @@
       "dlc_name": null,
       "manufacturer": "Ferrari",
       "model": "F355 Berlinetta",
+      "rarity": "Epic",
       "year": 1994
     },
     "255": {
@@ -77,6 +81,7 @@
       "dlc_name": null,
       "manufacturer": "Ferrari",
       "model": "512 TR",
+      "rarity": "Epic",
       "year": 1992
     },
     "260": {
@@ -89,6 +94,7 @@
       "dlc_name": null,
       "manufacturer": "Porsche",
       "model": "911 Carrera RS",
+      "rarity": "Legendary",
       "year": 1973
     },
     "261": {
@@ -101,6 +107,7 @@
       "dlc_name": null,
       "manufacturer": "Porsche",
       "model": "911 GT2",
+      "rarity": "Epic",
       "year": 1995
     },
     "262": {
@@ -113,6 +120,7 @@
       "dlc_name": null,
       "manufacturer": "Porsche",
       "model": "911 GT3",
+      "rarity": "Rare",
       "year": 2004
     },
     "265": {
@@ -125,6 +133,7 @@
       "dlc_name": null,
       "manufacturer": "Porsche",
       "model": "911 Turbo 3.3",
+      "rarity": "BarnFind",
       "year": 1982
     },
     "268": {
@@ -137,6 +146,7 @@
       "dlc_name": null,
       "manufacturer": "Porsche",
       "model": "944 Turbo",
+      "rarity": "Rare",
       "year": 1989
     },
     "269": {
@@ -149,6 +159,7 @@
       "dlc_name": null,
       "manufacturer": "Porsche",
       "model": "959",
+      "rarity": "TreasureCar",
       "year": 1987
     },
     "278": {
@@ -161,6 +172,7 @@
       "dlc_name": null,
       "manufacturer": "Vauxhall",
       "model": "Astra VXR",
+      "rarity": "Common",
       "year": 2006
     },
     "281": {
@@ -173,6 +185,7 @@
       "dlc_name": null,
       "manufacturer": "Plymouth",
       "model": "Barracuda Formula S",
+      "rarity": "Rare",
       "year": 1968
     },
     "289": {
@@ -185,6 +198,7 @@
       "dlc_name": null,
       "manufacturer": "Chevrolet",
       "model": "Camaro Super Sport Coupe",
+      "rarity": "Rare",
       "year": 1969
     },
     "292": {
@@ -197,6 +211,7 @@
       "dlc_name": null,
       "manufacturer": "Porsche",
       "model": "Carrera GT",
+      "rarity": "Epic",
       "year": 2003
     },
     "295": {
@@ -209,6 +224,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "Celica Sport Specialty II",
+      "rarity": "Rare",
       "year": 2003
     },
     "296": {
@@ -221,6 +237,7 @@
       "dlc_name": null,
       "manufacturer": "TVR",
       "model": "Cerbera Speed 12",
+      "rarity": "Epic",
       "year": 1998
     },
     "299": {
@@ -233,6 +250,7 @@
       "dlc_name": null,
       "manufacturer": "Chevrolet",
       "model": "Chevelle Super Sport 454",
+      "rarity": "Rare",
       "year": 1970
     },
     "302": {
@@ -245,6 +263,7 @@
       "dlc_name": null,
       "manufacturer": "Honda",
       "model": "Civic Type R",
+      "rarity": "Common",
       "year": 2004
     },
     "306": {
@@ -257,6 +276,7 @@
       "dlc_name": null,
       "manufacturer": "Shelby",
       "model": "Cobra 427 S/C",
+      "rarity": "Legendary",
       "year": 1965
     },
     "309": {
@@ -269,6 +289,7 @@
       "dlc_name": null,
       "manufacturer": "Volkswagen",
       "model": "Corrado VR6",
+      "rarity": "Common",
       "year": 1995
     },
     "312": {
@@ -281,6 +302,7 @@
       "dlc_name": null,
       "manufacturer": "Chevrolet",
       "model": "Corvette Stingray 427",
+      "rarity": "Epic",
       "year": 1967
     },
     "314": {
@@ -293,6 +315,7 @@
       "dlc_name": null,
       "manufacturer": "Chevrolet",
       "model": "Corvette Z06",
+      "rarity": "Common",
       "year": 2002
     },
     "315": {
@@ -305,6 +328,7 @@
       "dlc_name": null,
       "manufacturer": "Chevrolet",
       "model": "Corvette ZR-1",
+      "rarity": "Epic",
       "year": 1970
     },
     "316": {
@@ -317,6 +341,7 @@
       "dlc_name": null,
       "manufacturer": "Lamborghini",
       "model": "Countach LP5000 QV",
+      "rarity": "Epic",
       "year": 1988
     },
     "320": {
@@ -329,6 +354,7 @@
       "dlc_name": null,
       "manufacturer": "Honda",
       "model": "CR-X SiR",
+      "rarity": "Common",
       "year": 1991
     },
     "323": {
@@ -341,6 +367,7 @@
       "dlc_name": null,
       "manufacturer": "Lancia",
       "model": "Delta HF Integrale EVO",
+      "rarity": "Common",
       "year": 1992
     },
     "324": {
@@ -353,6 +380,7 @@
       "dlc_name": null,
       "manufacturer": "Lamborghini",
       "model": "Diablo GTR",
+      "rarity": "Epic",
       "year": 1999
     },
     "325": {
@@ -365,6 +393,7 @@
       "dlc_name": null,
       "manufacturer": "Lamborghini",
       "model": "Diablo SV",
+      "rarity": "BarnFind",
       "year": 1997
     },
     "326": {
@@ -377,6 +406,7 @@
       "dlc_name": null,
       "manufacturer": "Ferrari",
       "model": "Dino 246 GT",
+      "rarity": "Epic",
       "year": 1969
     },
     "327": {
@@ -389,6 +419,7 @@
       "dlc_name": null,
       "manufacturer": "Mitsubishi",
       "model": "Eclipse GSX",
+      "rarity": "Common",
       "year": 1995
     },
     "333": {
@@ -401,6 +432,7 @@
       "dlc_name": null,
       "manufacturer": "Ferrari",
       "model": "Enzo Ferrari",
+      "rarity": "Legendary",
       "year": 2002
     },
     "335": {
@@ -413,6 +445,7 @@
       "dlc_name": null,
       "manufacturer": "Lotus",
       "model": "Esprit V8",
+      "rarity": "Epic",
       "year": 2002
     },
     "336": {
@@ -425,6 +458,7 @@
       "dlc_name": null,
       "manufacturer": "Jaguar",
       "model": "E-type",
+      "rarity": "Epic",
       "year": 1961
     },
     "338": {
@@ -437,6 +471,7 @@
       "dlc_name": null,
       "manufacturer": "McLaren",
       "model": "F1 GT",
+      "rarity": "Legendary",
       "year": 1997
     },
     "340": {
@@ -449,6 +484,7 @@
       "dlc_name": null,
       "manufacturer": "Ferrari",
       "model": "F40",
+      "rarity": "Legendary",
       "year": 1987
     },
     "342": {
@@ -461,6 +497,7 @@
       "dlc_name": null,
       "manufacturer": "Ferrari",
       "model": "F50",
+      "rarity": "Legendary",
       "year": 1995
     },
     "343": {
@@ -473,6 +510,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "Fairlady Z 432",
+      "rarity": "Epic",
       "year": 1969
     },
     "344": {
@@ -485,6 +523,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "Fairlady Z",
+      "rarity": "Common",
       "year": 2003
     },
     "345": {
@@ -497,6 +536,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "Fairlady Z Version S Twin Turbo",
+      "rarity": "Epic",
       "year": 1994
     },
     "348": {
@@ -509,6 +549,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "GT",
+      "rarity": "TreasureCar",
       "year": 2005
     },
     "353": {
@@ -521,6 +562,7 @@
       "dlc_name": null,
       "manufacturer": "Volkswagen",
       "model": "Golf Gti 16v Mk2",
+      "rarity": "Common",
       "year": 1992
     },
     "357": {
@@ -533,6 +575,7 @@
       "dlc_name": null,
       "manufacturer": "Mitsubishi",
       "model": "GTO",
+      "rarity": "Common",
       "year": 1997
     },
     "358": {
@@ -545,6 +588,7 @@
       "dlc_name": null,
       "manufacturer": "Ferrari",
       "model": "288 GTO",
+      "rarity": "Legendary",
       "year": 1984
     },
     "363": {
@@ -557,6 +601,7 @@
       "dlc_name": null,
       "manufacturer": "Subaru",
       "model": "Impreza 22B-STi Version",
+      "rarity": "Legendary",
       "year": 1998
     },
     "364": {
@@ -569,6 +614,7 @@
       "dlc_name": null,
       "manufacturer": "Subaru",
       "model": "IMPREZA WRX STI",
+      "rarity": "Common",
       "year": 2004
     },
     "365": {
@@ -581,6 +627,7 @@
       "dlc_name": null,
       "manufacturer": "Subaru",
       "model": "IMPREZA WRX STI",
+      "rarity": "Common",
       "year": 2005
     },
     "368": {
@@ -593,6 +640,7 @@
       "dlc_name": null,
       "manufacturer": "Acura",
       "model": "Integra Type R",
+      "rarity": "Common",
       "year": 2001
     },
     "374": {
@@ -605,6 +653,7 @@
       "dlc_name": null,
       "manufacturer": "Mitsubishi",
       "model": "Lancer Evolution IX MR",
+      "rarity": "Epic",
       "year": 2006
     },
     "378": {
@@ -617,6 +666,7 @@
       "dlc_name": null,
       "manufacturer": "Mitsubishi",
       "model": "Lancer Evolution VIII MR",
+      "rarity": "Rare",
       "year": 2004
     },
     "379": {
@@ -629,6 +679,7 @@
       "dlc_name": null,
       "manufacturer": "Subaru",
       "model": "LEGACY B4 2.0 GT",
+      "rarity": "Common",
       "year": 2005
     },
     "382": {
@@ -641,6 +692,7 @@
       "dlc_name": null,
       "manufacturer": "BMW",
       "model": "M3",
+      "rarity": "Common",
       "year": 1997
     },
     "383": {
@@ -653,6 +705,7 @@
       "dlc_name": null,
       "manufacturer": "BMW",
       "model": "M3",
+      "rarity": "Common",
       "year": 2005
     },
     "391": {
@@ -665,6 +718,7 @@
       "dlc_name": null,
       "manufacturer": "Maserati",
       "model": "MC12",
+      "rarity": "Epic",
       "year": 2004
     },
     "398": {
@@ -677,6 +731,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "MR2 GT",
+      "rarity": "Rare",
       "year": 1995
     },
     "405": {
@@ -689,6 +744,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "Mustang SVT Cobra R",
+      "rarity": "Common",
       "year": 2000
     },
     "411": {
@@ -701,6 +757,7 @@
       "dlc_name": null,
       "manufacturer": "Honda",
       "model": "NSX-R",
+      "rarity": "Epic",
       "year": 2005
     },
     "412": {
@@ -713,6 +770,7 @@
       "dlc_name": null,
       "manufacturer": "Honda",
       "model": "NSX-R",
+      "rarity": "Epic",
       "year": 1992
     },
     "417": {
@@ -725,6 +783,7 @@
       "dlc_name": null,
       "manufacturer": "Buick",
       "model": "Regal GNX",
+      "rarity": "Epic",
       "year": 1987
     },
     "419": {
@@ -737,6 +796,7 @@
       "dlc_name": null,
       "manufacturer": "Audi",
       "model": "RS 4",
+      "rarity": "Rare",
       "year": 2006
     },
     "420": {
@@ -749,6 +809,7 @@
       "dlc_name": null,
       "manufacturer": "Audi",
       "model": "RS 6",
+      "rarity": "Rare",
       "year": 2003
     },
     "422": {
@@ -761,6 +822,7 @@
       "dlc_name": null,
       "manufacturer": "Acura",
       "model": "RSX Type S",
+      "rarity": "Common",
       "year": 2002
     },
     "423": {
@@ -773,6 +835,7 @@
       "dlc_name": null,
       "manufacturer": "Mazda",
       "model": "Savanna RX-7",
+      "rarity": "Epic",
       "year": 1990
     },
     "427": {
@@ -785,6 +848,7 @@
       "dlc_name": null,
       "manufacturer": "Honda",
       "model": "S2000",
+      "rarity": "Common",
       "year": 2003
     },
     "432": {
@@ -797,6 +861,7 @@
       "dlc_name": null,
       "manufacturer": "Saleen",
       "model": "S7",
+      "rarity": "Epic",
       "year": 2004
     },
     "433": {
@@ -809,6 +874,7 @@
       "dlc_name": null,
       "manufacturer": "TVR",
       "model": "Sagaris",
+      "rarity": "Rare",
       "year": 2005
     },
     "440": {
@@ -821,6 +887,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "Silvia K's",
+      "rarity": "Common",
       "year": 1994
     },
     "455": {
@@ -833,6 +900,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "Sprinter Trueno GT Apex",
+      "rarity": "Epic",
       "year": 1985
     },
     "458": {
@@ -845,6 +913,7 @@
       "dlc_name": null,
       "manufacturer": "Lancia",
       "model": "Stratos HF Stradale",
+      "rarity": "TreasureCar",
       "year": 1974
     },
     "460": {
@@ -857,6 +926,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "Supra 2.0 GT",
+      "rarity": "Rare",
       "year": 1992
     },
     "461": {
@@ -869,6 +939,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "Supra RZ",
+      "rarity": "Rare",
       "year": 1998
     },
     "483": {
@@ -881,6 +952,7 @@
       "dlc_name": null,
       "manufacturer": "Dodge",
       "model": "Viper GTS ACR",
+      "rarity": "Legendary",
       "year": 1999
     },
     "489": {
@@ -893,6 +965,7 @@
       "dlc_name": null,
       "manufacturer": "Jaguar",
       "model": "XJ220",
+      "rarity": "Legendary",
       "year": 1993
     },
     "513": {
@@ -905,6 +978,7 @@
       "dlc_name": null,
       "manufacturer": "Dodge",
       "model": "Charger R/T",
+      "rarity": "TreasureCar",
       "year": 1969
     },
     "567": {
@@ -917,6 +991,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "R390 (GT1)",
+      "rarity": "BarnFind",
       "year": 1998
     },
     "568": {
@@ -929,6 +1004,7 @@
       "dlc_name": null,
       "manufacturer": "Mercedes-Benz",
       "model": "AMG CLK GTR",
+      "rarity": "Legendary",
       "year": 1998
     },
     "569": {
@@ -941,6 +1017,7 @@
       "dlc_name": null,
       "manufacturer": "Honda",
       "model": "NSX-R GT",
+      "rarity": "BarnFind",
       "year": 2005
     },
     "615": {
@@ -953,6 +1030,7 @@
       "dlc_name": null,
       "manufacturer": "Peugeot",
       "model": "207 Super 2000",
+      "rarity": "Epic",
       "year": 2007
     },
     "625": {
@@ -965,10 +1043,11 @@
       "dlc_name": null,
       "manufacturer": "Honda",
       "model": "Civic Type R",
+      "rarity": "Common",
       "year": 2007
     },
     "633": {
-      "name": "1984 Audi Sport quattro",
+      "name": "1983 Audi Sport quattro",
       "id": "633",
       "acquisition": "Wheelspin, Seasonal",
       "car_type": "Retro Rally",
@@ -977,7 +1056,8 @@
       "dlc_name": null,
       "manufacturer": "Audi",
       "model": "Sport quattro",
-      "year": 1984
+      "rarity": "Epic",
+      "year": 1983
     },
     "634": {
       "name": "1980 Renault 5 Turbo",
@@ -989,6 +1069,7 @@
       "dlc_name": null,
       "manufacturer": "Renault",
       "model": "5 Turbo",
+      "rarity": "Rare",
       "year": 1980
     },
     "637": {
@@ -1001,6 +1082,7 @@
       "dlc_name": null,
       "manufacturer": "Lamborghini",
       "model": "Miura P400",
+      "rarity": "Legendary",
       "year": 1967
     },
     "639": {
@@ -1013,10 +1095,11 @@
       "dlc_name": null,
       "manufacturer": "Dodge",
       "model": "Challenger R/T",
+      "rarity": "Epic",
       "year": 1970
     },
     "641": {
-      "name": "1997 Porsche 911 GT1 Strassenversion",
+      "name": "1998 Porsche 911 GT1 Strassenversion",
       "id": "641",
       "acquisition": "Autoshow, Wheelspin",
       "car_type": "Retro Supercars",
@@ -1025,7 +1108,8 @@
       "dlc_name": null,
       "manufacturer": "Porsche",
       "model": "911 GT1 Strassenversion",
-      "year": 1997
+      "rarity": "Legendary",
+      "year": 1998
     },
     "1006": {
       "name": "2005 Ferrari FXX",
@@ -1037,6 +1121,7 @@
       "dlc_name": null,
       "manufacturer": "Ferrari",
       "model": "FXX",
+      "rarity": "Legendary",
       "year": 2005
     },
     "1007": {
@@ -1049,6 +1134,7 @@
       "dlc_name": null,
       "manufacturer": "Koenigsegg",
       "model": "CCGT",
+      "rarity": "Legendary",
       "year": 2008
     },
     "1009": {
@@ -1061,6 +1147,7 @@
       "dlc_name": null,
       "manufacturer": "Mitsubishi",
       "model": "Lancer Evolution X GSR",
+      "rarity": "Rare",
       "year": 2008
     },
     "1011": {
@@ -1073,6 +1160,7 @@
       "dlc_name": null,
       "manufacturer": "BMW",
       "model": "M3",
+      "rarity": "Common",
       "year": 2008
     },
     "1020": {
@@ -1085,6 +1173,7 @@
       "dlc_name": null,
       "manufacturer": "Ferrari",
       "model": "F50 GT",
+      "rarity": "Legendary",
       "year": 1996
     },
     "1022": {
@@ -1097,6 +1186,7 @@
       "dlc_name": null,
       "manufacturer": "Ferrari",
       "model": "430 Scuderia",
+      "rarity": "Epic",
       "year": 2007
     },
     "1023": {
@@ -1109,6 +1199,7 @@
       "dlc_name": null,
       "manufacturer": "Ferrari",
       "model": "F40 Competizione",
+      "rarity": "Legendary",
       "year": 1989
     },
     "1032": {
@@ -1121,6 +1212,7 @@
       "dlc_name": null,
       "manufacturer": "Alfa Romeo",
       "model": "8C Competizione",
+      "rarity": "Epic",
       "year": 2007
     },
     "1034": {
@@ -1133,6 +1225,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "Celica GT-Four ST205",
+      "rarity": "Common",
       "year": 1994
     },
     "1040": {
@@ -1145,6 +1238,7 @@
       "dlc_name": null,
       "manufacturer": "BMW",
       "model": "M1",
+      "rarity": "TreasureCar",
       "year": 1981
     },
     "1041": {
@@ -1157,6 +1251,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "Mustang SVT Cobra R",
+      "rarity": "Common",
       "year": 1993
     },
     "1042": {
@@ -1169,6 +1264,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "Skyline 2000GT-R",
+      "rarity": "BarnFind",
       "year": 1971
     },
     "1045": {
@@ -1181,6 +1277,7 @@
       "dlc_name": null,
       "manufacturer": "Pontiac",
       "model": "Firebird Trans Am GTA",
+      "rarity": "Common",
       "year": 1987
     },
     "1046": {
@@ -1193,6 +1290,7 @@
       "dlc_name": null,
       "manufacturer": "Dodge",
       "model": "Viper SRT-10 ACR",
+      "rarity": "Rare",
       "year": 2008
     },
     "1052": {
@@ -1205,6 +1303,7 @@
       "dlc_name": null,
       "manufacturer": "Dodge",
       "model": "Ram SRT-10",
+      "rarity": "Common",
       "year": 2006
     },
     "1059": {
@@ -1217,6 +1316,7 @@
       "dlc_name": null,
       "manufacturer": "BMW",
       "model": "Z4 M Coupé",
+      "rarity": "Rare",
       "year": 2008
     },
     "1060": {
@@ -1229,6 +1329,7 @@
       "dlc_name": null,
       "manufacturer": "Subaru",
       "model": "IMPREZA WRX STI",
+      "rarity": "Rare",
       "year": 2008
     },
     "1063": {
@@ -1241,6 +1342,7 @@
       "dlc_name": null,
       "manufacturer": "Dodge",
       "model": "Charger Daytona HEMI",
+      "rarity": "Epic",
       "year": 1969
     },
     "1064": {
@@ -1253,6 +1355,7 @@
       "dlc_name": null,
       "manufacturer": "Chevrolet",
       "model": "Camaro Z28",
+      "rarity": "Rare",
       "year": 1979
     },
     "1069": {
@@ -1265,6 +1368,7 @@
       "dlc_name": null,
       "manufacturer": "Chevrolet",
       "model": "Corvette ZR1",
+      "rarity": "Rare",
       "year": 2009
     },
     "1086": {
@@ -1277,6 +1381,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "Focus RS",
+      "rarity": "Epic",
       "year": 2009
     },
     "1090": {
@@ -1289,6 +1394,7 @@
       "dlc_name": null,
       "manufacturer": "Mercedes-Benz",
       "model": "SL 65 AMG Black Series",
+      "rarity": "Epic",
       "year": 2009
     },
     "1093": {
@@ -1301,6 +1407,7 @@
       "dlc_name": null,
       "manufacturer": "Chevrolet",
       "model": "Corvette",
+      "rarity": "Epic",
       "year": 1960
     },
     "1103": {
@@ -1313,6 +1420,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "370Z",
+      "rarity": "Common",
       "year": 2010
     },
     "1104": {
@@ -1325,6 +1433,7 @@
       "dlc_name": null,
       "manufacturer": "Datsun",
       "model": "510",
+      "rarity": "Common",
       "year": 1970
     },
     "1105": {
@@ -1337,6 +1446,7 @@
       "dlc_name": null,
       "manufacturer": "Aston Martin",
       "model": "DB5",
+      "rarity": "Epic",
       "year": 1964
     },
     "1108": {
@@ -1349,6 +1459,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "RS200 Evolution",
+      "rarity": "Epic",
       "year": 1985
     },
     "1110": {
@@ -1361,6 +1472,7 @@
       "dlc_name": null,
       "manufacturer": "Mazda",
       "model": "MX-5 Miata",
+      "rarity": "Common",
       "year": 1994
     },
     "1124": {
@@ -1373,6 +1485,7 @@
       "dlc_name": null,
       "manufacturer": "Abarth",
       "model": "Fiat 131",
+      "rarity": "Common",
       "year": 1980
     },
     "1126": {
@@ -1385,6 +1498,7 @@
       "dlc_name": null,
       "manufacturer": "BMW",
       "model": "M5",
+      "rarity": "Rare",
       "year": 2009
     },
     "1130": {
@@ -1397,6 +1511,7 @@
       "dlc_name": null,
       "manufacturer": "McLaren",
       "model": "12C Coupé",
+      "rarity": "Epic",
       "year": 2011
     },
     "1131": {
@@ -1409,6 +1524,7 @@
       "dlc_name": null,
       "manufacturer": "Ferrari",
       "model": "458 Italia",
+      "rarity": "Epic",
       "year": 2009
     },
     "1150": {
@@ -1421,6 +1537,7 @@
       "dlc_name": null,
       "manufacturer": "Alfa Romeo",
       "model": "Giulia Sprint GTA Stradale",
+      "rarity": "Rare",
       "year": 1965
     },
     "1155": {
@@ -1433,6 +1550,7 @@
       "dlc_name": null,
       "manufacturer": "Shelby",
       "model": "Cobra Daytona Coupe",
+      "rarity": "Legendary",
       "year": 1965
     },
     "1171": {
@@ -1445,6 +1563,7 @@
       "dlc_name": null,
       "manufacturer": "Ferrari",
       "model": "599XX",
+      "rarity": "Legendary",
       "year": 2010
     },
     "1173": {
@@ -1457,6 +1576,7 @@
       "dlc_name": null,
       "manufacturer": "Lamborghini",
       "model": "Murciélago LP 670-4 SV",
+      "rarity": "Epic",
       "year": 2010
     },
     "1175": {
@@ -1469,6 +1589,7 @@
       "dlc_name": null,
       "manufacturer": "Pagani",
       "model": "Zonda R",
+      "rarity": "Legendary",
       "year": 2009
     },
     "1184": {
@@ -1481,6 +1602,7 @@
       "dlc_name": null,
       "manufacturer": "Audi",
       "model": "RS 6",
+      "rarity": "Epic",
       "year": 2009
     },
     "1200": {
@@ -1493,6 +1615,7 @@
       "dlc_name": null,
       "manufacturer": "Audi",
       "model": "R8 LMS",
+      "rarity": "Rare",
       "year": 2009
     },
     "1204": {
@@ -1505,6 +1628,7 @@
       "dlc_name": null,
       "manufacturer": "Renault",
       "model": "Megane RS 250",
+      "rarity": "Common",
       "year": 2010
     },
     "1215": {
@@ -1517,6 +1641,7 @@
       "dlc_name": null,
       "manufacturer": null,
       "model": null,
+      "rarity": "Common",
       "year": null
     },
     "1216": {
@@ -1529,6 +1654,7 @@
       "dlc_name": null,
       "manufacturer": "Audi",
       "model": "RS 3 Sportback",
+      "rarity": "Common",
       "year": 2011
     },
     "1220": {
@@ -1541,6 +1667,7 @@
       "dlc_name": null,
       "manufacturer": "Audi",
       "model": "TT RS Coupé",
+      "rarity": "Rare",
       "year": 2010
     },
     "1221": {
@@ -1553,6 +1680,7 @@
       "dlc_name": null,
       "manufacturer": "Mazda",
       "model": "Mazdaspeed 3",
+      "rarity": "Common",
       "year": 2010
     },
     "1229": {
@@ -1565,6 +1693,7 @@
       "dlc_name": null,
       "manufacturer": "Mazda",
       "model": "Furai",
+      "rarity": "Legendary",
       "year": 2008
     },
     "1231": {
@@ -1577,6 +1706,7 @@
       "dlc_name": null,
       "manufacturer": "Volkswagen",
       "model": "Golf R",
+      "rarity": "Rare",
       "year": 2010
     },
     "1253": {
@@ -1589,6 +1719,7 @@
       "dlc_name": null,
       "manufacturer": "Noble",
       "model": "M600",
+      "rarity": "Epic",
       "year": 2010
     },
     "1260": {
@@ -1601,6 +1732,7 @@
       "dlc_name": null,
       "manufacturer": "Lexus",
       "model": "LFA",
+      "rarity": "Epic",
       "year": 2010
     },
     "1269": {
@@ -1613,6 +1745,7 @@
       "dlc_name": null,
       "manufacturer": "BMW",
       "model": "2002 Turbo",
+      "rarity": "Legendary",
       "year": 1973
     },
     "1270": {
@@ -1625,6 +1758,7 @@
       "dlc_name": null,
       "manufacturer": "DeLorean",
       "model": "DMC-12",
+      "rarity": "Legendary",
       "year": 1982
     },
     "1272": {
@@ -1637,6 +1771,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "Escort RS Cosworth",
+      "rarity": "Rare",
       "year": 1992
     },
     "1273": {
@@ -1649,6 +1784,7 @@
       "dlc_name": null,
       "manufacturer": "Honda",
       "model": "Civic Type R",
+      "rarity": "Common",
       "year": 1997
     },
     "1276": {
@@ -1661,6 +1797,7 @@
       "dlc_name": null,
       "manufacturer": "Pontiac",
       "model": "Firebird Trans Am",
+      "rarity": "Rare",
       "year": 1977
     },
     "1277": {
@@ -1673,6 +1810,7 @@
       "dlc_name": null,
       "manufacturer": "Plymouth",
       "model": "Cuda 426 HEMI",
+      "rarity": "Epic",
       "year": 1971
     },
     "1278": {
@@ -1685,6 +1823,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "XB Falcon GT",
+      "rarity": "Rare",
       "year": 1973
     },
     "1282": {
@@ -1697,6 +1836,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "240SX",
+      "rarity": "Epic",
       "year": 1993
     },
     "1283": {
@@ -1709,6 +1849,7 @@
       "dlc_name": "Car Pass",
       "manufacturer": "Ford",
       "model": "Thunderbird",
+      "rarity": "Common",
       "year": 1957
     },
     "1291": {
@@ -1721,6 +1862,7 @@
       "dlc_name": null,
       "manufacturer": "Chevrolet",
       "model": "El Camino Super Sport 454",
+      "rarity": "Rare",
       "year": 1970
     },
     "1293": {
@@ -1733,6 +1875,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "Sierra Cosworth RS500",
+      "rarity": "BarnFind",
       "year": 1987
     },
     "1294": {
@@ -1745,6 +1888,7 @@
       "dlc_name": null,
       "manufacturer": "GMC",
       "model": "Syclone",
+      "rarity": "Epic",
       "year": 1991
     },
     "1295": {
@@ -1757,6 +1901,7 @@
       "dlc_name": null,
       "manufacturer": "Lancia",
       "model": "037 Stradale",
+      "rarity": "Epic",
       "year": 1982
     },
     "1296": {
@@ -1769,6 +1914,7 @@
       "dlc_name": null,
       "manufacturer": "Mercedes-Benz",
       "model": "190 E 2.5-16 Evolution II",
+      "rarity": "Epic",
       "year": 1990
     },
     "1297": {
@@ -1781,6 +1927,7 @@
       "dlc_name": null,
       "manufacturer": "Mitsubishi",
       "model": "Starion ESI-R",
+      "rarity": "Rare",
       "year": 1988
     },
     "1299": {
@@ -1793,6 +1940,7 @@
       "dlc_name": null,
       "manufacturer": "Volvo",
       "model": "242 Turbo Evolution",
+      "rarity": "Common",
       "year": 1983
     },
     "1300": {
@@ -1805,6 +1953,7 @@
       "dlc_name": null,
       "manufacturer": "Chevrolet",
       "model": "Impala Super Sport 409",
+      "rarity": "Common",
       "year": 1964
     },
     "1301": {
@@ -1817,6 +1966,7 @@
       "dlc_name": null,
       "manufacturer": "Jaguar",
       "model": "D-Type",
+      "rarity": "Legendary",
       "year": 1956
     },
     "1314": {
@@ -1829,6 +1979,7 @@
       "dlc_name": null,
       "manufacturer": "McLaren",
       "model": "F1",
+      "rarity": "Legendary",
       "year": 1993
     },
     "1323": {
@@ -1841,6 +1992,7 @@
       "dlc_name": null,
       "manufacturer": "Subaru",
       "model": "WRX STI",
+      "rarity": "Rare",
       "year": 2011
     },
     "1325": {
@@ -1853,6 +2005,7 @@
       "dlc_name": null,
       "manufacturer": "Alfa Romeo",
       "model": "Giulietta Quadrifoglio Verde",
+      "rarity": "Common",
       "year": 2011
     },
     "1330": {
@@ -1865,6 +2018,7 @@
       "dlc_name": null,
       "manufacturer": "Chevrolet",
       "model": "Camaro Z28",
+      "rarity": "Rare",
       "year": 1970
     },
     "1332": {
@@ -1877,6 +2031,7 @@
       "dlc_name": null,
       "manufacturer": "Dodge",
       "model": "Dart HEMI Super Stock",
+      "rarity": "Legendary",
       "year": 1968
     },
     "1335": {
@@ -1889,6 +2044,7 @@
       "dlc_name": null,
       "manufacturer": "Mazda",
       "model": "#55 Mazda 787B",
+      "rarity": "BarnFind",
       "year": 1991
     },
     "1350": {
@@ -1901,6 +2057,7 @@
       "dlc_name": null,
       "manufacturer": "BMW",
       "model": "X5 M",
+      "rarity": "Common",
       "year": 2011
     },
     "1352": {
@@ -1913,6 +2070,7 @@
       "dlc_name": null,
       "manufacturer": "Dodge",
       "model": "Coronet Super Bee",
+      "rarity": "Rare",
       "year": 1970
     },
     "1355": {
@@ -1925,6 +2083,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "Mustang GT Coupe",
+      "rarity": "Epic",
       "year": 1965
     },
     "1367": {
@@ -1937,6 +2096,7 @@
       "dlc_name": null,
       "manufacturer": "BMW",
       "model": "M5",
+      "rarity": "Common",
       "year": 2003
     },
     "1368": {
@@ -1949,6 +2109,7 @@
       "dlc_name": null,
       "manufacturer": "BMW",
       "model": "M5",
+      "rarity": "Rare",
       "year": 1988
     },
     "1369": {
@@ -1961,6 +2122,7 @@
       "dlc_name": null,
       "manufacturer": "Pagani",
       "model": "Zonda Cinque Roadster",
+      "rarity": "Legendary",
       "year": 2010
     },
     "1376": {
@@ -1973,6 +2135,7 @@
       "dlc_name": null,
       "manufacturer": "Lotus",
       "model": "Elise Series 1 Sport 190",
+      "rarity": "Common",
       "year": 1999
     },
     "1379": {
@@ -1985,6 +2148,7 @@
       "dlc_name": null,
       "manufacturer": "Chevrolet",
       "model": "Impala Super Sport",
+      "rarity": "Common",
       "year": 1996
     },
     "1381": {
@@ -1997,6 +2161,7 @@
       "dlc_name": null,
       "manufacturer": "Mitsubishi",
       "model": "Galant VR-4",
+      "rarity": "Rare",
       "year": 1992
     },
     "1382": {
@@ -2009,6 +2174,7 @@
       "dlc_name": null,
       "manufacturer": "Subaru",
       "model": "LEGACY RS",
+      "rarity": "Common",
       "year": 1990
     },
     "1388": {
@@ -2021,6 +2187,7 @@
       "dlc_name": null,
       "manufacturer": "BMW",
       "model": "M5",
+      "rarity": "Rare",
       "year": 2012
     },
     "1392": {
@@ -2033,6 +2200,7 @@
       "dlc_name": null,
       "manufacturer": "Lamborghini",
       "model": "Sesto Elemento",
+      "rarity": "Legendary",
       "year": 2011
     },
     "1393": {
@@ -2045,6 +2213,7 @@
       "dlc_name": null,
       "manufacturer": "Alfa Romeo",
       "model": "155 Q4",
+      "rarity": "Epic",
       "year": 1992
     },
     "1394": {
@@ -2057,6 +2226,7 @@
       "dlc_name": null,
       "manufacturer": "GMC",
       "model": "Typhoon",
+      "rarity": "Epic",
       "year": 1992
     },
     "1395": {
@@ -2069,6 +2239,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "MR2 SC",
+      "rarity": "Epic",
       "year": 1989
     },
     "1397": {
@@ -2081,6 +2252,7 @@
       "dlc_name": null,
       "manufacturer": "Koenigsegg",
       "model": "Agera",
+      "rarity": "Legendary",
       "year": 2011
     },
     "1398": {
@@ -2093,6 +2265,7 @@
       "dlc_name": null,
       "manufacturer": "Lamborghini",
       "model": "Aventador LP700-4",
+      "rarity": "Epic",
       "year": 2012
     },
     "1417": {
@@ -2105,6 +2278,7 @@
       "dlc_name": null,
       "manufacturer": "Audi",
       "model": "RS 5 Coupé",
+      "rarity": "Rare",
       "year": 2011
     },
     "1418": {
@@ -2117,6 +2291,7 @@
       "dlc_name": null,
       "manufacturer": "BMW",
       "model": "M5",
+      "rarity": "Rare",
       "year": 1995
     },
     "1426": {
@@ -2129,6 +2304,7 @@
       "dlc_name": null,
       "manufacturer": "Mazda",
       "model": "RX-8 R3",
+      "rarity": "Rare",
       "year": 2011
     },
     "1428": {
@@ -2141,6 +2317,7 @@
       "dlc_name": null,
       "manufacturer": "Volkswagen",
       "model": "Scirocco R",
+      "rarity": "Rare",
       "year": 2011
     },
     "1429": {
@@ -2153,6 +2330,7 @@
       "dlc_name": null,
       "manufacturer": "Chevrolet",
       "model": "Nova Super Sport 396",
+      "rarity": "Common",
       "year": 1969
     },
     "1435": {
@@ -2165,6 +2343,7 @@
       "dlc_name": null,
       "manufacturer": "Volkswagen",
       "model": "Beetle",
+      "rarity": "Legendary",
       "year": 1963
     },
     "1459": {
@@ -2177,6 +2356,7 @@
       "dlc_name": null,
       "manufacturer": "Chevrolet",
       "model": "Bel Air",
+      "rarity": "Rare",
       "year": 1957
     },
     "1477": {
@@ -2189,6 +2369,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "Transit SuperSportVan",
+      "rarity": "Rare",
       "year": 2011
     },
     "1478": {
@@ -2201,6 +2382,7 @@
       "dlc_name": null,
       "manufacturer": "Audi",
       "model": "#2 Audi Sport quattro S1",
+      "rarity": "Legendary",
       "year": 1986
     },
     "1480": {
@@ -2213,6 +2395,7 @@
       "dlc_name": null,
       "manufacturer": "Mazda",
       "model": "RX-7 GSL-SE",
+      "rarity": "TreasureCar",
       "year": 1985
     },
     "1481": {
@@ -2225,6 +2408,7 @@
       "dlc_name": null,
       "manufacturer": "Austin-Healey",
       "model": "3000 MkIII",
+      "rarity": "Common",
       "year": 1965
     },
     "1493": {
@@ -2237,6 +2421,7 @@
       "dlc_name": null,
       "manufacturer": "BMW",
       "model": "850CSi",
+      "rarity": "Rare",
       "year": 1995
     },
     "1500": {
@@ -2249,6 +2434,7 @@
       "dlc_name": null,
       "manufacturer": "Mercedes-Benz",
       "model": "C 63 AMG Coupé Black Series",
+      "rarity": "Epic",
       "year": 2012
     },
     "1511": {
@@ -2261,6 +2447,7 @@
       "dlc_name": null,
       "manufacturer": "Holden",
       "model": "Monaro GTS 327",
+      "rarity": "Common",
       "year": 1968
     },
     "1513": {
@@ -2273,6 +2460,7 @@
       "dlc_name": null,
       "manufacturer": "Maserati",
       "model": "Ghibli Cup",
+      "rarity": "Rare",
       "year": 1997
     },
     "1514": {
@@ -2285,6 +2473,7 @@
       "dlc_name": null,
       "manufacturer": "Mazda",
       "model": "RX-3",
+      "rarity": "Common",
       "year": 1973
     },
     "1517": {
@@ -2297,6 +2486,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "Celica GT-Four RC ST185",
+      "rarity": "Rare",
       "year": 1992
     },
     "1522": {
@@ -2309,6 +2499,7 @@
       "dlc_name": null,
       "manufacturer": "Jeep",
       "model": "Wrangler Rubicon",
+      "rarity": "Common",
       "year": 2012
     },
     "1529": {
@@ -2321,6 +2512,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "Capri RS3100",
+      "rarity": "Rare",
       "year": 1973
     },
     "1532": {
@@ -2333,6 +2525,7 @@
       "dlc_name": null,
       "manufacturer": "Hennessey",
       "model": "Venom GT",
+      "rarity": "Legendary",
       "year": 2012
     },
     "1533": {
@@ -2345,6 +2538,7 @@
       "dlc_name": null,
       "manufacturer": "Holden",
       "model": "Torana A9X",
+      "rarity": "Rare",
       "year": 1977
     },
     "1534": {
@@ -2357,6 +2551,7 @@
       "dlc_name": null,
       "manufacturer": "Jaguar",
       "model": "XJ-S",
+      "rarity": "Common",
       "year": 1990
     },
     "1537": {
@@ -2369,6 +2564,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "Corolla SR5",
+      "rarity": "Epic",
       "year": 1974
     },
     "1549": {
@@ -2381,6 +2577,7 @@
       "dlc_name": null,
       "manufacturer": "Alfa Romeo",
       "model": "33 Stradale",
+      "rarity": "Legendary",
       "year": 1968
     },
     "1559": {
@@ -2393,6 +2590,7 @@
       "dlc_name": null,
       "manufacturer": "Mercedes-Benz",
       "model": "300 SLR",
+      "rarity": "Legendary",
       "year": 1955
     },
     "1562": {
@@ -2405,6 +2603,7 @@
       "dlc_name": null,
       "manufacturer": "SRT",
       "model": "Viper GTS",
+      "rarity": "Rare",
       "year": 2013
     },
     "1564": {
@@ -2417,6 +2616,7 @@
       "dlc_name": null,
       "manufacturer": "Chevrolet",
       "model": "Corvette",
+      "rarity": "Legendary",
       "year": 1953
     },
     "1568": {
@@ -2429,6 +2629,7 @@
       "dlc_name": null,
       "manufacturer": "Honda",
       "model": "Civic RS",
+      "rarity": "Common",
       "year": 1974
     },
     "1575": {
@@ -2441,6 +2642,7 @@
       "dlc_name": null,
       "manufacturer": "Chevrolet",
       "model": "Monte Carlo Super Sport",
+      "rarity": "Common",
       "year": 1988
     },
     "1578": {
@@ -2453,6 +2655,7 @@
       "dlc_name": null,
       "manufacturer": "Ferrari",
       "model": "250 GT Berlinetta Lusso",
+      "rarity": "Legendary",
       "year": 1962
     },
     "1586": {
@@ -2465,6 +2668,7 @@
       "dlc_name": null,
       "manufacturer": "Lincoln",
       "model": "Continental",
+      "rarity": "BarnFind",
       "year": 1962
     },
     "1587": {
@@ -2477,6 +2681,7 @@
       "dlc_name": null,
       "manufacturer": "Mazda",
       "model": "Cosmo 110S Series II",
+      "rarity": "Epic",
       "year": 1972
     },
     "1591": {
@@ -2489,6 +2694,7 @@
       "dlc_name": null,
       "manufacturer": "Peugeot",
       "model": "205 Turbo 16",
+      "rarity": "BarnFind",
       "year": 1984
     },
     "1592": {
@@ -2501,6 +2707,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "Celica GT",
+      "rarity": "Rare",
       "year": 1974
     },
     "1598": {
@@ -2513,6 +2720,7 @@
       "dlc_name": null,
       "manufacturer": "BMW",
       "model": "M3 GTS",
+      "rarity": "Epic",
       "year": 2010
     },
     "1599": {
@@ -2525,6 +2733,7 @@
       "dlc_name": null,
       "manufacturer": "Ferrari",
       "model": "599XX Evolution",
+      "rarity": "Legendary",
       "year": 2012
     },
     "1601": {
@@ -2537,6 +2746,7 @@
       "dlc_name": null,
       "manufacturer": "Lamborghini",
       "model": "Gallardo LP570-4 Spyder Performante",
+      "rarity": "Epic",
       "year": 2012
     },
     "1607": {
@@ -2549,6 +2759,7 @@
       "dlc_name": null,
       "manufacturer": "Audi",
       "model": "RS 4 Avant",
+      "rarity": "Rare",
       "year": 2013
     },
     "1627": {
@@ -2561,6 +2772,7 @@
       "dlc_name": null,
       "manufacturer": "Mercedes-Benz",
       "model": "G 65 AMG",
+      "rarity": "Rare",
       "year": 2013
     },
     "1650": {
@@ -2573,6 +2785,7 @@
       "dlc_name": null,
       "manufacturer": "Honda",
       "model": "Civic Si",
+      "rarity": "Epic",
       "year": 1986
     },
     "1651": {
@@ -2585,6 +2798,7 @@
       "dlc_name": null,
       "manufacturer": "Ariel",
       "model": "Atom 500 V8",
+      "rarity": "Epic",
       "year": 2013
     },
     "1654": {
@@ -2597,6 +2811,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "Mustang Shelby GT500",
+      "rarity": "Rare",
       "year": 2013
     },
     "1655": {
@@ -2609,6 +2824,7 @@
       "dlc_name": null,
       "manufacturer": "Subaru",
       "model": "BRZ",
+      "rarity": "Common",
       "year": 2013
     },
     "1658": {
@@ -2621,6 +2837,7 @@
       "dlc_name": null,
       "manufacturer": "Mercedes-Benz",
       "model": "A 45 AMG",
+      "rarity": "Rare",
       "year": 2013
     },
     "1661": {
@@ -2633,6 +2850,7 @@
       "dlc_name": null,
       "manufacturer": "Lancia",
       "model": "Delta S4",
+      "rarity": "Rare",
       "year": 1986
     },
     "1662": {
@@ -2645,6 +2863,7 @@
       "dlc_name": null,
       "manufacturer": "MINI",
       "model": "Cooper S",
+      "rarity": "Rare",
       "year": 1965
     },
     "1667": {
@@ -2657,6 +2876,7 @@
       "dlc_name": null,
       "manufacturer": "McLaren",
       "model": "P1",
+      "rarity": "Legendary",
       "year": 2013
     },
     "1668": {
@@ -2669,6 +2889,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "Mustang Boss 302",
+      "rarity": "Rare",
       "year": 1969
     },
     "2002": {
@@ -2681,6 +2902,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "GT-R Black Edition (R35)",
+      "rarity": "Rare",
       "year": 2012
     },
     "2003": {
@@ -2693,6 +2915,7 @@
       "dlc_name": null,
       "manufacturer": "MINI",
       "model": "John Cooper Works GP",
+      "rarity": "Rare",
       "year": 2012
     },
     "2004": {
@@ -2705,6 +2928,7 @@
       "dlc_name": null,
       "manufacturer": "Mazda",
       "model": "MX-5",
+      "rarity": "Common",
       "year": 2013
     },
     "2006": {
@@ -2717,6 +2941,7 @@
       "dlc_name": null,
       "manufacturer": "Chevrolet",
       "model": "Corvette ZR-1",
+      "rarity": "Common",
       "year": 1995
     },
     "2007": {
@@ -2729,6 +2954,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "86",
+      "rarity": "Rare",
       "year": 2013
     },
     "2009": {
@@ -2741,6 +2967,7 @@
       "dlc_name": null,
       "manufacturer": "Audi",
       "model": "RS 7 Sportback",
+      "rarity": "Epic",
       "year": 2013
     },
     "2010": {
@@ -2753,6 +2980,7 @@
       "dlc_name": null,
       "manufacturer": "Audi",
       "model": "R8 Coupé V10 plus 5.2 FSI quattro",
+      "rarity": "Epic",
       "year": 2013
     },
     "2017": {
@@ -2765,6 +2993,7 @@
       "dlc_name": null,
       "manufacturer": "Abarth",
       "model": "595 esseesse",
+      "rarity": "Common",
       "year": 1968
     },
     "2019": {
@@ -2777,6 +3006,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "Focus RS",
+      "rarity": "Common",
       "year": 2003
     },
     "2034": {
@@ -2789,6 +3019,7 @@
       "dlc_name": null,
       "manufacturer": "Ferrari",
       "model": "LaFerrari",
+      "rarity": "Legendary",
       "year": 2013
     },
     "2038": {
@@ -2801,6 +3032,7 @@
       "dlc_name": null,
       "manufacturer": "Alfa Romeo",
       "model": "4C",
+      "rarity": "Epic",
       "year": 2014
     },
     "2040": {
@@ -2813,6 +3045,7 @@
       "dlc_name": null,
       "manufacturer": "BAC",
       "model": "Mono",
+      "rarity": "Epic",
       "year": 2014
     },
     "2042": {
@@ -2825,6 +3058,7 @@
       "dlc_name": null,
       "manufacturer": "Lamborghini",
       "model": "Veneno",
+      "rarity": "Legendary",
       "year": 2013
     },
     "2119": {
@@ -2837,6 +3071,7 @@
       "dlc_name": null,
       "manufacturer": "Honda",
       "model": "Civic CRX Mugen",
+      "rarity": "Epic",
       "year": 1984
     },
     "2121": {
@@ -2849,6 +3084,7 @@
       "dlc_name": null,
       "manufacturer": "Honda",
       "model": "Prelude Si",
+      "rarity": "Common",
       "year": 1994
     },
     "2128": {
@@ -2861,6 +3097,7 @@
       "dlc_name": null,
       "manufacturer": "Cadillac",
       "model": "XTS Limousine",
+      "rarity": "Rare",
       "year": 2013
     },
     "2131": {
@@ -2873,6 +3110,7 @@
       "dlc_name": null,
       "manufacturer": "HSV",
       "model": "GEN-F GTS",
+      "rarity": "Rare",
       "year": 2014
     },
     "2133": {
@@ -2885,6 +3123,7 @@
       "dlc_name": null,
       "manufacturer": "BMW",
       "model": "i8",
+      "rarity": "Rare",
       "year": 2015
     },
     "2140": {
@@ -2897,6 +3136,7 @@
       "dlc_name": null,
       "manufacturer": "Subaru",
       "model": "BRAT GL",
+      "rarity": "Common",
       "year": 1980
     },
     "2142": {
@@ -2909,6 +3149,7 @@
       "dlc_name": null,
       "manufacturer": "Volkswagen",
       "model": "Golf R",
+      "rarity": "Common",
       "year": 2014
     },
     "2145": {
@@ -2921,6 +3162,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "Ranger T6 Rally Raid",
+      "rarity": "Epic",
       "year": 2014
     },
     "2147": {
@@ -2933,6 +3175,7 @@
       "dlc_name": null,
       "manufacturer": "MG",
       "model": "Metro 6R4",
+      "rarity": "Legendary",
       "year": 1986
     },
     "2148": {
@@ -2945,6 +3188,7 @@
       "dlc_name": null,
       "manufacturer": "MINI",
       "model": "X-Raid All4 Racing Countryman",
+      "rarity": "Epic",
       "year": 2013
     },
     "2149": {
@@ -2957,6 +3201,7 @@
       "dlc_name": null,
       "manufacturer": "Renault",
       "model": "Clio Williams",
+      "rarity": "Common",
       "year": 1993
     },
     "2151": {
@@ -2969,6 +3214,7 @@
       "dlc_name": null,
       "manufacturer": "Volkswagen",
       "model": "Type 2 De Luxe",
+      "rarity": "Rare",
       "year": 1963
     },
     "2154": {
@@ -2981,6 +3227,7 @@
       "dlc_name": null,
       "manufacturer": "BMW",
       "model": "M4 Coupé",
+      "rarity": "Rare",
       "year": 2014
     },
     "2157": {
@@ -2993,6 +3240,7 @@
       "dlc_name": null,
       "manufacturer": "Citroën",
       "model": "2CV",
+      "rarity": "TreasureCar",
       "year": 1970
     },
     "2161": {
@@ -3005,6 +3253,7 @@
       "dlc_name": null,
       "manufacturer": "Alfa Romeo",
       "model": "Giulia TZ2",
+      "rarity": "Legendary",
       "year": 1965
     },
     "2163": {
@@ -3017,6 +3266,7 @@
       "dlc_name": null,
       "manufacturer": "Honda",
       "model": "Civic Type R",
+      "rarity": "Common",
       "year": 2015
     },
     "2164": {
@@ -3029,6 +3279,7 @@
       "dlc_name": null,
       "manufacturer": "Lamborghini",
       "model": "Huracán LP 610-4",
+      "rarity": "Epic",
       "year": 2014
     },
     "2168": {
@@ -3041,6 +3292,7 @@
       "dlc_name": null,
       "manufacturer": "Subaru",
       "model": "WRX STI",
+      "rarity": "Common",
       "year": 2015
     },
     "2171": {
@@ -3053,6 +3305,7 @@
       "dlc_name": null,
       "manufacturer": "Mazda",
       "model": "Mazdaspeed MX-5",
+      "rarity": "Common",
       "year": 2005
     },
     "2175": {
@@ -3065,6 +3318,7 @@
       "dlc_name": null,
       "manufacturer": "Lexus",
       "model": "RC F",
+      "rarity": "Rare",
       "year": 2015
     },
     "2177": {
@@ -3077,6 +3331,7 @@
       "dlc_name": null,
       "manufacturer": "Chevrolet",
       "model": "Corvette Z06",
+      "rarity": "Rare",
       "year": 2015
     },
     "2178": {
@@ -3089,6 +3344,7 @@
       "dlc_name": null,
       "manufacturer": "Audi",
       "model": "RS 4 Avant",
+      "rarity": "Common",
       "year": 2001
     },
     "2179": {
@@ -3101,6 +3357,7 @@
       "dlc_name": null,
       "manufacturer": "Audi",
       "model": "S1",
+      "rarity": "Common",
       "year": 2015
     },
     "2180": {
@@ -3113,6 +3370,7 @@
       "dlc_name": null,
       "manufacturer": "Audi",
       "model": "RS 6 Avant",
+      "rarity": "Rare",
       "year": 2015
     },
     "2183": {
@@ -3125,6 +3383,7 @@
       "dlc_name": null,
       "manufacturer": "Chevrolet",
       "model": "Camaro Z/28",
+      "rarity": "Rare",
       "year": 2015
     },
     "2184": {
@@ -3137,6 +3396,7 @@
       "dlc_name": null,
       "manufacturer": "Ferrari",
       "model": "458 Speciale",
+      "rarity": "Epic",
       "year": 2013
     },
     "2188": {
@@ -3149,6 +3409,7 @@
       "dlc_name": null,
       "manufacturer": "Koenigsegg",
       "model": "One:1",
+      "rarity": "Legendary",
       "year": 2015
     },
     "2205": {
@@ -3161,6 +3422,7 @@
       "dlc_name": null,
       "manufacturer": "Honda",
       "model": "S800",
+      "rarity": "Common",
       "year": 1970
     },
     "2216": {
@@ -3173,6 +3435,7 @@
       "dlc_name": null,
       "manufacturer": "Plymouth",
       "model": "Fury",
+      "rarity": "Rare",
       "year": 1958
     },
     "2217": {
@@ -3185,6 +3448,7 @@
       "dlc_name": null,
       "manufacturer": "Subaru",
       "model": "SVX",
+      "rarity": "Common",
       "year": 1996
     },
     "2235": {
@@ -3197,6 +3461,7 @@
       "dlc_name": null,
       "manufacturer": "Jaguar",
       "model": "XKR-S GT",
+      "rarity": "Epic",
       "year": 2015
     },
     "2242": {
@@ -3209,6 +3474,7 @@
       "dlc_name": null,
       "manufacturer": "Mercedes-AMG",
       "model": "GT S",
+      "rarity": "Rare",
       "year": 2015
     },
     "2262": {
@@ -3221,6 +3487,7 @@
       "dlc_name": null,
       "manufacturer": "Cadillac",
       "model": "ATS-V",
+      "rarity": "Common",
       "year": 2016
     },
     "2263": {
@@ -3233,6 +3500,7 @@
       "dlc_name": null,
       "manufacturer": "Dodge",
       "model": "Challenger SRT Hellcat",
+      "rarity": "Rare",
       "year": 2015
     },
     "2267": {
@@ -3245,6 +3513,7 @@
       "dlc_name": null,
       "manufacturer": "Mazda",
       "model": "MX-5",
+      "rarity": "Epic",
       "year": 2016
     },
     "2270": {
@@ -3257,6 +3526,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "Skyline H/T 2000GT-R",
+      "rarity": "Epic",
       "year": 1973
     },
     "2272": {
@@ -3269,6 +3539,7 @@
       "dlc_name": null,
       "manufacturer": "Datsun",
       "model": "2000 Roadster",
+      "rarity": "Common",
       "year": 1969
     },
     "2290": {
@@ -3281,6 +3552,7 @@
       "dlc_name": null,
       "manufacturer": "Porsche",
       "model": "918 Spyder",
+      "rarity": "Legendary",
       "year": 2014
     },
     "2297": {
@@ -3293,6 +3565,7 @@
       "dlc_name": null,
       "manufacturer": "Porsche",
       "model": "911 GT3 RS 4.0",
+      "rarity": "Epic",
       "year": 2012
     },
     "2357": {
@@ -3305,6 +3578,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "Focus RS",
+      "rarity": "Epic",
       "year": 2017
     },
     "2363": {
@@ -3317,6 +3591,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "GT",
+      "rarity": "Epic",
       "year": 2017
     },
     "2371": {
@@ -3329,6 +3604,7 @@
       "dlc_name": null,
       "manufacturer": "Ferrari",
       "model": "FXX K",
+      "rarity": "Legendary",
       "year": 2014
     },
     "2372": {
@@ -3341,6 +3617,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "De Luxe Five-Window Coupe",
+      "rarity": "Common",
       "year": 1932
     },
     "2400": {
@@ -3353,6 +3630,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "Mustang Shelby GT350R",
+      "rarity": "Rare",
       "year": 2016
     },
     "2412": {
@@ -3365,6 +3643,7 @@
       "dlc_name": null,
       "manufacturer": "BMW",
       "model": "Isetta 300 Export",
+      "rarity": "Common",
       "year": 1957
     },
     "2416": {
@@ -3377,6 +3656,7 @@
       "dlc_name": null,
       "manufacturer": "Meyers",
       "model": "Manx",
+      "rarity": "Epic",
       "year": 1971
     },
     "2420": {
@@ -3389,6 +3669,7 @@
       "dlc_name": null,
       "manufacturer": "Opel",
       "model": "Manta 400",
+      "rarity": "Rare",
       "year": 1984
     },
     "2421": {
@@ -3401,6 +3682,7 @@
       "dlc_name": null,
       "manufacturer": "Cadillac",
       "model": "CTS-V Sedan",
+      "rarity": "Common",
       "year": 2016
     },
     "2422": {
@@ -3413,6 +3695,7 @@
       "dlc_name": null,
       "manufacturer": "HSV",
       "model": "Limited Edition GEN-F GTS Maloo",
+      "rarity": "Common",
       "year": 2014
     },
     "2430": {
@@ -3425,6 +3708,7 @@
       "dlc_name": null,
       "manufacturer": "Ariel",
       "model": "Nomad",
+      "rarity": "Rare",
       "year": 2016
     },
     "2467": {
@@ -3437,6 +3721,7 @@
       "dlc_name": null,
       "manufacturer": "Ferrari",
       "model": "488 GTB",
+      "rarity": "Epic",
       "year": 2015
     },
     "2468": {
@@ -3449,6 +3734,7 @@
       "dlc_name": null,
       "manufacturer": "Dodge",
       "model": "Charger SRT Hellcat",
+      "rarity": "Rare",
       "year": 2015
     },
     "2469": {
@@ -3461,6 +3747,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "Sports 800",
+      "rarity": "Rare",
       "year": 1965
     },
     "2470": {
@@ -3473,6 +3760,7 @@
       "dlc_name": null,
       "manufacturer": "Aston Martin",
       "model": "Vulcan",
+      "rarity": "Legendary",
       "year": 2016
     },
     "2471": {
@@ -3485,6 +3773,7 @@
       "dlc_name": null,
       "manufacturer": "Mercedes-AMG",
       "model": "C 63 S Coupé",
+      "rarity": "Rare",
       "year": 2016
     },
     "2472": {
@@ -3497,6 +3786,7 @@
       "dlc_name": null,
       "manufacturer": "McLaren",
       "model": "570S Coupé",
+      "rarity": "Epic",
       "year": 2015
     },
     "2473": {
@@ -3509,6 +3799,7 @@
       "dlc_name": null,
       "manufacturer": "Audi",
       "model": "R8 V10 plus",
+      "rarity": "Epic",
       "year": 2016
     },
     "2486": {
@@ -3521,6 +3812,7 @@
       "dlc_name": null,
       "manufacturer": "Radical",
       "model": "RXC Turbo",
+      "rarity": "Epic",
       "year": 2015
     },
     "2487": {
@@ -3533,6 +3825,7 @@
       "dlc_name": null,
       "manufacturer": "Honda",
       "model": "S660 Alpha",
+      "rarity": "Common",
       "year": 2016
     },
     "2489": {
@@ -3545,6 +3838,7 @@
       "dlc_name": null,
       "manufacturer": "Abarth",
       "model": "695 Biposto",
+      "rarity": "Common",
       "year": 2016
     },
     "2494": {
@@ -3557,6 +3851,7 @@
       "dlc_name": null,
       "manufacturer": "Land Rover",
       "model": "Range Rover Sport SVR",
+      "rarity": "Rare",
       "year": 2015
     },
     "2507": {
@@ -3569,6 +3864,7 @@
       "dlc_name": null,
       "manufacturer": "Chevrolet",
       "model": "150 Utility Sedan",
+      "rarity": "Common",
       "year": 1955
     },
     "2512": {
@@ -3581,6 +3877,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "Skyline GTS-R",
+      "rarity": "Epic",
       "year": 1987
     },
     "2515": {
@@ -3593,6 +3890,7 @@
       "dlc_name": null,
       "manufacturer": "Penhall",
       "model": "The Cholla",
+      "rarity": "Rare",
       "year": 2011
     },
     "2517": {
@@ -3605,6 +3903,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "#11 Rockstar F-150 Trophy Truck",
+      "rarity": "Epic",
       "year": 2014
     },
     "2526": {
@@ -3617,6 +3916,7 @@
       "dlc_name": null,
       "manufacturer": "Koenigsegg",
       "model": "Regera",
+      "rarity": "Legendary",
       "year": 2016
     },
     "2527": {
@@ -3629,6 +3929,7 @@
       "dlc_name": null,
       "manufacturer": "Aston Martin",
       "model": "DB11",
+      "rarity": "Epic",
       "year": 2017
     },
     "2534": {
@@ -3641,6 +3942,7 @@
       "dlc_name": null,
       "manufacturer": "Porsche",
       "model": "968 Turbo S",
+      "rarity": "Rare",
       "year": 1993
     },
     "2535": {
@@ -3653,6 +3955,7 @@
       "dlc_name": null,
       "manufacturer": "Porsche",
       "model": "928 GTS",
+      "rarity": "Rare",
       "year": 1993
     },
     "2542": {
@@ -3665,6 +3968,7 @@
       "dlc_name": null,
       "manufacturer": "Alfa Romeo",
       "model": "Giulia Quadrifoglio",
+      "rarity": "Rare",
       "year": 2017
     },
     "2544": {
@@ -3677,6 +3981,7 @@
       "dlc_name": null,
       "manufacturer": "Dodge",
       "model": "Viper ACR",
+      "rarity": "Epic",
       "year": 2016
     },
     "2549": {
@@ -3689,6 +3994,7 @@
       "dlc_name": null,
       "manufacturer": "Porsche",
       "model": "#3 917 LH",
+      "rarity": "Legendary",
       "year": 1970
     },
     "2551": {
@@ -3701,6 +4007,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "FPV Limited Edition Pursuit Ute",
+      "rarity": "Common",
       "year": 2014
     },
     "2552": {
@@ -3713,6 +4020,7 @@
       "dlc_name": null,
       "manufacturer": "Alumicraft",
       "model": "Class 10 Race Car",
+      "rarity": "Epic",
       "year": 2015
     },
     "2563": {
@@ -3725,6 +4033,7 @@
       "dlc_name": null,
       "manufacturer": "Reliant",
       "model": "Supervan III",
+      "rarity": "Common",
       "year": 1972
     },
     "2566": {
@@ -3737,6 +4046,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "FJ40",
+      "rarity": "Common",
       "year": 1979
     },
     "2568": {
@@ -3749,6 +4059,7 @@
       "dlc_name": null,
       "manufacturer": "Volkswagen",
       "model": "Class 5/1600 Baja Bug",
+      "rarity": "Rare",
       "year": 1969
     },
     "2569": {
@@ -3761,6 +4072,7 @@
       "dlc_name": null,
       "manufacturer": "Ultima",
       "model": "Evolution Coupe 1020",
+      "rarity": "Epic",
       "year": 2015
     },
     "2574": {
@@ -3773,6 +4085,7 @@
       "dlc_name": null,
       "manufacturer": "AMG Transport Dynamics",
       "model": "M12S Warthog CST",
+      "rarity": "Legendary",
       "year": 2554
     },
     "2577": {
@@ -3785,6 +4098,7 @@
       "dlc_name": null,
       "manufacturer": "Ferrari",
       "model": "F12tdf",
+      "rarity": "Epic",
       "year": 2015
     },
     "2613": {
@@ -3797,6 +4111,7 @@
       "dlc_name": null,
       "manufacturer": "GMC",
       "model": "Jimmy",
+      "rarity": "Common",
       "year": 1970
     },
     "2614": {
@@ -3809,6 +4124,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "Mustang GT 2+2 Fastback",
+      "rarity": "Legendary",
       "year": 1968
     },
     "2616": {
@@ -3821,6 +4137,7 @@
       "dlc_name": null,
       "manufacturer": "Lamborghini",
       "model": "Centenario LP 770-4",
+      "rarity": "Legendary",
       "year": 2016
     },
     "2618": {
@@ -3833,6 +4150,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "GT-R (R35)",
+      "rarity": "Rare",
       "year": 2017
     },
     "2625": {
@@ -3845,6 +4163,7 @@
       "dlc_name": null,
       "manufacturer": "Bentley",
       "model": "Bentayga",
+      "rarity": "Epic",
       "year": 2016
     },
     "2628": {
@@ -3857,6 +4176,7 @@
       "dlc_name": null,
       "manufacturer": "BMW",
       "model": "M4 GTS",
+      "rarity": "Epic",
       "year": 2016
     },
     "2636": {
@@ -3869,6 +4189,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "#1 T100 Baja Truck",
+      "rarity": "Legendary",
       "year": 1993
     },
     "2647": {
@@ -3881,6 +4202,7 @@
       "dlc_name": null,
       "manufacturer": "Pagani",
       "model": "Huayra BC Coupe",
+      "rarity": "Legendary",
       "year": 2016
     },
     "2649": {
@@ -3893,6 +4215,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "Crown Victoria Police Interceptor",
+      "rarity": "Common",
       "year": 2010
     },
     "2652": {
@@ -3905,6 +4228,7 @@
       "dlc_name": null,
       "manufacturer": "Mitsubishi",
       "model": "Montero Evolution",
+      "rarity": "BarnFind",
       "year": 1997
     },
     "2654": {
@@ -3917,6 +4241,7 @@
       "dlc_name": null,
       "manufacturer": "Mercedes-AMG",
       "model": "GT R",
+      "rarity": "Epic",
       "year": 2017
     },
     "2659": {
@@ -3929,6 +4254,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "Silvia K's Aero",
+      "rarity": "Common",
       "year": 1998
     },
     "2663": {
@@ -3941,6 +4267,7 @@
       "dlc_name": null,
       "manufacturer": "RJ Anderson",
       "model": "#37 Polaris RZR Pro 2 Truck",
+      "rarity": "Epic",
       "year": 2016
     },
     "2711": {
@@ -3953,6 +4280,7 @@
       "dlc_name": null,
       "manufacturer": null,
       "model": "Mazdaspeed 3 (Traffic)",
+      "rarity": "Common",
       "year": 2010
     },
     "2712": {
@@ -3965,6 +4293,7 @@
       "dlc_name": null,
       "manufacturer": "Mitsubishi",
       "model": "Galant VR-4 (Traffic)",
+      "rarity": "Common",
       "year": 1992
     },
     "2713": {
@@ -3977,6 +4306,7 @@
       "dlc_name": null,
       "manufacturer": null,
       "model": "Box Truck (Traffic)",
+      "rarity": "Common",
       "year": 2014
     },
     "2714": {
@@ -3989,6 +4319,7 @@
       "dlc_name": null,
       "manufacturer": null,
       "model": "Bus (Traffic)",
+      "rarity": "Common",
       "year": 2014
     },
     "2738": {
@@ -4001,6 +4332,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "NISMO GT-R LM",
+      "rarity": "Legendary",
       "year": 1995
     },
     "2739": {
@@ -4013,6 +4345,7 @@
       "dlc_name": null,
       "manufacturer": "Chevrolet",
       "model": "Camaro ZL1",
+      "rarity": "Rare",
       "year": 2017
     },
     "2740": {
@@ -4025,6 +4358,7 @@
       "dlc_name": null,
       "manufacturer": "Abarth",
       "model": "124 Spider",
+      "rarity": "Rare",
       "year": 2017
     },
     "2742": {
@@ -4037,6 +4371,7 @@
       "dlc_name": null,
       "manufacturer": "Jeep",
       "model": "Trailcat",
+      "rarity": "Rare",
       "year": 2016
     },
     "2743": {
@@ -4049,6 +4384,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "Land Cruiser Arctic Trucks AT37",
+      "rarity": "Rare",
       "year": 2016
     },
     "2745": {
@@ -4061,6 +4397,7 @@
       "dlc_name": null,
       "manufacturer": "Honda",
       "model": "Ridgeline Baja Trophy Truck",
+      "rarity": "Epic",
       "year": 2015
     },
     "2755": {
@@ -4073,6 +4410,7 @@
       "dlc_name": null,
       "manufacturer": "Porsche",
       "model": "911 GT2 RS",
+      "rarity": "Epic",
       "year": 2018
     },
     "2773": {
@@ -4085,6 +4423,7 @@
       "dlc_name": null,
       "manufacturer": "Porsche",
       "model": "Cayenne Turbo",
+      "rarity": "Epic",
       "year": 2018
     },
     "2792": {
@@ -4097,6 +4436,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "#2 GT40 Mk II",
+      "rarity": "Legendary",
       "year": 1966
     },
     "2793": {
@@ -4109,6 +4449,7 @@
       "dlc_name": null,
       "manufacturer": "Ferrari",
       "model": "#24 Ferrari Spa 330 P4",
+      "rarity": "Legendary",
       "year": 1967
     },
     "2794": {
@@ -4121,6 +4462,7 @@
       "dlc_name": null,
       "manufacturer": "Porsche",
       "model": "911 Turbo S Leichtbau",
+      "rarity": "Legendary",
       "year": 1993
     },
     "2801": {
@@ -4133,6 +4475,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "#11 Tomica Skyline Turbo Super Silhouette",
+      "rarity": "BarnFind",
       "year": 1983
     },
     "2817": {
@@ -4145,6 +4488,7 @@
       "dlc_name": null,
       "manufacturer": "Honda",
       "model": "Prelude Type SH",
+      "rarity": "Common",
       "year": 2000
     },
     "2822": {
@@ -4157,6 +4501,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "Safari Turbo",
+      "rarity": "TreasureCar",
       "year": 1985
     },
     "2825": {
@@ -4169,6 +4514,7 @@
       "dlc_name": null,
       "manufacturer": "Lotus",
       "model": "Elise GT1",
+      "rarity": "Legendary",
       "year": 1997
     },
     "2841": {
@@ -4181,6 +4527,7 @@
       "dlc_name": null,
       "manufacturer": "Jeep",
       "model": "Grand Cherokee Trackhawk",
+      "rarity": "Common",
       "year": 2018
     },
     "2866": {
@@ -4193,6 +4540,7 @@
       "dlc_name": null,
       "manufacturer": "Exomotive",
       "model": "Exocet Sport V8 XP-5",
+      "rarity": "Epic",
       "year": 2018
     },
     "2870": {
@@ -4205,6 +4553,7 @@
       "dlc_name": null,
       "manufacturer": "Honda",
       "model": "Civic Type R",
+      "rarity": "Rare",
       "year": 2018
     },
     "2871": {
@@ -4217,6 +4566,7 @@
       "dlc_name": null,
       "manufacturer": "Can-Am",
       "model": "Maverick X RS Turbo R",
+      "rarity": "Common",
       "year": 2018
     },
     "2872": {
@@ -4229,6 +4579,7 @@
       "dlc_name": null,
       "manufacturer": "Hyundai",
       "model": "Veloster N",
+      "rarity": "Epic",
       "year": 2019
     },
     "2902": {
@@ -4241,6 +4592,7 @@
       "dlc_name": null,
       "manufacturer": null,
       "model": "Flatbed Truck (Traffic)",
+      "rarity": "Common",
       "year": 2018
     },
     "2903": {
@@ -4253,6 +4605,7 @@
       "dlc_name": null,
       "manufacturer": "Subaru",
       "model": "Legacy B4 GT (Traffic)",
+      "rarity": "Common",
       "year": 2005
     },
     "2909": {
@@ -4265,6 +4618,7 @@
       "dlc_name": null,
       "manufacturer": "Dodge",
       "model": "Challenger SRT Demon",
+      "rarity": "Rare",
       "year": 2018
     },
     "2910": {
@@ -4277,6 +4631,7 @@
       "dlc_name": null,
       "manufacturer": "Koenigsegg",
       "model": "Agera RS",
+      "rarity": "Legendary",
       "year": 2017
     },
     "2935": {
@@ -4289,6 +4644,7 @@
       "dlc_name": null,
       "manufacturer": "Funco Motorsports",
       "model": "F9",
+      "rarity": "Epic",
       "year": 2018
     },
     "2937": {
@@ -4301,6 +4657,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "#14 Rahal Letterman Lanigan Racing Fiesta",
+      "rarity": "Epic",
       "year": 2017
     },
     "2968": {
@@ -4313,6 +4670,7 @@
       "dlc_name": null,
       "manufacturer": "Aston Martin",
       "model": "Valkyrie",
+      "rarity": "Legendary",
       "year": 2023
     },
     "2974": {
@@ -4325,6 +4683,7 @@
       "dlc_name": null,
       "manufacturer": "Ferrari",
       "model": "812 Superfast",
+      "rarity": "Legendary",
       "year": 2017
     },
     "2986": {
@@ -4337,6 +4696,7 @@
       "dlc_name": null,
       "manufacturer": "Mercedes-Benz",
       "model": "Unimog U5023",
+      "rarity": "Rare",
       "year": 2014
     },
     "2987": {
@@ -4349,6 +4709,7 @@
       "dlc_name": null,
       "manufacturer": "Peel",
       "model": "P50",
+      "rarity": "Legendary",
       "year": 1962
     },
     "2992": {
@@ -4361,6 +4722,7 @@
       "dlc_name": null,
       "manufacturer": "Jaguar",
       "model": "Lightweight E-Type",
+      "rarity": "Legendary",
       "year": 1964
     },
     "2993": {
@@ -4373,6 +4735,7 @@
       "dlc_name": null,
       "manufacturer": "TVR",
       "model": "Griffith",
+      "rarity": "Rare",
       "year": 2018
     },
     "2995": {
@@ -4385,6 +4748,7 @@
       "dlc_name": null,
       "manufacturer": "Volkswagen",
       "model": "Golf GTI",
+      "rarity": "Common",
       "year": 1983
     },
     "2996": {
@@ -4397,6 +4761,7 @@
       "dlc_name": null,
       "manufacturer": "Formula Drift",
       "model": "#13 Ford Mustang",
+      "rarity": "Epic",
       "year": 2015
     },
     "2997": {
@@ -4409,6 +4774,7 @@
       "dlc_name": null,
       "manufacturer": "Formula Drift",
       "model": "#530 HSV Maloo GEN-F",
+      "rarity": "Epic",
       "year": 2016
     },
     "3000": {
@@ -4421,6 +4787,7 @@
       "dlc_name": null,
       "manufacturer": "Formula Drift",
       "model": "#777 Nissan 240SX",
+      "rarity": "Epic",
       "year": 1997
     },
     "3003": {
@@ -4433,6 +4800,7 @@
       "dlc_name": null,
       "manufacturer": "Formula Drift",
       "model": "#43 Dodge Viper SRT-10 ACR",
+      "rarity": "Epic",
       "year": 2006
     },
     "3007": {
@@ -4445,6 +4813,7 @@
       "dlc_name": null,
       "manufacturer": "Volkswagen",
       "model": "#34 Andretti Rally Cross Beetle",
+      "rarity": "Epic",
       "year": 2017
     },
     "3031": {
@@ -4457,6 +4826,7 @@
       "dlc_name": null,
       "manufacturer": "Porsche",
       "model": "#185 959 Prodrive Rally Raid",
+      "rarity": "Legendary",
       "year": 1985
     },
     "3035": {
@@ -4469,6 +4839,7 @@
       "dlc_name": null,
       "manufacturer": "KTM",
       "model": "X-Bow GT4",
+      "rarity": "Epic",
       "year": 2018
     },
     "3037": {
@@ -4481,6 +4852,7 @@
       "dlc_name": null,
       "manufacturer": "Formula Drift",
       "model": "#98 BMW 325i",
+      "rarity": "Epic",
       "year": 1989
     },
     "3051": {
@@ -4493,6 +4865,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "M-Sport Fiesta RS",
+      "rarity": "Epic",
       "year": 2017
     },
     "3055": {
@@ -4505,6 +4878,7 @@
       "dlc_name": null,
       "manufacturer": "Jaguar",
       "model": "C-X75",
+      "rarity": "Legendary",
       "year": 2010
     },
     "3062": {
@@ -4517,6 +4891,7 @@
       "dlc_name": null,
       "manufacturer": "Ferrari",
       "model": "512 S",
+      "rarity": "Legendary",
       "year": 1970
     },
     "3063": {
@@ -4529,6 +4904,7 @@
       "dlc_name": null,
       "manufacturer": "Mercedes-Benz",
       "model": "X-Class",
+      "rarity": "Common",
       "year": 2018
     },
     "3064": {
@@ -4541,6 +4917,7 @@
       "dlc_name": null,
       "manufacturer": "Mercedes-AMG",
       "model": "GT 4-Door Coupé",
+      "rarity": "Epic",
       "year": 2018
     },
     "3072": {
@@ -4553,6 +4930,7 @@
       "dlc_name": null,
       "manufacturer": "Porsche",
       "model": "911 GT3 RS",
+      "rarity": "Epic",
       "year": 2019
     },
     "3082": {
@@ -4565,6 +4943,7 @@
       "dlc_name": null,
       "manufacturer": "Maserati",
       "model": "MC12 Versione Corsa",
+      "rarity": "Legendary",
       "year": 2008
     },
     "3084": {
@@ -4577,6 +4956,7 @@
       "dlc_name": null,
       "manufacturer": "Hillman",
       "model": "Imp",
+      "rarity": "Common",
       "year": 1966
     },
     "3085": {
@@ -4589,6 +4969,7 @@
       "dlc_name": null,
       "manufacturer": "DeBerti",
       "model": "Ford Mustang GT",
+      "rarity": "Epic",
       "year": 2018
     },
     "3087": {
@@ -4601,6 +4982,7 @@
       "dlc_name": null,
       "manufacturer": "McLaren",
       "model": "650S Spider",
+      "rarity": "Epic",
       "year": 2014
     },
     "3088": {
@@ -4613,6 +4995,7 @@
       "dlc_name": null,
       "manufacturer": "DeBerti",
       "model": "Chevrolet Silverado 1500 Drift Truck",
+      "rarity": "Epic",
       "year": 2018
     },
     "3091": {
@@ -4625,6 +5008,7 @@
       "dlc_name": null,
       "manufacturer": "Aston Martin",
       "model": "Vantage",
+      "rarity": "Epic",
       "year": 2019
     },
     "3107": {
@@ -4637,6 +5021,7 @@
       "dlc_name": null,
       "manufacturer": "Mercedes-Benz",
       "model": "G 63 AMG 6x6",
+      "rarity": "Epic",
       "year": 2014
     },
     "3108": {
@@ -4649,10 +5034,11 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "Mustang RTR Spec 5",
+      "rarity": "Rare",
       "year": 2018
     },
     "3110": {
-      "name": "2013 DeBerti Jeep Wrangler Unlimited",
+      "name": "2018 DeBerti Jeep Wrangler Unlimited",
       "id": "3110",
       "acquisition": "Autoshow, Wheelspin",
       "car_type": "Unlimited Offroad",
@@ -4661,7 +5047,8 @@
       "dlc_name": null,
       "manufacturer": "DeBerti",
       "model": "Jeep Wrangler Unlimited",
-      "year": 2013
+      "rarity": "Epic",
+      "year": 2018
     },
     "3117": {
       "name": "2018 Porsche 718 Cayman GTS",
@@ -4673,6 +5060,7 @@
       "dlc_name": null,
       "manufacturer": "Porsche",
       "model": "718 Cayman GTS",
+      "rarity": "Epic",
       "year": 2018
     },
     "3118": {
@@ -4685,6 +5073,7 @@
       "dlc_name": null,
       "manufacturer": "Chevrolet",
       "model": "Corvette ZR1",
+      "rarity": "Epic",
       "year": 2019
     },
     "3120": {
@@ -4697,6 +5086,7 @@
       "dlc_name": null,
       "manufacturer": "Lamborghini",
       "model": "Urus",
+      "rarity": "Rare",
       "year": 2019
     },
     "3123": {
@@ -4709,6 +5099,7 @@
       "dlc_name": null,
       "manufacturer": "Porsche",
       "model": "911 Carrera S",
+      "rarity": "Rare",
       "year": 2019
     },
     "3128": {
@@ -4721,6 +5112,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "#25 'Brocky' Ultra4 Bronco RTR",
+      "rarity": "Epic",
       "year": 2017
     },
     "3129": {
@@ -4733,6 +5125,7 @@
       "dlc_name": null,
       "manufacturer": "Renault",
       "model": "Mégane R26.R",
+      "rarity": "Rare",
       "year": 2008
     },
     "3132": {
@@ -4745,6 +5138,7 @@
       "dlc_name": null,
       "manufacturer": "MINI",
       "model": "X-Raid John Cooper Works Buggy",
+      "rarity": "Epic",
       "year": 2018
     },
     "3134": {
@@ -4757,6 +5151,7 @@
       "dlc_name": null,
       "manufacturer": "Renault",
       "model": "Megane R.S.",
+      "rarity": "Rare",
       "year": 2018
     },
     "3141": {
@@ -4769,6 +5164,7 @@
       "dlc_name": null,
       "manufacturer": "Apollo",
       "model": "Intensa Emozione",
+      "rarity": "Legendary",
       "year": 2019
     },
     "3149": {
@@ -4781,6 +5177,7 @@
       "dlc_name": null,
       "manufacturer": "Chevrolet",
       "model": "Camaro ZL1 1LE",
+      "rarity": "Rare",
       "year": 2018
     },
     "3153": {
@@ -4793,6 +5190,7 @@
       "dlc_name": null,
       "manufacturer": "McLaren",
       "model": "600LT Coupé",
+      "rarity": "Epic",
       "year": 2018
     },
     "3156": {
@@ -4805,6 +5203,7 @@
       "dlc_name": null,
       "manufacturer": "McLaren",
       "model": "Speedtail",
+      "rarity": "Legendary",
       "year": 2019
     },
     "3170": {
@@ -4817,6 +5216,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "Supervan 3",
+      "rarity": "Epic",
       "year": 1994
     },
     "3173": {
@@ -4829,6 +5229,7 @@
       "dlc_name": null,
       "manufacturer": "BMW",
       "model": "Z4 Roadster",
+      "rarity": "Common",
       "year": 2019
     },
     "3176": {
@@ -4841,6 +5242,7 @@
       "dlc_name": null,
       "manufacturer": "Mercedes-Benz",
       "model": "AMG Hammer Coupe",
+      "rarity": "Common",
       "year": 1987
     },
     "3180": {
@@ -4853,6 +5255,7 @@
       "dlc_name": null,
       "manufacturer": "Peugeot",
       "model": "205 Rallye",
+      "rarity": "Rare",
       "year": 1991
     },
     "3184": {
@@ -4865,6 +5268,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "#5 Escort RS1800 MkII",
+      "rarity": "Epic",
       "year": 1977
     },
     "3185": {
@@ -4877,6 +5281,7 @@
       "dlc_name": null,
       "manufacturer": "Aston Martin",
       "model": "DBS Superleggera",
+      "rarity": "Epic",
       "year": 2019
     },
     "3187": {
@@ -4889,6 +5294,7 @@
       "dlc_name": null,
       "manufacturer": "Porsche",
       "model": "Macan LPR Rally Raid",
+      "rarity": "Epic",
       "year": 2018
     },
     "3189": {
@@ -4901,6 +5307,7 @@
       "dlc_name": null,
       "manufacturer": "Hennessey",
       "model": "Ford F-150 VelociRaptor 6X6",
+      "rarity": "Legendary",
       "year": 2019
     },
     "3190": {
@@ -4913,6 +5320,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "F-150 SVT Lightning",
+      "rarity": "Common",
       "year": 2003
     },
     "3191": {
@@ -4925,6 +5333,7 @@
       "dlc_name": null,
       "manufacturer": "Lamborghini",
       "model": "Espada 400 GT",
+      "rarity": "Rare",
       "year": 1973
     },
     "3198": {
@@ -4937,6 +5346,7 @@
       "dlc_name": null,
       "manufacturer": "De Tomaso",
       "model": "Pantera GT5",
+      "rarity": "Legendary",
       "year": 1984
     },
     "3211": {
@@ -4949,6 +5359,7 @@
       "dlc_name": null,
       "manufacturer": "Aston Martin",
       "model": "Vulcan AMR Pro",
+      "rarity": "Legendary",
       "year": 2017
     },
     "3212": {
@@ -4961,6 +5372,7 @@
       "dlc_name": null,
       "manufacturer": "Zenvo",
       "model": "TSR-S",
+      "rarity": "Legendary",
       "year": 2019
     },
     "3214": {
@@ -4973,6 +5385,7 @@
       "dlc_name": null,
       "manufacturer": "Porsche",
       "model": "#70 Porsche Motorsport 935",
+      "rarity": "Legendary",
       "year": 2019
     },
     "3225": {
@@ -4985,6 +5398,7 @@
       "dlc_name": null,
       "manufacturer": "Ferrari",
       "model": "Portofino",
+      "rarity": "Epic",
       "year": 2018
     },
     "3226": {
@@ -4997,6 +5411,7 @@
       "dlc_name": null,
       "manufacturer": "Ferrari",
       "model": "J50",
+      "rarity": "Rare",
       "year": 2017
     },
     "3227": {
@@ -5009,6 +5424,7 @@
       "dlc_name": null,
       "manufacturer": "Ferrari",
       "model": "488 Pista",
+      "rarity": "Epic",
       "year": 2019
     },
     "3228": {
@@ -5021,6 +5437,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "Racing Puma",
+      "rarity": "Rare",
       "year": 1999
     },
     "3232": {
@@ -5033,6 +5450,7 @@
       "dlc_name": null,
       "manufacturer": "Formula Drift",
       "model": "#777 Chevrolet Corvette",
+      "rarity": "Epic",
       "year": 2013
     },
     "3235": {
@@ -5045,6 +5463,7 @@
       "dlc_name": null,
       "manufacturer": "Volkswagen",
       "model": "Pickup LX",
+      "rarity": "Epic",
       "year": 1982
     },
     "3241": {
@@ -5057,6 +5476,7 @@
       "dlc_name": null,
       "manufacturer": "Subaru",
       "model": "WRX STI ARX Supercar",
+      "rarity": "Epic",
       "year": 2018
     },
     "3249": {
@@ -5069,6 +5489,7 @@
       "dlc_name": null,
       "manufacturer": "Formula Drift",
       "model": "#117 599 GTB Fiorano",
+      "rarity": "Epic",
       "year": 2007
     },
     "3250": {
@@ -5081,6 +5502,7 @@
       "dlc_name": null,
       "manufacturer": "Mercedes-AMG",
       "model": "E 63 S",
+      "rarity": "Epic",
       "year": 2018
     },
     "3255": {
@@ -5093,6 +5515,7 @@
       "dlc_name": null,
       "manufacturer": "Jeep",
       "model": "JT",
+      "rarity": "Common",
       "year": 2020
     },
     "3257": {
@@ -5105,6 +5528,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "Pulsar GTI-R",
+      "rarity": "Rare",
       "year": 1990
     },
     "3277": {
@@ -5117,6 +5541,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "Mustang Shelby GT500",
+      "rarity": "Rare",
       "year": 2020
     },
     "3282": {
@@ -5129,6 +5554,7 @@
       "dlc_name": "Car Pass",
       "manufacturer": "Porsche",
       "model": "#203 Porsche AG 961",
+      "rarity": "Legendary",
       "year": 1987
     },
     "3287": {
@@ -5141,6 +5567,7 @@
       "dlc_name": null,
       "manufacturer": "Jaguar",
       "model": "Sport XJR-15",
+      "rarity": "Legendary",
       "year": 1991
     },
     "3288": {
@@ -5153,6 +5580,7 @@
       "dlc_name": null,
       "manufacturer": "Schuppan",
       "model": "962CR",
+      "rarity": "Epic",
       "year": 1993
     },
     "3289": {
@@ -5165,6 +5593,7 @@
       "dlc_name": null,
       "manufacturer": "Lamborghini",
       "model": "Aventador SVJ",
+      "rarity": "Legendary",
       "year": 2018
     },
     "3293": {
@@ -5177,6 +5606,7 @@
       "dlc_name": null,
       "manufacturer": "Jaguar",
       "model": "XJ220S TWR",
+      "rarity": "Rare",
       "year": 1993
     },
     "3304": {
@@ -5189,6 +5619,7 @@
       "dlc_name": "Italian Passion Car Pack",
       "manufacturer": "Alfa Romeo",
       "model": "SE 048SP",
+      "rarity": "Legendary",
       "year": 1990
     },
     "3307": {
@@ -5201,6 +5632,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "370Z Nismo",
+      "rarity": "Rare",
       "year": 2019
     },
     "3311": {
@@ -5213,6 +5645,7 @@
       "dlc_name": null,
       "manufacturer": "Ferrari",
       "model": "FXX-K Evo",
+      "rarity": "Legendary",
       "year": 2018
     },
     "3312": {
@@ -5225,6 +5658,7 @@
       "dlc_name": null,
       "manufacturer": "Ferrari",
       "model": "Monza SP2",
+      "rarity": "Legendary",
       "year": 2019
     },
     "3315": {
@@ -5237,6 +5671,7 @@
       "dlc_name": null,
       "manufacturer": "Koenigsegg",
       "model": "Jesko",
+      "rarity": "Legendary",
       "year": 2020
     },
     "3318": {
@@ -5249,6 +5684,7 @@
       "dlc_name": null,
       "manufacturer": "Audi",
       "model": "RS 4 Avant",
+      "rarity": "Rare",
       "year": 2018
     },
     "3325": {
@@ -5261,6 +5697,7 @@
       "dlc_name": "Car Pass",
       "manufacturer": "Aston Martin",
       "model": "DB7 GT",
+      "rarity": "Rare",
       "year": 2003
     },
     "3359": {
@@ -5273,6 +5710,7 @@
       "dlc_name": null,
       "manufacturer": "Audi",
       "model": "RS e-tron GT",
+      "rarity": "Epic",
       "year": 2021
     },
     "3363": {
@@ -5285,6 +5723,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "#23 Pennzoil NISMO Skyline GT-R",
+      "rarity": "BarnFind",
       "year": 1998
     },
     "3364": {
@@ -5297,6 +5736,7 @@
       "dlc_name": null,
       "manufacturer": "Aston Martin",
       "model": "Valhalla Concept Car",
+      "rarity": "Legendary",
       "year": 2019
     },
     "3367": {
@@ -5309,6 +5749,7 @@
       "dlc_name": null,
       "manufacturer": "Ferrari",
       "model": "F8 Tributo",
+      "rarity": "Legendary",
       "year": 2019
     },
     "3369": {
@@ -5321,6 +5762,7 @@
       "dlc_name": null,
       "manufacturer": "Chevrolet",
       "model": "Corvette Stingray Coupe",
+      "rarity": "Rare",
       "year": 2020
     },
     "3371": {
@@ -5333,6 +5775,7 @@
       "dlc_name": null,
       "manufacturer": "Lamborghini",
       "model": "Huracán EVO",
+      "rarity": "Epic",
       "year": 2020
     },
     "3373": {
@@ -5345,6 +5788,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "4Runner TRD Pro",
+      "rarity": "Rare",
       "year": 2019
     },
     "3374": {
@@ -5357,6 +5801,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "Tacoma TRD Pro",
+      "rarity": "Rare",
       "year": 2019
     },
     "3395": {
@@ -5369,6 +5814,7 @@
       "dlc_name": null,
       "manufacturer": "Renault",
       "model": "8 Gordini",
+      "rarity": "Common",
       "year": 1967
     },
     "3400": {
@@ -5381,6 +5827,7 @@
       "dlc_name": null,
       "manufacturer": "Formula Drift",
       "model": "#99 Mazda RX-8",
+      "rarity": "Epic",
       "year": 2009
     },
     "3402": {
@@ -5393,6 +5840,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "GR Supra",
+      "rarity": "Rare",
       "year": 2020
     },
     "3404": {
@@ -5405,6 +5853,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "#2069 Ford Performance Bronco R",
+      "rarity": "Epic",
       "year": 2020
     },
     "3411": {
@@ -5417,6 +5866,7 @@
       "dlc_name": null,
       "manufacturer": "Formula Drift",
       "model": "#34 Toyota Supra MkIV",
+      "rarity": "Epic",
       "year": 1995
     },
     "3412": {
@@ -5429,6 +5879,7 @@
       "dlc_name": null,
       "manufacturer": "Subaru",
       "model": "STI S209",
+      "rarity": "Common",
       "year": 2019
     },
     "3413": {
@@ -5441,6 +5892,7 @@
       "dlc_name": null,
       "manufacturer": "Volkswagen",
       "model": "Golf R",
+      "rarity": "Common",
       "year": 2021
     },
     "3414": {
@@ -5453,6 +5905,7 @@
       "dlc_name": null,
       "manufacturer": "Land Rover",
       "model": "Defender 110 X",
+      "rarity": "Common",
       "year": 2020
     },
     "3429": {
@@ -5465,6 +5918,7 @@
       "dlc_name": null,
       "manufacturer": "Ginetta",
       "model": "G40 Junior",
+      "rarity": "Epic",
       "year": 2019
     },
     "3434": {
@@ -5477,6 +5931,7 @@
       "dlc_name": null,
       "manufacturer": "BMW",
       "model": "M2 Competition Coupé",
+      "rarity": "Epic",
       "year": 2020
     },
     "3439": {
@@ -5489,6 +5944,7 @@
       "dlc_name": null,
       "manufacturer": "DeBerti",
       "model": "Ford Super Duty F-250 Lariat 'Transformer'",
+      "rarity": "Epic",
       "year": 2019
     },
     "3441": {
@@ -5501,6 +5957,7 @@
       "dlc_name": null,
       "manufacturer": "DeBerti",
       "model": "Toyota Tacoma TRD ‘The Performance Truck’",
+      "rarity": "Common",
       "year": 2019
     },
     "3445": {
@@ -5513,6 +5970,7 @@
       "dlc_name": null,
       "manufacturer": "Porsche",
       "model": "Taycan Turbo S",
+      "rarity": "Common",
       "year": 2020
     },
     "3449": {
@@ -5525,6 +5983,7 @@
       "dlc_name": null,
       "manufacturer": "Lotus",
       "model": "Evija",
+      "rarity": "Legendary",
       "year": 2020
     },
     "3454": {
@@ -5537,6 +5996,7 @@
       "dlc_name": null,
       "manufacturer": "Audi",
       "model": "RS 3 Sedan",
+      "rarity": "Rare",
       "year": 2020
     },
     "3476": {
@@ -5549,6 +6009,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "Super Duty F-450 DRW PLATINUM",
+      "rarity": "Common",
       "year": 2020
     },
     "3477": {
@@ -5561,6 +6022,7 @@
       "dlc_name": null,
       "manufacturer": "Chevrolet",
       "model": "Silverado LT Trail Boss",
+      "rarity": "Rare",
       "year": 2020
     },
     "3482": {
@@ -5573,6 +6035,7 @@
       "dlc_name": null,
       "manufacturer": "McLaren",
       "model": "765LT Coupé",
+      "rarity": "Epic",
       "year": 2021
     },
     "3486": {
@@ -5585,6 +6048,7 @@
       "dlc_name": null,
       "manufacturer": "Jeep",
       "model": "Wrangler Rubicon (Traffic)",
+      "rarity": "Common",
       "year": 2012
     },
     "3494": {
@@ -5597,6 +6061,7 @@
       "dlc_name": "Car Pass",
       "manufacturer": "Alfa Romeo",
       "model": "Autodelta Tipo 33/2 Daytona",
+      "rarity": "Epic",
       "year": 1968
     },
     "3498": {
@@ -5609,6 +6074,7 @@
       "dlc_name": null,
       "manufacturer": "Saleen",
       "model": "S7 LM",
+      "rarity": "Epic",
       "year": 2017
     },
     "3518": {
@@ -5621,6 +6087,7 @@
       "dlc_name": null,
       "manufacturer": "BMW",
       "model": "M8 Competition Coupé",
+      "rarity": "Rare",
       "year": 2020
     },
     "3520": {
@@ -5633,6 +6100,7 @@
       "dlc_name": null,
       "manufacturer": "Lexus",
       "model": "LC 500",
+      "rarity": "Rare",
       "year": 2021
     },
     "3523": {
@@ -5645,6 +6113,7 @@
       "dlc_name": null,
       "manufacturer": "Formula Drift",
       "model": "#151 Toyota GR Supra",
+      "rarity": "Epic",
       "year": 2020
     },
     "3524": {
@@ -5657,6 +6126,7 @@
       "dlc_name": null,
       "manufacturer": "Formula Drift",
       "model": "#411 Toyota Corolla Hatchback",
+      "rarity": "Epic",
       "year": 2019
     },
     "3533": {
@@ -5669,6 +6139,7 @@
       "dlc_name": null,
       "manufacturer": "Volkswagen",
       "model": "Golf R",
+      "rarity": "Rare",
       "year": 2022
     },
     "3534": {
@@ -5681,6 +6152,7 @@
       "dlc_name": null,
       "manufacturer": "MINI",
       "model": "John Cooper Works GP",
+      "rarity": "Rare",
       "year": 2021
     },
     "3539": {
@@ -5693,6 +6165,7 @@
       "dlc_name": null,
       "manufacturer": "SIERRA Cars",
       "model": "#23 Yokohama ALPHA",
+      "rarity": "Epic",
       "year": 2020
     },
     "3540": {
@@ -5705,6 +6178,7 @@
       "dlc_name": null,
       "manufacturer": "SIERRA Cars",
       "model": "RX3",
+      "rarity": "Rare",
       "year": 2021
     },
     "3543": {
@@ -5717,6 +6191,7 @@
       "dlc_name": null,
       "manufacturer": "Pagani",
       "model": "Huayra R",
+      "rarity": "Legendary",
       "year": 2021
     },
     "3548": {
@@ -5729,6 +6204,7 @@
       "dlc_name": null,
       "manufacturer": "Wuling",
       "model": "Sunshine S",
+      "rarity": "Rare",
       "year": 2013
     },
     "3549": {
@@ -5741,6 +6217,7 @@
       "dlc_name": null,
       "manufacturer": "Alumicraft",
       "model": "#122 Class 1 Buggy",
+      "rarity": "Epic",
       "year": 2021
     },
     "3551": {
@@ -5753,6 +6230,7 @@
       "dlc_name": null,
       "manufacturer": "Formula Drift",
       "model": "#91 BMW M2",
+      "rarity": "Epic",
       "year": 2020
     },
     "3554": {
@@ -5765,6 +6243,7 @@
       "dlc_name": null,
       "manufacturer": "Mitsubishi",
       "model": "#1 Sierra Sierra Enterprises Lancer Evolution Time Attack",
+      "rarity": "BarnFind",
       "year": 2005
     },
     "3580": {
@@ -5777,6 +6256,7 @@
       "dlc_name": null,
       "manufacturer": "Aston Martin",
       "model": "DBX",
+      "rarity": "Rare",
       "year": 2021
     },
     "3583": {
@@ -5789,6 +6269,7 @@
       "dlc_name": null,
       "manufacturer": "Audi",
       "model": "RS 6 Avant",
+      "rarity": "Rare",
       "year": 2021
     },
     "3584": {
@@ -5801,6 +6282,7 @@
       "dlc_name": null,
       "manufacturer": "Audi",
       "model": "RS 7 Sportback",
+      "rarity": "Rare",
       "year": 2021
     },
     "3590": {
@@ -5813,6 +6295,7 @@
       "dlc_name": null,
       "manufacturer": "Chevrolet",
       "model": "K-10 Custom",
+      "rarity": "Common",
       "year": 1972
     },
     "3593": {
@@ -5825,6 +6308,7 @@
       "dlc_name": "Car Pass",
       "manufacturer": "Ferrari",
       "model": "Purosangue",
+      "rarity": "Rare",
       "year": 2024
     },
     "3594": {
@@ -5837,6 +6321,7 @@
       "dlc_name": null,
       "manufacturer": "Ferrari",
       "model": "Roma",
+      "rarity": "Epic",
       "year": 2020
     },
     "3595": {
@@ -5849,6 +6334,7 @@
       "dlc_name": null,
       "manufacturer": "Ferrari",
       "model": "SF90 Stradale",
+      "rarity": "Legendary",
       "year": 2020
     },
     "3597": {
@@ -5861,6 +6347,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "F-150 XLT Lariat",
+      "rarity": "Common",
       "year": 1986
     },
     "3599": {
@@ -5873,6 +6360,7 @@
       "dlc_name": null,
       "manufacturer": "Gordon Murray Automotive",
       "model": "T.50",
+      "rarity": "Legendary",
       "year": 2020
     },
     "3600": {
@@ -5885,6 +6373,7 @@
       "dlc_name": null,
       "manufacturer": "Hennessey",
       "model": "Venom F5",
+      "rarity": "Legendary",
       "year": 2021
     },
     "3603": {
@@ -5897,6 +6386,7 @@
       "dlc_name": null,
       "manufacturer": "Casey Currie Motorsports",
       "model": "#4402 Ultra 4 'Trophy Jeep'",
+      "rarity": "Epic",
       "year": 2019
     },
     "3604": {
@@ -5909,6 +6399,7 @@
       "dlc_name": null,
       "manufacturer": "Jimco",
       "model": "#179 Hammerhead Class 1",
+      "rarity": "Rare",
       "year": 2020
     },
     "3605": {
@@ -5921,6 +6412,7 @@
       "dlc_name": null,
       "manufacturer": "Jimco",
       "model": "#240 Fastball Racing Class 6100 Spec Trophy Truck",
+      "rarity": "Epic",
       "year": 2019
     },
     "3606": {
@@ -5933,6 +6425,7 @@
       "dlc_name": null,
       "manufacturer": "Lamborghini",
       "model": "Essenza SCV12",
+      "rarity": "Legendary",
       "year": 2020
     },
     "3608": {
@@ -5945,6 +6438,7 @@
       "dlc_name": null,
       "manufacturer": "Lamborghini",
       "model": "Sián Roadster",
+      "rarity": "Legendary",
       "year": 2020
     },
     "3611": {
@@ -5957,10 +6451,11 @@
       "dlc_name": null,
       "manufacturer": "Maserati",
       "model": "MC20",
+      "rarity": "Epic",
       "year": 2022
     },
     "3616": {
-      "name": "2020 Mercedes-AMG GT Black Series",
+      "name": "2021 Mercedes-AMG GT Black Series",
       "id": "3616",
       "acquisition": "Autoshow, Wheelspin",
       "car_type": "Track Toys",
@@ -5969,7 +6464,8 @@
       "dlc_name": null,
       "manufacturer": "Mercedes-AMG",
       "model": "GT Black Series",
-      "year": 2020
+      "rarity": "Epic",
+      "year": 2021
     },
     "3617": {
       "name": "2021 Mercedes-AMG SL 63",
@@ -5981,6 +6477,7 @@
       "dlc_name": null,
       "manufacturer": "Mercedes-AMG",
       "model": "SL 63",
+      "rarity": "Rare",
       "year": 2021
     },
     "3622": {
@@ -5993,6 +6490,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "GT-R NISMO (R35)",
+      "rarity": "Epic",
       "year": 2020
     },
     "3624": {
@@ -6005,6 +6503,7 @@
       "dlc_name": "Car Pass",
       "manufacturer": "Porsche",
       "model": "Carrera Coupe 'Luftauto 002'",
+      "rarity": "Epic",
       "year": 1987
     },
     "3625": {
@@ -6017,6 +6516,7 @@
       "dlc_name": null,
       "manufacturer": "Rimac",
       "model": "Nevera",
+      "rarity": "Legendary",
       "year": 2021
     },
     "3629": {
@@ -6029,6 +6529,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "GR Yaris",
+      "rarity": "Epic",
       "year": 2021
     },
     "3631": {
@@ -6041,6 +6542,7 @@
       "dlc_name": null,
       "manufacturer": "Aston Martin",
       "model": "Valkyrie AMR Pro",
+      "rarity": "Legendary",
       "year": 2022
     },
     "3645": {
@@ -6053,6 +6555,7 @@
       "dlc_name": null,
       "manufacturer": "BMW",
       "model": "M4 Competition Coupé",
+      "rarity": "Rare",
       "year": 2021
     },
     "3650": {
@@ -6065,6 +6568,7 @@
       "dlc_name": null,
       "manufacturer": "Mercedes-AMG",
       "model": "Mercedes-AMG ONE",
+      "rarity": "Legendary",
       "year": 2021
     },
     "3655": {
@@ -6077,10 +6581,11 @@
       "dlc_name": null,
       "manufacturer": "McLaren",
       "model": "620R",
+      "rarity": "Epic",
       "year": 2021
     },
     "3657": {
-      "name": "2022 Rivian R1T",
+      "name": "2021 Rivian R1T",
       "id": "3657",
       "acquisition": "Autoshow, Wheelspin",
       "car_type": "Pickups & 4x4's",
@@ -6089,7 +6594,8 @@
       "dlc_name": null,
       "manufacturer": "Rivian",
       "model": "R1T",
-      "year": 2022
+      "rarity": "Epic",
+      "year": 2021
     },
     "3661": {
       "name": "2018 Lotus Exige Cup 430",
@@ -6101,6 +6607,7 @@
       "dlc_name": null,
       "manufacturer": "Lotus",
       "model": "Exige Cup 430",
+      "rarity": "Epic",
       "year": 2018
     },
     "3662": {
@@ -6113,6 +6620,7 @@
       "dlc_name": null,
       "manufacturer": "RJ Anderson",
       "model": "#37 Polaris RZR Pro 4 Truck",
+      "rarity": "Epic",
       "year": 2021
     },
     "3665": {
@@ -6125,6 +6633,7 @@
       "dlc_name": null,
       "manufacturer": "SIERRA Cars",
       "model": "700R",
+      "rarity": "Rare",
       "year": 2021
     },
     "3667": {
@@ -6137,6 +6646,7 @@
       "dlc_name": null,
       "manufacturer": "Porsche",
       "model": "911 GT3",
+      "rarity": "Epic",
       "year": 2021
     },
     "3668": {
@@ -6149,6 +6659,7 @@
       "dlc_name": null,
       "manufacturer": "McLaren",
       "model": "Artura",
+      "rarity": "Epic",
       "year": 2023
     },
     "3670": {
@@ -6161,6 +6672,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "#4 Ford Focus RS",
+      "rarity": "Rare",
       "year": 2001
     },
     "3672": {
@@ -6173,6 +6685,7 @@
       "dlc_name": null,
       "manufacturer": "Lamborghini",
       "model": "Huracán STO",
+      "rarity": "Legendary",
       "year": 2020
     },
     "3678": {
@@ -6185,6 +6698,7 @@
       "dlc_name": null,
       "manufacturer": "Hyundai",
       "model": "i30 N",
+      "rarity": "Rare",
       "year": 2020
     },
     "3686": {
@@ -6197,6 +6711,7 @@
       "dlc_name": null,
       "manufacturer": "Polaris",
       "model": "RZR Pro XP Factory Racing Limited Edition",
+      "rarity": "Rare",
       "year": 2021
     },
     "3687": {
@@ -6209,6 +6724,7 @@
       "dlc_name": null,
       "manufacturer": "Polaris",
       "model": "RZR Pro XP Ultimate",
+      "rarity": "Rare",
       "year": 2021
     },
     "3692": {
@@ -6221,6 +6737,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "F-150 Lightning",
+      "rarity": "Epic",
       "year": 2022
     },
     "3693": {
@@ -6233,10 +6750,11 @@
       "dlc_name": null,
       "manufacturer": "Alumicraft",
       "model": "#6165 Trick Truck",
+      "rarity": "Epic",
       "year": 2022
     },
     "3698": {
-      "name": "2021 Porsche Mission R",
+      "name": "2022 Porsche Mission R",
       "id": "3698",
       "acquisition": "Autoshow, Wheelspin",
       "car_type": "Extreme Track Toys",
@@ -6245,7 +6763,8 @@
       "dlc_name": null,
       "manufacturer": "Porsche",
       "model": "Mission R",
-      "year": 2021
+      "rarity": "Legendary",
+      "year": 2022
     },
     "3700": {
       "name": "2021 McLaren Sabre",
@@ -6257,6 +6776,7 @@
       "dlc_name": null,
       "manufacturer": "McLaren",
       "model": "Sabre",
+      "rarity": "Epic",
       "year": 2021
     },
     "3716": {
@@ -6269,6 +6789,7 @@
       "dlc_name": null,
       "manufacturer": "Lotus",
       "model": "Emira",
+      "rarity": "Rare",
       "year": 2023
     },
     "3719": {
@@ -6281,6 +6802,7 @@
       "dlc_name": null,
       "manufacturer": "Cadillac",
       "model": "CT4-V Blackwing",
+      "rarity": "Rare",
       "year": 2022
     },
     "3720": {
@@ -6293,6 +6815,7 @@
       "dlc_name": null,
       "manufacturer": "Cadillac",
       "model": "CT5-V Blackwing",
+      "rarity": "Rare",
       "year": 2022
     },
     "3722": {
@@ -6305,6 +6828,7 @@
       "dlc_name": null,
       "manufacturer": "GMC",
       "model": "HUMMER EV Pickup",
+      "rarity": "Epic",
       "year": 2022
     },
     "3724": {
@@ -6317,6 +6841,7 @@
       "dlc_name": null,
       "manufacturer": "Ferrari",
       "model": "296 GTB",
+      "rarity": "Epic",
       "year": 2022
     },
     "3726": {
@@ -6329,6 +6854,7 @@
       "dlc_name": null,
       "manufacturer": "Acura",
       "model": "Integra A-Spec",
+      "rarity": "Rare",
       "year": 2023
     },
     "3728": {
@@ -6341,6 +6867,7 @@
       "dlc_name": null,
       "manufacturer": "Bentley",
       "model": "Continental GT Convertible",
+      "rarity": "Rare",
       "year": 2021
     },
     "3735": {
@@ -6353,6 +6880,7 @@
       "dlc_name": null,
       "manufacturer": "Subaru",
       "model": "BRZ",
+      "rarity": "Epic",
       "year": 2022
     },
     "3736": {
@@ -6365,6 +6893,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "Bronco Raptor",
+      "rarity": "Epic",
       "year": 2022
     },
     "3737": {
@@ -6377,6 +6906,7 @@
       "dlc_name": null,
       "manufacturer": "BMW",
       "model": "iX xDrive50",
+      "rarity": "Rare",
       "year": 2022
     },
     "3744": {
@@ -6389,6 +6919,7 @@
       "dlc_name": null,
       "manufacturer": "Formula Drift",
       "model": "#64 Forsberg Racing Nissan Z",
+      "rarity": "Epic",
       "year": 2023
     },
     "3745": {
@@ -6401,6 +6932,7 @@
       "dlc_name": null,
       "manufacturer": "Audi",
       "model": "R8 V10 performance",
+      "rarity": "Rare",
       "year": 2020
     },
     "3750": {
@@ -6413,6 +6945,7 @@
       "dlc_name": null,
       "manufacturer": "Mitsubishi",
       "model": "Montero Exceed 2800 TD",
+      "rarity": "Rare",
       "year": 1995
     },
     "3753": {
@@ -6425,6 +6958,7 @@
       "dlc_name": null,
       "manufacturer": "Lamborghini",
       "model": "Huracán Tecnica",
+      "rarity": "Legendary",
       "year": 2022
     },
     "3755": {
@@ -6437,6 +6971,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "Supervan 4",
+      "rarity": "Rare",
       "year": 2022
     },
     "3759": {
@@ -6449,6 +6984,7 @@
       "dlc_name": null,
       "manufacturer": "Lamborghini",
       "model": "Huracán EVO Spyder",
+      "rarity": "Rare",
       "year": 2022
     },
     "3760": {
@@ -6461,6 +6997,7 @@
       "dlc_name": null,
       "manufacturer": "Porsche",
       "model": "718 Cayman GT4 RS",
+      "rarity": "Epic",
       "year": 2022
     },
     "3761": {
@@ -6473,6 +7010,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "GR86",
+      "rarity": "Common",
       "year": 2022
     },
     "3763": {
@@ -6485,6 +7023,7 @@
       "dlc_name": null,
       "manufacturer": "BMW",
       "model": "M2",
+      "rarity": "Rare",
       "year": 2023
     },
     "3764": {
@@ -6497,6 +7036,7 @@
       "dlc_name": null,
       "manufacturer": "BMW",
       "model": "M5 CS",
+      "rarity": "Rare",
       "year": 2022
     },
     "3766": {
@@ -6509,6 +7049,7 @@
       "dlc_name": null,
       "manufacturer": "Chevrolet",
       "model": "Corvette Z06",
+      "rarity": "Epic",
       "year": 2023
     },
     "3767": {
@@ -6521,6 +7062,7 @@
       "dlc_name": null,
       "manufacturer": "Acura",
       "model": "NSX Type S",
+      "rarity": "Epic",
       "year": 2022
     },
     "3771": {
@@ -6533,6 +7075,7 @@
       "dlc_name": null,
       "manufacturer": "Chevrolet",
       "model": "Corvette E-Ray",
+      "rarity": "Epic",
       "year": 2024
     },
     "3773": {
@@ -6545,6 +7088,7 @@
       "dlc_name": null,
       "manufacturer": "Honda",
       "model": "Civic Type R",
+      "rarity": "Rare",
       "year": 2023
     },
     "3774": {
@@ -6557,10 +7101,11 @@
       "dlc_name": null,
       "manufacturer": "Lamborghini",
       "model": "Countach LPI 800-4",
+      "rarity": "Legendary",
       "year": 2021
     },
     "3775": {
-      "name": "2022 Lamborghini Aventador LP 780-4 Ultimae",
+      "name": "2021 Lamborghini Aventador LP 780-4 Ultimae",
       "id": "3775",
       "acquisition": "Seasonal",
       "car_type": "Hypercars",
@@ -6569,7 +7114,8 @@
       "dlc_name": null,
       "manufacturer": "Lamborghini",
       "model": "Aventador LP 780-4 Ultimae",
-      "year": 2022
+      "rarity": "Legendary",
+      "year": 2021
     },
     "3781": {
       "name": "2023 Porsche 911 GT3 RS",
@@ -6581,6 +7127,7 @@
       "dlc_name": null,
       "manufacturer": "Porsche",
       "model": "911 GT3 RS",
+      "rarity": "Epic",
       "year": 2023
     },
     "3783": {
@@ -6593,6 +7140,7 @@
       "dlc_name": null,
       "manufacturer": "Volkswagen",
       "model": "Rallye Golf",
+      "rarity": "Rare",
       "year": 1989
     },
     "3785": {
@@ -6605,6 +7153,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "Soarer 2.5 GT-T",
+      "rarity": "Rare",
       "year": 1997
     },
     "3789": {
@@ -6617,6 +7166,7 @@
       "dlc_name": null,
       "manufacturer": "Wuling",
       "model": "Hongguang Mini EV",
+      "rarity": "Rare",
       "year": 2022
     },
     "3795": {
@@ -6629,6 +7179,7 @@
       "dlc_name": null,
       "manufacturer": "Meyers",
       "model": "Manx 2.0",
+      "rarity": "Epic",
       "year": 2023
     },
     "3798": {
@@ -6641,6 +7192,7 @@
       "dlc_name": null,
       "manufacturer": "Mazda",
       "model": "MX-5 Cup",
+      "rarity": "Epic",
       "year": 2017
     },
     "3811": {
@@ -6653,6 +7205,7 @@
       "dlc_name": null,
       "manufacturer": "Lucid",
       "model": "Air Sapphire",
+      "rarity": "Rare",
       "year": 2024
     },
     "3819": {
@@ -6665,6 +7218,7 @@
       "dlc_name": null,
       "manufacturer": "Subaru",
       "model": "WRX",
+      "rarity": "Epic",
       "year": 2022
     },
     "3823": {
@@ -6677,6 +7231,7 @@
       "dlc_name": null,
       "manufacturer": "Mazda",
       "model": "MX-5 Miata RF",
+      "rarity": "Epic",
       "year": 2022
     },
     "3827": {
@@ -6689,6 +7244,7 @@
       "dlc_name": null,
       "manufacturer": "Hyundai",
       "model": "IONIQ 5 N",
+      "rarity": "Rare",
       "year": 2023
     },
     "3829": {
@@ -6701,6 +7257,7 @@
       "dlc_name": null,
       "manufacturer": "Hyundai",
       "model": "N Vision 74",
+      "rarity": "Rare",
       "year": 2022
     },
     "3839": {
@@ -6713,10 +7270,11 @@
       "dlc_name": "Car Pass",
       "manufacturer": "Mercedes-AMG",
       "model": "GT 63 4Matic+",
+      "rarity": "Rare",
       "year": 2024
     },
     "3840": {
-      "name": "2022 Lamborghini Huracán Sterrato",
+      "name": "2023 Lamborghini Huracán Sterrato",
       "id": "3840",
       "acquisition": "Collection Journal, Seasonal",
       "car_type": "Rally Monsters",
@@ -6725,7 +7283,8 @@
       "dlc_name": null,
       "manufacturer": "Lamborghini",
       "model": "Huracán Sterrato",
-      "year": 2022
+      "rarity": "Legendary",
+      "year": 2023
     },
     "3846": {
       "name": "2024 Ford Mustang GT",
@@ -6737,6 +7296,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "Mustang GT",
+      "rarity": "Epic",
       "year": 2024
     },
     "3847": {
@@ -6749,6 +7309,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "Mustang Dark Horse",
+      "rarity": "Epic",
       "year": 2024
     },
     "3848": {
@@ -6761,6 +7322,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "Camry TRD",
+      "rarity": "Epic",
       "year": 2023
     },
     "3849": {
@@ -6773,6 +7335,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "F-150 Raptor R",
+      "rarity": "Epic",
       "year": 2023
     },
     "3850": {
@@ -6785,6 +7348,7 @@
       "dlc_name": null,
       "manufacturer": "Dodge",
       "model": "Durango SRT Hellcat",
+      "rarity": "Epic",
       "year": 2021
     },
     "3851": {
@@ -6797,6 +7361,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "Sera",
+      "rarity": "Rare",
       "year": 1991
     },
     "3852": {
@@ -6809,6 +7374,7 @@
       "dlc_name": null,
       "manufacturer": "Honda",
       "model": "Beat",
+      "rarity": "Rare",
       "year": 1991
     },
     "3854": {
@@ -6821,6 +7387,7 @@
       "dlc_name": null,
       "manufacturer": "Autozam",
       "model": "AZ-1",
+      "rarity": "Rare",
       "year": 1993
     },
     "3855": {
@@ -6833,6 +7400,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "Figaro",
+      "rarity": "TreasureCar",
       "year": 1991
     },
     "3856": {
@@ -6845,10 +7413,11 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "Be-1",
+      "rarity": "Epic",
       "year": 1987
     },
     "3857": {
-      "name": "1990 Eunos Cosmos",
+      "name": "1990 Eunos Cosmo",
       "id": "3857",
       "acquisition": "Autoshow DLC",
       "car_type": "Retro Sports Cars",
@@ -6856,7 +7425,8 @@
       "dlc": true,
       "dlc_name": "Car Pass",
       "manufacturer": "Eunos",
-      "model": "Cosmos",
+      "model": "Cosmo",
+      "rarity": "Rare",
       "year": 1990
     },
     "3858": {
@@ -6869,6 +7439,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "Stagea RS Four V",
+      "rarity": "Epic",
       "year": 1997
     },
     "3859": {
@@ -6881,6 +7452,7 @@
       "dlc_name": null,
       "manufacturer": "Honda",
       "model": "City E II",
+      "rarity": "Epic",
       "year": 1984
     },
     "3860": {
@@ -6893,6 +7465,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "S-Cargo",
+      "rarity": "Rare",
       "year": 1989
     },
     "3865": {
@@ -6905,6 +7478,7 @@
       "dlc_name": null,
       "manufacturer": "Honda",
       "model": "Acty",
+      "rarity": "Common",
       "year": 1994
     },
     "3880": {
@@ -6917,6 +7491,7 @@
       "dlc_name": "Car Pass",
       "manufacturer": "Toyota",
       "model": "GR Corolla",
+      "rarity": "Rare",
       "year": 2023
     },
     "3886": {
@@ -6929,6 +7504,7 @@
       "dlc_name": null,
       "manufacturer": "Mitsubishi",
       "model": "Lancer Evolution III GSR",
+      "rarity": "TreasureCar",
       "year": 1995
     },
     "3891": {
@@ -6941,6 +7517,7 @@
       "dlc_name": null,
       "manufacturer": "Lamborghini",
       "model": "Revuelto",
+      "rarity": "Legendary",
       "year": 2024
     },
     "3895": {
@@ -6953,6 +7530,7 @@
       "dlc_name": null,
       "manufacturer": "Mercedes-AMG",
       "model": "SLC 43 Final Edition",
+      "rarity": "Rare",
       "year": 2020
     },
     "3903": {
@@ -6965,6 +7543,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "Fiesta ST",
+      "rarity": "Common",
       "year": 2023
     },
     "3904": {
@@ -6977,6 +7556,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "Focus ST",
+      "rarity": "Common",
       "year": 2022
     },
     "3908": {
@@ -6989,6 +7569,7 @@
       "dlc_name": null,
       "manufacturer": "Honda",
       "model": "e",
+      "rarity": "Common",
       "year": 2022
     },
     "3910": {
@@ -7001,6 +7582,7 @@
       "dlc_name": null,
       "manufacturer": "Porsche",
       "model": "911 Rallye",
+      "rarity": "Epic",
       "year": 2023
     },
     "3914": {
@@ -7013,6 +7595,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "Chaser GT Twin Turbo",
+      "rarity": "Rare",
       "year": 1991
     },
     "3917": {
@@ -7025,6 +7608,7 @@
       "dlc_name": "Car Pass",
       "manufacturer": "Audi",
       "model": "R8 Coupé V10 GT RWD",
+      "rarity": "Epic",
       "year": 2023
     },
     "3918": {
@@ -7037,6 +7621,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "Gloria Gran Turismo",
+      "rarity": "Rare",
       "year": 1995
     },
     "3921": {
@@ -7049,6 +7634,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "Z NISMO",
+      "rarity": "Epic",
       "year": 2024
     },
     "3928": {
@@ -7061,6 +7647,7 @@
       "dlc_name": null,
       "manufacturer": "Hyundai",
       "model": "i20 N",
+      "rarity": "Rare",
       "year": 2021
     },
     "3929": {
@@ -7073,6 +7660,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "PAO",
+      "rarity": "BarnFind",
       "year": 1989
     },
     "3933": {
@@ -7085,6 +7673,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "Chaser 2.5 Tourer V",
+      "rarity": "Rare",
       "year": 1997
     },
     "3937": {
@@ -7097,6 +7686,7 @@
       "dlc_name": null,
       "manufacturer": "Honda",
       "model": "N600",
+      "rarity": "Common",
       "year": 1970
     },
     "3950": {
@@ -7109,6 +7699,7 @@
       "dlc_name": "Italian Passion Car Pack",
       "manufacturer": "Ferrari",
       "model": "275 GTB4 Spider",
+      "rarity": "Epic",
       "year": 1967
     },
     "3953": {
@@ -7121,6 +7712,7 @@
       "dlc_name": null,
       "manufacturer": "Porsche",
       "model": "911 Turbo S",
+      "rarity": "Rare",
       "year": 2023
     },
     "3954": {
@@ -7133,6 +7725,7 @@
       "dlc_name": null,
       "manufacturer": "Chevrolet",
       "model": "Camaro ZL1",
+      "rarity": "Rare",
       "year": 2024
     },
     "3955": {
@@ -7145,6 +7738,7 @@
       "dlc_name": null,
       "manufacturer": "Ram",
       "model": "1500 TRX",
+      "rarity": "Common",
       "year": 2024
     },
     "3958": {
@@ -7157,6 +7751,7 @@
       "dlc_name": "Car Pass",
       "manufacturer": "Dodge",
       "model": "Challenger SRT Demon 170",
+      "rarity": "Epic",
       "year": 2023
     },
     "3959": {
@@ -7169,6 +7764,7 @@
       "dlc_name": null,
       "manufacturer": "Dodge",
       "model": "Challenger SRT Super Stock",
+      "rarity": "Rare",
       "year": 2022
     },
     "3960": {
@@ -7181,6 +7777,7 @@
       "dlc_name": null,
       "manufacturer": "Subaru",
       "model": "Vivio RX-R",
+      "rarity": "Epic",
       "year": 1994
     },
     "3964": {
@@ -7193,6 +7790,7 @@
       "dlc_name": "Car Pass",
       "manufacturer": "Toyota",
       "model": "Prius Prime XSE Premium",
+      "rarity": "Common",
       "year": 2024
     },
     "3978": {
@@ -7205,6 +7803,7 @@
       "dlc_name": null,
       "manufacturer": "Fiat",
       "model": "Panda",
+      "rarity": "Common",
       "year": 1987
     },
     "3980": {
@@ -7217,6 +7816,7 @@
       "dlc_name": "Car Pass",
       "manufacturer": "Renault",
       "model": "Sport Spider",
+      "rarity": "Rare",
       "year": 1998
     },
     "3983": {
@@ -7229,6 +7829,7 @@
       "dlc_name": null,
       "manufacturer": "BMW",
       "model": "X6 M Competition",
+      "rarity": "Epic",
       "year": 2024
     },
     "3999": {
@@ -7241,6 +7842,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "Silvia Spec-R",
+      "rarity": "Common",
       "year": 2002
     },
     "4002": {
@@ -7253,6 +7855,7 @@
       "dlc_name": null,
       "manufacturer": "Lamborghini",
       "model": "Temerario",
+      "rarity": "Legendary",
       "year": 2024
     },
     "4034": {
@@ -7265,6 +7868,7 @@
       "dlc_name": "Car Pass",
       "manufacturer": "Honda",
       "model": "Z GT",
+      "rarity": "Common",
       "year": 1972
     },
     "4038": {
@@ -7277,6 +7881,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "Altezza RS200 Z EDITION",
+      "rarity": "Rare",
       "year": 1999
     },
     "4055": {
@@ -7289,6 +7894,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "Starlet Glanza V",
+      "rarity": "Common",
       "year": 1996
     },
     "4057": {
@@ -7301,6 +7907,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "Skyline GT-R V-Spec",
+      "rarity": "Rare",
       "year": 1997
     },
     "4067": {
@@ -7313,6 +7920,7 @@
       "dlc_name": null,
       "manufacturer": "Bentley",
       "model": "Continental GT Speed",
+      "rarity": "Rare",
       "year": 2025
     },
     "4069": {
@@ -7325,6 +7933,7 @@
       "dlc_name": null,
       "manufacturer": "BMW",
       "model": "M3",
+      "rarity": "Rare",
       "year": 1988
     },
     "4081": {
@@ -7337,6 +7946,7 @@
       "dlc_name": "Car Pass",
       "manufacturer": "Koenigsegg",
       "model": "Gemera",
+      "rarity": "Epic",
       "year": 2024
     },
     "4084": {
@@ -7349,6 +7959,7 @@
       "dlc_name": "Car Pass",
       "manufacturer": "Datsun",
       "model": "#269 Attacking the Clock Racing 240Z 'All Carbon Hill Climb Beast'",
+      "rarity": "Epic",
       "year": 1972
     },
     "4085": {
@@ -7361,6 +7972,7 @@
       "dlc_name": "Time Attack Car Pack",
       "manufacturer": "Mitsubishi",
       "model": "#269 Attacking the Clock Racing Minicab Time Attack",
+      "rarity": "Epic",
       "year": 1990
     },
     "4086": {
@@ -7373,6 +7985,7 @@
       "dlc_name": "Car Pass",
       "manufacturer": "Porsche",
       "model": "Macan GTS",
+      "rarity": "Rare",
       "year": 2025
     },
     "4090": {
@@ -7385,6 +7998,7 @@
       "dlc_name": null,
       "manufacturer": "Mitsubishi",
       "model": "Lancer Evolution VI GSR TM Edition",
+      "rarity": "Rare",
       "year": 2001
     },
     "4094": {
@@ -7397,6 +8011,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "GT-R Nismo",
+      "rarity": "Epic",
       "year": 2024
     },
     "4114": {
@@ -7409,6 +8024,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "Skyline GT-R",
+      "rarity": "Rare",
       "year": 1992
     },
     "4118": {
@@ -7421,6 +8037,7 @@
       "dlc_name": "Car Pass",
       "manufacturer": "McLaren",
       "model": "W1",
+      "rarity": "Legendary",
       "year": 2025
     },
     "4119": {
@@ -7433,6 +8050,7 @@
       "dlc_name": "Car Pass",
       "manufacturer": "Nissan",
       "model": "Skyline GT-R 40th Anniversary",
+      "rarity": "Legendary",
       "year": 1998
     },
     "4122": {
@@ -7445,6 +8063,7 @@
       "dlc_name": null,
       "manufacturer": "BMW",
       "model": "M4 CS",
+      "rarity": "Epic",
       "year": 2025
     },
     "4124": {
@@ -7457,6 +8076,7 @@
       "dlc_name": null,
       "manufacturer": "Mercedes-Benz",
       "model": "G65 AMG (Traffic)",
+      "rarity": "Common",
       "year": 2013
     },
     "4125": {
@@ -7469,6 +8089,7 @@
       "dlc_name": null,
       "manufacturer": "Honda",
       "model": "Acty (Traffic)",
+      "rarity": "Common",
       "year": 1994
     },
     "4126": {
@@ -7481,6 +8102,7 @@
       "dlc_name": null,
       "manufacturer": "Honda",
       "model": "e (Traffic)",
+      "rarity": "Common",
       "year": 2022
     },
     "4127": {
@@ -7493,6 +8115,7 @@
       "dlc_name": null,
       "manufacturer": "Mitsubishi",
       "model": "Pajero (Traffic)",
+      "rarity": "Common",
       "year": 1995
     },
     "4128": {
@@ -7505,6 +8128,7 @@
       "dlc_name": null,
       "manufacturer": "Subaru",
       "model": "WRX (Traffic)",
+      "rarity": "Common",
       "year": 2022
     },
     "4129": {
@@ -7517,6 +8141,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "Stagea (Traffic)",
+      "rarity": "Common",
       "year": 1997
     },
     "4144": {
@@ -7529,6 +8154,7 @@
       "dlc_name": null,
       "manufacturer": "Mazda",
       "model": "RX-7 Type R",
+      "rarity": "Rare",
       "year": 1992
     },
     "4145": {
@@ -7541,6 +8167,7 @@
       "dlc_name": "Car Pass",
       "manufacturer": "Mazda",
       "model": "#123 Mad Mike 808 Wagon 'FURSTY'",
+      "rarity": "Legendary",
       "year": 1974
     },
     "4147": {
@@ -7553,10 +8180,11 @@
       "dlc_name": "Italian Passion Car Pack",
       "manufacturer": "Alfa Romeo",
       "model": "Giulia GTAm",
+      "rarity": "Rare",
       "year": 2021
     },
     "4156": {
-      "name": "2025 Ferrari F80",
+      "name": "2024 Ferrari F80",
       "id": "4156",
       "acquisition": "Autoshow DLC",
       "car_type": "Hypercars",
@@ -7565,7 +8193,8 @@
       "dlc_name": "Italian Passion Car Pack",
       "manufacturer": "Ferrari",
       "model": "F80",
-      "year": 2025
+      "rarity": "Legendary",
+      "year": 2024
     },
     "4158": {
       "name": "2010 Lexus LFA Forza Edition",
@@ -7577,6 +8206,7 @@
       "dlc_name": null,
       "manufacturer": "Lexus",
       "model": "LFA Forza Edition",
+      "rarity": "HorizonEdition",
       "year": 2010
     },
     "4160": {
@@ -7589,6 +8219,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "S-Cargo Forza Edition",
+      "rarity": "HorizonEdition",
       "year": 1989
     },
     "4162": {
@@ -7601,10 +8232,11 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "Sprinter Trueno GT Apex Forza Edition",
+      "rarity": "HorizonEdition",
       "year": 1985
     },
     "4163": {
-      "name": "2013 Wuling Sunshine S Forza Edition",
+      "name": "2020 Wuling Sunshine S Forza Edition",
       "id": "4163",
       "acquisition": "Wheelspin, Seasonal",
       "car_type": "Track Toys",
@@ -7613,7 +8245,8 @@
       "dlc_name": null,
       "manufacturer": "Wuling",
       "model": "Sunshine S Forza Edition",
-      "year": 2013
+      "rarity": "HorizonEdition",
+      "year": 2020
     },
     "4164": {
       "name": "2022 Subaru BRZ Forza Edition",
@@ -7625,6 +8258,7 @@
       "dlc_name": null,
       "manufacturer": "Subaru",
       "model": "BRZ Forza Edition",
+      "rarity": "HorizonEdition",
       "year": 2022
     },
     "4165": {
@@ -7637,6 +8271,7 @@
       "dlc_name": null,
       "manufacturer": "Mazda",
       "model": "RX-3 Forza Edition",
+      "rarity": "HorizonEdition",
       "year": 1973
     },
     "4166": {
@@ -7649,6 +8284,7 @@
       "dlc_name": null,
       "manufacturer": "BMW",
       "model": "M2 Forza Edition",
+      "rarity": "HorizonEdition",
       "year": 2023
     },
     "4167": {
@@ -7661,6 +8297,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "GT-R Black Edition (R35) Forza Edition",
+      "rarity": "HorizonEdition",
       "year": 2012
     },
     "4168": {
@@ -7673,6 +8310,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "Mustang GT 2+2 Fastback Forza Edition",
+      "rarity": "HorizonEdition",
       "year": 1968
     },
     "4169": {
@@ -7685,6 +8323,7 @@
       "dlc_name": null,
       "manufacturer": "Mercedes-Benz",
       "model": "190 E 2.5-16 Evolution II Forza Edition",
+      "rarity": "HorizonEdition",
       "year": 1990
     },
     "4171": {
@@ -7697,6 +8336,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "F-150 XLT Lariat Forza Edition",
+      "rarity": "HorizonEdition",
       "year": 1986
     },
     "4175": {
@@ -7709,6 +8349,7 @@
       "dlc_name": null,
       "manufacturer": "Ford",
       "model": "Super Duty F-450 DRW PLATINUM Forza Edition",
+      "rarity": "HorizonEdition",
       "year": 2020
     },
     "4179": {
@@ -7721,6 +8362,7 @@
       "dlc_name": "Car Pass",
       "manufacturer": "Nissan",
       "model": "#12 Skyline GT-R (BNR32 Gr.A) JTC",
+      "rarity": "Legendary",
       "year": 1990
     },
     "4181": {
@@ -7733,6 +8375,7 @@
       "dlc_name": "Car Pass",
       "manufacturer": "Nissan",
       "model": "240RS",
+      "rarity": "Rare",
       "year": 1983
     },
     "4188": {
@@ -7745,6 +8388,7 @@
       "dlc_name": "Car Pass",
       "manufacturer": "Datsun",
       "model": "240Z #5 Rallye",
+      "rarity": "Legendary",
       "year": 1972
     },
     "4197": {
@@ -7757,6 +8401,7 @@
       "dlc_name": null,
       "manufacturer": "Mazda",
       "model": "MX-5 Miata Forza Edition",
+      "rarity": "HorizonEdition",
       "year": 1994
     },
     "4198": {
@@ -7769,6 +8414,7 @@
       "dlc_name": "VIP",
       "manufacturer": "Dodge",
       "model": "Viper GTS ACR Forza Edition",
+      "rarity": "HorizonEdition",
       "year": 1999
     },
     "4199": {
@@ -7781,6 +8427,7 @@
       "dlc_name": "VIP",
       "manufacturer": "Toyota",
       "model": "Tacoma TRD Pro Forza Edition",
+      "rarity": "HorizonEdition",
       "year": 2019
     },
     "4200": {
@@ -7793,6 +8440,7 @@
       "dlc_name": "VIP",
       "manufacturer": "Lotus",
       "model": "Evija Forza Edition",
+      "rarity": "HorizonEdition",
       "year": 2020
     },
     "4205": {
@@ -7805,6 +8453,7 @@
       "dlc_name": "Car Pass",
       "manufacturer": "Nissan",
       "model": "Patrol",
+      "rarity": "Common",
       "year": 1972
     },
     "4210": {
@@ -7817,6 +8466,7 @@
       "dlc_name": null,
       "manufacturer": "Lotus",
       "model": "Scura Motorsports Exige WTAC",
+      "rarity": "Legendary",
       "year": 2018
     },
     "4211": {
@@ -7829,6 +8479,7 @@
       "dlc_name": "Time Attack Car Pack",
       "manufacturer": "Honda",
       "model": "#19 101 Motorsport CRX WTAC",
+      "rarity": "Epic",
       "year": 1990
     },
     "4212": {
@@ -7841,6 +8492,7 @@
       "dlc_name": "Time Attack Car Pack",
       "manufacturer": "Nissan",
       "model": "#32 Skyline WTAC 'Xtreme GTR'",
+      "rarity": "Epic",
       "year": 1993
     },
     "4213": {
@@ -7853,6 +8505,7 @@
       "dlc_name": "Time Attack Car Pack",
       "manufacturer": "Nissan",
       "model": "#36 Dream Project S15 Silvia WTAC",
+      "rarity": "Epic",
       "year": 2000
     },
     "4214": {
@@ -7865,6 +8518,7 @@
       "dlc_name": "Time Attack Car Pack",
       "manufacturer": "Toyota",
       "model": "J&J Motorsport Supra WTAC",
+      "rarity": "Epic",
       "year": 1995
     },
     "4216": {
@@ -7877,6 +8531,7 @@
       "dlc_name": null,
       "manufacturer": "Honda",
       "model": "Acty (RakuRaku Express)",
+      "rarity": "Common",
       "year": 1994
     },
     "4221": {
@@ -7889,6 +8544,7 @@
       "dlc_name": null,
       "manufacturer": "GR",
       "model": "GT Prototype",
+      "rarity": "Legendary",
       "year": 2025
     },
     "4222": {
@@ -7901,6 +8557,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "Silvia K's",
+      "rarity": "Common",
       "year": 1989
     },
     "4223": {
@@ -7913,6 +8570,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "Skyline GT-R V Spec II",
+      "rarity": "Rare",
       "year": 2000
     },
     "4231": {
@@ -7925,6 +8583,7 @@
       "dlc_name": "Time Attack Car Pack",
       "manufacturer": "Honda",
       "model": "#52 Evasive Motorsports S2000 WTAC",
+      "rarity": "Epic",
       "year": 2004
     },
     "4232": {
@@ -7937,6 +8596,7 @@
       "dlc_name": null,
       "manufacturer": "Porsche",
       "model": "Cayman GT3 WTAC",
+      "rarity": "Epic",
       "year": 2005
     },
     "4234": {
@@ -7949,6 +8609,7 @@
       "dlc_name": "Car Pass",
       "manufacturer": "Honda",
       "model": "Civic Type R (FD2)",
+      "rarity": "Rare",
       "year": 2008
     },
     "4238": {
@@ -7961,6 +8622,7 @@
       "dlc_name": "Car Pass",
       "manufacturer": "Nissan",
       "model": "Skyline 2000 Turbo RS",
+      "rarity": "Common",
       "year": 1983
     },
     "4250": {
@@ -7973,6 +8635,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "Sprinter (Touge Edition)",
+      "rarity": "Legendary",
       "year": 1985
     },
     "4251": {
@@ -7985,6 +8648,7 @@
       "dlc_name": null,
       "manufacturer": "Honda",
       "model": "S2000 (Touge Edition)",
+      "rarity": "Legendary",
       "year": 2003
     },
     "4252": {
@@ -7997,6 +8661,7 @@
       "dlc_name": null,
       "manufacturer": "Subaru",
       "model": "Impreza 22B (Touge Edition)",
+      "rarity": "Legendary",
       "year": 1998
     },
     "4254": {
@@ -8009,6 +8674,7 @@
       "dlc_name": "Time Attack Car Pack",
       "manufacturer": "Honda",
       "model": "#33 Integra WTAC",
+      "rarity": "Epic",
       "year": 2001
     },
     "4255": {
@@ -8021,6 +8687,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "Crown Super Deluxe Taxi",
+      "rarity": "Common",
       "year": 2005
     },
     "4257": {
@@ -8033,6 +8700,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "JPN Taxi",
+      "rarity": "Common",
       "year": 2017
     },
     "4259": {
@@ -8045,6 +8713,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "86 Stories",
+      "rarity": "Legendary",
       "year": 2013
     },
     "4260": {
@@ -8057,6 +8726,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "GT-R Nismo (Unobtainable)",
+      "rarity": "Epic",
       "year": 2024
     },
     "4261": {
@@ -8069,6 +8739,7 @@
       "dlc_name": null,
       "manufacturer": "Porsche",
       "model": "911 GT2 (Unobtainable)",
+      "rarity": "Epic",
       "year": 1995
     },
     "4263": {
@@ -8081,6 +8752,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "Scallop (Unobtainable)",
+      "rarity": "Legendary",
       "year": 2026
     },
     "4264": {
@@ -8093,6 +8765,7 @@
       "dlc_name": "Welcome Pack",
       "manufacturer": "Ferrari",
       "model": "FXX-K Evo Welcome Pack",
+      "rarity": "Legendary",
       "year": 2018
     },
     "4265": {
@@ -8105,6 +8778,7 @@
       "dlc_name": "Welcome Pack",
       "manufacturer": "Mercedes-AMG",
       "model": "GT Black Series Welcome Pack",
+      "rarity": "Legendary",
       "year": 2020
     },
     "4266": {
@@ -8117,6 +8791,7 @@
       "dlc_name": "Welcome Pack",
       "manufacturer": "BMW",
       "model": "M4 Competition Coupé Welcome Pack",
+      "rarity": "Legendary",
       "year": 2021
     },
     "4267": {
@@ -8129,6 +8804,7 @@
       "dlc_name": "Welcome Pack",
       "manufacturer": "Mitsubishi",
       "model": "Lancer Evolution VIII MR Welcome Pack",
+      "rarity": "Legendary",
       "year": 2004
     },
     "4268": {
@@ -8141,6 +8817,7 @@
       "dlc_name": "Welcome Pack",
       "manufacturer": "Ford",
       "model": "F-150 Raptor R Welcome Pack",
+      "rarity": "Legendary",
       "year": 2023
     },
     "4270": {
@@ -8153,6 +8830,7 @@
       "dlc_name": "Car Pass",
       "manufacturer": "Ford",
       "model": "Mustang GTD",
+      "rarity": "Epic",
       "year": 2025
     },
     "4277": {
@@ -8165,6 +8843,7 @@
       "dlc_name": "Time Attack Car Pack",
       "manufacturer": "Honda",
       "model": "#21 Hardrace/JDMYard Civic WTAC",
+      "rarity": "Epic",
       "year": 1992
     },
     "4278": {
@@ -8177,6 +8856,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "Land Cruiser",
+      "rarity": "Rare",
       "year": 2025
     },
     "4282": {
@@ -8189,6 +8869,7 @@
       "dlc_name": "Car Pass",
       "manufacturer": "Volkswagen",
       "model": "Electric Buzz",
+      "rarity": "Common",
       "year": 2025
     },
     "4287": {
@@ -8201,6 +8882,7 @@
       "dlc_name": null,
       "manufacturer": "Subaru",
       "model": "Vivio RX-R Forza Edition",
+      "rarity": "HorizonEdition",
       "year": 1994
     },
     "4303": {
@@ -8213,6 +8895,7 @@
       "dlc_name": null,
       "manufacturer": "Nissan",
       "model": "GT-R Black Edition R35 (Touge Edition)",
+      "rarity": "Legendary",
       "year": 2012
     },
     "4311": {
@@ -8225,6 +8908,7 @@
       "dlc_name": null,
       "manufacturer": "Citroën",
       "model": "Ami",
+      "rarity": "Rare",
       "year": 2025
     },
     "4313": {
@@ -8237,6 +8921,7 @@
       "dlc_name": null,
       "manufacturer": "Porsche",
       "model": "#3 917 LH Forza Edition",
+      "rarity": "HorizonEdition",
       "year": 1970
     },
     "4315": {
@@ -8249,6 +8934,7 @@
       "dlc_name": "Partnership DLC",
       "manufacturer": "Peel",
       "model": "P50 Trolli Edition",
+      "rarity": "Legendary",
       "year": 1962
     },
     "4332": {
@@ -8261,6 +8947,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "Crown Taxi (Traffic)",
+      "rarity": "Common",
       "year": 2005
     },
     "4333": {
@@ -8273,6 +8960,7 @@
       "dlc_name": null,
       "manufacturer": "Toyota",
       "model": "JPN Taxi (Traffic)",
+      "rarity": "Common",
       "year": 2017
     },
     "4341": {
@@ -8285,6 +8973,7 @@
       "dlc_name": "Preorder Bonus",
       "manufacturer": "Ferrari",
       "model": "J50 Preorder Car",
+      "rarity": "Legendary",
       "year": 2017
     },
     "4342": {
@@ -8297,6 +8986,7 @@
       "dlc_name": "Partnership DLC",
       "manufacturer": "Toyota",
       "model": "Sports 800 Fanta Edition",
+      "rarity": "Rare",
       "year": 1965
     },
     "4354": {
@@ -8309,6 +8999,7 @@
       "dlc_name": null,
       "manufacturer": "Jaguar",
       "model": "XJ-S Forza Edition",
+      "rarity": "HorizonEdition",
       "year": 1990
     }
   }
