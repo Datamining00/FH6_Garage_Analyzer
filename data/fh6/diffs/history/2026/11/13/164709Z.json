@@ -1,0 +1,15 @@
+{
+  "schema": "fh6_vehicle_field_diff_v1",
+  "generated_at": "2026-11-13T16:47:09Z",
+  "previous_normalized_sha256": "7b6cf8d403064eb6139712314bb2cbdfc33894fe83523675dec43a1f07e2b912",
+  "current_normalized_sha256": "7b6cf8d403064eb6139712314bb2cbdfc33894fe83523675dec43a1f07e2b912",
+  "changed": false,
+  "counts": {
+    "added": 0,
+    "removed": 0,
+    "modified": 0
+  },
+  "added": {},
+  "removed": {},
+  "modified": {}
+}
