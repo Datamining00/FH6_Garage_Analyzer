@@ -2,9 +2,9 @@
   "_meta": {
     "updated_at": "2026-11-13.2",
     "program_update": {
-      "patch_date": "2026-11-08",
-      "version": "1.6.2",
-      "comment": "v1.6.2 업데이트",
+      "patch_date": "2026-11-15",
+      "version": "1.6.3",
+      "comment": "v1.6.3_Beta 업데이트-차고 탭 ",
       "download_url": "https://github.com/Datamining00/FH6_Garage_Analyzer/releases/latest"
     }
   },
